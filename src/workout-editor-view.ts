@@ -572,6 +572,7 @@ export class WorkoutEditorView extends ItemView {
           names.add(exercise.exerciseName);
         }
       } catch {
+        /** Suggestion-list collection should never break the editor; skip unreadable or unparseable files silently. */
         continue;
       }
     }
