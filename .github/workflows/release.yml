@@ -33,7 +33,7 @@ jobs:
 
       - name: Determine version bump
         id: bump
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           result-encoding: string
           script: |
