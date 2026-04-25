@@ -9,14 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Initial scaffold from obsidian-sample-plugin template.
+
 ### Changed
 
 ### Fixed
 
 ### Removed
-
-## [0.0.1] - 2026-04-25
-
-### Added
-
-- Initial scaffold from obsidian-sample-plugin template.
