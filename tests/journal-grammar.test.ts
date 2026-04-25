@@ -91,6 +91,14 @@ describe('journal grammar', () => {
     ]);
   });
 
+  it('parses a leading date without treating it as ignored content', () => {
+    const parsed = parseJournal(['2026-04-26', 'Squat 100 x 5', 'Plank 60s'].join('\n'));
+
+    expect(parsed.date).toBe('2026-04-26');
+    expect(parsed.warnings).toEqual([]);
+    expect(parsed.exercises.map((exercise) => exercise.rawName)).toEqual(['Squat', 'Plank']);
+  });
+
   it('parses bare slash strength rows', () => {
     const parsed = parseJournal('Bench 60 / 8 / 6');
 
