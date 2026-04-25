@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Initial scaffold from obsidian-sample-plugin template.
+- Journal importer commands and a registry bootstrap action.
 
 ### Changed
 

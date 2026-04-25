@@ -4,6 +4,7 @@ import type { ExerciseRegistry, ExerciseRegistryEntry } from '../src/exercise-re
 import {
   bootstrapFromStems,
   createRegistry,
+  mergeRegistries,
   removeEntry,
   resolve,
   upsertEntry,
@@ -65,5 +66,31 @@ describe('exercise registry', () => {
     expect(next.entries).toHaveLength(1);
     expect(next.entries.map((entry) => entry.name)).toEqual(['Plank']);
     expect(next.entries).not.toBe(original.entries);
+  });
+
+  it('merges fresh entries without replacing existing aliases', () => {
+    const existing: ExerciseRegistryEntry[] = [
+      { name: 'Squat', kind: 'strength', aliases: ['squats'] },
+    ];
+    const fresh: ExerciseRegistryEntry[] = [
+      { name: 'Squat', kind: 'strength', aliases: [] },
+      { name: 'Bench Press', kind: 'strength', aliases: [] },
+    ];
+
+    expect(mergeRegistries(existing, fresh)).toEqual([
+      { name: 'Squat', kind: 'strength', aliases: ['squats'] },
+      { name: 'Bench Press', kind: 'strength', aliases: [] },
+    ]);
+  });
+
+  it('merges fresh entries case-insensitively', () => {
+    const existing: ExerciseRegistryEntry[] = [
+      { name: 'squat', kind: 'strength', aliases: ['squats'] },
+    ];
+    const fresh: ExerciseRegistryEntry[] = [{ name: 'Squat', kind: 'strength', aliases: [] }];
+
+    expect(mergeRegistries(existing, fresh)).toEqual([
+      { name: 'squat', kind: 'strength', aliases: ['squats'] },
+    ]);
   });
 });

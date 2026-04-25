@@ -2,11 +2,14 @@ import { Notice, Plugin, TFile, normalizePath } from 'obsidian';
 
 import type { FitKitIndex, IndexDiagnostic } from './index';
 import { rebuildIndex } from './index';
+import { CreateMissingExercisesModal } from './create-missing-exercises-modal';
 import { regenerateDashboard } from './dashboard';
+import { ImportModal } from './import-modal';
 import { ParseDiagnosticsModal } from './parse-diagnostics-modal';
 import { DEFAULT_SETTINGS, FitKitSettingTab, type FitKitSettings } from './settings';
 import { dashboardPath, workoutFilename, workoutsFolder } from './settings-paths';
 import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from './workout-editor-view';
+import { parseWorkoutNote } from './workout-note-model';
 
 function formatTodayIsoDate(): string {
   const d = new Date();
@@ -120,6 +123,33 @@ export default class FitKitPlugin extends Plugin {
         return true;
       },
     });
+
+    this.addCommand({
+      id: 'fitkit-import-journal-active-file',
+      name: 'Import workout from journal note',
+      checkCallback: (checking) => {
+        const file = this.app.workspace.getActiveFile();
+        if (!(file instanceof TFile) || file.extension.toLowerCase() !== 'md') {
+          return false;
+        }
+        if (!checking) {
+          void this.openImporterForActiveFile(file);
+        }
+        return true;
+      },
+    });
+
+    this.addCommand({
+      id: 'fitkit-import-journal-paste',
+      name: 'Import workout from pasted text',
+      callback: () => {
+        new ImportModal(this, {
+          initialInput: '',
+          readOnly: false,
+          defaultFilenameDate: formatTodayIsoDate(),
+        }).open();
+      },
+    });
   }
 
   /* eslint-disable-next-line obsidianmd/detach-leaves */
@@ -138,6 +168,22 @@ export default class FitKitPlugin extends Plugin {
     if (view instanceof WorkoutEditorView) {
       await view.loadFile(file);
     }
+  }
+
+  private async openImporterForActiveFile(file: TFile): Promise<void> {
+    const text = await this.app.vault.read(file);
+    const parsed = parseWorkoutNote(text, file.path);
+    if (parsed.isWorkout && parsed.model) {
+      new CreateMissingExercisesModal(this, parsed.model).open();
+      return;
+    }
+    const stem = file.basename;
+    const defaultDate = /^\d{4}-\d{2}-\d{2}$/.test(stem) ? stem : formatTodayIsoDate();
+    new ImportModal(this, {
+      initialInput: text,
+      readOnly: false,
+      defaultFilenameDate: defaultDate,
+    }).open();
   }
 
   async loadSettings(): Promise<void> {

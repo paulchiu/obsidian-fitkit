@@ -1,6 +1,7 @@
-import { App, PluginSettingTab, Setting, normalizePath } from 'obsidian';
+import { App, Notice, PluginSettingTab, Setting, normalizePath } from 'obsidian';
 
 import type { ExerciseRegistryEntry } from './exercise-registry';
+import { bootstrapFromStems, mergeRegistries } from './exercise-registry';
 import type FitKitPlugin from './main';
 import { dashboardPath, exercisesFolder, workoutsFolder } from './settings-paths';
 
@@ -120,5 +121,28 @@ export class FitKitSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         });
       });
+
+    new Setting(containerEl).setName('Registry').setHeading();
+
+    new Setting(containerEl)
+      .setName('Bootstrap from vault')
+      .setDesc(
+        'Scan <fitnessRoot>/Exercises and add an entry per stem. Existing aliases are preserved.',
+      )
+      .addButton((button) =>
+        button.setButtonText('Bootstrap').onClick(async () => {
+          const folder = exercisesFolder(settings);
+          const stems = this.plugin.app.vault
+            .getMarkdownFiles()
+            .filter((file) => file.path.startsWith(`${folder}/`))
+            .map((file) => file.basename);
+          const fresh = bootstrapFromStems(stems);
+          const merged = mergeRegistries(settings.exerciseRegistry, fresh.entries);
+          settings.exerciseRegistry = merged;
+          await this.plugin.saveSettings();
+          new Notice(`Registry now has ${merged.length} entries.`);
+          this.display();
+        }),
+      );
   }
 }

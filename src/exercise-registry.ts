@@ -115,6 +115,19 @@ export function removeEntry(registry: ExerciseRegistry, name: string): ExerciseR
   return { entries: registry.entries.filter((entry) => entry.name !== name) };
 }
 
+export function mergeRegistries(
+  existing: ExerciseRegistryEntry[],
+  fresh: ExerciseRegistryEntry[],
+): ExerciseRegistryEntry[] {
+  const existingNames = new Set(existing.map((entry) => normalize(entry.name)));
+  return [
+    ...existing.map(cloneEntry),
+    ...fresh
+      .filter((entry) => !existingNames.has(normalize(entry.name)))
+      .map((entry) => cloneEntry(entry)),
+  ];
+}
+
 /**
  * Bootstrap a registry from exercise filename stems. Every stem becomes a
  * canonical entry with no aliases. Kind defaults to strength; duration
