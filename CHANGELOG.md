@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Dashboard strength tables now use Dataview list fields instead of text matching.
 - Journal import now accepts bare exercise rows like `Squat 100 x 5` and `Plank 60s`.
+- Journal import now treats a leading `yyyy-mm-dd` line as the workout date, resolves exercise notes from the vault when the saved registry is empty, and only saves mapping changes after a successful import.
 - Blank workout editor strength rows no longer persist as zero-weight zero-rep sets.
 - Autosave debounce settings now show the clamped fallback after invalid input.
 - Zero-rep strength sets no longer qualify as PBs.

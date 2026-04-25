@@ -1,7 +1,7 @@
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from 'obsidian';
 
 import type { ExerciseRegistryEntry } from './exercise-registry';
-import { bootstrapFromStems, mergeRegistries } from './exercise-registry';
+import { exerciseRegistryWithVaultNotes } from './exercise-registry-vault';
 import type FitKitPlugin from './main';
 import { dashboardPath, exercisesFolder, workoutsFolder } from './settings-paths';
 
@@ -133,13 +133,7 @@ export class FitKitSettingTab extends PluginSettingTab {
       )
       .addButton((button) =>
         button.setButtonText('Bootstrap').onClick(async () => {
-          const folder = exercisesFolder(settings);
-          const stems = this.plugin.app.vault
-            .getMarkdownFiles()
-            .filter((file) => file.path.startsWith(`${folder}/`))
-            .map((file) => file.basename);
-          const fresh = bootstrapFromStems(stems);
-          const merged = mergeRegistries(settings.exerciseRegistry, fresh.entries);
+          const merged = exerciseRegistryWithVaultNotes(this.plugin.app, settings);
           settings.exerciseRegistry = merged;
           await this.plugin.saveSettings();
           new Notice(`Registry now has ${merged.length} entries.`);

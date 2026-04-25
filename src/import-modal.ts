@@ -2,10 +2,17 @@ import type { App } from 'obsidian';
 import { Modal, Notice, TFile, normalizePath } from 'obsidian';
 
 import { regenerateDashboard } from './dashboard';
-import type { ExerciseKind, ExerciseRegistryEntry } from './exercise-registry';
-import { createRegistry, normalize, resolve, upsertEntry } from './exercise-registry';
+import type { ExerciseRegistryEntry } from './exercise-registry';
+import { createRegistry, normalize, resolve } from './exercise-registry';
 import type { ExerciseRegistry } from './exercise-registry';
 import { rebuildIndex, updateIndexEntry } from './index';
+import { exerciseRegistryWithVaultNotes } from './exercise-registry-vault';
+import type { ImportMappingState } from './import-mapping';
+import {
+  mappingWithParsedExercises,
+  mappingWithSelection,
+  registryWithImportMappingChanges,
+} from './import-mapping';
 import type { ParsedExercise, ParsedJournal } from './journal-grammar';
 import { parseJournal } from './journal-grammar';
 import type FitKitPlugin from './main';
@@ -13,13 +20,6 @@ import { exercisesFolder, workoutFilename, workoutsFolder } from './settings-pat
 import { ensureParentFolder } from './vault-utils';
 import type { CanonicalExercise, CanonicalWorkout } from './workout-note-serializer';
 import { serializeWorkout } from './workout-note-serializer';
-
-type MappingChoice =
-  | { kind: 'resolved'; canonicalName: string }
-  | { kind: 'create-new'; canonicalName: string; exerciseKind: ExerciseKind }
-  | { kind: 'unresolved' };
-
-type MappingState = Map<string, MappingChoice>;
 
 interface ImportModalOptions {
   initialInput: string;
@@ -34,8 +34,9 @@ export class ImportModal extends Modal {
   private readOnly: boolean;
   private defaultFilenameDate: string;
   private parsed: ParsedJournal;
-  private mapping: MappingState = new Map();
+  private mapping: ImportMappingState = new Map();
   private targetPath: string;
+  private targetPathManuallyEdited = false;
   private createMissing: boolean;
 
   private contentWrapper: HTMLElement | null = null;
@@ -58,7 +59,9 @@ export class ImportModal extends Modal {
   }
 
   onOpen(): void {
-    this.registry = createRegistry(this.plugin.settings.exerciseRegistry);
+    this.registry = createRegistry(
+      exerciseRegistryWithVaultNotes(this.plugin.app, this.plugin.settings),
+    );
 
     const { contentEl } = this;
     contentEl.empty();
@@ -96,6 +99,7 @@ export class ImportModal extends Modal {
     });
     targetInput.value = this.targetPath;
     targetInput.addEventListener('input', () => {
+      this.targetPathManuallyEdited = true;
       this.targetPath = targetInput.value.trim();
       this.renderPreview();
     });
@@ -139,13 +143,18 @@ export class ImportModal extends Modal {
   }
 
   private defaultTargetPath(): string {
-    return normalizePath(
-      `${workoutsFolder(this.plugin.settings)}/${workoutFilename(this.defaultFilenameDate)}`,
-    );
+    const date = this.parsed.date ?? this.defaultFilenameDate;
+    return normalizePath(`${workoutsFolder(this.plugin.settings)}/${workoutFilename(date)}`);
   }
 
   private recompute(): void {
     this.parsed = parseJournal(this.rawInput);
+    if (!this.targetPathManuallyEdited) {
+      this.targetPath = this.defaultTargetPath();
+      if (this.targetInput) {
+        this.targetInput.value = this.targetPath;
+      }
+    }
     this.syncMappingWithParsed();
     this.renderMapping();
     this.renderWarnings();
@@ -153,25 +162,7 @@ export class ImportModal extends Modal {
   }
 
   private syncMappingWithParsed(): void {
-    const seen = new Set<string>();
-    for (const exercise of this.parsed.exercises) {
-      const key = normalize(exercise.rawName);
-      seen.add(key);
-      if (this.mapping.has(key)) {
-        continue;
-      }
-      const resolution = resolve(this.registry, exercise.rawName);
-      if (resolution.kind === 'match') {
-        this.mapping.set(key, { kind: 'resolved', canonicalName: resolution.entry.name });
-      } else {
-        this.mapping.set(key, { kind: 'unresolved' });
-      }
-    }
-    for (const key of [...this.mapping.keys()]) {
-      if (!seen.has(key)) {
-        this.mapping.delete(key);
-      }
-    }
+    this.mapping = mappingWithParsedExercises(this.mapping, this.registry, this.parsed.exercises);
   }
 
   private renderMapping(): void {
@@ -265,55 +256,14 @@ export class ImportModal extends Modal {
     }
 
     select.addEventListener('change', () => {
-      void this.handleMappingSelection(exercise, select.value);
+      this.handleMappingSelection(exercise, select.value);
     });
   }
 
-  private async handleMappingSelection(exercise: ParsedExercise, value: string): Promise<void> {
-    const key = normalize(exercise.rawName);
-    if (value === '__unresolved__') {
-      this.mapping.set(key, { kind: 'unresolved' });
-    } else if (value === 'create-strength' || value === 'create-duration') {
-      const exerciseKind: ExerciseKind = value === 'create-duration' ? 'duration' : 'strength';
-      this.mapping.set(key, {
-        kind: 'create-new',
-        canonicalName: exercise.rawName,
-        exerciseKind,
-      });
-      await this.upsertRegistryEntry({
-        name: exercise.rawName,
-        kind: exerciseKind,
-        aliases: [],
-      });
-    } else if (value.startsWith('existing:')) {
-      const name = value.slice('existing:'.length);
-      this.mapping.set(key, { kind: 'resolved', canonicalName: name });
-      await this.persistAliasForExistingEntry(name, exercise.rawName);
-    }
+  private handleMappingSelection(exercise: ParsedExercise, value: string): void {
+    this.mapping = mappingWithSelection(this.mapping, exercise.rawName, value);
     this.renderWarnings();
     this.renderPreview();
-  }
-
-  private async persistAliasForExistingEntry(name: string, rawName: string): Promise<void> {
-    const entry = this.registry.entries.find((candidate) => candidate.name === name);
-    if (!entry) {
-      return;
-    }
-    const rawKey = normalize(rawName);
-    const knownKeys = new Set([entry.name, ...entry.aliases].map((value) => normalize(value)));
-    if (knownKeys.has(rawKey)) {
-      return;
-    }
-    await this.upsertRegistryEntry({
-      ...entry,
-      aliases: [...entry.aliases, rawName],
-    });
-  }
-
-  private async upsertRegistryEntry(entry: ExerciseRegistryEntry): Promise<void> {
-    this.registry = upsertEntry(this.registry, entry);
-    this.plugin.settings.exerciseRegistry = this.registry.entries;
-    await this.plugin.saveSettings();
   }
 
   private renderWarnings(): void {
@@ -446,8 +396,6 @@ export class ImportModal extends Modal {
       return;
     }
 
-    await this.persistNewEntries();
-
     const serialized = serializeWorkout(workout);
     const targetPath = normalizePath(this.targetPath);
     const existing = this.plugin.app.vault.getAbstractFileByPath(targetPath);
@@ -464,6 +412,7 @@ export class ImportModal extends Modal {
       await this.plugin.app.vault.create(targetPath, serialized);
     }
 
+    await this.persistMappingChanges();
     if (this.createMissing) {
       await this.createMissingExerciseNotes();
     }
@@ -473,21 +422,18 @@ export class ImportModal extends Modal {
     this.close();
   }
 
-  private async persistNewEntries(): Promise<void> {
-    for (const choice of this.mapping.values()) {
-      if (choice.kind !== 'create-new') {
-        continue;
-      }
-      const existing = this.registry.entries.find((entry) => entry.name === choice.canonicalName);
-      if (existing) {
-        continue;
-      }
-      await this.upsertRegistryEntry({
-        name: choice.canonicalName,
-        kind: choice.exerciseKind,
-        aliases: [],
-      });
+  private async persistMappingChanges(): Promise<void> {
+    const { registry: next, changed } = registryWithImportMappingChanges(
+      this.registry,
+      this.parsed.exercises,
+      this.mapping,
+    );
+    if (!changed) {
+      return;
     }
+    this.registry = next;
+    this.plugin.settings.exerciseRegistry = next.entries;
+    await this.plugin.saveSettings();
   }
 
   private async createMissingExerciseNotes(): Promise<void> {

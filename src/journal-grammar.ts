@@ -38,11 +38,13 @@ export type JournalWarning = {
 
 export type ParsedJournal = {
   name: string;
+  date: string | null;
   exercises: ParsedExercise[];
   warnings: JournalWarning[];
 };
 
 const HEADING_LINE = /^#\s+(.+?)\s*$/;
+const DATE_LINE = /^(\d{4}-\d{2}-\d{2})$/;
 const EXERCISE_H2_WIKILINK = /^##\s+\[\[([^\]]+)\]\]\s*$/;
 const EXERCISE_H2_PLAIN = /^##\s+(.+?)\s*$/;
 const EXERCISE_BARE_WIKILINK = /^\[\[([^\]]+)\]\]\s*$/;
@@ -209,6 +211,7 @@ function isPurelyNumericText(value: string): boolean {
 export function parseJournal(input: string): ParsedJournal {
   const lines = input.split(/\r?\n/);
   let name = 'Imported workout';
+  let date: string | null = null;
   let sawTitle = false;
   const exercises: ParsedExercise[] = [];
   const warnings: JournalWarning[] = [];
@@ -228,6 +231,14 @@ export function parseJournal(input: string): ParsedJournal {
       if (titleMatch && !line.startsWith('##')) {
         name = (titleMatch[1] ?? 'Imported workout').trim() || 'Imported workout';
         sawTitle = true;
+        continue;
+      }
+    }
+
+    if (!current) {
+      const dateMatch = line.match(DATE_LINE);
+      if (dateMatch) {
+        date = dateMatch[1] ?? null;
         continue;
       }
     }
@@ -283,5 +294,5 @@ export function parseJournal(input: string): ParsedJournal {
     }
   }
 
-  return { name, exercises, warnings };
+  return { name, date, exercises, warnings };
 }
