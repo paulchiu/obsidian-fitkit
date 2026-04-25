@@ -119,6 +119,7 @@ export class FitKitSettingTab extends PluginSettingTab {
         text.setValue(String(settings.autosaveDebounceMs)).onChange(async (value) => {
           const parsed = Number.parseInt(value, 10);
           settings.autosaveDebounceMs = Number.isNaN(parsed) || parsed < 0 ? 600 : parsed;
+          text.setValue(String(settings.autosaveDebounceMs));
           await this.plugin.saveSettings();
         });
       });

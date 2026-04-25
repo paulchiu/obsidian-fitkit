@@ -58,7 +58,8 @@ function stripLeadingOrdinal(line: string): string {
 
 /**
  * Try to parse a strength set row. Accepts forms `W x R`, `W × R`, `W / R`,
- * `W / R / RPE`. RPE is tolerated but dropped.
+ * and extra slash-separated numeric values. Extra slash values are tolerated
+ * but dropped.
  */
 function parseStrengthSet(line: string): SetRow | null {
   const body = stripLeadingOrdinal(line);
@@ -70,17 +71,19 @@ function parseStrengthSet(line: string): SetRow | null {
       return { kind: 'strength', weight, reps, raw: line };
     }
   }
-  const slashMatch = body.match(
-    /^(-?\d+(?:\.\d+)?)\s*\/\s*(-?\d+(?:\.\d+)?)(?:\s*\/\s*(-?\d+(?:\.\d+)?))?\s*$/,
-  );
-  if (slashMatch) {
-    const weight = Number(slashMatch[1]);
-    const reps = Number(slashMatch[2]);
+  const slashParts = body.split('/').map((part) => part.trim());
+  if (slashParts.length >= 2 && slashParts.every(isNumericToken)) {
+    const weight = Number(slashParts[0]);
+    const reps = Number(slashParts[1]);
     if (Number.isFinite(weight) && Number.isFinite(reps)) {
       return { kind: 'strength', weight, reps, raw: line };
     }
   }
   return null;
+}
+
+function isNumericToken(value: string): boolean {
+  return /^-?\d+(?:\.\d+)?$/.test(value);
 }
 
 /**
@@ -128,8 +131,18 @@ function tryMatchExerciseHeading(line: string): string | null {
 
 function tryParseInlineExerciseRow(line: string): ParsedExercise | null {
   const match = line.match(EXERCISE_INLINE_ROW);
-  const rawName = match?.[1]?.trim();
-  const rowText = match?.[2]?.trim();
+  if (match) {
+    return tryBuildInlineExercise(match[1]?.trim(), match[2]?.trim(), line);
+  }
+
+  return tryParseBareInlineExerciseRow(line);
+}
+
+function tryBuildInlineExercise(
+  rawName: string | undefined,
+  rowText: string | undefined,
+  line: string,
+): ParsedExercise | null {
   if (!rawName || !rowText) {
     return null;
   }
@@ -153,6 +166,40 @@ function tryParseInlineExerciseRow(line: string): ParsedExercise | null {
   }
 
   return null;
+}
+
+function tryParseBareInlineExerciseRow(line: string): ParsedExercise | null {
+  const candidate = matchBareInlineExerciseRow(line);
+  if (!candidate) {
+    return null;
+  }
+
+  return tryBuildInlineExercise(candidate.rawName, candidate.rowText, line);
+}
+
+function matchBareInlineExerciseRow(line: string): { rawName: string; rowText: string } | null {
+  const trimmed = line.trim();
+  const matches = [
+    trimmed.match(/^(.+?)\s+(-?\d+(?:\.\d+)?\s*[x×]\s*-?\d+(?:\.\d+)?)\s*$/i),
+    trimmed.match(/^(.+?)\s+(-?\d+(?:\.\d+)?(?:\s*\/\s*-?\d+(?:\.\d+)?)+)\s*$/),
+    trimmed.match(
+      /^(.+?)\s+(\d+(?:\.\d+)?\s*(?:s|sec|secs|second|seconds|m|min|mins|minute|minutes))\s*$/i,
+    ),
+  ];
+
+  for (const match of matches) {
+    const rawName = match?.[1]?.trim();
+    const rowText = match?.[2]?.trim();
+    if (rawName && rowText && !isPurelyNumericText(rawName)) {
+      return { rawName, rowText };
+    }
+  }
+
+  return null;
+}
+
+function isPurelyNumericText(value: string): boolean {
+  return /^[\d\s.+-]+$/.test(value.trim());
 }
 
 /**

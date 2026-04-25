@@ -116,6 +116,30 @@ describe('workout note model', () => {
     expect(semanticEqual(model, reparsed)).toBe(true);
   });
 
+  it('serializes blank strength sets without zero weight or reps', () => {
+    const serialized = serializeWorkoutNote({
+      date: '2026-04-24',
+      name: 'Blank Set',
+      sourcePath: 'blank-set.md',
+      preserveBlocks: [],
+      exercises: [
+        {
+          exerciseName: 'Squat',
+          kind: 'strength',
+          strengthSets: [
+            { set: 1, weight: 10, reps: 10 },
+            { set: 2, weight: 20, reps: 8 },
+            { set: 3 },
+          ],
+        },
+      ],
+    });
+
+    expect(serialized).toContain('- [exercise:: [[Squat]]] [set:: 3]\n');
+    expect(serialized).not.toContain('[set:: 3] [weight:: 0]');
+    expect(serialized).not.toContain('[set:: 3] [reps:: 0]');
+  });
+
   it('reports non-workout markdown without a model', () => {
     const result = parseWorkoutNote('hello world', 'x');
 

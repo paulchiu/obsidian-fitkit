@@ -92,7 +92,11 @@ function aggregateExercises(index: FitKitIndex): ExerciseAggregate[] {
         aggregate.sessionCount += 1;
         sessionExercises.add(row.exerciseName);
       }
-      if (row.bestSet && (!aggregate.bestSet || row.bestSet.e1rm > aggregate.bestSet.e1rm)) {
+      if (
+        row.bestSet &&
+        row.bestSet.reps !== 0 &&
+        (!aggregate.bestSet || row.bestSet.e1rm > aggregate.bestSet.e1rm)
+      ) {
         aggregate.bestSet = row.bestSet;
       }
     }
@@ -147,12 +151,16 @@ function dataviewQuery(exercise: ExerciseAggregate, workoutsFolderPath: string):
   }
 
   return [
-    'table without id file.link as Session, weight + " kg x " + reps as Set',
-    `from "${workoutsFolderPath}"`,
-    'flatten file.lists as item',
-    `where contains(item.text, "[exercise:: [[${exercise.exerciseName}]]]") and item.weight`,
-    'sort file.name desc',
-    'limit 12',
+    'TABLE WITHOUT ID',
+    '  file.link AS Workout,',
+    '  L.set AS Set,',
+    '  L.weight AS Weight,',
+    '  L.reps AS Reps',
+    `FROM "${workoutsFolderPath}"`,
+    'FLATTEN file.lists AS L',
+    `WHERE L.exercise = link("${exercise.exerciseName}") AND L.set`,
+    'SORT file.name DESC, L.set ASC',
+    'LIMIT 10',
   ];
 }
 

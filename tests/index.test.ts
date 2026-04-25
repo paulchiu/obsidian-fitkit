@@ -50,4 +50,27 @@ describe('index helpers', () => {
   it('returns null for empty sets', () => {
     expect(pickBestSet([])).toBeNull();
   });
+
+  it('returns null when every strength set has zero reps', () => {
+    expect(
+      pickBestSet([
+        { weight: 20, reps: 0 },
+        { weight: 30, reps: 0 },
+      ]),
+    ).toBeNull();
+  });
+
+  it('picks the best set from non-zero-rep candidates', () => {
+    expect(
+      pickBestSet([
+        { weight: 200, reps: 0 },
+        { weight: 80, reps: 5 },
+        { weight: 90, reps: 3 },
+      ]),
+    ).toEqual({
+      weight: 90,
+      reps: 3,
+      e1rm: epleyE1rm(90, 3),
+    });
+  });
 });

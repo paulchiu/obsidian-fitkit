@@ -11,7 +11,7 @@
  *
  * Bullet kinds:
  *  - Exercise-level note: has `[exercise::]` and optional `[notes::]` only.
- *  - Strength row: has `[set::]`, `[weight::]`, `[reps::]`, optional `[notes::]`.
+ *  - Strength row: has `[set::]`, optional `[weight::]`, optional `[reps::]`, optional `[notes::]`.
  *  - Duration row: has `[duration::]` (seconds), optional `[set::]`, optional `[notes::]`.
  *
  * Fenced code blocks (triple-backtick) anywhere in the body are preserved
@@ -22,8 +22,8 @@ export type ExerciseKind = 'strength' | 'duration';
 
 export interface StrengthSet {
   set: number;
-  weight: number;
-  reps: number;
+  weight?: number;
+  reps?: number;
   note?: string;
 }
 
@@ -145,15 +145,6 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
     const hasReps = fields.has('reps');
     const hasDuration = fields.has('duration');
     const note = fields.get('notes');
-    if (!hasDuration && hasSet && (!hasWeight || !hasReps)) {
-      const missing = [!hasWeight ? 'weight' : null, !hasReps ? 'reps' : null].filter(
-        (value): value is string => value !== null,
-      );
-      warnings.push(
-        `${sourcePath}: Strength row for "${inlineName}" is missing ${missing.join(' and ')}; round-trip would invent zero values.`,
-      );
-    }
-
     if (!current || current.exerciseName !== inlineName) {
       flush();
       const kind: ExerciseKind = hasDuration ? 'duration' : 'strength';
@@ -209,9 +200,13 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
       current.durationEntries = undefined;
     }
     const setNum = Number(fields.get('set') ?? '0');
-    const weight = Number(fields.get('weight') ?? '0');
-    const reps = Number(fields.get('reps') ?? '0');
-    const set: StrengthSet = { set: setNum, weight, reps };
+    const set: StrengthSet = { set: setNum };
+    if (hasWeight) {
+      set.weight = Number(fields.get('weight'));
+    }
+    if (hasReps) {
+      set.reps = Number(fields.get('reps'));
+    }
     if (note !== undefined) {
       set.note = note;
     }
@@ -281,12 +276,13 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
     }
     if (exercise.kind === 'strength') {
       for (const set of exercise.strengthSets ?? []) {
-        const parts = [
-          `[exercise:: [[${exercise.exerciseName}]]]`,
-          `[set:: ${set.set}]`,
-          `[weight:: ${formatNumber(set.weight)}]`,
-          `[reps:: ${set.reps}]`,
-        ];
+        const parts = [`[exercise:: [[${exercise.exerciseName}]]]`, `[set:: ${set.set}]`];
+        if (set.weight !== undefined) {
+          parts.push(`[weight:: ${formatNumber(set.weight)}]`);
+        }
+        if (set.reps !== undefined) {
+          parts.push(`[reps:: ${set.reps}]`);
+        }
         if (set.note !== undefined) {
           parts.push(`[notes:: ${set.note}]`);
         }

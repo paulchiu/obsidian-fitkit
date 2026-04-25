@@ -22,4 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Dashboard strength tables now use Dataview list fields instead of text matching.
+- Journal import now accepts bare exercise rows like `Squat 100 x 5` and `Plank 60s`.
+- Blank workout editor strength rows no longer persist as zero-weight zero-rep sets.
+- Autosave debounce settings now show the clamped fallback after invalid input.
+- Zero-rep strength sets no longer qualify as PBs.
+
 ### Removed

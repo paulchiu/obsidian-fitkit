@@ -72,4 +72,37 @@ describe('journal grammar', () => {
       { kind: 'duration', seconds: 60, raw: 'Plank: 60s' },
     ]);
   });
+
+  it('parses bare strength rows', () => {
+    const parsed = parseJournal('Squat 100 x 5');
+
+    expect(parsed.exercises.map((exercise) => exercise.rawName)).toEqual(['Squat']);
+    expect(strengthRows(exerciseAt(parsed.exercises, 0))).toEqual([
+      { kind: 'strength', weight: 100, reps: 5, raw: 'Squat 100 x 5' },
+    ]);
+  });
+
+  it('parses bare duration rows', () => {
+    const parsed = parseJournal('Plank 60s');
+
+    expect(parsed.exercises.map((exercise) => exercise.rawName)).toEqual(['Plank']);
+    expect(durationRows(exerciseAt(parsed.exercises, 0))).toEqual([
+      { kind: 'duration', seconds: 60, raw: 'Plank 60s' },
+    ]);
+  });
+
+  it('parses bare slash strength rows', () => {
+    const parsed = parseJournal('Bench 60 / 8 / 6');
+
+    expect(parsed.exercises.map((exercise) => exercise.rawName)).toEqual(['Bench']);
+    expect(strengthRows(exerciseAt(parsed.exercises, 0))).toEqual([
+      { kind: 'strength', weight: 60, reps: 8, raw: 'Bench 60 / 8 / 6' },
+    ]);
+  });
+
+  it('does not parse plain sentences as bare exercise rows', () => {
+    const parsed = parseJournal('Just a sentence');
+
+    expect(parsed.exercises).toEqual([]);
+  });
 });

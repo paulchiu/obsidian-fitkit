@@ -715,9 +715,13 @@ function toEditorExercise(exercise: ExerciseEntry): ExerciseCard {
 function toEditorStrengthSet(set: StrengthSet): EditableStrengthSet {
   const editable: EditableStrengthSet = {
     set: set.set,
-    weight: set.weight,
-    reps: set.reps,
   };
+  if (set.weight !== undefined) {
+    editable.weight = set.weight;
+  }
+  if (set.reps !== undefined) {
+    editable.reps = set.reps;
+  }
   if (set.note !== undefined) {
     editable.note = set.note;
   }
@@ -766,9 +770,13 @@ function toWorkoutExercise(card: ExerciseCard): ExerciseEntry {
 function toStrengthSet(set: EditableStrengthSet, index: number): StrengthSet {
   const strengthSet: StrengthSet = {
     set: set.set ?? index + 1,
-    weight: set.weight ?? 0,
-    reps: set.reps ?? 0,
   };
+  if (set.weight !== undefined) {
+    strengthSet.weight = set.weight;
+  }
+  if (set.reps !== undefined) {
+    strengthSet.reps = set.reps;
+  }
   if (set.note !== undefined) {
     strengthSet.note = set.note;
   }
