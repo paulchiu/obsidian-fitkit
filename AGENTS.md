@@ -72,6 +72,7 @@
 - **Format:** `npm run format` (check with `npm run format:check`).
 - **Test:** `npm test` once Vitest is wired up.
 - **Version bump:** `npm version <patch|minor|major>` (runs `version-bump.mjs`).
+- **Changelog:** update CHANGELOG.md under [Unreleased] as you land user-visible changes. On version bump, move [Unreleased] entries under the new version heading.
 
 ## 7. Git Commit Convention
 
@@ -95,3 +96,4 @@ Scope in parens is welcome when it clarifies (e.g., `feat(importer): ...`). Keep
 5. **Do not** leave the repo in a broken state. `npm run build` and `npm run lint` must pass before calling a task done.
 6. **Do not** ignore warnings (ESLint, TypeScript, deprecation). Fix them in the same change.
 7. **Do not** commit `main.js`, `node_modules`, or `data.json` (user plugin settings).
+8. **Do not** ship a version bump without updating CHANGELOG.md. Move entries from [Unreleased] to the new version section.
