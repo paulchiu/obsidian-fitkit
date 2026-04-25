@@ -70,7 +70,7 @@
 - **Build:** `npm run build` (runs `tsc -noEmit` then esbuild in production mode; must complete with zero errors).
 - **Lint:** `npm run lint` (zero warnings tolerated).
 - **Format:** `npm run format` (check with `npm run format:check`).
-- **Test:** `npm test` once Vitest is wired up.
+- **Test:** `npm test` (Vitest, runs unit tests for pure modules).
 - **Version bump:** automated. Every PR must carry exactly one of the labels `major`, `minor`, `patch`, or `norelease`. On merge to `main`, the Release workflow runs `npm version` with that bump, tags the commit as bare `X.Y.Z` (no `v` prefix, so BRAT and the community registry resolve it), and publishes a GitHub release with `main.js`, `manifest.json`, and `styles.css` attached. `npm version <patch|minor|major>` still works locally for dev; it runs `version-bump.mjs` to update `manifest.json` and `versions.json`.
 - **Changelog:** add entries to `CHANGELOG.md` under `## [Unreleased]` as part of each PR. On merge, the Release workflow renames that heading to `## [X.Y.Z] - YYYY-MM-DD` and inserts a fresh empty `[Unreleased]` block above it. Do not rename the heading manually.
 
