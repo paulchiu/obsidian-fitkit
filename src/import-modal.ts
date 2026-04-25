@@ -10,6 +10,7 @@ import type { ParsedExercise, ParsedJournal } from './journal-grammar';
 import { parseJournal } from './journal-grammar';
 import type FitKitPlugin from './main';
 import { exercisesFolder, workoutFilename, workoutsFolder } from './settings-paths';
+import { ensureParentFolder } from './vault-utils';
 import type { CanonicalExercise, CanonicalWorkout } from './workout-note-serializer';
 import { serializeWorkout } from './workout-note-serializer';
 
@@ -531,18 +532,6 @@ export class ImportModal extends Modal {
       new Notice(`Dashboard update failed: ${formatError(error)}`);
     }
   }
-}
-
-async function ensureParentFolder(app: App, path: string): Promise<void> {
-  const parent = path.split('/').slice(0, -1).join('/');
-  if (!parent) {
-    return;
-  }
-  const existing = app.vault.getAbstractFileByPath(parent);
-  if (existing) {
-    return;
-  }
-  await app.vault.createFolder(parent);
 }
 
 function formatError(error: unknown): string {

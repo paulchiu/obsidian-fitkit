@@ -1,10 +1,10 @@
-import type { App } from 'obsidian';
 import { Modal, Notice, TFile, normalizePath } from 'obsidian';
 
 import type { ExerciseKind, ExerciseRegistry } from './exercise-registry';
 import { createRegistry, resolve, upsertEntry } from './exercise-registry';
 import type FitKitPlugin from './main';
 import { exercisesFolder } from './settings-paths';
+import { ensureParentFolder } from './vault-utils';
 import type { ExerciseEntry, WorkoutNoteModel } from './workout-note-model';
 
 type Row = {
@@ -193,16 +193,4 @@ function dedupeExercises(exercises: ExerciseEntry[]): ExerciseEntry[] {
     }
   }
   return [...byName.values()];
-}
-
-async function ensureParentFolder(app: App, path: string): Promise<void> {
-  const parent = path.split('/').slice(0, -1).join('/');
-  if (!parent) {
-    return;
-  }
-  const existing = app.vault.getAbstractFileByPath(parent);
-  if (existing) {
-    return;
-  }
-  await app.vault.createFolder(parent);
 }

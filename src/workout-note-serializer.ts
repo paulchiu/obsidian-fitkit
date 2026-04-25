@@ -46,11 +46,9 @@ function renderExercise(exercise: CanonicalExercise): string {
 
 /**
  * Format a number without trailing zero noise: `10` not `10.0`, `13.6` kept.
+ * `String(n)` already collapses `10.0` to `'10'` in JS, so this is the canonical write path.
  */
 function formatNumber(value: number): string {
-  if (Number.isInteger(value)) {
-    return String(value);
-  }
   return String(value);
 }
 
