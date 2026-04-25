@@ -71,8 +71,8 @@
 - **Lint:** `npm run lint` (zero warnings tolerated).
 - **Format:** `npm run format` (check with `npm run format:check`).
 - **Test:** `npm test` once Vitest is wired up.
-- **Version bump:** `npm version <patch|minor|major>` (runs `version-bump.mjs`).
-- **Changelog:** update CHANGELOG.md under [Unreleased] as you land user-visible changes. On version bump, move [Unreleased] entries under the new version heading.
+- **Version bump:** automated. Every PR must carry exactly one of the labels `major`, `minor`, `patch`, or `norelease`. On merge to `main`, the Release workflow runs `npm version` with that bump, tags the commit as bare `X.Y.Z` (no `v` prefix, so BRAT and the community registry resolve it), and publishes a GitHub release with `main.js`, `manifest.json`, and `styles.css` attached. `npm version <patch|minor|major>` still works locally for dev; it runs `version-bump.mjs` to update `manifest.json` and `versions.json`.
+- **Changelog:** add entries to `CHANGELOG.md` under `## [Unreleased]` as part of each PR. On merge, the Release workflow renames that heading to `## [X.Y.Z] - YYYY-MM-DD` and inserts a fresh empty `[Unreleased]` block above it. Do not rename the heading manually.
 
 ## 7. Git Commit Convention
 
@@ -96,4 +96,5 @@ Scope in parens is welcome when it clarifies (e.g., `feat(importer): ...`). Keep
 5. **Do not** leave the repo in a broken state. `npm run build` and `npm run lint` must pass before calling a task done.
 6. **Do not** ignore warnings (ESLint, TypeScript, deprecation). Fix them in the same change.
 7. **Do not** commit `main.js`, `node_modules`, or `data.json` (user plugin settings).
-8. **Do not** ship a version bump without updating CHANGELOG.md. Move entries from [Unreleased] to the new version section.
+8. **Do not** open a PR without exactly one version label (`major`, `minor`, `patch`, or `norelease`). The `check-labels` CI gate enforces this.
+9. **Do not** add user-visible changes without a matching entry under `## [Unreleased]` in `CHANGELOG.md`. Use `norelease` only when batching a truly user-invisible change into a later bump.

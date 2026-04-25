@@ -1,20 +1,25 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - '[0-9]+.[0-9]+.[0-9]+'
+  pull_request:
+    types: [closed]
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
   release:
-    name: Build and publish release
+    name: Bump version, tag, and publish release
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout main
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -22,17 +27,94 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
+      - name: Determine version bump
+        id: bump
+        uses: actions/github-script@v7
+        with:
+          result-encoding: string
+          script: |
+            const labels = context.payload.pull_request.labels.map(l => l.name);
+            if (labels.includes('major')) return 'major';
+            if (labels.includes('minor')) return 'minor';
+            if (labels.includes('patch')) return 'patch';
+            return 'norelease';
+
+      - name: Skip release
+        if: steps.bump.outputs.result == 'norelease'
+        run: echo "PR labelled norelease; skipping version bump and release."
+
+      - name: Configure git
+        if: steps.bump.outputs.result != 'norelease'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Install dependencies
+        if: steps.bump.outputs.result != 'norelease'
         run: npm ci
 
+      - name: Bump version
+        if: steps.bump.outputs.result != 'norelease'
+        id: version
+        run: |
+          # version-bump.mjs runs via the `version` npm script hook and updates manifest.json + versions.json.
+          npm version ${{ steps.bump.outputs.result }} --no-git-tag-version
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Roll CHANGELOG [Unreleased] into new version
+        if: steps.bump.outputs.result != 'norelease'
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+        run: |
+          node - <<'EOF'
+          const fs = require('fs');
+          const path = 'CHANGELOG.md';
+          const version = process.env.NEW_VERSION;
+          const date = new Date().toISOString().slice(0, 10);
+          const content = fs.readFileSync(path, 'utf8');
+          const freshUnreleased = [
+            '## [Unreleased]',
+            '',
+            '### Added',
+            '',
+            '### Changed',
+            '',
+            '### Fixed',
+            '',
+            '### Removed',
+            '',
+            `## [${version}] - ${date}`,
+          ].join('\n');
+          const updated = content.replace(/## \[Unreleased\]/, freshUnreleased);
+          if (updated === content) {
+            console.error('CHANGELOG.md: could not find [Unreleased] heading to roll.');
+            process.exit(1);
+          }
+          fs.writeFileSync(path, updated);
+          EOF
+
       - name: Build
+        if: steps.bump.outputs.result != 'norelease'
         run: npm run build
 
-      - name: Create GitHub release
+      - name: Commit bump and push tag
+        if: steps.bump.outputs.result != 'norelease'
+        run: |
+          VERSION="${{ steps.version.outputs.new_version }}"
+          git add package.json package-lock.json manifest.json versions.json CHANGELOG.md
+          git commit -m "chore(release): bump to $VERSION"
+          # Bare X.Y.Z tag (no v prefix): BRAT and the Obsidian community registry require tag to equal manifest version.
+          git tag "$VERSION"
+          git push origin main
+          git push origin "$VERSION"
+
+      - name: Publish GitHub release
+        if: steps.bump.outputs.result != 'norelease'
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
+          name: ${{ steps.version.outputs.new_version }}
+          tag_name: ${{ steps.version.outputs.new_version }}
           draft: false
           prerelease: false
           # Obsidian plugin release assets must be uploaded as individual files (not zipped);
