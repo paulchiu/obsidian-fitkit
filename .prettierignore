@@ -6,3 +6,5 @@ coverage
 package-lock.json
 .obsidian
 data.json
+tests/fixtures
+
