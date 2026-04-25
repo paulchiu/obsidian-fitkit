@@ -11,7 +11,12 @@ export default tseslint.config(
       },
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['eslint.config.mts', 'manifest.json', 'version-bump.mjs'],
+          allowDefaultProject: [
+            'eslint.config.mts',
+            'manifest.json',
+            'version-bump.mjs',
+            'vitest.config.ts',
+          ],
         },
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.json'],
@@ -23,6 +28,17 @@ export default tseslint.config(
     files: ['src/**/*.ts'],
     rules: {
       'no-console': 'error',
+    },
+  },
+  {
+    files: ['tests/**/*.ts'],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        projectService: false,
+        project: './tsconfig.vitest.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
   },
   {

@@ -57,6 +57,10 @@ jobs:
         if: steps.bump.outputs.result != 'norelease'
         run: npm ci
 
+      - name: Test
+        if: steps.bump.outputs.result != 'norelease'
+        run: npm test
+
       - name: Bump version
         if: steps.bump.outputs.result != 'norelease'
         id: version

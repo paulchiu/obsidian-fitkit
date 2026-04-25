@@ -1,0 +1,4 @@
+---
+type: exercise
+kind: strength
+---

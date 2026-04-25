@@ -1,1 +1,428 @@
 /* FitKit styles */
+
+.fitkit-editor-root {
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.fitkit-empty {
+  color: var(--text-muted);
+  padding: 24px 8px;
+  text-align: center;
+}
+
+.fitkit-container {
+  display: grid;
+  gap: 14px;
+}
+
+.fitkit-header {
+  display: grid;
+  gap: 4px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 8px;
+}
+
+.fitkit-file-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.fitkit-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.fitkit-warn {
+  border: 1px solid var(--text-warning);
+  background: color-mix(in srgb, var(--text-warning) 15%, transparent);
+  color: var(--text-warning);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.fitkit-conflict {
+  border: 1px solid var(--text-error);
+  background: color-mix(in srgb, var(--text-error) 15%, transparent);
+  color: var(--text-error);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.fitkit-exercise-list {
+  display: grid;
+  gap: 12px;
+}
+
+.fitkit-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.fitkit-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.fitkit-name-input {
+  flex: 1 1 160px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 14px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.fitkit-kind-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.fitkit-field-row {
+  display: grid;
+  gap: 4px;
+}
+
+.fitkit-label,
+.fitkit-set-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fitkit-input,
+.fitkit-textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 13px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.fitkit-textarea {
+  min-height: 40px;
+  resize: vertical;
+}
+
+.fitkit-set-area {
+  display: grid;
+  gap: 6px;
+}
+
+.fitkit-set-row {
+  display: grid;
+  grid-template-columns:
+    minmax(52px, 72px) minmax(86px, 1fr) minmax(64px, 0.8fr) minmax(120px, 2fr)
+    auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.fitkit-duration-row {
+  grid-template-columns: minmax(108px, 1fr) minmax(120px, 2fr) auto;
+}
+
+.fitkit-cell {
+  min-width: 0;
+}
+
+.fitkit-action-cell {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.fitkit-set-head {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fitkit-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.fitkit-footer {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 10px;
+}
+
+.fitkit-btn {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.fitkit-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.fitkit-btn-muted.is-active {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+}
+
+.fitkit-btn-primary {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.fitkit-btn-danger:hover:not(:disabled),
+.fitkit-btn-danger:focus-visible:not(:disabled),
+.fitkit-destructive-button:hover:not(:disabled),
+.fitkit-destructive-button:focus-visible:not(:disabled) {
+  border-color: var(--text-error);
+  color: var(--text-error);
+  background: var(--background-modifier-error);
+}
+
+.fitkit-btn-warn {
+  border-color: var(--text-warning);
+  color: var(--text-warning);
+}
+
+.fitkit-kind-confirm-modal {
+  display: grid;
+  gap: 12px;
+}
+
+.fitkit-kind-confirm-modal h2 {
+  margin: 0;
+}
+
+.fitkit-kind-confirm-modal p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.fitkit-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.fitkit-import-modal {
+  display: grid;
+  gap: 12px;
+  max-width: 1000px;
+}
+
+.fitkit-import-modal h2,
+.fitkit-import-modal h3 {
+  margin: 0;
+}
+
+.fitkit-import-panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.fitkit-import-pane {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fitkit-import-pane-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  color: var(--text-muted);
+}
+
+.fitkit-import-raw-textarea,
+.fitkit-import-preview {
+  width: 100%;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 8px;
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  white-space: pre-wrap;
+  height: clamp(220px, 36vh, 360px);
+  min-height: 0;
+  overflow: auto;
+  box-sizing: border-box;
+}
+
+.fitkit-import-below,
+.fitkit-import-section {
+  display: grid;
+  gap: 8px;
+}
+
+.fitkit-import-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.fitkit-import-table th,
+.fitkit-import-table td {
+  padding: 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--background-modifier-border);
+  vertical-align: top;
+}
+
+.fitkit-import-select {
+  width: 100%;
+  padding: 4px;
+  font-size: 12px;
+}
+
+.fitkit-import-muted {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.fitkit-import-status-match {
+  color: var(--text-success, var(--text-normal));
+}
+
+.fitkit-import-status-ambiguous {
+  color: var(--text-warning, var(--text-normal));
+}
+
+.fitkit-import-status-unknown {
+  color: var(--text-error);
+}
+
+.fitkit-import-warning-group {
+  border-left: 2px solid var(--text-error);
+  padding-left: 8px;
+}
+
+.fitkit-import-warning-heading {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.fitkit-import-target-row {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.fitkit-import-target-input {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-sizing: border-box;
+}
+
+.fitkit-import-checkbox-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.fitkit-import-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  position: sticky;
+  bottom: 0;
+  padding-top: 8px;
+  background: var(--modal-background, var(--background-primary));
+}
+
+.fitkit-suggest-title {
+  font-weight: 600;
+}
+
+.fitkit-suggest-title.is-new {
+  color: var(--interactive-accent);
+}
+
+.fitkit-suggest-note {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.fitkit-editor-root.is-narrow .fitkit-set-head {
+  display: none;
+}
+
+.fitkit-editor-root.is-narrow .fitkit-set-row,
+.fitkit-editor-root.is-narrow .fitkit-duration-row {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.fitkit-editor-root.is-narrow .fitkit-set-row:last-child {
+  border-bottom: 0;
+}
+
+.fitkit-editor-root.is-narrow .fitkit-set-row:not(.fitkit-set-head) .fitkit-cell {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.fitkit-editor-root.is-narrow .fitkit-set-row:not(.fitkit-set-head) .fitkit-cell::before {
+  content: attr(data-label);
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fitkit-editor-root.is-narrow .fitkit-action-cell {
+  justify-content: stretch;
+}
+
+.fitkit-editor-root.is-narrow .fitkit-action-cell .fitkit-btn {
+  width: fit-content;
+}
+
+@media (max-width: 720px) {
+  .fitkit-import-panes,
+  .fitkit-import-target-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

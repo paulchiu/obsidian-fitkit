@@ -3,7 +3,7 @@
   "name": "FitKit",
   "version": "0.0.0",
   "minAppVersion": "0.15.0",
-  "description": "Track workouts as plain-markdown notes in Obsidian.",
+  "description": "Track workouts as plain-markdown notes. Edit structured set/rep/weight/duration data in a custom view, import from rough journals, and auto-generate a dashboard with PBs.",
   "author": "Paul Chiu",
   "isDesktopOnly": false
 }

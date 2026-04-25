@@ -34,4 +34,5 @@ jobs:
       - name: Build
         run: npm run build
 
-      # TODO: add `npm test` step once Vitest is wired up
+      - name: Test
+        run: npm test
