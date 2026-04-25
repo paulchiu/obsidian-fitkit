@@ -41,7 +41,7 @@
 
 ## 4. Coding Standards
 
-- **Formatting:** Tabs for indentation (matches Obsidian sample plugin + existing POCs). No semicolon-free style: semicolons required. Single quotes. Trailing commas where valid.
+- **Formatting:** 2 spaces for indentation (Prettier enforces, `printWidth: 100`). Semicolons required. Single quotes. Trailing commas where valid (`trailingComma: 'all'`). Run `npm run format` before committing; `npm run format:check` runs in CI.
 - **TypeScript:**
   - `noImplicitAny`, `strictNullChecks`, `noUncheckedIndexedAccess` enabled.
   - No `any`. Use `unknown` and narrow.
@@ -49,7 +49,7 @@
 - **Comments & docs:**
   - Default to no comments. Let names carry the meaning.
   - When a comment is warranted (non-obvious invariant, workaround, subtle edge case), write a JSDoc block (`/** ... */`) rather than stacked `//` lines.
-  - Document *why*, not *what*. Don't reference PR numbers, tickets, or the current task (they rot).
+  - Document _why_, not _what_. Don't reference PR numbers, tickets, or the current task (they rot).
 - **Error handling:**
   - Recoverable: return `null` or a typed result (e.g., `{ok: false, reason}`). Don't throw across module boundaries.
   - User-facing: surface via `Notice` for quick feedback, or a modal banner for anything the user must acknowledge. Never swallow errors silently.
@@ -69,6 +69,7 @@
 - **Dev (watch):** `npm run dev`
 - **Build:** `npm run build` (runs `tsc -noEmit` then esbuild in production mode; must complete with zero errors).
 - **Lint:** `npm run lint` (zero warnings tolerated).
+- **Format:** `npm run format` (check with `npm run format:check`).
 - **Test:** `npm test` once Vitest is wired up.
 - **Version bump:** `npm version <patch|minor|major>` (runs `version-bump.mjs`).
 
@@ -83,7 +84,7 @@ Conventional commits, sentence case, imperative mood:
 - `chore:` tooling, deps, config
 - `docs:` docs only
 
-Scope in parens is welcome when it clarifies (e.g., `feat(importer): ...`). Keep subject under 72 chars. Body explains *why*, not *what*.
+Scope in parens is welcome when it clarifies (e.g., `feat(importer): ...`). Keep subject under 72 chars. Body explains _why_, not _what_.
 
 ## 8. "Do Not" Rules
 

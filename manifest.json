@@ -1,9 +1,9 @@
 {
-	"id": "obsidian-fitkit",
-	"name": "FitKit",
-	"version": "0.0.1",
-	"minAppVersion": "0.15.0",
-	"description": "Track workouts as plain-markdown notes in Obsidian.",
-	"author": "Paul Chiu",
-	"isDesktopOnly": false
+  "id": "obsidian-fitkit",
+  "name": "FitKit",
+  "version": "0.0.1",
+  "minAppVersion": "0.15.0",
+  "description": "Track workouts as plain-markdown notes in Obsidian.",
+  "author": "Paul Chiu",
+  "isDesktopOnly": false
 }

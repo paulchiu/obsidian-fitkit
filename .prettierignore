@@ -1,0 +1,8 @@
+node_modules
+main.js
+main.js.map
+dist
+coverage
+package-lock.json
+.obsidian
+data.json
