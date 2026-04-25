@@ -1,0 +1,55 @@
+version: 2
+updates:
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    open-pull-requests-limit: 10
+    versioning-strategy: 'auto'
+    allow:
+      - dependency-type: 'all'
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
+    labels:
+      - 'dependencies'
+    groups:
+      dev-dependencies:
+        patterns:
+          - '@eslint/*'
+          - '@types/*'
+          - 'eslint*'
+          - 'typescript*'
+          - 'prettier'
+          - 'esbuild'
+          - 'globals'
+          - 'jiti'
+          - 'tslib'
+        update-types:
+          - 'minor'
+          - 'patch'
+      runtime-dependencies:
+        patterns:
+          - 'obsidian'
+        update-types:
+          - 'minor'
+          - 'patch'
+
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'
+    labels:
+      - 'dependencies'
+      - 'github-actions'
+    groups:
+      github-actions:
+        patterns:
+          - '*'
+        update-types:
+          - 'minor'
+          - 'patch'
