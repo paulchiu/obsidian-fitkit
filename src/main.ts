@@ -92,12 +92,11 @@ export default class FitKitPlugin extends Plugin {
       name: "Open today's workout",
       callback: async () => {
         const today = formatTodayIsoDate();
-        const path = `${workoutsFolder(this.settings)}/${workoutFilename(today)}`;
+        const folder = normalizePath(workoutsFolder(this.settings));
+        const path = normalizePath(`${folder}/${workoutFilename(today)}`);
         let file = this.app.vault.getAbstractFileByPath(path);
         if (!(file instanceof TFile)) {
-          const folder = workoutsFolder(this.settings);
-          const folderEntry = this.app.vault.getAbstractFileByPath(folder);
-          if (!folderEntry) {
+          if (!this.app.vault.getAbstractFileByPath(folder)) {
             await this.app.vault.createFolder(folder).catch(() => undefined);
           }
           file = await this.app.vault.create(path, emptyWorkoutMarkdown(today));
