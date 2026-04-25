@@ -1,11 +1,23 @@
-import { Notice, Plugin, normalizePath } from 'obsidian';
+import { Notice, Plugin, TFile, normalizePath } from 'obsidian';
 
 import type { FitKitIndex, IndexDiagnostic } from './index';
 import { rebuildIndex } from './index';
 import { regenerateDashboard } from './dashboard';
 import { ParseDiagnosticsModal } from './parse-diagnostics-modal';
 import { DEFAULT_SETTINGS, FitKitSettingTab, type FitKitSettings } from './settings';
-import { dashboardPath } from './settings-paths';
+import { dashboardPath, workoutFilename, workoutsFolder } from './settings-paths';
+import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from './workout-editor-view';
+
+function formatTodayIsoDate(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+    d.getDate(),
+  ).padStart(2, '0')}`;
+}
+
+function emptyWorkoutMarkdown(date: string): string {
+  return `---\ntype: workout\ndate: ${date}\nname: \n---\n`;
+}
 
 export default class FitKitPlugin extends Plugin {
   settings!: FitKitSettings;
@@ -69,10 +81,63 @@ export default class FitKitPlugin extends Plugin {
         new ParseDiagnosticsModal(this.app, this.lastDiagnostics).open();
       },
     });
+
+    this.registerView(VIEW_TYPE_FITKIT_WORKOUT_EDITOR, (leaf) => new WorkoutEditorView(leaf, this));
+
+    this.addCommand({
+      id: 'fitkit-open-todays-workout',
+      name: "Open today's workout",
+      callback: async () => {
+        const today = formatTodayIsoDate();
+        const path = `${workoutsFolder(this.settings)}/${workoutFilename(today)}`;
+        let file = this.app.vault.getAbstractFileByPath(path);
+        if (!(file instanceof TFile)) {
+          const folder = workoutsFolder(this.settings);
+          const folderEntry = this.app.vault.getAbstractFileByPath(folder);
+          if (!folderEntry) {
+            await this.app.vault.createFolder(folder).catch(() => undefined);
+          }
+          file = await this.app.vault.create(path, emptyWorkoutMarkdown(today));
+        }
+        if (file instanceof TFile) {
+          await this.openWorkoutEditor(file);
+        }
+      },
+    });
+
+    this.addCommand({
+      id: 'fitkit-open-workout-editor',
+      name: 'Open workout editor for current file',
+      checkCallback: (checking) => {
+        const file = this.app.workspace.getActiveFile();
+        const ok = file instanceof TFile && file.extension.toLowerCase() === 'md';
+        if (!ok) {
+          return false;
+        }
+        if (!checking && file) {
+          void this.openWorkoutEditor(file);
+        }
+        return true;
+      },
+    });
   }
 
+  /* eslint-disable-next-line obsidianmd/detach-leaves */
   onunload(): void {
-    /* Phase 4 will add teardown for the editor view. */
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR);
+  }
+
+  private async openWorkoutEditor(file: TFile): Promise<void> {
+    let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR)[0];
+    if (!leaf) {
+      leaf = this.app.workspace.getRightLeaf(false) ?? this.app.workspace.getLeaf(true);
+    }
+    await leaf.setViewState({ type: VIEW_TYPE_FITKIT_WORKOUT_EDITOR, active: true });
+    await this.app.workspace.revealLeaf(leaf);
+    const view = leaf.view;
+    if (view instanceof WorkoutEditorView) {
+      await view.loadFile(file);
+    }
   }
 
   async loadSettings(): Promise<void> {
