@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Bump version, tag, and publish release
@@ -98,6 +102,13 @@ jobs:
         if: steps.bump.outputs.result != 'norelease'
         run: npm run build
 
+      - name: Verify formatting after mutations
+        if: steps.bump.outputs.result != 'norelease'
+        # Commits pushed via GITHUB_TOKEN do not retrigger the CI workflow,
+        # so re-run format:check inline to catch any drift introduced by the
+        # version bump or changelog roll before it lands on main.
+        run: npm run format:check
+
       - name: Commit bump and push tag
         if: steps.bump.outputs.result != 'norelease'
         run: |
@@ -106,8 +117,8 @@ jobs:
           git commit -m "chore(release): bump to $VERSION"
           # Bare X.Y.Z tag (no v prefix): BRAT and the Obsidian community registry require tag to equal manifest version.
           git tag "$VERSION"
-          git push origin main
-          git push origin "$VERSION"
+          # Push branch and tag together so the tag never appears on the remote without its commit.
+          git push origin main "$VERSION"
 
       - name: Publish GitHub release
         if: steps.bump.outputs.result != 'norelease'
