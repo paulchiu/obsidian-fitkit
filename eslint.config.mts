@@ -11,7 +11,7 @@ export default tseslint.config(
       },
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['eslint.config.js', 'manifest.json'],
+          allowDefaultProject: ['eslint.config.mts', 'manifest.json', 'version-bump.mjs'],
         },
         tsconfigRootDir: import.meta.dirname,
         extraFileExtensions: ['.json'],
@@ -19,13 +19,19 @@ export default tseslint.config(
     },
   },
   ...obsidianmd.configs.recommended,
-  globalIgnores([
-    'node_modules',
-    'dist',
-    'esbuild.config.mjs',
-    'eslint.config.js',
-    'version-bump.mjs',
-    'versions.json',
-    'main.js',
-  ]),
+  {
+    files: ['src/**/*.ts'],
+    rules: {
+      'no-console': 'error',
+    },
+  },
+  {
+    files: ['version-bump.mjs'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+  globalIgnores(['node_modules', 'dist', 'esbuild.config.mjs', 'versions.json', 'main.js']),
 );
