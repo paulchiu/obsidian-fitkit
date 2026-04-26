@@ -19,12 +19,13 @@
   - Pure functions for parsing, serialization, normalization, and registry logic. Extract into `src/` modules that are trivially unit-testable without `App`.
   - Classes are fine where Obsidian requires them (`Plugin`, `Modal`, `ItemView`, `SettingTab`). Keep them thin: hold references, wire events, delegate logic to pure helpers.
   - Immutability: `const` by default. Avoid in-place mutation of data structures that flow between modules.
-- **File layout:**
+- **File layout:** `src/` is split into three tiers plus a thin top level for the plugin entry-point and configuration glue.
   - `src/main.ts` - Plugin entry point (`export default class ... extends Plugin`).
-  - `src/<feature>.ts` - Pure helpers (parser, serializer, registry, etc.).
-  - `src/<feature>-modal.ts` or `src/<feature>-view.ts` - Obsidian UI surfaces.
-  - `src/settings.ts` - Settings types, defaults, and `PluginSettingTab` subclass.
-  - Keep the module graph flat. Avoid deep nesting until the codebase justifies it.
+  - `src/settings.ts`, `src/settings-paths.ts` - Settings types, defaults, `PluginSettingTab` subclass, and the pure path helpers shared by every tier.
+  - `src/domain/` - Pure modules (parsers, serializers, registry, scoring, types). No `obsidian` imports allowed.
+  - `src/vault/` - Obsidian-aware, non-UI helpers (vault scanner, file session, dashboard generator, vault-backed registry, vault utilities). May import from `obsidian` and `src/domain/`. Must not import from `src/ui/`.
+  - `src/ui/` - Obsidian UI surfaces (views, modals). May import from anywhere.
+  - Within a tier, imports use `./` relative paths. Cross-tier, use `../<tier>/` (e.g. `../domain/types`). Keep modules at the tier root: avoid deeper nesting until the codebase justifies it.
 - **State:**
   - Plugin settings persisted via `loadData` / `saveData`.
   - Derived state recomputed from files/settings on demand; avoid long-lived in-memory caches unless profiling demands them.
@@ -41,7 +42,7 @@
 
 ## 4. Coding Standards
 
-- **Formatting:** 2 spaces for indentation (Prettier enforces, `printWidth: 100`). Semicolons required. Single quotes. Trailing commas where valid (`trailingComma: 'all'`). Run `npm run format` before committing; `npm run format:check` runs in CI.
+- **Formatting:** 2 spaces for indentation (Prettier enforces, `printWidth: 100`). Semicolons omitted (Prettier semi false). Single quotes. Trailing commas where valid (`trailingComma: 'all'`). Run `npm run format` before committing; `npm run format:check` runs in CI.
 - **TypeScript:**
   - `noImplicitAny`, `strictNullChecks`, `noUncheckedIndexedAccess` enabled.
   - No `any`. Use `unknown` and narrow.
@@ -91,7 +92,7 @@ Official references (authoritative):
 - **Format:** `npm run format` (check with `npm run format:check`).
 - **Test:** `npm test` (Vitest, runs unit tests for pure modules).
 - **Version bump:** automated. Every PR must carry exactly one of the labels `major`, `minor`, `patch`, or `norelease`. On merge to `main`, the Release workflow runs `npm version` with that bump, tags the commit as bare `X.Y.Z` (no `v` prefix, so BRAT and the community registry resolve it), and publishes a GitHub release with `main.js`, `manifest.json`, and `styles.css` attached. `npm version <patch|minor|major>` still works locally for dev; it runs `version-bump.mjs` to update `manifest.json` and `versions.json`.
-- **Changelog:** add entries to `CHANGELOG.md` under `## [Unreleased]` as part of each PR. Prefix every bullet with the date it was written, in `YYYY-MM-DD: ` form (e.g. `- 2026-04-26: Plugin id renamed...`); use `git blame` if backdating an existing line. On merge, the Release workflow renames the `[Unreleased]` heading to `## [X.Y.Z] - YYYY-MM-DD` and inserts a fresh empty `[Unreleased]` block above it. Do not rename the heading manually.
+- **Changelog:** add entries to `CHANGELOG.md` under `## [Unreleased]` as part of each PR. Bullets do not carry per-bullet dates. The version heading captures the date in UTC; entries land under `## [Unreleased]` until the release workflow stamps the heading on merge. On merge, the Release workflow renames the `[Unreleased]` heading to `## [X.Y.Z] - YYYY-MM-DD` and inserts a fresh empty `[Unreleased]` block above it. Do not rename the heading manually.
 
 ## 7. Git Commit Convention
 
@@ -117,3 +118,13 @@ Scope in parens is welcome when it clarifies (e.g., `feat(importer): ...`). Keep
 7. **Do not** commit `main.js`, `node_modules`, or `data.json` (user plugin settings).
 8. **Do not** open a PR without exactly one version label (`major`, `minor`, `patch`, or `norelease`). The `check-labels` CI gate enforces this.
 9. **Do not** add user-visible changes without a matching entry under `## [Unreleased]` in `CHANGELOG.md`. Use `norelease` only when batching a truly user-invisible change into a later bump.
+10. **Do not** rewrite the substance of existing files under `plans/`. They are historical records (see §9). Coding-style touch-ups from `npm run format` are fine; intentional content edits are not.
+
+## 9. Plans
+
+The `plans/` directory holds dated implementation plans (e.g. `plans/2026-04-26 v0.2.1 Implementation Plan.md`) used as durable, agent-readable context for the work that produced a particular release.
+
+- **Append-only.** Once a plan ships, treat it as a historical record. Future agents read it to understand prior reasoning, not to modify it. New work goes in a new plan file with a fresh date.
+- **Style-only edits are fine.** Repo-wide formatting passes (`npm run format`, mass-rename refactors that touch every markdown file) may rewrite prose mechanically. That is acceptable. Substantive content edits to a shipped plan are not.
+- **Naming.** `plans/YYYY-MM-DD <title>.md` (sentence case in the title; preserve any acronym casing). The date is when the plan was authored, not when work landed.
+- **Frontmatter.** Each plan starts with YAML frontmatter capturing at minimum `status`, `target`, `date`, and `branch`. Status moves `draft` to `approved` to `shipped`; do not flip back.

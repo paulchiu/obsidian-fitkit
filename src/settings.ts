@@ -1,21 +1,21 @@
-import { App, Notice, PluginSettingTab, Setting, normalizePath } from 'obsidian';
+import { App, Notice, PluginSettingTab, Setting, normalizePath } from 'obsidian'
 
-import type { ExerciseRegistryEntry } from './exercise-registry';
-import { exerciseRegistryWithVaultNotes } from './exercise-registry-vault';
-import type FitKitPlugin from './main';
-import { dashboardPath, exercisesFolder, workoutsFolder } from './settings-paths';
+import type { ExerciseRegistryEntry } from './domain/exercise-registry'
+import type FitKitPlugin from './main'
+import { dashboardPath, exercisesFolder, workoutsFolder } from './settings-paths'
+import { exerciseRegistryWithVaultNotes } from './vault/exercise-registry-vault'
 
-export { dashboardPath, exercisesFolder, workoutFilename, workoutsFolder } from './settings-paths';
+export { dashboardPath, exercisesFolder, workoutFilename, workoutsFolder } from './settings-paths'
 
 export interface FitKitSettings {
-  fitnessRoot: string;
-  journalFolder: string;
-  autoCreateMissingExercises: boolean;
-  autoUpdateDashboard: boolean;
-  autosaveDebounceMs: number;
-  exerciseRegistry: ExerciseRegistryEntry[];
-  hiddenDashboardSectionsByPath: Record<string, string[]>;
-  schemaVersion: 1;
+  fitnessRoot: string
+  journalFolder: string
+  autoCreateMissingExercises: boolean
+  autoUpdateDashboard: boolean
+  autosaveDebounceMs: number
+  exerciseRegistry: ExerciseRegistryEntry[]
+  hiddenDashboardSectionsByPath: Record<string, string[]>
+  schemaVersion: 1
 }
 
 export const DEFAULT_SETTINGS: FitKitSettings = {
@@ -27,62 +27,62 @@ export const DEFAULT_SETTINGS: FitKitSettings = {
   exerciseRegistry: [],
   hiddenDashboardSectionsByPath: {},
   schemaVersion: 1,
-};
+}
 
 export class FitKitSettingTab extends PluginSettingTab {
-  plugin: FitKitPlugin;
+  plugin: FitKitPlugin
 
   constructor(app: App, plugin: FitKitPlugin) {
-    super(app, plugin);
-    this.plugin = plugin;
+    super(app, plugin)
+    this.plugin = plugin
   }
 
   display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-    const settings = this.plugin.settings;
+    const { containerEl } = this
+    containerEl.empty()
+    const settings = this.plugin.settings
 
-    new Setting(containerEl).setName('Paths').setHeading();
+    new Setting(containerEl).setName('Paths').setHeading()
 
     new Setting(containerEl)
       .setName('Fitness root')
       .setDesc('Folder under the vault root where workouts, exercises, and the dashboard live.')
       .addText((text) =>
         text.setValue(settings.fitnessRoot).onChange(async (value) => {
-          settings.fitnessRoot = normalizePath(value);
-          await this.plugin.saveSettings();
-          this.display();
+          settings.fitnessRoot = normalizePath(value)
+          await this.plugin.saveSettings()
+          this.display()
         }),
-      );
+      )
 
     new Setting(containerEl)
       .setName('Journal folder')
       .setDesc('Optional. Folder where rough journal notes live (used by the import command).')
       .addText((text) =>
         text.setValue(settings.journalFolder).onChange(async (value) => {
-          settings.journalFolder = normalizePath(value);
-          await this.plugin.saveSettings();
+          settings.journalFolder = normalizePath(value)
+          await this.plugin.saveSettings()
         }),
-      );
+      )
 
     containerEl.createEl('div', {
       text: 'Derived paths:',
       cls: 'setting-item-name',
-    });
+    })
     containerEl.createEl('div', {
       text: `Workouts folder: ${workoutsFolder(settings)}`,
       cls: 'setting-item-description',
-    });
+    })
     containerEl.createEl('div', {
       text: `Exercises folder: ${exercisesFolder(settings)}`,
       cls: 'setting-item-description',
-    });
+    })
     containerEl.createEl('div', {
       text: `Dashboard: ${dashboardPath(settings)}`,
       cls: 'setting-item-description',
-    });
+    })
 
-    new Setting(containerEl).setName('Behavior').setHeading();
+    new Setting(containerEl).setName('Behavior').setHeading()
 
     new Setting(containerEl)
       .setName('Auto-create missing exercises')
@@ -91,10 +91,10 @@ export class FitKitSettingTab extends PluginSettingTab {
       )
       .addToggle((toggle) =>
         toggle.setValue(settings.autoCreateMissingExercises).onChange(async (value) => {
-          settings.autoCreateMissingExercises = value;
-          await this.plugin.saveSettings();
+          settings.autoCreateMissingExercises = value
+          await this.plugin.saveSettings()
         }),
-      );
+      )
 
     new Setting(containerEl)
       .setName('Auto-update dashboard on save')
@@ -103,10 +103,10 @@ export class FitKitSettingTab extends PluginSettingTab {
       )
       .addToggle((toggle) =>
         toggle.setValue(settings.autoUpdateDashboard).onChange(async (value) => {
-          settings.autoUpdateDashboard = value;
-          await this.plugin.saveSettings();
+          settings.autoUpdateDashboard = value
+          await this.plugin.saveSettings()
         }),
-      );
+      )
 
     new Setting(containerEl)
       .setName('Autosave debounce (ms)')
@@ -114,17 +114,17 @@ export class FitKitSettingTab extends PluginSettingTab {
         'How long to wait after the last edit before persisting changes in the workout editor view.',
       )
       .addText((text) => {
-        text.inputEl.type = 'number';
-        text.inputEl.min = '0';
+        text.inputEl.type = 'number'
+        text.inputEl.min = '0'
         text.setValue(String(settings.autosaveDebounceMs)).onChange(async (value) => {
-          const parsed = Number.parseInt(value, 10);
-          settings.autosaveDebounceMs = Number.isNaN(parsed) || parsed < 0 ? 600 : parsed;
-          text.setValue(String(settings.autosaveDebounceMs));
-          await this.plugin.saveSettings();
-        });
-      });
+          const parsed = Number.parseInt(value, 10)
+          settings.autosaveDebounceMs = Number.isNaN(parsed) || parsed < 0 ? 600 : parsed
+          text.setValue(String(settings.autosaveDebounceMs))
+          await this.plugin.saveSettings()
+        })
+      })
 
-    new Setting(containerEl).setName('Registry').setHeading();
+    new Setting(containerEl).setName('Registry').setHeading()
 
     new Setting(containerEl)
       .setName('Bootstrap from vault')
@@ -133,12 +133,12 @@ export class FitKitSettingTab extends PluginSettingTab {
       )
       .addButton((button) =>
         button.setButtonText('Bootstrap').onClick(async () => {
-          const merged = exerciseRegistryWithVaultNotes(this.plugin.app, settings);
-          settings.exerciseRegistry = merged;
-          await this.plugin.saveSettings();
-          new Notice(`Registry now has ${merged.length} entries.`);
-          this.display();
+          const merged = exerciseRegistryWithVaultNotes(this.plugin.app, settings)
+          settings.exerciseRegistry = merged
+          await this.plugin.saveSettings()
+          new Notice(`Registry now has ${merged.length} entries.`)
+          this.display()
         }),
-      );
+      )
   }
 }
