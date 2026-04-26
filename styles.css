@@ -196,26 +196,24 @@
   gap: 6px;
 }
 
+.fitkit-row {
+  display: grid;
+  gap: 4px;
+}
+
 .fitkit-set-row {
   display: grid;
-  grid-template-columns:
-    minmax(52px, 72px) minmax(86px, 1fr) minmax(64px, 0.8fr) minmax(120px, 2fr)
-    auto;
-  gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--size-4-2, 8px);
   align-items: center;
 }
 
 .fitkit-duration-row {
-  grid-template-columns: minmax(108px, 1fr) minmax(120px, 2fr) auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .fitkit-cell {
   min-width: 0;
-}
-
-.fitkit-action-cell {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .fitkit-set-head {
@@ -229,6 +227,21 @@
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.fitkit-row-actions-strip {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--size-4-1, 4px);
+}
+
+.fitkit-row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
 }
 
 .fitkit-footer {
@@ -445,46 +458,6 @@
   color: var(--text-muted);
   font-size: 12px;
   margin-top: 2px;
-}
-
-.fitkit-editor-root.is-narrow .fitkit-set-head {
-  display: none;
-}
-
-.fitkit-editor-root.is-narrow .fitkit-set-row,
-.fitkit-editor-root.is-narrow .fitkit-duration-row {
-  grid-template-columns: minmax(0, 1fr);
-  align-items: stretch;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.fitkit-editor-root.is-narrow .fitkit-set-row:last-child {
-  border-bottom: 0;
-}
-
-.fitkit-editor-root.is-narrow .fitkit-set-row:not(.fitkit-set-head) .fitkit-cell {
-  display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-}
-
-.fitkit-editor-root.is-narrow .fitkit-set-row:not(.fitkit-set-head) .fitkit-cell::before {
-  content: attr(data-label);
-  color: var(--text-muted);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.fitkit-editor-root.is-narrow .fitkit-action-cell {
-  justify-content: stretch;
-}
-
-.fitkit-editor-root.is-narrow .fitkit-action-cell .fitkit-btn {
-  width: fit-content;
 }
 
 @media (max-width: 720px) {

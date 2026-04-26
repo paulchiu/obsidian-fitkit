@@ -315,8 +315,6 @@ export class WorkoutEditorView extends ItemView {
     header.createSpan({ cls: 'fitkit-set-label', text: 'Set' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Weight' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Reps' })
-    header.createSpan({ cls: 'fitkit-set-label', text: 'Notes' })
-    header.createSpan({ cls: 'fitkit-set-label', text: '' })
 
     for (let i = 0; i < ex.strengthSets.length; i++) {
       this.renderStrengthRow(wrap, ex, i)
@@ -355,7 +353,8 @@ export class WorkoutEditorView extends ItemView {
     if (!set) {
       return
     }
-    const row = wrap.createDiv({ cls: 'fitkit-set-row' })
+    const container = wrap.createDiv({ cls: 'fitkit-row' })
+    const row = container.createDiv({ cls: 'fitkit-set-row' })
 
     const setInput = this.createInputCell(row, 'Set', { type: 'number', inputmode: 'numeric' })
     setInput.value = set.set !== undefined ? String(set.set) : ''
@@ -382,22 +381,13 @@ export class WorkoutEditorView extends ItemView {
       this.markDirty()
     })
 
-    const notesInput = this.createInputCell(row, 'Notes', { type: 'text' })
-    notesInput.value = set.note ?? ''
-    notesInput.addEventListener('input', () => {
-      set.note = notesInput.value.length > 0 ? notesInput.value : undefined
-      this.markDirty()
-    })
-
-    const actionCell = this.createCell(row, 'Actions', 'fitkit-action-cell')
-    const rm = actionCell.createEl('button', {
-      cls: 'fitkit-btn fitkit-destructive-button',
-      text: 'X',
-    })
-    rm.addEventListener('click', () => {
-      ex.strengthSets.splice(i, 1)
-      this.markDirty()
-      this.render()
+    this.renderRowActions(container, {
+      label: `set ${i + 1}`,
+      onDelete: () => {
+        ex.strengthSets.splice(i, 1)
+        this.markDirty()
+        this.render()
+      },
     })
   }
 
@@ -405,9 +395,8 @@ export class WorkoutEditorView extends ItemView {
     const wrap = card.createDiv({ cls: 'fitkit-set-area' })
 
     const header = wrap.createDiv({ cls: 'fitkit-set-row fitkit-duration-row fitkit-set-head' })
+    header.createSpan({ cls: 'fitkit-set-label', text: 'Set' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Duration (s)' })
-    header.createSpan({ cls: 'fitkit-set-label', text: 'Notes' })
-    header.createSpan({ cls: 'fitkit-set-label', text: '' })
 
     for (let i = 0; i < ex.durationEntries.length; i++) {
       this.renderDurationRow(wrap, ex, i)
@@ -428,7 +417,15 @@ export class WorkoutEditorView extends ItemView {
     if (!durationEntry) {
       return
     }
-    const row = wrap.createDiv({ cls: 'fitkit-set-row fitkit-duration-row' })
+    const container = wrap.createDiv({ cls: 'fitkit-row' })
+    const row = container.createDiv({ cls: 'fitkit-set-row fitkit-duration-row' })
+
+    const setInput = this.createInputCell(row, 'Set', { type: 'number', inputmode: 'numeric' })
+    setInput.value = durationEntry.set !== undefined ? String(durationEntry.set) : String(i + 1)
+    setInput.addEventListener('input', () => {
+      durationEntry.set = parseNumberInput(setInput.value)
+      this.markDirty()
+    })
 
     const durationInput = this.createInputCell(row, 'Duration (s)', {
       type: 'number',
@@ -442,23 +439,54 @@ export class WorkoutEditorView extends ItemView {
       this.markDirty()
     })
 
-    const notesInput = this.createInputCell(row, 'Notes', { type: 'text' })
-    notesInput.value = durationEntry.note ?? ''
-    notesInput.addEventListener('input', () => {
-      durationEntry.note = notesInput.value.length > 0 ? notesInput.value : undefined
-      this.markDirty()
+    this.renderRowActions(container, {
+      label: `duration entry ${i + 1}`,
+      onDelete: () => {
+        ex.durationEntries.splice(i, 1)
+        this.markDirty()
+        this.render()
+      },
     })
+  }
 
-    const actionCell = this.createCell(row, 'Actions', 'fitkit-action-cell')
-    const rm = actionCell.createEl('button', {
-      cls: 'fitkit-btn fitkit-destructive-button',
-      text: 'X',
+  private renderRowActions(
+    container: HTMLElement,
+    opts: { label: string; onDelete: () => void },
+  ): void {
+    const strip = container.createDiv({ cls: 'fitkit-row-actions-strip' })
+    const noteBtn = strip.createEl('button', {
+      cls: 'fitkit-btn fitkit-row-action',
+      attr: { 'aria-label': `Edit note for ${opts.label}` },
     })
-    rm.addEventListener('click', () => {
-      ex.durationEntries.splice(i, 1)
-      this.markDirty()
-      this.render()
+    setIcon(noteBtn, 'pencil')
+    noteBtn.toggleAttribute('disabled', true)
+
+    const trashBtn = strip.createEl('button', {
+      cls: 'fitkit-btn fitkit-destructive-button fitkit-row-action',
+      attr: { 'aria-label': `Remove ${opts.label}` },
     })
+    setIcon(trashBtn, 'trash-2')
+    trashBtn.addEventListener('click', () => {
+      void this.confirmAndDeleteRow(opts.label, opts.onDelete)
+    })
+  }
+
+  private async confirmAndDeleteRow(label: string, onDelete: () => void): Promise<void> {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      new ConfirmModal(
+        this.app,
+        {
+          title: 'Remove row?',
+          message: `Remove ${label}? This cannot be undone.`,
+          confirmText: 'Remove',
+          cancelText: 'Cancel',
+        },
+        resolve,
+      ).open()
+    })
+    if (confirmed) {
+      onDelete()
+    }
   }
 
   private async switchKind(index: number, nextKind: ExerciseKind): Promise<void> {
@@ -537,7 +565,7 @@ export class WorkoutEditorView extends ItemView {
     if (!(card instanceof HTMLElement)) {
       return
     }
-    const rows = card.querySelectorAll('.fitkit-set-area > .fitkit-set-row:not(.fitkit-set-head)')
+    const rows = card.querySelectorAll('.fitkit-set-area > .fitkit-row')
     const row = rows.item(rowIndex)
     if (!(row instanceof HTMLElement)) {
       return
