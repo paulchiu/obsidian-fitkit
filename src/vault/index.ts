@@ -1,6 +1,6 @@
 import type { App, TAbstractFile, TFile } from 'obsidian'
 
-import { epleyE1rm, pickBestSet } from '../domain/epley'
+import { pickBestSet } from '../domain/epley'
 import type { ExerciseIndexRow, FitKitIndex, IndexDiagnostic, IndexEntry } from '../domain/types'
 import {
   parseWorkoutNote,
@@ -9,8 +9,6 @@ import {
 } from '../domain/workout-note-model'
 import type { FitKitSettings } from '../settings'
 import { normalizeFolder, workoutsFolder } from '../settings-paths'
-
-export { epleyE1rm, pickBestSet }
 
 /**
  * Full vault scan. Lists markdown files under the configured workouts folder.
