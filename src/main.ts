@@ -32,7 +32,7 @@ export default class FitKitPlugin extends Plugin {
     this.addSettingTab(new FitKitSettingTab(this.app, this));
 
     this.addCommand({
-      id: 'fitkit-rebuild-index',
+      id: 'rebuild-index',
       name: 'Rebuild index',
       callback: async () => {
         this.cachedIndex = await rebuildIndex(this.app, this.settings);
@@ -46,7 +46,7 @@ export default class FitKitPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: 'fitkit-rebuild-dashboard',
+      id: 'rebuild-dashboard',
       name: 'Rebuild dashboard',
       callback: async () => {
         this.cachedIndex = await rebuildIndex(this.app, this.settings);
@@ -57,7 +57,7 @@ export default class FitKitPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: 'fitkit-restore-hidden-sections',
+      id: 'restore-hidden-sections',
       name: 'Restore hidden sections in current dashboard',
       callback: async () => {
         const path = normalizePath(dashboardPath(this.settings));
@@ -74,7 +74,7 @@ export default class FitKitPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: 'fitkit-show-parse-diagnostics',
+      id: 'show-parse-diagnostics',
       name: 'Show parse diagnostics',
       callback: () => {
         if (this.lastDiagnostics.length === 0) {
@@ -88,7 +88,7 @@ export default class FitKitPlugin extends Plugin {
     this.registerView(VIEW_TYPE_FITKIT_WORKOUT_EDITOR, (leaf) => new WorkoutEditorView(leaf, this));
 
     this.addCommand({
-      id: 'fitkit-open-todays-workout',
+      id: 'open-todays-workout',
       name: "Open today's workout",
       callback: async () => {
         const today = formatTodayIsoDate();
@@ -108,7 +108,7 @@ export default class FitKitPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: 'fitkit-open-workout-editor',
+      id: 'open-workout-editor',
       name: 'Open workout editor for current file',
       checkCallback: (checking) => {
         const file = this.app.workspace.getActiveFile();
@@ -124,7 +124,7 @@ export default class FitKitPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: 'fitkit-import-journal-active-file',
+      id: 'import-journal-active-file',
       name: 'Import workout from journal note',
       checkCallback: (checking) => {
         const file = this.app.workspace.getActiveFile();
@@ -139,7 +139,7 @@ export default class FitKitPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: 'fitkit-import-journal-paste',
+      id: 'import-journal-paste',
       name: 'Import workout from pasted text',
       callback: () => {
         new ImportModal(this, {

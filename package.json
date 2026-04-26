@@ -1,5 +1,5 @@
 {
-  "name": "obsidian-fitkit",
+  "name": "fitkit",
   "version": "0.1.0",
   "description": "Track workouts as plain-markdown notes in Obsidian.",
   "main": "main.js",

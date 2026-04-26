@@ -13,7 +13,7 @@ v0.1.0: first usable release. Feedback welcome.
 To install via BRAT: install the BRAT community plugin, then add this repo URL.
 
 To install manually: build with `npm run build`, copy main.js, manifest.json,
-and styles.css into `<vault>/.obsidian/plugins/obsidian-fitkit/`, and reload
+and styles.css into `<vault>/.obsidian/plugins/fitkit/`, and reload
 Obsidian.
 
 ## Vault layout

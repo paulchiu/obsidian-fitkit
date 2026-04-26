@@ -113,14 +113,8 @@ export class CreateMissingExercisesModal extends Modal {
       kindCell.setText(row.kind);
     } else {
       const select = kindCell.createEl('select', { cls: 'fitkit-import-select' });
-      const strengthOption = document.createElement('option');
-      strengthOption.value = 'strength';
-      strengthOption.text = 'strength';
-      select.appendChild(strengthOption);
-      const durationOption = document.createElement('option');
-      durationOption.value = 'duration';
-      durationOption.text = 'duration';
-      select.appendChild(durationOption);
+      select.createEl('option', { value: 'strength', text: 'Strength' });
+      select.createEl('option', { value: 'duration', text: 'Duration' });
       select.value = row.kind;
       select.addEventListener('change', () => {
         row.kind = select.value === 'duration' ? 'duration' : 'strength';

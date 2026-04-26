@@ -66,7 +66,7 @@ export async function regenerateDashboard(
   const existing = app.vault.getAbstractFileByPath(path);
 
   if (isMarkdownFile(existing)) {
-    await app.vault.modify(existing, markdown);
+    await app.vault.process(existing, () => markdown);
   } else {
     await app.vault.create(path, markdown);
   }
