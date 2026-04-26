@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Plugin id renamed from `obsidian-fitkit` to `fitkit` to comply with the Obsidian community plugin naming rules (id must not include `obsidian`). The plugin's data folder under `.obsidian/plugins/` moves accordingly; any prior `data.json` will need to be relocated by hand.
 - Command IDs no longer carry the redundant `fitkit-` prefix. Existing user-set hotkeys for these commands will need to be re-bound.
 - Background file writes (dashboard regeneration, journal import, workout editor autosave) now use `Vault.process()` instead of `Vault.modify()`, aligning with current Obsidian guidance.
 
