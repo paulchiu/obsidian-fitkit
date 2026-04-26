@@ -637,6 +637,13 @@ export class WorkoutEditorView extends ItemView {
       }
       finish(false)
     })
+    /** Capture can be revoked (modal steal, OS gesture). Mirror pointercancel cleanup. */
+    body.addEventListener('lostpointercapture', (evt) => {
+      if (evt.pointerId !== pointerId) {
+        return
+      }
+      finish(false)
+    })
   }
 
   private async confirmAndDeleteRow(label: string, onDelete: () => void): Promise<void> {
