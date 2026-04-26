@@ -1,42 +1,15 @@
 import type { App, TAbstractFile, TFile } from 'obsidian'
 
+import type {
+  BestSet,
+  ExerciseIndexRow,
+  FitKitIndex,
+  IndexDiagnostic,
+  IndexEntry,
+} from './domain/types'
 import type { FitKitSettings } from './settings'
 import { normalizeFolder, workoutsFolder } from './settings-paths'
 import { parseWorkoutNote, type ExerciseEntry, type WorkoutNoteModel } from './workout-note-model'
-
-export interface BestSet {
-  weight: number
-  reps: number
-  e1rm: number
-}
-
-export interface ExerciseIndexRow {
-  exerciseName: string
-  kind: 'strength' | 'duration'
-  bestSet?: BestSet
-  totalSets?: number
-  totalDurationSeconds?: number
-}
-
-export interface IndexEntry {
-  path: string
-  mtime: number
-  date: string
-  name: string
-  exercises: ExerciseIndexRow[]
-}
-
-export interface IndexDiagnostic {
-  path: string
-  warnings: string[]
-}
-
-export interface FitKitIndex {
-  schemaVersion: 1
-  builtAt: number
-  entries: IndexEntry[]
-  diagnostics: IndexDiagnostic[]
-}
 
 /** Epley formula: weight * (1 + reps / 30). */
 export function epleyE1rm(weight: number, reps: number): number {

@@ -1,6 +1,6 @@
 import { Notice, Plugin, TFile, normalizePath } from 'obsidian'
 
-import type { FitKitIndex, IndexDiagnostic } from './index'
+import type { FitKitIndex, IndexDiagnostic } from './domain/types'
 import { rebuildIndex } from './index'
 import { CreateMissingExercisesModal } from './create-missing-exercises-modal'
 import { regenerateDashboard } from './dashboard'

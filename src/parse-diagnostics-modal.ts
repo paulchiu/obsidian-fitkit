@@ -1,6 +1,6 @@
 import { Modal, type App } from 'obsidian'
 
-import type { IndexDiagnostic } from './index'
+import type { IndexDiagnostic } from './domain/types'
 
 export class ParseDiagnosticsModal extends Modal {
   private readonly diagnostics: IndexDiagnostic[]

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { composeDashboard } from '../src/dashboard'
-import type { FitKitIndex } from '../src/index'
+import type { FitKitIndex } from '../src/domain/types'
 
 const emptyIndex: FitKitIndex = {
   schemaVersion: 1,
