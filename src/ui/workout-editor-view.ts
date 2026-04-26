@@ -116,6 +116,7 @@ export class WorkoutEditorView extends ItemView {
     }
     this.registerDomEvent(activeWindow, 'pointerup', finish)
     this.registerDomEvent(activeWindow, 'pointercancel', cancel)
+    this.registerDomEvent(activeWindow, 'lostpointercapture', cancel)
   }
 
   async onClose(): Promise<void> {
@@ -737,14 +738,6 @@ export class WorkoutEditorView extends ItemView {
       session.toIndex = this.computeDropIndex(session, evt.clientY)
       this.positionDropIndicator(session)
     })
-
-    handle.addEventListener('lostpointercapture', (evt) => {
-      const session = this.dragSession
-      if (!session || evt.pointerId !== session.pointerId) {
-        return
-      }
-      this.endDrag(false)
-    })
   }
 
   private computeDropIndex(session: DragSession, pointerY: number): number {
@@ -794,10 +787,12 @@ export class WorkoutEditorView extends ItemView {
     if (!commit || !this.model) {
       return
     }
-    if (session.fromIndex === session.toIndex) {
+    const { fromIndex, toIndex } = session
+    const targetIndex = toIndex > fromIndex ? toIndex - 1 : toIndex
+    if (fromIndex === targetIndex) {
       return
     }
-    this.model.exercises = reorderArray(this.model.exercises, session.fromIndex, session.toIndex)
+    this.model.exercises = reorderArray(this.model.exercises, fromIndex, targetIndex)
     this.markDirty()
     this.render()
   }
