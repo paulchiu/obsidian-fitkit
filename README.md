@@ -6,7 +6,7 @@ dashboard with PB tracking.
 
 ## Status
 
-v0.1.0: first usable release. Feedback welcome.
+v0.3.0: workout editor redesign and polish landed. Feedback welcome.
 
 ## Install
 
@@ -34,8 +34,27 @@ Default expectations under `Fitness/` (configurable):
 
 Open a workout note in the FitKit editor to edit sets, reps, weight, and duration
 as structured rows while the note remains plain Markdown. The editor autosaves
-after the configured debounce, tracks file changes, and falls back to the right
-sidebar when it opens a dedicated view.
+after the configured debounce and tracks file changes (mtime + content hash) to
+warn on conflicts.
+
+Per-card controls live in a top row that lines up the drag handle, exercise
+name, and a gear menu at a uniform height. The gear menu offers switch kind,
+move up, move down, and remove (with confirmation). Drag the left-edge grip
+handle to reorder exercises. Click the exercise name to rename via the picker
+or add a new entry inline.
+
+Per-row actions:
+
+- Desktop: each set/duration row carries an overflow kebab on the right with
+  Edit note and Delete row.
+- Obsidian Mobile: swipe right on a row past 80 px to edit the note, swipe left
+  past 80 px to delete (vertical scrolling wins if the gesture starts mostly
+  vertical).
+
+When you switch an exercise's kind via the gear menu, FitKit asks whether to
+apply the change just to this workout or also persist it back to the exercise
+registry so future workouts default to the new kind. Renaming to a registered
+name adopts that entry's kind automatically.
 
 Relevant commands:
 
@@ -123,9 +142,10 @@ Body uses Dataview inline fields per exercise:
 
 Duration exercises use `[duration:: 60]` (seconds).
 
-## Limitations in v0.1.0
+## Limitations
 
-- Merge conflict UI
+- Merge conflict UI (FitKit detects conflicts on autosave and surfaces a notice; manual resolution still happens in the underlying Markdown).
+- No settings-tab editor for the exercise registry beyond the bootstrap action; flip a kind via the gear menu's "Update registry too" choice, or edit `data.json` by hand.
 - SQL/WASM analytics
 - Custom fenced source format
 - Repeat-last-workout shortcut

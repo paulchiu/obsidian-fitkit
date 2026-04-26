@@ -4,6 +4,7 @@ import type { ExerciseRegistry, ExerciseRegistryEntry } from '../src/domain/exer
 import {
   bootstrapFromStems,
   createRegistry,
+  kindForName,
   mergeRegistries,
   removeEntry,
   resolve,
@@ -81,6 +82,26 @@ describe('exercise registry', () => {
       { name: 'Squat', kind: 'strength', aliases: ['squats'] },
       { name: 'Bench Press', kind: 'strength', aliases: [] },
     ])
+  })
+
+  it('returns the kind for an exact match and aliases', () => {
+    const registry = createRegistry([squat, plank])
+
+    expect(kindForName(registry, 'Squat')).toBe('strength')
+    expect(kindForName(registry, 'back squat')).toBe('strength')
+    expect(kindForName(registry, 'plank')).toBe('duration')
+  })
+
+  it('returns null for unknown or ambiguous names', () => {
+    const otherSquat: ExerciseRegistryEntry = {
+      name: 'Front Squat',
+      kind: 'strength',
+      aliases: ['squats'],
+    }
+    const registry = createRegistry([squat, otherSquat])
+
+    expect(kindForName(registry, 'unknown exercise')).toBeNull()
+    expect(kindForName(registry, 'squats')).toBeNull()
   })
 
   it('merges fresh entries case-insensitively', () => {
