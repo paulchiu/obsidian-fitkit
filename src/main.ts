@@ -151,11 +151,6 @@ export default class FitKitPlugin extends Plugin {
     })
   }
 
-  /* eslint-disable-next-line obsidianmd/detach-leaves */
-  onunload(): void {
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR)
-  }
-
   private async openWorkoutEditor(file: TFile): Promise<void> {
     let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR)[0]
     if (!leaf) {
