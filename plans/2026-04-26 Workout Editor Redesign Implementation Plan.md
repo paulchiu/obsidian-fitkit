@@ -114,13 +114,20 @@ bound to frontmatter.
    real `<input>` (use `createEl('input', ...)`). Bind to `model.name`. On `input`,
    update `model.name` and call `markDirty()`. Keep the `<h3>` file basename; keep the
    `date` segment as read-only meta text in this phase.
-3. Do not refactor unrelated code; behavioral surface stays the same elsewhere.
+3. Constrain `updateMetaText` (currently calls `setText()` on `.fitkit-meta`) so it does
+   not clobber the name input on every `markDirty()`. Wrap the date text and the
+   `unsaved` flag in a sibling span (e.g. `.fitkit-meta-line`) and have `updateMetaText`
+   target only that span. Otherwise typing while autosave fires loses focus and
+   characters.
+4. Do not refactor unrelated code; behavioral surface stays the same elsewhere.
 
 **Acceptance:**
 
 - `Open today's workout` opens a tab in the main area regardless of right-sidebar state.
 - Editing the name input persists to frontmatter `name` after autosave; reopening the
   file reflects the saved name.
+- Typing continuously in the name input across an autosave debounce window does not
+  lose focus, drop characters, or reset the caret position.
 - Lint, format, build, tests all clean.
 
 ### Phase 2: Per-card gear menu and ConfirmModal extraction
@@ -148,7 +155,9 @@ Remove button. Remove routes through a confirmation modal.
 
 **Acceptance:**
 
-- Gear button is keyboard-focusable; Enter and Space open the menu.
+- Gear button is keyboard-focusable; Enter and Space open the menu, anchored to the
+  gear's bounding rect (not at `(0, 0)`), and the menu does not clip the viewport on
+  desktop or mobile.
 - Remove never fires without confirmation.
 - Move up / down still work; existing reorder semantics preserved.
 - `npm run lint` clean (no new ESLint warnings, especially around Obsidian API rules).
@@ -172,36 +181,59 @@ menu's Move up / down items become a keyboard / accessibility fallback.
 3. In `renderExerciseCard`, prepend a drag handle to `.fitkit-card-top`. Use
    `setIcon(handle, 'grip-vertical')`. Set `aria-label="Drag to reorder"` and `tabindex="0"`.
 4. Pointer-events drag in a private helper `installCardDrag(card, index)`:
-   - On `pointerdown` on the handle: call `handle.setPointerCapture(evt.pointerId)`,
-     record the start coords and the card's index, add `is-dragging` to the card.
+   - Set `touch-action: none` on `.fitkit-drag-handle` in `styles.css` so iOS / Android
+     do not intercept the gesture as a vertical scroll. Do not set `touch-action` on
+     `.fitkit-exercise-list` itself; the list must still scroll when the user swipes
+     anywhere outside a handle.
+   - On `pointerdown` on the handle: skip non-primary buttons (`evt.button !== 0`),
+     call `handle.setPointerCapture(evt.pointerId)`, record the start coords and the
+     card's index in a single `this.dragSession` field, add `is-dragging` to the card.
    - On `pointermove`: translate the dragged card by setting a CSS custom property via
-     `card.style.setProperty('--fitkit-drag-offset', '<n>px')`. Compute the candidate
-     target index by hit-testing sibling card center Y values.
+     `card.style.setProperty('--fitkit-drag-offset', '<n>px')` (see "AGENTS.md §5
+     watchpoints" below). Compute the candidate target index by hit-testing sibling card
+     center Y values.
    - Render a drop indicator (a single CSS-styled element) inserted into
      `.fitkit-exercise-list` at the candidate index.
-   - On `pointerup` and `pointercancel`: release capture, remove `is-dragging`, remove
-     the indicator. If the target index changed, set
-     `this.model.exercises = reorderArray(this.model.exercises, from, to)`, then call
-     `markDirty()` and `render()`.
+   - On `pointerup`, `pointercancel`, and `lostpointercapture`: release capture, clear
+     `this.dragSession`, remove `is-dragging`, remove the indicator. If the target index
+     changed, set `this.model.exercises = reorderArray(this.model.exercises, from, to)`,
+     then call `markDirty()` and `render()`.
 5. Touch behavior: pointer events handle this. Verify on Obsidian iOS in Phase 7.
-6. Register a fallback `pointerup` listener on `activeWindow` via `this.registerDomEvent`
-   so a dropped pointer (iOS Safari off-viewport) still cleans the `is-dragging` state and
-   the drop indicator.
+6. Register the fallback `pointerup` and `lostpointercapture` listeners on
+   `activeWindow` via `this.registerDomEvent` exactly once per view lifetime, in
+   `onOpen` (not inside `installCardDrag`, which runs on every `render()`).
+   `registerDomEvent` releases on view unload, so per-render registration would leak
+   listeners on every keystroke. The global handler reads `this.dragSession` to decide
+   whether there is anything to clean up.
 
 **AGENTS.md §5 watchpoints:**
 
-- No inline styles. The drag offset uses a CSS custom property set via JS, which is the
-  documented escape hatch in the Obsidian eslint plugin. If the linter still flags it,
-  fall back to a `data-fitkit-drag-offset` attribute and a CSS attribute selector. Do not
-  silence the rule.
+- No inline styles. The drag offset is written via
+  `card.style.setProperty('--fitkit-drag-offset', '<n>px')`; the matching rule in
+  `styles.css` consumes it (`transform: translateY(var(--fitkit-drag-offset, 0));`).
+  Setting a custom property is the documented escape hatch for the Obsidian eslint
+  plugin's no-inline-styles rule. If the linter still flags it, do not silence the rule
+  and do not write `style="transform: ..."` directly. Bubble to the human reviewer
+  before applying any other workaround (a `data-*` attribute fallback cannot express a
+  dynamic pixel offset without ultimately re-introducing a CSS variable).
 - Use `activeWindow` (not bare `window`) for any pointer fallbacks.
+- Per-view DOM cleanup is guaranteed by `registerDomEvent` only when registration runs
+  on the view lifetime (`onOpen`), not on every `render()`.
 
 **Acceptance:**
 
-- Drag-and-drop reorders cards on Obsidian desktop (mouse) and Obsidian mobile (touch).
-- Releasing outside the list cancels (no reorder, no exception).
+- Drag-and-drop reorders cards on Obsidian desktop (mouse) and Obsidian iOS (touch) at
+  360 px viewport width.
+- A vertical swipe that starts outside a drag handle still scrolls the editor list; the
+  drag only engages from the handle.
+- Releasing outside the list cancels (no reorder, no exception). Forcing
+  `lostpointercapture` (e.g., switching apps mid-drag on mobile) cleans the
+  `is-dragging` class and the drop indicator.
 - `tests/array-utils.test.ts` passes.
 - Keyboard users can still reorder via the gear menu's Move up / Move down items.
+- Opening and closing the editor view ≥ 3 times in one session does not leave global
+  pointer listeners attached (verify via DevTools or by inspecting the `onOpen` /
+  `onClose` registration site).
 
 ### Phase 4: Three-column rows, action strip, per-set delete confirm
 
@@ -232,10 +264,20 @@ delete asks for confirmation.
    - Action strip: `display: flex; gap: var(--size-4-1);` aligned trailing the row.
    - Trash button reuses `.fitkit-destructive-button` semantics (neutral at rest, error
      color on hover/focus per AGENTS.md §4); pencil is neutral.
+   - Each tap target on the action strip is at least 44 × 44 px on touch viewports.
+6. `focusRowCell` (currently around line 478 of `src/ui/workout-editor-view.ts`) queries
+   `.fitkit-cell[data-label="<label>"] input.fitkit-input` against direct row
+   descendants. The new structure nests inputs inside the inner 3-col grid, so the
+   query's scope changes. Update the selector to walk the new DOM. Re-verify each
+   add-row code path (`Add set`, `Duplicate last set`, `Add duration entry`) still
+   lands focus on the freshly added cell.
 
 **Acceptance:**
 
-- Strength rows show three columns at iPhone-width viewports (manual + DevTools).
+- Strength rows show three columns at 360 px viewport width with no horizontal scroll;
+  every input stays readable; tap targets meet a 44 px minimum.
+- After `Add set`, `Duplicate last set`, and `Add duration entry`, focus lands on the
+  expected newly-added cell (verified manually).
 - Per-set delete prompts a confirm modal; cancel leaves data intact.
 - Existing parser and serializer tests still pass (no model changes).
 - No inline styles introduced.
@@ -301,8 +343,10 @@ uses the existing exercise picker modal.
    element (`.fitkit-name-button`). Render the current name as the button's text.
 3. Click handler:
    - Build the suggestion list via the existing `collectExerciseSuggestions()` helper.
-   - Open `ExerciseSuggestModal` with the current name pre-populated in the search
-     input (set `modal.inputEl.value` after `open()`).
+   - Open `ExerciseSuggestModal` with the current name pre-populated. After `open()`
+     resolves, set `modal.inputEl.value = currentName` and dispatch an `input` event
+     (`modal.inputEl.dispatchEvent(new Event('input'))`) so the suggestion list
+     refreshes against the prefilled value rather than starting empty.
    - On pick: update `ex.name` to the chosen value, call `markDirty()` and `render()`.
 4. The "Add 'Foo'" path continues to work for renames (changing a card to a brand-new
    name without creating an exercise note, matching the v0.1.0 Q4 contract).
@@ -362,9 +406,14 @@ phase.
 ## 6. Risks
 
 - **Pointer-events drag on iOS.** Pointer capture sometimes drops on iOS Safari for
-  touches that move outside the viewport. Mitigation: register a fallback `pointerup` on
-  `activeWindow` via `this.registerDomEvent`; ensure the cleanup path always removes
-  `is-dragging` and the drop indicator.
+  touches that move outside the viewport. Mitigation: register fallback `pointerup` and
+  `lostpointercapture` listeners on `activeWindow` via `this.registerDomEvent`; ensure
+  the cleanup path always removes `is-dragging`, the drop indicator, and the
+  `dragSession` field.
+- **Listener accumulation across renders.** Per-card setup runs every `render()`; the
+  drag fallback listener must register exactly once per view lifetime in `onOpen`, not
+  per card. Mitigation: a single `dragSession` field on the view + a single global
+  listener; a smoke check in Phase 7 that verifies open / close cycles do not leak.
 - **Inline-style lint trap.** The drag offset uses a CSS custom property set via JS. If
   `obsidianmd/no-inline-styles` flags it, switch to a `data-fitkit-drag-offset`
   attribute paired with a `[data-fitkit-drag-offset]` CSS rule. Do not silence the rule.
