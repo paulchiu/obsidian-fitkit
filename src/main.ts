@@ -1,15 +1,15 @@
 import { Notice, Plugin, TFile, normalizePath } from 'obsidian'
 
 import type { FitKitIndex, IndexDiagnostic } from './domain/types'
-import { rebuildIndex } from './index'
-import { CreateMissingExercisesModal } from './create-missing-exercises-modal'
-import { regenerateDashboard } from './dashboard'
-import { ImportModal } from './import-modal'
-import { ParseDiagnosticsModal } from './parse-diagnostics-modal'
+import { parseWorkoutNote } from './domain/workout-note-model'
 import { DEFAULT_SETTINGS, FitKitSettingTab, type FitKitSettings } from './settings'
 import { dashboardPath, workoutFilename, workoutsFolder } from './settings-paths'
-import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from './workout-editor-view'
-import { parseWorkoutNote } from './workout-note-model'
+import { CreateMissingExercisesModal } from './ui/create-missing-exercises-modal'
+import { ImportModal } from './ui/import-modal'
+import { ParseDiagnosticsModal } from './ui/parse-diagnostics-modal'
+import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from './ui/workout-editor-view'
+import { regenerateDashboard } from './vault/dashboard'
+import { rebuildIndex } from './vault/index'
 
 function formatTodayIsoDate(): string {
   const d = new Date()

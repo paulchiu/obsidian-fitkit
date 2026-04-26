@@ -1,8 +1,8 @@
 import type { App, TAbstractFile, TFile } from 'obsidian'
 
-import type { BestSet, ExerciseIndexRow, FitKitIndex } from './domain/types'
-import type { FitKitSettings } from './settings'
-import { dashboardPath, normalizeFolder, workoutsFolder } from './settings-paths'
+import type { BestSet, ExerciseIndexRow, FitKitIndex } from '../domain/types'
+import type { FitKitSettings } from '../settings'
+import { dashboardPath, normalizeFolder, workoutsFolder } from '../settings-paths'
 
 interface ExerciseAggregate {
   exerciseName: string

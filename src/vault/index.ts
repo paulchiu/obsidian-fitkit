@@ -1,10 +1,14 @@
 import type { App, TAbstractFile, TFile } from 'obsidian'
 
-import { epleyE1rm, pickBestSet } from './domain/epley'
-import type { ExerciseIndexRow, FitKitIndex, IndexDiagnostic, IndexEntry } from './domain/types'
-import type { FitKitSettings } from './settings'
-import { normalizeFolder, workoutsFolder } from './settings-paths'
-import { parseWorkoutNote, type ExerciseEntry, type WorkoutNoteModel } from './workout-note-model'
+import { epleyE1rm, pickBestSet } from '../domain/epley'
+import type { ExerciseIndexRow, FitKitIndex, IndexDiagnostic, IndexEntry } from '../domain/types'
+import {
+  parseWorkoutNote,
+  type ExerciseEntry,
+  type WorkoutNoteModel,
+} from '../domain/workout-note-model'
+import type { FitKitSettings } from '../settings'
+import { normalizeFolder, workoutsFolder } from '../settings-paths'
 
 export { epleyE1rm, pickBestSet }
 

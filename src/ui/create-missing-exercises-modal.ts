@@ -1,11 +1,11 @@
 import { Modal, Notice, TFile, normalizePath } from 'obsidian'
 
-import type { ExerciseKind, ExerciseRegistry } from './exercise-registry'
-import { createRegistry, resolve, upsertEntry } from './exercise-registry'
-import type FitKitPlugin from './main'
-import { exercisesFolder } from './settings-paths'
-import { ensureParentFolder } from './vault-utils'
-import type { ExerciseEntry, WorkoutNoteModel } from './workout-note-model'
+import type { ExerciseKind, ExerciseRegistry } from '../domain/exercise-registry'
+import { createRegistry, resolve, upsertEntry } from '../domain/exercise-registry'
+import type { ExerciseEntry, WorkoutNoteModel } from '../domain/workout-note-model'
+import type FitKitPlugin from '../main'
+import { exercisesFolder } from '../settings-paths'
+import { ensureParentFolder } from '../vault/vault-utils'
 
 type Row = {
   rawName: string

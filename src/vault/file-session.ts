@@ -1,7 +1,7 @@
 import type { App, TFile } from 'obsidian'
 
-import { fnv1a32 } from './hash'
-import { parseWorkoutNote, type WorkoutNoteModel } from './workout-note-model'
+import { fnv1a32 } from '../domain/hash'
+import { parseWorkoutNote, type WorkoutNoteModel } from '../domain/workout-note-model'
 
 export interface LoadResult {
   text: string

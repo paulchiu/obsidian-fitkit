@@ -19,12 +19,13 @@
   - Pure functions for parsing, serialization, normalization, and registry logic. Extract into `src/` modules that are trivially unit-testable without `App`.
   - Classes are fine where Obsidian requires them (`Plugin`, `Modal`, `ItemView`, `SettingTab`). Keep them thin: hold references, wire events, delegate logic to pure helpers.
   - Immutability: `const` by default. Avoid in-place mutation of data structures that flow between modules.
-- **File layout:**
+- **File layout:** `src/` is split into three tiers plus a thin top level for the plugin entry-point and configuration glue.
   - `src/main.ts` - Plugin entry point (`export default class ... extends Plugin`).
-  - `src/<feature>.ts` - Pure helpers (parser, serializer, registry, etc.).
-  - `src/<feature>-modal.ts` or `src/<feature>-view.ts` - Obsidian UI surfaces.
-  - `src/settings.ts` - Settings types, defaults, and `PluginSettingTab` subclass.
-  - Keep the module graph flat. Avoid deep nesting until the codebase justifies it.
+  - `src/settings.ts`, `src/settings-paths.ts` - Settings types, defaults, `PluginSettingTab` subclass, and the pure path helpers shared by every tier.
+  - `src/domain/` - Pure modules (parsers, serializers, registry, scoring, types). No `obsidian` imports allowed.
+  - `src/vault/` - Obsidian-aware, non-UI helpers (vault scanner, file session, dashboard generator, vault-backed registry, vault utilities). May import from `obsidian` and `src/domain/`. Must not import from `src/ui/`.
+  - `src/ui/` - Obsidian UI surfaces (views, modals). May import from anywhere.
+  - Within a tier, imports use `./` relative paths. Cross-tier, use `../<tier>/` (e.g. `../domain/types`). Keep modules at the tier root: avoid deeper nesting until the codebase justifies it.
 - **State:**
   - Plugin settings persisted via `loadData` / `saveData`.
   - Derived state recomputed from files/settings on demand; avoid long-lived in-memory caches unless profiling demands them.

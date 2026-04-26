@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { epleyE1rm, pickBestSet } from '../src/index'
+import { epleyE1rm, pickBestSet } from '../src/vault/index'
 
 describe('index helpers', () => {
   it('calculates Epley e1RM', () => {

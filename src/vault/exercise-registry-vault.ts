@@ -1,9 +1,9 @@
 import type { App } from 'obsidian'
 
-import { bootstrapFromStems, mergeRegistries } from './exercise-registry'
-import type { ExerciseRegistryEntry } from './exercise-registry'
-import type { FitKitSettings } from './settings'
-import { exercisesFolder } from './settings-paths'
+import { bootstrapFromStems, mergeRegistries } from '../domain/exercise-registry'
+import type { ExerciseRegistryEntry } from '../domain/exercise-registry'
+import type { FitKitSettings } from '../settings'
+import { exercisesFolder } from '../settings-paths'
 
 export function exerciseRegistryWithVaultNotes(
   app: App,

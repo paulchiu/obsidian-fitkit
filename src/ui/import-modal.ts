@@ -1,25 +1,25 @@
 import type { App } from 'obsidian'
 import { Modal, Notice, TFile, normalizePath } from 'obsidian'
 
-import { regenerateDashboard } from './dashboard'
-import type { ExerciseRegistryEntry, ResolutionResult } from './exercise-registry'
-import { createRegistry, normalize, resolve } from './exercise-registry'
-import type { ExerciseRegistry } from './exercise-registry'
-import { rebuildIndex, updateIndexEntry } from './index'
-import { exerciseRegistryWithVaultNotes } from './exercise-registry-vault'
-import type { ImportMappingState } from './import-mapping'
+import type { ExerciseRegistryEntry, ResolutionResult } from '../domain/exercise-registry'
+import { createRegistry, normalize, resolve } from '../domain/exercise-registry'
+import type { ExerciseRegistry } from '../domain/exercise-registry'
+import type { ImportMappingState } from '../domain/import-mapping'
 import {
   mappingWithParsedExercises,
   mappingWithSelection,
   registryWithImportMappingChanges,
-} from './import-mapping'
-import type { ParsedExercise, ParsedJournal } from './journal-grammar'
-import { parseJournal } from './journal-grammar'
-import type FitKitPlugin from './main'
-import { exercisesFolder, workoutFilename, workoutsFolder } from './settings-paths'
-import { ensureParentFolder } from './vault-utils'
-import type { CanonicalExercise, CanonicalWorkout } from './workout-note-serializer'
-import { serializeWorkout } from './workout-note-serializer'
+} from '../domain/import-mapping'
+import type { ParsedExercise, ParsedJournal } from '../domain/journal-grammar'
+import { parseJournal } from '../domain/journal-grammar'
+import type { CanonicalExercise, CanonicalWorkout } from '../domain/workout-note-serializer'
+import { serializeWorkout } from '../domain/workout-note-serializer'
+import type FitKitPlugin from '../main'
+import { exercisesFolder, workoutFilename, workoutsFolder } from '../settings-paths'
+import { regenerateDashboard } from '../vault/dashboard'
+import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
+import { rebuildIndex, updateIndexEntry } from '../vault/index'
+import { ensureParentFolder } from '../vault/vault-utils'
 
 interface ImportModalOptions {
   initialInput: string

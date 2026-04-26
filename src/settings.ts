@@ -1,9 +1,9 @@
 import { App, Notice, PluginSettingTab, Setting, normalizePath } from 'obsidian'
 
-import type { ExerciseRegistryEntry } from './exercise-registry'
-import { exerciseRegistryWithVaultNotes } from './exercise-registry-vault'
+import type { ExerciseRegistryEntry } from './domain/exercise-registry'
 import type FitKitPlugin from './main'
 import { dashboardPath, exercisesFolder, workoutsFolder } from './settings-paths'
+import { exerciseRegistryWithVaultNotes } from './vault/exercise-registry-vault'
 
 export { dashboardPath, exercisesFolder, workoutFilename, workoutsFolder } from './settings-paths'
 

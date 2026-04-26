@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { fnv1a32 } from '../src/hash'
+import { fnv1a32 } from '../src/domain/hash'
 
 describe('fnv1a32', () => {
   it('hashes the empty string to the offset basis', () => {

@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import type { DurationRow, ParsedExercise, SetRow } from '../src/journal-grammar'
-import { parseJournal } from '../src/journal-grammar'
+import type { DurationRow, ParsedExercise, SetRow } from '../src/domain/journal-grammar'
+import { parseJournal } from '../src/domain/journal-grammar'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 function fixture(rel: string): string {

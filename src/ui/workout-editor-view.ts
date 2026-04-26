@@ -1,9 +1,6 @@
 import type { App, TFile, WorkspaceLeaf } from 'obsidian'
 import { ItemView, Modal, Notice, SuggestModal } from 'obsidian'
 
-import { FileSession } from './file-session'
-import type FitKitPlugin from './main'
-import { exercisesFolder, workoutsFolder } from './settings-paths'
 import {
   parseWorkoutNote,
   serializeWorkoutNote,
@@ -13,7 +10,10 @@ import {
   type PreserveBlock,
   type StrengthSet,
   type WorkoutNoteModel,
-} from './workout-note-model'
+} from '../domain/workout-note-model'
+import type FitKitPlugin from '../main'
+import { exercisesFolder, workoutsFolder } from '../settings-paths'
+import { FileSession } from '../vault/file-session'
 
 export const VIEW_TYPE_FITKIT_WORKOUT_EDITOR = 'fitkit-workout-editor'
 
