@@ -1,6 +1,6 @@
 {
   "name": "fitkit",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Track workouts as plain-markdown notes in Obsidian. Uses the Dataview plugin to render dashboard history.",
   "main": "main.js",
   "type": "module",

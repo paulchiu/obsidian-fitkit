@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.4.0] - 2026-04-26
+
+### Added
+
 - Workout editor: per-row overflow kebab menu on desktop with Edit note and Delete row entries.
 - Workout editor: touch swipe gestures on rows (swipe right to edit note, swipe left to delete) on Obsidian Mobile.
 
