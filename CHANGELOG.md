@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.3.0] - 2026-04-26
+
+### Added
+
 - Workout editor: per-card gear menu (switch kind, move up, move down, remove with confirmation).
 - Workout editor: drag-and-drop exercise reorder via a left-edge grip handle (mouse and touch).
 - Workout editor: editable workout name in the header.
