@@ -41,7 +41,7 @@
 
 ## 4. Coding Standards
 
-- **Formatting:** 2 spaces for indentation (Prettier enforces, `printWidth: 100`). Semicolons required. Single quotes. Trailing commas where valid (`trailingComma: 'all'`). Run `npm run format` before committing; `npm run format:check` runs in CI.
+- **Formatting:** 2 spaces for indentation (Prettier enforces, `printWidth: 100`). Semicolons omitted (Prettier semi false). Single quotes. Trailing commas where valid (`trailingComma: 'all'`). Run `npm run format` before committing; `npm run format:check` runs in CI.
 - **TypeScript:**
   - `noImplicitAny`, `strictNullChecks`, `noUncheckedIndexedAccess` enabled.
   - No `any`. Use `unknown` and narrow.

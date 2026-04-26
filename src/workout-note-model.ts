@@ -18,60 +18,60 @@
  * verbatim at their original line index and are skipped by the parser.
  */
 
-export type ExerciseKind = 'strength' | 'duration';
+export type ExerciseKind = 'strength' | 'duration'
 
 export interface StrengthSet {
-  set: number;
-  weight?: number;
-  reps?: number;
-  note?: string;
+  set: number
+  weight?: number
+  reps?: number
+  note?: string
 }
 
 export interface DurationEntry {
-  set?: number;
-  durationSeconds: number;
-  note?: string;
+  set?: number
+  durationSeconds: number
+  note?: string
 }
 
 export interface ExerciseEntry {
-  exerciseName: string;
-  kind: ExerciseKind;
-  note?: string;
-  strengthSets?: StrengthSet[];
-  durationEntries?: DurationEntry[];
+  exerciseName: string
+  kind: ExerciseKind
+  note?: string
+  strengthSets?: StrengthSet[]
+  durationEntries?: DurationEntry[]
 }
 
 export interface PreserveBlock {
   /** 0-based line index in the re-serialized output where the block should be injected. */
-  index: number;
-  text: string;
+  index: number
+  text: string
 }
 
 export interface WorkoutNoteModel {
-  date: string;
-  name: string;
-  sourcePath: string;
-  exercises: ExerciseEntry[];
-  preserveBlocks: PreserveBlock[];
+  date: string
+  name: string
+  sourcePath: string
+  exercises: ExerciseEntry[]
+  preserveBlocks: PreserveBlock[]
 }
 
 export interface ParseResult {
-  model: WorkoutNoteModel | null;
+  model: WorkoutNoteModel | null
   /** True iff the note has frontmatter `type: workout`. */
-  isWorkout: boolean;
-  warnings: string[];
+  isWorkout: boolean
+  warnings: string[]
 }
 
-const FRONTMATTER_FENCE = /^---\s*$/;
-const CODE_FENCE = /^```/;
-const H2 = /^##\s+(.*)$/;
-const BULLET = /^[-*]\s+(.*)$/;
+const FRONTMATTER_FENCE = /^---\s*$/
+const CODE_FENCE = /^```/
+const H2 = /^##\s+(.*)$/
+const BULLET = /^[-*]\s+(.*)$/
 /**
  * Matches `[key:: value]` where `value` may itself contain `[[wikilinks]]`.
  * The value alternative accepts either a `[[...]]` run or any non-`]` char.
  */
-const INLINE_FIELD = /\[([a-zA-Z][\w-]*)::\s*((?:\[\[[^\]]*\]\]|[^\]])*)\]/g;
-const WIKILINK = /^\[\[([^\]]+)\]\]$/;
+const INLINE_FIELD = /\[([a-zA-Z][\w-]*)::\s*((?:\[\[[^\]]*\]\]|[^\]])*)\]/g
+const WIKILINK = /^\[\[([^\]]+)\]\]$/
 
 /**
  * Parse a markdown string. Returns a result that flags whether this is a
@@ -79,155 +79,155 @@ const WIKILINK = /^\[\[([^\]]+)\]\]$/;
  * warnings (for example, H2 vs inline exercise name mismatches).
  */
 export function parseWorkoutNote(source: string, sourcePath: string): ParseResult {
-  const warnings: string[] = [];
-  const rawLines = source.split(/\r?\n/);
-  const { frontmatter, frontmatterEnd } = readFrontmatter(rawLines);
+  const warnings: string[] = []
+  const rawLines = source.split(/\r?\n/)
+  const { frontmatter, frontmatterEnd } = readFrontmatter(rawLines)
   if (!frontmatter) {
-    return { model: null, isWorkout: false, warnings };
+    return { model: null, isWorkout: false, warnings }
   }
   if (frontmatter.get('type') !== 'workout') {
-    return { model: null, isWorkout: false, warnings };
+    return { model: null, isWorkout: false, warnings }
   }
-  const date = frontmatter.get('date') ?? '';
-  const name = frontmatter.get('name') ?? '';
+  const date = frontmatter.get('date') ?? ''
+  const name = frontmatter.get('name') ?? ''
 
   /** Walk the body. Strip fenced blocks first (preserving them verbatim). */
-  const bodyLines = rawLines.slice(frontmatterEnd + 1);
-  const { cleanedLines, preserveBlocks } = extractFencedBlocks(bodyLines);
+  const bodyLines = rawLines.slice(frontmatterEnd + 1)
+  const { cleanedLines, preserveBlocks } = extractFencedBlocks(bodyLines)
 
-  const exercises: ExerciseEntry[] = [];
-  let currentHeadingName: string | null = null;
-  let currentHeadingWarned = false;
-  let current: ExerciseEntry | null = null;
+  const exercises: ExerciseEntry[] = []
+  let currentHeadingName: string | null = null
+  let currentHeadingWarned = false
+  let current: ExerciseEntry | null = null
 
   const flush = () => {
     if (current) {
-      exercises.push(current);
-      current = null;
+      exercises.push(current)
+      current = null
     }
-  };
+  }
 
   for (const line of cleanedLines) {
     if (line === null) {
-      continue;
+      continue
     }
-    const trimmed = line.trim();
+    const trimmed = line.trim()
     if (trimmed === '') {
-      continue;
+      continue
     }
-    const h2 = trimmed.match(H2);
+    const h2 = trimmed.match(H2)
     if (h2 && h2[1] !== undefined) {
-      flush();
-      currentHeadingName = parseHeadingName(h2[1].trim());
-      currentHeadingWarned = false;
-      current = null;
-      continue;
+      flush()
+      currentHeadingName = parseHeadingName(h2[1].trim())
+      currentHeadingWarned = false
+      current = null
+      continue
     }
-    const bullet = trimmed.match(BULLET);
+    const bullet = trimmed.match(BULLET)
     if (!bullet || bullet[1] === undefined) {
-      continue;
+      continue
     }
-    const fields = collectInlineFields(bullet[1]);
-    const exerciseField = fields.get('exercise');
+    const fields = collectInlineFields(bullet[1])
+    const exerciseField = fields.get('exercise')
     if (!exerciseField) {
-      continue;
+      continue
     }
-    const inlineName = unwrapWikiLink(exerciseField);
+    const inlineName = unwrapWikiLink(exerciseField)
     if (currentHeadingName && inlineName !== currentHeadingName && !currentHeadingWarned) {
       warnings.push(
         `${sourcePath}: H2 "${currentHeadingName}" disagrees with inline exercise "${inlineName}"; trusting inline.`,
-      );
-      currentHeadingWarned = true;
+      )
+      currentHeadingWarned = true
     }
 
-    const hasSet = fields.has('set');
-    const hasWeight = fields.has('weight');
-    const hasReps = fields.has('reps');
-    const hasDuration = fields.has('duration');
-    const note = fields.get('notes');
+    const hasSet = fields.has('set')
+    const hasWeight = fields.has('weight')
+    const hasReps = fields.has('reps')
+    const hasDuration = fields.has('duration')
+    const note = fields.get('notes')
     if (!current || current.exerciseName !== inlineName) {
-      flush();
-      const kind: ExerciseKind = hasDuration ? 'duration' : 'strength';
+      flush()
+      const kind: ExerciseKind = hasDuration ? 'duration' : 'strength'
       current = {
         exerciseName: inlineName,
         kind,
         strengthSets: kind === 'strength' ? [] : undefined,
         durationEntries: kind === 'duration' ? [] : undefined,
-      };
+      }
     }
 
     if (!hasSet && !hasDuration && !hasWeight && !hasReps) {
       /** Exercise-level note row. */
       if (note !== undefined) {
-        current.note = note;
+        current.note = note
       }
-      continue;
+      continue
     }
 
     if (hasDuration) {
       if (current.kind !== 'duration') {
-        current.kind = 'duration';
-        current.durationEntries = current.durationEntries ?? [];
+        current.kind = 'duration'
+        current.durationEntries = current.durationEntries ?? []
         if ((current.strengthSets ?? []).length > 0) {
           warnings.push(
             `${sourcePath}: Exercise "${inlineName}" has both strength and duration rows; dropping strength data.`,
-          );
+          )
         }
-        current.strengthSets = undefined;
+        current.strengthSets = undefined
       }
-      const durationSeconds = Number(fields.get('duration'));
-      const entry: DurationEntry = { durationSeconds };
+      const durationSeconds = Number(fields.get('duration'))
+      const entry: DurationEntry = { durationSeconds }
       if (hasSet) {
-        entry.set = Number(fields.get('set'));
+        entry.set = Number(fields.get('set'))
       }
       if (note !== undefined) {
-        entry.note = note;
+        entry.note = note
       }
-      current.durationEntries = current.durationEntries ?? [];
-      current.durationEntries.push(entry);
-      continue;
+      current.durationEntries = current.durationEntries ?? []
+      current.durationEntries.push(entry)
+      continue
     }
 
     /** Strength row. We tolerate RPE and drop it; keep set/weight/reps/notes. */
     if (current.kind !== 'strength') {
-      current.kind = 'strength';
-      current.strengthSets = current.strengthSets ?? [];
+      current.kind = 'strength'
+      current.strengthSets = current.strengthSets ?? []
       if ((current.durationEntries ?? []).length > 0) {
         warnings.push(
           `${sourcePath}: Exercise "${inlineName}" has both strength and duration rows; dropping duration data.`,
-        );
+        )
       }
-      current.durationEntries = undefined;
+      current.durationEntries = undefined
     }
-    const setNum = Number(fields.get('set') ?? '0');
-    const set: StrengthSet = { set: setNum };
+    const setNum = Number(fields.get('set') ?? '0')
+    const set: StrengthSet = { set: setNum }
     if (hasWeight) {
-      set.weight = Number(fields.get('weight'));
+      set.weight = Number(fields.get('weight'))
     }
     if (hasReps) {
-      set.reps = Number(fields.get('reps'));
+      set.reps = Number(fields.get('reps'))
     }
     if (note !== undefined) {
-      set.note = note;
+      set.note = note
     }
-    current.strengthSets = current.strengthSets ?? [];
-    current.strengthSets.push(set);
+    current.strengthSets = current.strengthSets ?? []
+    current.strengthSets.push(set)
   }
-  flush();
+  flush()
 
   for (const exercise of exercises) {
     if (exercise.kind !== 'strength') {
-      continue;
+      continue
     }
-    const sets = exercise.strengthSets ?? [];
+    const sets = exercise.strengthSets ?? []
     for (let index = 0; index < sets.length; index += 1) {
-      const expected = index + 1;
-      const actual = sets[index]?.set;
+      const expected = index + 1
+      const actual = sets[index]?.set
       if (actual !== expected) {
         warnings.push(
           `${sourcePath}: Strength set numbers for "${exercise.exerciseName}" skip expected set ${expected}.`,
-        );
-        break;
+        )
+        break
       }
     }
   }
@@ -242,7 +242,7 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
     },
     isWorkout: true,
     warnings,
-  };
+  }
 }
 
 /**
@@ -251,74 +251,74 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
  * original line indices within the generated body.
  */
 export function serializeWorkoutNote(model: WorkoutNoteModel): string {
-  const lines: string[] = [];
-  lines.push('---');
-  lines.push('type: workout');
-  lines.push(`date: ${model.date}`);
-  lines.push(`name: ${model.name}`);
-  lines.push('---');
-  lines.push('');
+  const lines: string[] = []
+  lines.push('---')
+  lines.push('type: workout')
+  lines.push(`date: ${model.date}`)
+  lines.push(`name: ${model.name}`)
+  lines.push('---')
+  lines.push('')
 
-  const bodyStart = lines.length;
-  const bodyLines: string[] = [];
+  const bodyStart = lines.length
+  const bodyLines: string[] = []
   for (let i = 0; i < model.exercises.length; i++) {
-    const exercise = model.exercises[i];
+    const exercise = model.exercises[i]
     if (!exercise) {
-      continue;
+      continue
     }
     if (i > 0) {
-      bodyLines.push('');
+      bodyLines.push('')
     }
-    bodyLines.push(`## [[${exercise.exerciseName}]]`);
-    bodyLines.push('');
+    bodyLines.push(`## [[${exercise.exerciseName}]]`)
+    bodyLines.push('')
     if (exercise.note !== undefined) {
-      bodyLines.push(`- [exercise:: [[${exercise.exerciseName}]]] [notes:: ${exercise.note}]`);
+      bodyLines.push(`- [exercise:: [[${exercise.exerciseName}]]] [notes:: ${exercise.note}]`)
     }
     if (exercise.kind === 'strength') {
       for (const set of exercise.strengthSets ?? []) {
-        const parts = [`[exercise:: [[${exercise.exerciseName}]]]`, `[set:: ${set.set}]`];
+        const parts = [`[exercise:: [[${exercise.exerciseName}]]]`, `[set:: ${set.set}]`]
         if (set.weight !== undefined) {
-          parts.push(`[weight:: ${formatNumber(set.weight)}]`);
+          parts.push(`[weight:: ${formatNumber(set.weight)}]`)
         }
         if (set.reps !== undefined) {
-          parts.push(`[reps:: ${set.reps}]`);
+          parts.push(`[reps:: ${set.reps}]`)
         }
         if (set.note !== undefined) {
-          parts.push(`[notes:: ${set.note}]`);
+          parts.push(`[notes:: ${set.note}]`)
         }
-        bodyLines.push(`- ${parts.join(' ')}`);
+        bodyLines.push(`- ${parts.join(' ')}`)
       }
     } else {
       for (const entry of exercise.durationEntries ?? []) {
-        const parts = [`[exercise:: [[${exercise.exerciseName}]]]`];
+        const parts = [`[exercise:: [[${exercise.exerciseName}]]]`]
         if (entry.set !== undefined) {
-          parts.push(`[set:: ${entry.set}]`);
+          parts.push(`[set:: ${entry.set}]`)
         }
-        parts.push(`[duration:: ${formatNumber(entry.durationSeconds)}]`);
+        parts.push(`[duration:: ${formatNumber(entry.durationSeconds)}]`)
         if (entry.note !== undefined) {
-          parts.push(`[notes:: ${entry.note}]`);
+          parts.push(`[notes:: ${entry.note}]`)
         }
-        bodyLines.push(`- ${parts.join(' ')}`);
+        bodyLines.push(`- ${parts.join(' ')}`)
       }
     }
   }
 
   /** Inject preserveBlocks. Their index is the 0-based line position within the body they occupied originally. */
-  const sortedBlocks = [...model.preserveBlocks].sort((a, b) => a.index - b.index);
-  let offset = 0;
+  const sortedBlocks = [...model.preserveBlocks].sort((a, b) => a.index - b.index)
+  let offset = 0
   for (const block of sortedBlocks) {
-    const insertAt = Math.min(Math.max(block.index + offset, 0), bodyLines.length);
-    const blockLines = block.text.split(/\r?\n/);
-    bodyLines.splice(insertAt, 0, ...blockLines);
-    offset += blockLines.length;
+    const insertAt = Math.min(Math.max(block.index + offset, 0), bodyLines.length)
+    const blockLines = block.text.split(/\r?\n/)
+    bodyLines.splice(insertAt, 0, ...blockLines)
+    offset += blockLines.length
   }
 
   for (const line of bodyLines) {
-    lines.push(line);
+    lines.push(line)
   }
   /** Ensure trailing newline for POSIX-friendly output. */
-  void bodyStart;
-  return lines.join('\n') + '\n';
+  void bodyStart
+  return lines.join('\n') + '\n'
 }
 
 /**
@@ -346,42 +346,42 @@ export function canonicalizeForEquality(model: WorkoutNoteModel): unknown {
         note: entry.note,
       })),
     })),
-  };
+  }
 }
 
 export function semanticEqual(a: WorkoutNoteModel, b: WorkoutNoteModel): boolean {
-  return JSON.stringify(canonicalizeForEquality(a)) === JSON.stringify(canonicalizeForEquality(b));
+  return JSON.stringify(canonicalizeForEquality(a)) === JSON.stringify(canonicalizeForEquality(b))
 }
 
 /** Read the leading frontmatter block. Returns a map of key -> string value and the index of the closing `---`. */
 function readFrontmatter(lines: string[]): {
-  frontmatter: Map<string, string> | null;
-  frontmatterEnd: number;
+  frontmatter: Map<string, string> | null
+  frontmatterEnd: number
 } {
   if (lines.length === 0 || !FRONTMATTER_FENCE.test(lines[0] ?? '')) {
-    return { frontmatter: null, frontmatterEnd: -1 };
+    return { frontmatter: null, frontmatterEnd: -1 }
   }
-  const map = new Map<string, string>();
+  const map = new Map<string, string>()
   for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
+    const line = lines[i]
     if (line === undefined) {
-      break;
+      break
     }
     if (FRONTMATTER_FENCE.test(line)) {
-      return { frontmatter: map, frontmatterEnd: i };
+      return { frontmatter: map, frontmatterEnd: i }
     }
-    const match = line.match(/^([a-zA-Z][\w-]*)\s*:\s*(.*)$/);
+    const match = line.match(/^([a-zA-Z][\w-]*)\s*:\s*(.*)$/)
     if (match && match[1] !== undefined && match[2] !== undefined) {
-      map.set(match[1].trim(), match[2].trim());
+      map.set(match[1].trim(), match[2].trim())
     }
   }
-  return { frontmatter: null, frontmatterEnd: -1 };
+  return { frontmatter: null, frontmatterEnd: -1 }
 }
 
 interface ExtractResult {
   /** Same length as input body lines. Lines that were inside a fenced block are replaced with `null`. */
-  cleanedLines: Array<string | null>;
-  preserveBlocks: PreserveBlock[];
+  cleanedLines: Array<string | null>
+  preserveBlocks: PreserveBlock[]
 }
 
 /**
@@ -390,70 +390,70 @@ interface ExtractResult {
  * start index so the serializer can re-insert them.
  */
 function extractFencedBlocks(bodyLines: string[]): ExtractResult {
-  const cleaned: Array<string | null> = bodyLines.map((l) => l);
-  const blocks: PreserveBlock[] = [];
-  let i = 0;
+  const cleaned: Array<string | null> = bodyLines.map((l) => l)
+  const blocks: PreserveBlock[] = []
+  let i = 0
   while (i < cleaned.length) {
-    const line = cleaned[i];
+    const line = cleaned[i]
     if (typeof line === 'string' && CODE_FENCE.test(line)) {
-      const start = i;
-      const fenceTokenMatch = line.match(/^(`{3,})/);
-      const fenceToken = fenceTokenMatch?.[1] ?? '```';
-      i++;
+      const start = i
+      const fenceTokenMatch = line.match(/^(`{3,})/)
+      const fenceToken = fenceTokenMatch?.[1] ?? '```'
+      i++
       while (i < cleaned.length) {
-        const inner = cleaned[i];
+        const inner = cleaned[i]
         if (typeof inner === 'string' && inner.startsWith(fenceToken)) {
-          i++;
-          break;
+          i++
+          break
         }
-        i++;
+        i++
       }
-      const end = i;
-      const blockText = bodyLines.slice(start, end).join('\n');
+      const end = i
+      const blockText = bodyLines.slice(start, end).join('\n')
       for (let k = start; k < end; k++) {
-        cleaned[k] = null;
+        cleaned[k] = null
       }
-      blocks.push({ index: start, text: blockText });
-      continue;
+      blocks.push({ index: start, text: blockText })
+      continue
     }
-    i++;
+    i++
   }
-  return { cleanedLines: cleaned, preserveBlocks: blocks };
+  return { cleanedLines: cleaned, preserveBlocks: blocks }
 }
 
 function parseHeadingName(raw: string): string {
-  const wiki = raw.match(WIKILINK);
+  const wiki = raw.match(WIKILINK)
   if (wiki && wiki[1] !== undefined) {
-    return wiki[1].trim();
+    return wiki[1].trim()
   }
-  return raw.trim();
+  return raw.trim()
 }
 
 function unwrapWikiLink(raw: string): string {
-  const trimmed = raw.trim();
-  const wiki = trimmed.match(WIKILINK);
+  const trimmed = raw.trim()
+  const wiki = trimmed.match(WIKILINK)
   if (wiki && wiki[1] !== undefined) {
-    return wiki[1].trim();
+    return wiki[1].trim()
   }
-  return trimmed;
+  return trimmed
 }
 
 function collectInlineFields(bullet: string): Map<string, string> {
-  const map = new Map<string, string>();
-  INLINE_FIELD.lastIndex = 0;
-  let match: RegExpExecArray | null;
+  const map = new Map<string, string>()
+  INLINE_FIELD.lastIndex = 0
+  let match: RegExpExecArray | null
   while ((match = INLINE_FIELD.exec(bullet)) !== null) {
-    const key = (match[1] ?? '').toLowerCase();
-    const value = (match[2] ?? '').trim();
-    map.set(key, value);
+    const key = (match[1] ?? '').toLowerCase()
+    const value = (match[2] ?? '').trim()
+    map.set(key, value)
   }
-  return map;
+  return map
 }
 
 function formatNumber(n: number): string {
   if (!Number.isFinite(n)) {
-    return String(n);
+    return String(n)
   }
   /** Render integers without decimal, floats with their natural representation. */
-  return Number.isInteger(n) ? String(n) : String(n);
+  return Number.isInteger(n) ? String(n) : String(n)
 }

@@ -1,35 +1,35 @@
-import type { ExerciseKind, ExerciseRegistry } from './exercise-registry';
-import { normalize, resolve, upsertEntry } from './exercise-registry';
-import type { ParsedExercise } from './journal-grammar';
+import type { ExerciseKind, ExerciseRegistry } from './exercise-registry'
+import { normalize, resolve, upsertEntry } from './exercise-registry'
+import type { ParsedExercise } from './journal-grammar'
 
 export type ImportMappingChoice =
   | { kind: 'resolved'; canonicalName: string }
   | { kind: 'create-new'; canonicalName: string; exerciseKind: ExerciseKind }
-  | { kind: 'unresolved' };
+  | { kind: 'unresolved' }
 
-export type ImportMappingState = Map<string, ImportMappingChoice>;
+export type ImportMappingState = Map<string, ImportMappingChoice>
 
 export function mappingWithSelection(
   mapping: ImportMappingState,
   rawName: string,
   value: string,
 ): ImportMappingState {
-  const next = new Map(mapping);
-  const key = normalize(rawName);
+  const next = new Map(mapping)
+  const key = normalize(rawName)
   if (value === '__unresolved__') {
-    next.set(key, { kind: 'unresolved' });
+    next.set(key, { kind: 'unresolved' })
   } else if (value === 'create-strength' || value === 'create-duration') {
-    const exerciseKind: ExerciseKind = value === 'create-duration' ? 'duration' : 'strength';
+    const exerciseKind: ExerciseKind = value === 'create-duration' ? 'duration' : 'strength'
     next.set(key, {
       kind: 'create-new',
       canonicalName: rawName,
       exerciseKind,
-    });
+    })
   } else if (value.startsWith('existing:')) {
-    const name = value.slice('existing:'.length);
-    next.set(key, { kind: 'resolved', canonicalName: name });
+    const name = value.slice('existing:'.length)
+    next.set(key, { kind: 'resolved', canonicalName: name })
   }
-  return next;
+  return next
 }
 
 export function mappingWithParsedExercises(
@@ -37,79 +37,77 @@ export function mappingWithParsedExercises(
   registry: ExerciseRegistry,
   exercises: ParsedExercise[],
 ): ImportMappingState {
-  const next = new Map(mapping);
-  const seen = new Set<string>();
+  const next = new Map(mapping)
+  const seen = new Set<string>()
   for (const exercise of exercises) {
-    const key = normalize(exercise.rawName);
-    seen.add(key);
+    const key = normalize(exercise.rawName)
+    seen.add(key)
     if (next.has(key)) {
-      continue;
+      continue
     }
-    const resolution = resolve(registry, exercise.rawName);
+    const resolution = resolve(registry, exercise.rawName)
     if (resolution.kind === 'match') {
-      next.set(key, { kind: 'resolved', canonicalName: resolution.entry.name });
+      next.set(key, { kind: 'resolved', canonicalName: resolution.entry.name })
     } else {
-      next.set(key, { kind: 'unresolved' });
+      next.set(key, { kind: 'unresolved' })
     }
   }
   for (const key of [...next.keys()]) {
     if (!seen.has(key)) {
-      next.delete(key);
+      next.delete(key)
     }
   }
-  return next;
+  return next
 }
 
 export type ImportMappingRegistryUpdate = {
-  registry: ExerciseRegistry;
-  changed: boolean;
-};
+  registry: ExerciseRegistry
+  changed: boolean
+}
 
 export function registryWithImportMappingChanges(
   registry: ExerciseRegistry,
   exercises: ParsedExercise[],
   mapping: ImportMappingState,
 ): ImportMappingRegistryUpdate {
-  let next = registry;
-  let changed = false;
-  const seen = new Set<string>();
+  let next = registry
+  let changed = false
+  const seen = new Set<string>()
   for (const exercise of exercises) {
-    const key = normalize(exercise.rawName);
+    const key = normalize(exercise.rawName)
     if (seen.has(key)) {
-      continue;
+      continue
     }
-    seen.add(key);
-    const choice = mapping.get(key);
+    seen.add(key)
+    const choice = mapping.get(key)
     if (!choice || choice.kind === 'unresolved') {
-      continue;
+      continue
     }
-    const existing = next.entries.find((entry) => entry.name === choice.canonicalName);
+    const existing = next.entries.find((entry) => entry.name === choice.canonicalName)
     if (choice.kind === 'create-new') {
       if (!existing) {
         next = upsertEntry(next, {
           name: choice.canonicalName,
           kind: choice.exerciseKind,
           aliases: [],
-        });
-        changed = true;
+        })
+        changed = true
       }
-      continue;
+      continue
     }
     if (!existing) {
-      continue;
+      continue
     }
-    const rawKey = normalize(exercise.rawName);
-    const knownKeys = new Set(
-      [existing.name, ...existing.aliases].map((value) => normalize(value)),
-    );
+    const rawKey = normalize(exercise.rawName)
+    const knownKeys = new Set([existing.name, ...existing.aliases].map((value) => normalize(value)))
     if (knownKeys.has(rawKey)) {
-      continue;
+      continue
     }
     next = upsertEntry(next, {
       ...existing,
       aliases: [...existing.aliases, exercise.rawName],
-    });
-    changed = true;
+    })
+    changed = true
   }
-  return { registry: next, changed };
+  return { registry: next, changed }
 }

@@ -1,23 +1,23 @@
 export function normalizeFolder(s: string): string {
-  return s.replace(/^\/+/, '').replace(/\/+$/, '');
+  return s.replace(/^\/+/, '').replace(/\/+$/, '')
 }
 
 export interface FitKitSettingsPathInput {
-  fitnessRoot: string;
+  fitnessRoot: string
 }
 
 export function workoutsFolder(s: FitKitSettingsPathInput): string {
-  return `${normalizeFolder(s.fitnessRoot)}/Workouts`;
+  return `${normalizeFolder(s.fitnessRoot)}/Workouts`
 }
 
 export function exercisesFolder(s: FitKitSettingsPathInput): string {
-  return `${normalizeFolder(s.fitnessRoot)}/Exercises`;
+  return `${normalizeFolder(s.fitnessRoot)}/Exercises`
 }
 
 export function dashboardPath(s: FitKitSettingsPathInput): string {
-  return `${normalizeFolder(s.fitnessRoot)}/Fitness Dashboard.md`;
+  return `${normalizeFolder(s.fitnessRoot)}/Fitness Dashboard.md`
 }
 
 export function workoutFilename(date: string): string {
-  return `${date}.md`;
+  return `${date}.md`
 }

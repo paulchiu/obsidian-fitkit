@@ -1,142 +1,142 @@
-import { Notice, Plugin, TFile, normalizePath } from 'obsidian';
+import { Notice, Plugin, TFile, normalizePath } from 'obsidian'
 
-import type { FitKitIndex, IndexDiagnostic } from './index';
-import { rebuildIndex } from './index';
-import { CreateMissingExercisesModal } from './create-missing-exercises-modal';
-import { regenerateDashboard } from './dashboard';
-import { ImportModal } from './import-modal';
-import { ParseDiagnosticsModal } from './parse-diagnostics-modal';
-import { DEFAULT_SETTINGS, FitKitSettingTab, type FitKitSettings } from './settings';
-import { dashboardPath, workoutFilename, workoutsFolder } from './settings-paths';
-import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from './workout-editor-view';
-import { parseWorkoutNote } from './workout-note-model';
+import type { FitKitIndex, IndexDiagnostic } from './index'
+import { rebuildIndex } from './index'
+import { CreateMissingExercisesModal } from './create-missing-exercises-modal'
+import { regenerateDashboard } from './dashboard'
+import { ImportModal } from './import-modal'
+import { ParseDiagnosticsModal } from './parse-diagnostics-modal'
+import { DEFAULT_SETTINGS, FitKitSettingTab, type FitKitSettings } from './settings'
+import { dashboardPath, workoutFilename, workoutsFolder } from './settings-paths'
+import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from './workout-editor-view'
+import { parseWorkoutNote } from './workout-note-model'
 
 function formatTodayIsoDate(): string {
-  const d = new Date();
+  const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
     d.getDate(),
-  ).padStart(2, '0')}`;
+  ).padStart(2, '0')}`
 }
 
 function emptyWorkoutMarkdown(date: string): string {
-  return `---\ntype: workout\ndate: ${date}\nname: \n---\n`;
+  return `---\ntype: workout\ndate: ${date}\nname: \n---\n`
 }
 
 export default class FitKitPlugin extends Plugin {
-  settings!: FitKitSettings;
-  cachedIndex: FitKitIndex | null = null;
-  lastDiagnostics: IndexDiagnostic[] = [];
+  settings!: FitKitSettings
+  cachedIndex: FitKitIndex | null = null
+  lastDiagnostics: IndexDiagnostic[] = []
 
   async onload(): Promise<void> {
-    await this.loadSettings();
-    this.addSettingTab(new FitKitSettingTab(this.app, this));
+    await this.loadSettings()
+    this.addSettingTab(new FitKitSettingTab(this.app, this))
 
     this.addCommand({
       id: 'rebuild-index',
       name: 'Rebuild index',
       callback: async () => {
-        this.cachedIndex = await rebuildIndex(this.app, this.settings);
-        this.lastDiagnostics = this.cachedIndex.diagnostics;
+        this.cachedIndex = await rebuildIndex(this.app, this.settings)
+        this.lastDiagnostics = this.cachedIndex.diagnostics
         new Notice(
           `Indexed ${this.cachedIndex.entries.length} workout(s)${
             this.lastDiagnostics.length ? `, ${this.lastDiagnostics.length} diagnostic(s)` : ''
           }.`,
-        );
+        )
       },
-    });
+    })
 
     this.addCommand({
       id: 'rebuild-dashboard',
       name: 'Rebuild dashboard',
       callback: async () => {
-        this.cachedIndex = await rebuildIndex(this.app, this.settings);
-        this.lastDiagnostics = this.cachedIndex.diagnostics;
-        const result = await regenerateDashboard(this.app, this.settings, this.cachedIndex);
-        new Notice(`Dashboard rebuilt: ${result.sectionCount} section(s) at ${result.path}.`);
+        this.cachedIndex = await rebuildIndex(this.app, this.settings)
+        this.lastDiagnostics = this.cachedIndex.diagnostics
+        const result = await regenerateDashboard(this.app, this.settings, this.cachedIndex)
+        new Notice(`Dashboard rebuilt: ${result.sectionCount} section(s) at ${result.path}.`)
       },
-    });
+    })
 
     this.addCommand({
       id: 'restore-hidden-sections',
       name: 'Restore hidden sections in current dashboard',
       callback: async () => {
-        const path = normalizePath(dashboardPath(this.settings));
+        const path = normalizePath(dashboardPath(this.settings))
         if (this.settings.hiddenDashboardSectionsByPath[path]) {
-          delete this.settings.hiddenDashboardSectionsByPath[path];
-          await this.saveSettings();
+          delete this.settings.hiddenDashboardSectionsByPath[path]
+          await this.saveSettings()
         }
         if (!this.cachedIndex) {
-          this.cachedIndex = await rebuildIndex(this.app, this.settings);
+          this.cachedIndex = await rebuildIndex(this.app, this.settings)
         }
-        const result = await regenerateDashboard(this.app, this.settings, this.cachedIndex);
-        new Notice(`Restored hidden sections; ${result.sectionCount} section(s) now in dashboard.`);
+        const result = await regenerateDashboard(this.app, this.settings, this.cachedIndex)
+        new Notice(`Restored hidden sections; ${result.sectionCount} section(s) now in dashboard.`)
       },
-    });
+    })
 
     this.addCommand({
       id: 'show-parse-diagnostics',
       name: 'Show parse diagnostics',
       callback: () => {
         if (this.lastDiagnostics.length === 0) {
-          new Notice('No diagnostics from the last index build.');
-          return;
+          new Notice('No diagnostics from the last index build.')
+          return
         }
-        new ParseDiagnosticsModal(this.app, this.lastDiagnostics).open();
+        new ParseDiagnosticsModal(this.app, this.lastDiagnostics).open()
       },
-    });
+    })
 
-    this.registerView(VIEW_TYPE_FITKIT_WORKOUT_EDITOR, (leaf) => new WorkoutEditorView(leaf, this));
+    this.registerView(VIEW_TYPE_FITKIT_WORKOUT_EDITOR, (leaf) => new WorkoutEditorView(leaf, this))
 
     this.addCommand({
       id: 'open-todays-workout',
       name: "Open today's workout",
       callback: async () => {
-        const today = formatTodayIsoDate();
-        const folder = normalizePath(workoutsFolder(this.settings));
-        const path = normalizePath(`${folder}/${workoutFilename(today)}`);
-        let file = this.app.vault.getAbstractFileByPath(path);
+        const today = formatTodayIsoDate()
+        const folder = normalizePath(workoutsFolder(this.settings))
+        const path = normalizePath(`${folder}/${workoutFilename(today)}`)
+        let file = this.app.vault.getAbstractFileByPath(path)
         if (!(file instanceof TFile)) {
           if (!this.app.vault.getAbstractFileByPath(folder)) {
-            await this.app.vault.createFolder(folder).catch(() => undefined);
+            await this.app.vault.createFolder(folder).catch(() => undefined)
           }
-          file = await this.app.vault.create(path, emptyWorkoutMarkdown(today));
+          file = await this.app.vault.create(path, emptyWorkoutMarkdown(today))
         }
         if (file instanceof TFile) {
-          await this.openWorkoutEditor(file);
+          await this.openWorkoutEditor(file)
         }
       },
-    });
+    })
 
     this.addCommand({
       id: 'open-workout-editor',
       name: 'Open workout editor for current file',
       checkCallback: (checking) => {
-        const file = this.app.workspace.getActiveFile();
-        const ok = file instanceof TFile && file.extension.toLowerCase() === 'md';
+        const file = this.app.workspace.getActiveFile()
+        const ok = file instanceof TFile && file.extension.toLowerCase() === 'md'
         if (!ok) {
-          return false;
+          return false
         }
         if (!checking && file) {
-          void this.openWorkoutEditor(file);
+          void this.openWorkoutEditor(file)
         }
-        return true;
+        return true
       },
-    });
+    })
 
     this.addCommand({
       id: 'import-journal-active-file',
       name: 'Import workout from journal note',
       checkCallback: (checking) => {
-        const file = this.app.workspace.getActiveFile();
+        const file = this.app.workspace.getActiveFile()
         if (!(file instanceof TFile) || file.extension.toLowerCase() !== 'md') {
-          return false;
+          return false
         }
         if (!checking) {
-          void this.openImporterForActiveFile(file);
+          void this.openImporterForActiveFile(file)
         }
-        return true;
+        return true
       },
-    });
+    })
 
     this.addCommand({
       id: 'import-journal-paste',
@@ -146,56 +146,56 @@ export default class FitKitPlugin extends Plugin {
           initialInput: '',
           readOnly: false,
           defaultFilenameDate: formatTodayIsoDate(),
-        }).open();
+        }).open()
       },
-    });
+    })
   }
 
   /* eslint-disable-next-line obsidianmd/detach-leaves */
   onunload(): void {
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR);
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR)
   }
 
   private async openWorkoutEditor(file: TFile): Promise<void> {
-    let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR)[0];
+    let leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR)[0]
     if (!leaf) {
-      leaf = this.app.workspace.getRightLeaf(false) ?? this.app.workspace.getLeaf(true);
+      leaf = this.app.workspace.getRightLeaf(false) ?? this.app.workspace.getLeaf(true)
     }
-    await leaf.setViewState({ type: VIEW_TYPE_FITKIT_WORKOUT_EDITOR, active: true });
-    await this.app.workspace.revealLeaf(leaf);
-    const view = leaf.view;
+    await leaf.setViewState({ type: VIEW_TYPE_FITKIT_WORKOUT_EDITOR, active: true })
+    await this.app.workspace.revealLeaf(leaf)
+    const view = leaf.view
     if (view instanceof WorkoutEditorView) {
-      await view.loadFile(file);
+      await view.loadFile(file)
     }
   }
 
   private async openImporterForActiveFile(file: TFile): Promise<void> {
-    const text = await this.app.vault.read(file);
-    const parsed = parseWorkoutNote(text, file.path);
+    const text = await this.app.vault.read(file)
+    const parsed = parseWorkoutNote(text, file.path)
     if (parsed.isWorkout && parsed.model) {
-      new CreateMissingExercisesModal(this, parsed.model).open();
-      return;
+      new CreateMissingExercisesModal(this, parsed.model).open()
+      return
     }
-    const stem = file.basename;
-    const defaultDate = /^\d{4}-\d{2}-\d{2}$/.test(stem) ? stem : formatTodayIsoDate();
+    const stem = file.basename
+    const defaultDate = /^\d{4}-\d{2}-\d{2}$/.test(stem) ? stem : formatTodayIsoDate()
     new ImportModal(this, {
       initialInput: text,
       readOnly: false,
       defaultFilenameDate: defaultDate,
-    }).open();
+    }).open()
   }
 
   async loadSettings(): Promise<void> {
-    const stored = (await this.loadData()) as Partial<FitKitSettings> | null;
+    const stored = (await this.loadData()) as Partial<FitKitSettings> | null
     if (stored && stored.schemaVersion !== DEFAULT_SETTINGS.schemaVersion) {
-      this.settings = { ...DEFAULT_SETTINGS };
-      await this.saveSettings();
-      return;
+      this.settings = { ...DEFAULT_SETTINGS }
+      await this.saveSettings()
+      return
     }
-    this.settings = { ...DEFAULT_SETTINGS, ...(stored ?? {}) };
+    this.settings = { ...DEFAULT_SETTINGS, ...(stored ?? {}) }
   }
 
   async saveSettings(): Promise<void> {
-    await this.saveData(this.settings);
+    await this.saveData(this.settings)
   }
 }

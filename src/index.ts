@@ -1,46 +1,46 @@
-import type { App, TAbstractFile, TFile } from 'obsidian';
+import type { App, TAbstractFile, TFile } from 'obsidian'
 
-import type { FitKitSettings } from './settings';
-import { normalizeFolder, workoutsFolder } from './settings-paths';
-import { parseWorkoutNote, type ExerciseEntry, type WorkoutNoteModel } from './workout-note-model';
+import type { FitKitSettings } from './settings'
+import { normalizeFolder, workoutsFolder } from './settings-paths'
+import { parseWorkoutNote, type ExerciseEntry, type WorkoutNoteModel } from './workout-note-model'
 
 export interface BestSet {
-  weight: number;
-  reps: number;
-  e1rm: number;
+  weight: number
+  reps: number
+  e1rm: number
 }
 
 export interface ExerciseIndexRow {
-  exerciseName: string;
-  kind: 'strength' | 'duration';
-  bestSet?: BestSet;
-  totalSets?: number;
-  totalDurationSeconds?: number;
+  exerciseName: string
+  kind: 'strength' | 'duration'
+  bestSet?: BestSet
+  totalSets?: number
+  totalDurationSeconds?: number
 }
 
 export interface IndexEntry {
-  path: string;
-  mtime: number;
-  date: string;
-  name: string;
-  exercises: ExerciseIndexRow[];
+  path: string
+  mtime: number
+  date: string
+  name: string
+  exercises: ExerciseIndexRow[]
 }
 
 export interface IndexDiagnostic {
-  path: string;
-  warnings: string[];
+  path: string
+  warnings: string[]
 }
 
 export interface FitKitIndex {
-  schemaVersion: 1;
-  builtAt: number;
-  entries: IndexEntry[];
-  diagnostics: IndexDiagnostic[];
+  schemaVersion: 1
+  builtAt: number
+  entries: IndexEntry[]
+  diagnostics: IndexDiagnostic[]
 }
 
 /** Epley formula: weight * (1 + reps / 30). */
 export function epleyE1rm(weight: number, reps: number): number {
-  return weight * (1 + reps / 30);
+  return weight * (1 + reps / 30)
 }
 
 /**
@@ -54,65 +54,65 @@ export function epleyE1rm(weight: number, reps: number): number {
 export function pickBestSet(
   sets: ReadonlyArray<{ weight?: number; reps?: number }>,
 ): BestSet | null {
-  const eligibleSets = sets.filter(isBestSetCandidate);
+  const eligibleSets = sets.filter(isBestSetCandidate)
   if (eligibleSets.length === 0) {
-    return null;
+    return null
   }
 
   const tierA = pickMaxE1rm(
     eligibleSets.filter((set) => set.weight > 0 && set.reps >= 1 && set.reps <= 12),
-  );
+  )
   if (tierA) {
-    return tierA;
+    return tierA
   }
 
-  const tierB = pickMaxE1rm(eligibleSets.filter((set) => set.weight > 0 && set.reps >= 1));
+  const tierB = pickMaxE1rm(eligibleSets.filter((set) => set.weight > 0 && set.reps >= 1))
   if (tierB) {
-    return tierB;
+    return tierB
   }
 
   if (eligibleSets.every((set) => set.weight === 0)) {
-    const mostReps = pickByScore(eligibleSets, (set) => set.reps);
-    return { weight: mostReps.weight, reps: mostReps.reps, e1rm: 0 };
+    const mostReps = pickByScore(eligibleSets, (set) => set.reps)
+    return { weight: mostReps.weight, reps: mostReps.reps, e1rm: 0 }
   }
 
-  const heaviest = pickByScore(eligibleSets, (set) => set.weight);
+  const heaviest = pickByScore(eligibleSets, (set) => set.weight)
   return {
     weight: heaviest.weight,
     reps: heaviest.reps,
     e1rm: epleyE1rm(heaviest.weight, heaviest.reps),
-  };
+  }
 }
 
 function isBestSetCandidate(set: { weight?: number; reps?: number }): set is {
-  weight: number;
-  reps: number;
+  weight: number
+  reps: number
 } {
-  return set.weight !== undefined && set.reps !== undefined && set.reps !== 0;
+  return set.weight !== undefined && set.reps !== undefined && set.reps !== 0
 }
 
 /**
  * Full vault scan. Lists markdown files under the configured workouts folder.
  */
 export async function rebuildIndex(app: App, settings: FitKitSettings): Promise<FitKitIndex> {
-  const folder = workoutsFolder(settings);
-  const entries: IndexEntry[] = [];
-  const diagnostics: IndexDiagnostic[] = [];
+  const folder = workoutsFolder(settings)
+  const entries: IndexEntry[] = []
+  const diagnostics: IndexDiagnostic[] = []
 
   for (const file of app.vault.getMarkdownFiles()) {
     if (!isInFolder(file.path, folder)) {
-      continue;
+      continue
     }
 
-    const source = await app.vault.read(file);
-    const result = parseWorkoutNote(source, file.path);
+    const source = await app.vault.read(file)
+    const result = parseWorkoutNote(source, file.path)
     if (!result.isWorkout || !result.model) {
-      continue;
+      continue
     }
 
-    entries.push(toEntry(file, result.model));
+    entries.push(toEntry(file, result.model))
     if (result.warnings.length > 0) {
-      diagnostics.push({ path: file.path, warnings: result.warnings });
+      diagnostics.push({ path: file.path, warnings: result.warnings })
     }
   }
 
@@ -121,7 +121,7 @@ export async function rebuildIndex(app: App, settings: FitKitSettings): Promise<
     builtAt: Date.now(),
     entries: sortEntries(entries),
     diagnostics: sortDiagnostics(diagnostics),
-  };
+  }
 }
 
 /**
@@ -133,13 +133,13 @@ export async function updateIndexEntry(
   index: FitKitIndex,
   path: string,
 ): Promise<FitKitIndex> {
-  const normalizedPath = normalizeFolder(path);
-  const existingEntries = index.entries.filter((entry) => entry.path !== normalizedPath);
+  const normalizedPath = normalizeFolder(path)
+  const existingEntries = index.entries.filter((entry) => entry.path !== normalizedPath)
   const existingDiagnostics = index.diagnostics.filter(
     (diagnostic) => diagnostic.path !== normalizedPath,
-  );
-  const file = app.vault.getAbstractFileByPath(normalizedPath);
-  const folder = workoutsFolder(settings);
+  )
+  const file = app.vault.getAbstractFileByPath(normalizedPath)
+  const folder = workoutsFolder(settings)
 
   if (!isMarkdownFile(file) || !isInFolder(file.path, folder)) {
     return {
@@ -147,53 +147,53 @@ export async function updateIndexEntry(
       builtAt: Date.now(),
       entries: existingEntries,
       diagnostics: existingDiagnostics,
-    };
+    }
   }
 
-  const source = await app.vault.read(file);
-  const result = parseWorkoutNote(source, file.path);
+  const source = await app.vault.read(file)
+  const result = parseWorkoutNote(source, file.path)
   if (!result.isWorkout || !result.model) {
     return {
       ...index,
       builtAt: Date.now(),
       entries: existingEntries,
       diagnostics: existingDiagnostics,
-    };
+    }
   }
 
   const diagnostics =
     result.warnings.length > 0
       ? [...existingDiagnostics, { path: file.path, warnings: result.warnings }]
-      : existingDiagnostics;
+      : existingDiagnostics
 
   return {
     ...index,
     builtAt: Date.now(),
     entries: sortEntries([...existingEntries, toEntry(file, result.model)]),
     diagnostics: sortDiagnostics(diagnostics),
-  };
+  }
 }
 
 function pickMaxE1rm(sets: ReadonlyArray<{ weight: number; reps: number }>): BestSet | null {
   if (sets.length === 0) {
-    return null;
+    return null
   }
 
-  const best = pickByScore(sets, (set) => epleyE1rm(set.weight, set.reps));
+  const best = pickByScore(sets, (set) => epleyE1rm(set.weight, set.reps))
   return {
     weight: best.weight,
     reps: best.reps,
     e1rm: epleyE1rm(best.weight, best.reps),
-  };
+  }
 }
 
 function pickByScore<T>(items: ReadonlyArray<T>, score: (item: T) => number): T {
-  const first = items[0];
+  const first = items[0]
   if (first === undefined) {
-    throw new Error('Cannot pick from an empty collection.');
+    throw new Error('Cannot pick from an empty collection.')
   }
 
-  return items.slice(1).reduce((best, item) => (score(item) > score(best) ? item : best), first);
+  return items.slice(1).reduce((best, item) => (score(item) > score(best) ? item : best), first)
 }
 
 function toEntry(file: TFile, model: WorkoutNoteModel): IndexEntry {
@@ -203,12 +203,12 @@ function toEntry(file: TFile, model: WorkoutNoteModel): IndexEntry {
     date: model.date,
     name: model.name,
     exercises: model.exercises.map(toRow),
-  };
+  }
 }
 
 function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
   if (exercise.kind === 'duration') {
-    const durationEntries = exercise.durationEntries ?? [];
+    const durationEntries = exercise.durationEntries ?? []
     return {
       exerciseName: exercise.exerciseName,
       kind: exercise.kind,
@@ -217,30 +217,30 @@ function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
         (total, entry) => total + entry.durationSeconds,
         0,
       ),
-    };
+    }
   }
 
-  const strengthSets = exercise.strengthSets ?? [];
+  const strengthSets = exercise.strengthSets ?? []
   return {
     exerciseName: exercise.exerciseName,
     kind: exercise.kind,
     bestSet: pickBestSet(strengthSets) ?? undefined,
     totalSets: strengthSets.length,
-  };
+  }
 }
 
 function isInFolder(path: string, folder: string): boolean {
-  return path !== folder && path.startsWith(`${folder}/`);
+  return path !== folder && path.startsWith(`${folder}/`)
 }
 
 function isMarkdownFile(file: TAbstractFile | null): file is TFile {
-  return file !== null && (file as { extension?: unknown }).extension === 'md';
+  return file !== null && (file as { extension?: unknown }).extension === 'md'
 }
 
 function sortEntries(entries: ReadonlyArray<IndexEntry>): IndexEntry[] {
-  return [...entries].sort((left, right) => left.path.localeCompare(right.path));
+  return [...entries].sort((left, right) => left.path.localeCompare(right.path))
 }
 
 function sortDiagnostics(diagnostics: ReadonlyArray<IndexDiagnostic>): IndexDiagnostic[] {
-  return [...diagnostics].sort((left, right) => left.path.localeCompare(right.path));
+  return [...diagnostics].sort((left, right) => left.path.localeCompare(right.path))
 }
