@@ -57,11 +57,30 @@
 
 ## 5. Obsidian-Specific Guidance
 
-- **Vault I/O:** Use `app.vault.read` / `app.vault.modify` / `app.vault.create` and `app.vault.getAbstractFileByPath`. Normalize paths with `normalizePath`. Don't touch the filesystem directly.
-- **Autosave pattern (editor views):** Debounce writes (~600ms), flush on tab close and on switching files, and show an `unsaved` indicator while a write is pending. Block on mid-edit external changes and offer a reload path.
+Official references (authoritative):
+
+- Plugin guidelines: https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines
+- Submission requirements: https://docs.obsidian.md/Plugins/Releasing/Submission+requirements+for+plugins
+- Linter (most rules auto-enforced by `npm run lint`): https://github.com/obsidianmd/eslint-plugin
+
+### Pitfalls reviewers and the linter look for
+
+- **Manifest:** `id` and `name` must not include `obsidian`, and `id` must not end with `plugin`. `description` must not begin with "This plugin"/"Obsidian" and must end with terminal punctuation.
+- **UI text:** all user-visible strings (settings, command names, modal copy, locale JSON/TS) are sentence case.
+- **Commands:** don't include the word "command" or duplicate the plugin id in command IDs/names. Don't set default hotkeys.
+- **Vault I/O:** use `vault.process(file, current => next)` for background rewrites and the `Editor` API for active-file edits. Use `fileManager.trashFile(file)` for deletes. Look files up with `vault.getAbstractFileByPath(path)`. Normalize all user-supplied paths with `normalizePath()`. Never touch the filesystem directly.
+- **Popout safety:** use `activeWindow` / `activeDocument` (declared as ESLint readonly globals here) and `activeWindow.setTimeout` / `setInterval`. Bare `window` / `document` / `setTimeout` break in popout windows.
+- **DOM:** build elements via Obsidian helpers (`createEl`, `createDiv`, `createSpan`). Never use `document.createElement`, `innerHTML`, `outerHTML`, or inline styles. All styling lives in `styles.css` using Obsidian CSS variables.
+- **Network & platform:** `requestUrl()` over `fetch()`; `Platform.isMobile` over `navigator.userAgent`.
+- **Lifecycle:** register subscriptions with `this.registerEvent / registerDomEvent / registerInterval`. Don't store view references on the plugin or call `detachLeavesOfType` in `onunload`.
+- **Logging:** no `console.log` in `onload` / `onunload`. Use `Notice` for user feedback.
+- **Mobile:** avoid regex lookbehind (broken on iOS < 16.4) and Node APIs. Keep `isDesktopOnly: false` unless a feature genuinely needs desktop.
+
+### Project-specific patterns
+
+- **Autosave (editor views):** debounce writes (~600ms), flush on tab close and on switching files, show an `unsaved` indicator while a write is pending, and block on mid-edit external changes (offer a reload path).
 - **Dataview inline fields** are the canonical editing surface for workout data: `[exercise:: [[Name]]] [set:: N] [weight:: X] [reps:: Y]` (strength) and `[exercise:: [[Name]]] [duration:: S]` (duration). Fenced code blocks are reporting-only.
-- **Frontmatter contracts:** `type: workout` on workout notes; `type: exercise` on exercise notes. Treat these as the discriminator between canonical docs and journal drafts.
-- **Mobile:** Keep `isDesktopOnly: false` unless a feature genuinely can't run on mobile. Avoid Node APIs and desktop-only Obsidian APIs.
+- **Frontmatter contracts:** `type: workout` on workout notes; `type: exercise` on exercise notes. Treat them as the discriminator between canonical docs and journal drafts.
 
 ## 6. Operation Manual
 
@@ -72,7 +91,7 @@
 - **Format:** `npm run format` (check with `npm run format:check`).
 - **Test:** `npm test` (Vitest, runs unit tests for pure modules).
 - **Version bump:** automated. Every PR must carry exactly one of the labels `major`, `minor`, `patch`, or `norelease`. On merge to `main`, the Release workflow runs `npm version` with that bump, tags the commit as bare `X.Y.Z` (no `v` prefix, so BRAT and the community registry resolve it), and publishes a GitHub release with `main.js`, `manifest.json`, and `styles.css` attached. `npm version <patch|minor|major>` still works locally for dev; it runs `version-bump.mjs` to update `manifest.json` and `versions.json`.
-- **Changelog:** add entries to `CHANGELOG.md` under `## [Unreleased]` as part of each PR. On merge, the Release workflow renames that heading to `## [X.Y.Z] - YYYY-MM-DD` and inserts a fresh empty `[Unreleased]` block above it. Do not rename the heading manually.
+- **Changelog:** add entries to `CHANGELOG.md` under `## [Unreleased]` as part of each PR. Prefix every bullet with the date it was written, in `(YYYY-MM-DD)` form (e.g. `- (2026-04-26) Plugin id renamed...`); use `git blame` if backdating an existing line. On merge, the Release workflow renames the `[Unreleased]` heading to `## [X.Y.Z] - YYYY-MM-DD` and inserts a fresh empty `[Unreleased]` block above it. Do not rename the heading manually.
 
 ## 7. Git Commit Convention
 
