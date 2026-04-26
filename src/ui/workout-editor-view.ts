@@ -16,6 +16,7 @@ import type FitKitPlugin from '../main'
 import { exercisesFolder, workoutsFolder } from '../settings-paths'
 import { FileSession } from '../vault/file-session'
 import { ConfirmModal } from './confirm-modal'
+import { SetNoteModal } from './set-note-modal'
 
 interface DragSession {
   pointerId: number
@@ -383,8 +384,14 @@ export class WorkoutEditorView extends ItemView {
 
     this.renderRowActions(container, {
       label: `set ${i + 1}`,
+      currentNote: set.note,
       onDelete: () => {
         ex.strengthSets.splice(i, 1)
+        this.markDirty()
+        this.render()
+      },
+      onNoteSave: (next) => {
+        set.note = next
         this.markDirty()
         this.render()
       },
@@ -441,8 +448,14 @@ export class WorkoutEditorView extends ItemView {
 
     this.renderRowActions(container, {
       label: `duration entry ${i + 1}`,
+      currentNote: durationEntry.note,
       onDelete: () => {
         ex.durationEntries.splice(i, 1)
+        this.markDirty()
+        this.render()
+      },
+      onNoteSave: (next) => {
+        durationEntry.note = next
         this.markDirty()
         this.render()
       },
@@ -451,7 +464,12 @@ export class WorkoutEditorView extends ItemView {
 
   private renderRowActions(
     container: HTMLElement,
-    opts: { label: string; onDelete: () => void },
+    opts: {
+      label: string
+      currentNote: string | undefined
+      onDelete: () => void
+      onNoteSave: (next: string | undefined) => void
+    },
   ): void {
     const strip = container.createDiv({ cls: 'fitkit-row-actions-strip' })
     const noteBtn = strip.createEl('button', {
@@ -459,7 +477,14 @@ export class WorkoutEditorView extends ItemView {
       attr: { 'aria-label': `Edit note for ${opts.label}` },
     })
     setIcon(noteBtn, 'pencil')
-    noteBtn.toggleAttribute('disabled', true)
+    const openNoteModal = (): void => {
+      new SetNoteModal(this.app, {
+        title: `Note for ${opts.label}`,
+        initial: opts.currentNote ?? '',
+        onSave: opts.onNoteSave,
+      }).open()
+    }
+    noteBtn.addEventListener('click', openNoteModal)
 
     const trashBtn = strip.createEl('button', {
       cls: 'fitkit-btn fitkit-destructive-button fitkit-row-action',
@@ -469,6 +494,21 @@ export class WorkoutEditorView extends ItemView {
     trashBtn.addEventListener('click', () => {
       void this.confirmAndDeleteRow(opts.label, opts.onDelete)
     })
+
+    if (opts.currentNote && opts.currentNote.length > 0) {
+      const line = container.createDiv({
+        cls: 'fitkit-note-line',
+        attr: { role: 'button', tabindex: '0' },
+      })
+      line.setText(opts.currentNote)
+      line.addEventListener('click', openNoteModal)
+      line.addEventListener('keydown', (evt) => {
+        if (evt.key === 'Enter' || evt.key === ' ') {
+          evt.preventDefault()
+          openNoteModal()
+        }
+      })
+    }
   }
 
   private async confirmAndDeleteRow(label: string, onDelete: () => void): Promise<void> {

@@ -244,6 +244,39 @@
   padding: 0;
 }
 
+.fitkit-note-line {
+  width: 100%;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  padding: var(--size-4-1, 4px) var(--size-4-2, 8px);
+  cursor: pointer;
+  white-space: pre-wrap;
+}
+
+.fitkit-note-line:hover,
+.fitkit-note-line:focus-visible {
+  color: var(--text-normal);
+  outline: none;
+}
+
+.fitkit-set-note-modal {
+  display: grid;
+  gap: 12px;
+}
+
+.fitkit-set-note-modal h2 {
+  margin: 0;
+}
+
+.fitkit-set-note-field {
+  display: grid;
+  gap: 4px;
+}
+
+.fitkit-set-note-textarea {
+  min-height: 100px;
+}
+
 .fitkit-footer {
   display: flex;
   gap: 8px;
