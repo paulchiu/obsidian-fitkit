@@ -1,6 +1,8 @@
 /**
  * Simple FNV-1a 32-bit hash over a UTF-16 string. Not cryptographic; used only
- * for change detection. Returns an 8-character hex string.
+ * for change detection. Returns an 8-character hex string. Kept in-tree because
+ * plugins ship with minimal deps and Web Crypto is async, whereas this hash
+ * needs to run synchronously during change detection.
  */
 export function fnv1a32(s: string): string {
   let h = 0x811c9dc5
