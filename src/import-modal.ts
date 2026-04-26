@@ -2,7 +2,7 @@ import type { App } from 'obsidian'
 import { Modal, Notice, TFile, normalizePath } from 'obsidian'
 
 import { regenerateDashboard } from './dashboard'
-import type { ExerciseRegistryEntry } from './exercise-registry'
+import type { ExerciseRegistryEntry, ResolutionResult } from './exercise-registry'
 import { createRegistry, normalize, resolve } from './exercise-registry'
 import type { ExerciseRegistry } from './exercise-registry'
 import { rebuildIndex, updateIndexEntry } from './index'
@@ -25,6 +25,12 @@ interface ImportModalOptions {
   initialInput: string
   readOnly: boolean
   defaultFilenameDate: string
+}
+
+function candidateEntriesFor(resolution: ResolutionResult): ExerciseRegistryEntry[] {
+  if (resolution.kind === 'ambiguous') return resolution.candidates
+  if (resolution.kind === 'match') return [resolution.entry]
+  return []
 }
 
 export class ImportModal extends Modal {
@@ -208,12 +214,7 @@ export class ImportModal extends Modal {
 
     select.createEl('option', { value: '__unresolved__', text: '(unresolved)' })
 
-    const candidateEntries: ExerciseRegistryEntry[] =
-      resolution.kind === 'ambiguous'
-        ? resolution.candidates
-        : resolution.kind === 'match'
-          ? [resolution.entry]
-          : []
+    const candidateEntries: ExerciseRegistryEntry[] = candidateEntriesFor(resolution)
 
     for (const entry of this.registry.entries) {
       select.createEl('option', {
