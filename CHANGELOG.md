@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+### Fixed
+
+### Removed
+
+## [0.2.1] - 2026-04-26
+
+### Added
+
+### Changed
+
 - Plugin and package descriptions now mention the Dataview plugin dependency.
 - README documents the Dataview plugin requirement and expands the Development section.
 
