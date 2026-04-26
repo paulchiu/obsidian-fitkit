@@ -376,13 +376,19 @@
   color: var(--text-on-accent);
 }
 
+.fitkit-btn-danger,
+.fitkit-destructive-button {
+  border-color: var(--text-error);
+  color: var(--text-error);
+}
+
 .fitkit-btn-danger:hover:not(:disabled),
 .fitkit-btn-danger:focus-visible:not(:disabled),
 .fitkit-destructive-button:hover:not(:disabled),
 .fitkit-destructive-button:focus-visible:not(:disabled) {
+  background: var(--text-error);
   border-color: var(--text-error);
-  color: var(--text-error);
-  background: var(--background-modifier-error);
+  color: var(--text-on-accent);
 }
 
 .fitkit-btn-warn {
