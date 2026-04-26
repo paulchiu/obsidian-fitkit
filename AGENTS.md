@@ -118,3 +118,13 @@ Scope in parens is welcome when it clarifies (e.g., `feat(importer): ...`). Keep
 7. **Do not** commit `main.js`, `node_modules`, or `data.json` (user plugin settings).
 8. **Do not** open a PR without exactly one version label (`major`, `minor`, `patch`, or `norelease`). The `check-labels` CI gate enforces this.
 9. **Do not** add user-visible changes without a matching entry under `## [Unreleased]` in `CHANGELOG.md`. Use `norelease` only when batching a truly user-invisible change into a later bump.
+10. **Do not** rewrite the substance of existing files under `plans/`. They are historical records (see §9). Coding-style touch-ups from `npm run format` are fine; intentional content edits are not.
+
+## 9. Plans
+
+The `plans/` directory holds dated implementation plans (e.g. `plans/2026-04-26 v0.2.1 Implementation Plan.md`) used as durable, agent-readable context for the work that produced a particular release.
+
+- **Append-only.** Once a plan ships, treat it as a historical record. Future agents read it to understand prior reasoning, not to modify it. New work goes in a new plan file with a fresh date.
+- **Style-only edits are fine.** Repo-wide formatting passes (`npm run format`, mass-rename refactors that touch every markdown file) may rewrite prose mechanically. That is acceptable. Substantive content edits to a shipped plan are not.
+- **Naming.** `plans/YYYY-MM-DD <title>.md` (sentence case in the title; preserve any acronym casing). The date is when the plan was authored, not when work landed.
+- **Frontmatter.** Each plan starts with YAML frontmatter capturing at minimum `status`, `target`, `date`, and `branch`. Status moves `draft` to `approved` to `shipped`; do not flip back.
