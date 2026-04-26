@@ -186,8 +186,33 @@ export class WorkoutEditorView extends ItemView {
     const header = container.createDiv({ cls: 'fitkit-header' })
     const file = this.session?.file
     header.createEl('h3', { cls: 'fitkit-file-title', text: file?.basename ?? 'Workout' })
+
     const meta = header.createDiv({ cls: 'fitkit-meta' })
-    meta.setText(this.metaText())
+    if (this.model?.isFitKitWorkout) {
+      const nameField = meta.createDiv({ cls: 'fitkit-name-field' })
+      nameField.createEl('label', {
+        cls: 'fitkit-label',
+        text: 'Workout name',
+        attr: { for: 'fitkit-workout-name' },
+      })
+      const nameInput = nameField.createEl('input', {
+        cls: 'fitkit-workout-name-input',
+        attr: {
+          type: 'text',
+          id: 'fitkit-workout-name',
+          placeholder: 'Untitled workout',
+        },
+      })
+      nameInput.value = this.model.name
+      nameInput.addEventListener('input', () => {
+        if (!this.model) {
+          return
+        }
+        this.model.name = nameInput.value
+        this.markDirty()
+      })
+    }
+    meta.createSpan({ cls: 'fitkit-meta-line', text: this.metaLineText() })
   }
 
   private renderExerciseCard(list: HTMLElement, index: number): void {
@@ -586,13 +611,10 @@ export class WorkoutEditorView extends ItemView {
     this.scheduleAutoSave()
   }
 
-  private metaText(): string {
+  private metaLineText(): string {
     const parts: string[] = []
     if (this.model?.date) {
       parts.push(`date: ${this.model.date}`)
-    }
-    if (this.model?.name) {
-      parts.push(`name: ${this.model.name}`)
     }
     if (this.dirty) {
       parts.push('unsaved')
@@ -601,11 +623,10 @@ export class WorkoutEditorView extends ItemView {
   }
 
   private updateMetaText(): void {
-    const meta = this.contentEl.querySelector('.fitkit-meta')
-    if (!meta) {
-      return
+    const line = this.contentEl.querySelector('.fitkit-meta-line')
+    if (line instanceof HTMLElement) {
+      line.setText(this.metaLineText())
     }
-    ;(meta as HTMLElement).setText(this.metaText())
   }
 
   private scheduleAutoSave(): void {

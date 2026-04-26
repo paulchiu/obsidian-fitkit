@@ -29,6 +29,30 @@
 }
 
 .fitkit-meta {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.fitkit-name-field {
+  display: grid;
+  gap: 4px;
+}
+
+.fitkit-workout-name-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 14px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.fitkit-meta-line {
   font-size: 12px;
   color: var(--text-muted);
 }
