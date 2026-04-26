@@ -112,9 +112,13 @@
   font-weight: 600;
 }
 
-.fitkit-kind-toggle {
-  display: flex;
-  gap: 4px;
+.fitkit-gear-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  width: 32px;
+  height: 32px;
 }
 
 .fitkit-field-row {

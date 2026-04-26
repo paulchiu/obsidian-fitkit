@@ -1,5 +1,5 @@
 import type { App, TFile, WorkspaceLeaf } from 'obsidian'
-import { ItemView, Modal, Notice, SuggestModal } from 'obsidian'
+import { ItemView, Menu, Notice, SuggestModal, setIcon } from 'obsidian'
 
 import {
   parseWorkoutNote,
@@ -14,6 +14,7 @@ import {
 import type FitKitPlugin from '../main'
 import { exercisesFolder, workoutsFolder } from '../settings-paths'
 import { FileSession } from '../vault/file-session'
+import { ConfirmModal } from './confirm-modal'
 
 export const VIEW_TYPE_FITKIT_WORKOUT_EDITOR = 'fitkit-workout-editor'
 
@@ -237,29 +238,12 @@ export class WorkoutEditorView extends ItemView {
       this.markDirty()
     })
 
-    const kindWrap = top.createDiv({ cls: 'fitkit-kind-toggle' })
-    const strengthBtn = kindWrap.createEl('button', {
-      cls: `fitkit-btn fitkit-btn-muted${ex.kind === 'strength' ? ' is-active' : ''}`,
-      text: 'Strength',
+    const gearBtn = top.createEl('button', {
+      cls: 'fitkit-btn fitkit-btn-muted fitkit-gear-button',
+      attr: { 'aria-label': 'Exercise options' },
     })
-    const durationBtn = kindWrap.createEl('button', {
-      cls: `fitkit-btn fitkit-btn-muted${ex.kind === 'duration' ? ' is-active' : ''}`,
-      text: 'Duration',
-    })
-    strengthBtn.addEventListener('click', () => void this.switchKind(index, 'strength'))
-    durationBtn.addEventListener('click', () => void this.switchKind(index, 'duration'))
-
-    const moveUp = top.createEl('button', { cls: 'fitkit-btn fitkit-btn-muted', text: 'Up' })
-    moveUp.toggleAttribute('disabled', index === 0)
-    moveUp.addEventListener('click', () => this.moveExercise(index, -1))
-    const moveDown = top.createEl('button', { cls: 'fitkit-btn fitkit-btn-muted', text: 'Down' })
-    moveDown.toggleAttribute('disabled', index === this.model.exercises.length - 1)
-    moveDown.addEventListener('click', () => this.moveExercise(index, 1))
-    const removeBtn = top.createEl('button', {
-      cls: 'fitkit-btn fitkit-destructive-button',
-      text: 'Remove',
-    })
-    removeBtn.addEventListener('click', () => this.removeExercise(index))
+    setIcon(gearBtn, 'settings')
+    gearBtn.addEventListener('click', (evt) => this.openCardMenu(evt, index))
 
     const notesRow = card.createDiv({ cls: 'fitkit-field-row' })
     notesRow.createEl('label', { cls: 'fitkit-label', text: 'Exercise notes' })
@@ -548,6 +532,84 @@ export class WorkoutEditorView extends ItemView {
     this.render()
   }
 
+  private openCardMenu(evt: MouseEvent, index: number): void {
+    if (!this.model) {
+      return
+    }
+    const ex = this.model.exercises[index]
+    if (!ex) {
+      return
+    }
+    const lastIndex = this.model.exercises.length - 1
+    const otherKind: ExerciseKind = ex.kind === 'strength' ? 'duration' : 'strength'
+    const switchLabel = otherKind === 'strength' ? 'Switch to strength' : 'Switch to duration'
+
+    const menu = new Menu()
+    menu.addItem((item) =>
+      item
+        .setTitle(switchLabel)
+        .setIcon('repeat')
+        .onClick(() => void this.switchKind(index, otherKind)),
+    )
+    menu.addSeparator()
+    menu.addItem((item) =>
+      item
+        .setTitle('Move up')
+        .setIcon('chevron-up')
+        .setDisabled(index === 0)
+        .onClick(() => this.moveExercise(index, -1)),
+    )
+    menu.addItem((item) =>
+      item
+        .setTitle('Move down')
+        .setIcon('chevron-down')
+        .setDisabled(index === lastIndex)
+        .onClick(() => this.moveExercise(index, 1)),
+    )
+    menu.addSeparator()
+    menu.addItem((item) =>
+      item
+        .setTitle('Remove exercise')
+        .setIcon('trash-2')
+        .setWarning(true)
+        .onClick(() => void this.confirmAndRemoveExercise(index)),
+    )
+
+    const target = evt.currentTarget
+    if (target instanceof HTMLElement) {
+      const rect = target.getBoundingClientRect()
+      menu.showAtPosition({ x: rect.left, y: rect.bottom })
+    } else {
+      menu.showAtMouseEvent(evt)
+    }
+  }
+
+  private async confirmAndRemoveExercise(index: number): Promise<void> {
+    if (!this.model) {
+      return
+    }
+    const ex = this.model.exercises[index]
+    if (!ex) {
+      return
+    }
+    const confirmed = await new Promise<boolean>((resolve) => {
+      new ConfirmModal(
+        this.app,
+        {
+          title: 'Remove exercise?',
+          message: `Remove "${ex.name}"? This cannot be undone.`,
+          confirmText: 'Remove',
+          cancelText: 'Cancel',
+        },
+        resolve,
+      ).open()
+    })
+    if (!confirmed) {
+      return
+    }
+    this.removeExercise(index)
+  }
+
   private async openAddExerciseModal(): Promise<void> {
     if (!this.model) {
       return
@@ -819,60 +881,6 @@ function toDurationEntry(entry: EditableDurationEntry): DurationEntry {
 
 function isInFolder(path: string, folder: string): boolean {
   return path !== folder && path.startsWith(`${folder}/`)
-}
-
-interface ConfirmModalOptions {
-  title: string
-  message: string
-  confirmText: string
-  cancelText: string
-}
-
-class ConfirmModal extends Modal {
-  private settled = false
-
-  constructor(
-    app: App,
-    private options: ConfirmModalOptions,
-    private resolveChoice: (confirmed: boolean) => void,
-  ) {
-    super(app)
-  }
-
-  onOpen(): void {
-    const { contentEl } = this
-    contentEl.empty()
-    contentEl.addClass('fitkit-kind-confirm-modal')
-    contentEl.createEl('h2', { text: this.options.title })
-    contentEl.createEl('p', { text: this.options.message })
-
-    const actions = contentEl.createDiv({ cls: 'fitkit-confirm-actions' })
-    const cancel = actions.createEl('button', { cls: 'fitkit-btn', text: this.options.cancelText })
-    cancel.addEventListener('click', () => this.finish(false))
-    const confirm = actions.createEl('button', {
-      cls: 'fitkit-btn fitkit-destructive-button',
-      text: this.options.confirmText,
-    })
-    confirm.addEventListener('click', () => this.finish(true))
-  }
-
-  onClose(): void {
-    this.resolve(false)
-    this.contentEl.empty()
-  }
-
-  private finish(confirmed: boolean): void {
-    this.resolve(confirmed)
-    this.close()
-  }
-
-  private resolve(confirmed: boolean): void {
-    if (this.settled) {
-      return
-    }
-    this.settled = true
-    this.resolveChoice(confirmed)
-  }
 }
 
 type ExerciseChoice = {
