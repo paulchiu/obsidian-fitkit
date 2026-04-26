@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Command IDs no longer carry the redundant `fitkit-` prefix. Existing user-set hotkeys for these commands will need to be re-bound.
+- Background file writes (dashboard regeneration, journal import, workout editor autosave) now use `Vault.process()` instead of `Vault.modify()`, aligning with current Obsidian guidance.
+
 ### Fixed
 
 ### Removed

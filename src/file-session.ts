@@ -60,7 +60,7 @@ export class FileSession {
       }
     }
 
-    await this.app.vault.modify(this.file, nextText);
+    await this.app.vault.process(this.file, () => nextText);
     const newHash = fnv1a32(nextText);
     const newMtime = this.file.stat.mtime;
     this.lastHash = newHash;

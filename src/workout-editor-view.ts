@@ -86,7 +86,7 @@ export class WorkoutEditorView extends ItemView {
 
   async onClose(): Promise<void> {
     if (this.autoSaveTimer !== null) {
-      window.clearTimeout(this.autoSaveTimer);
+      activeWindow.clearTimeout(this.autoSaveTimer);
       this.autoSaveTimer = null;
     }
     await this.flushAutoSave();
@@ -103,7 +103,7 @@ export class WorkoutEditorView extends ItemView {
 
   async loadFile(file: TFile): Promise<void> {
     if (this.autoSaveTimer !== null) {
-      window.clearTimeout(this.autoSaveTimer);
+      activeWindow.clearTimeout(this.autoSaveTimer);
       this.autoSaveTimer = null;
     }
     if (this.session && this.dirty && !this.conflictDetected) {
@@ -125,7 +125,7 @@ export class WorkoutEditorView extends ItemView {
       return;
     }
     if (this.autoSaveTimer !== null) {
-      window.clearTimeout(this.autoSaveTimer);
+      activeWindow.clearTimeout(this.autoSaveTimer);
       this.autoSaveTimer = null;
     }
     const { model, isWorkout } = await this.session.load();
@@ -613,9 +613,9 @@ export class WorkoutEditorView extends ItemView {
       return;
     }
     if (this.autoSaveTimer !== null) {
-      window.clearTimeout(this.autoSaveTimer);
+      activeWindow.clearTimeout(this.autoSaveTimer);
     }
-    this.autoSaveTimer = window.setTimeout(() => {
+    this.autoSaveTimer = activeWindow.setTimeout(() => {
       this.autoSaveTimer = null;
       void this.flushAutoSave();
     }, this.plugin.settings.autosaveDebounceMs);

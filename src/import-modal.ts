@@ -206,10 +206,7 @@ export class ImportModal extends Modal {
     const statusCell = row.createEl('td');
     const select = row.createEl('td').createEl('select', { cls: 'fitkit-import-select' });
 
-    const optionUnresolved = document.createElement('option');
-    optionUnresolved.value = '__unresolved__';
-    optionUnresolved.text = '(unresolved)';
-    select.appendChild(optionUnresolved);
+    select.createEl('option', { value: '__unresolved__', text: '(unresolved)' });
 
     const candidateEntries: ExerciseRegistryEntry[] =
       resolution.kind === 'ambiguous'
@@ -219,20 +216,20 @@ export class ImportModal extends Modal {
           : [];
 
     for (const entry of this.registry.entries) {
-      const option = document.createElement('option');
-      option.value = `existing:${entry.name}`;
-      option.text = `${entry.name} (${entry.kind})`;
-      select.appendChild(option);
+      select.createEl('option', {
+        value: `existing:${entry.name}`,
+        text: `${entry.name} (${entry.kind})`,
+      });
     }
 
-    const createStrengthOption = document.createElement('option');
-    createStrengthOption.value = 'create-strength';
-    createStrengthOption.text = `Create new (strength): ${exercise.rawName}`;
-    select.appendChild(createStrengthOption);
-    const createDurationOption = document.createElement('option');
-    createDurationOption.value = 'create-duration';
-    createDurationOption.text = `Create new (duration): ${exercise.rawName}`;
-    select.appendChild(createDurationOption);
+    select.createEl('option', {
+      value: 'create-strength',
+      text: `Create new (strength): ${exercise.rawName}`,
+    });
+    select.createEl('option', {
+      value: 'create-duration',
+      text: `Create new (duration): ${exercise.rawName}`,
+    });
 
     if (choice && choice.kind === 'resolved') {
       select.value = `existing:${choice.canonicalName}`;
@@ -404,9 +401,9 @@ export class ImportModal extends Modal {
       if (!confirm) {
         return;
       }
-      await this.plugin.app.vault.modify(existing, serialized);
+      await this.plugin.app.vault.process(existing, () => serialized);
     } else if (existing instanceof TFile && overwrite) {
-      await this.plugin.app.vault.modify(existing, serialized);
+      await this.plugin.app.vault.process(existing, () => serialized);
     } else {
       await ensureParentFolder(this.plugin.app, targetPath);
       await this.plugin.app.vault.create(targetPath, serialized);
