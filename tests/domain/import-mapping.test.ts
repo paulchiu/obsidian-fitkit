@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { createRegistry, normalize } from '../src/domain/exercise-registry'
+import { createRegistry, normalize } from '../../src/domain/exercise-registry'
 import {
   mappingWithParsedExercises,
   mappingWithSelection,
   registryWithImportMappingChanges,
-} from '../src/domain/import-mapping'
-import type { ImportMappingState } from '../src/domain/import-mapping'
-import { parseJournal } from '../src/domain/journal-grammar'
+} from '../../src/domain/import-mapping'
+import type { ImportMappingState } from '../../src/domain/import-mapping'
+import { parseJournal } from '../../src/domain/journal-grammar'
 
 const squat = { name: 'Squat', kind: 'strength' as const, aliases: [] }
 

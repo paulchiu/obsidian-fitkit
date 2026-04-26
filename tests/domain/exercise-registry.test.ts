@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { ExerciseRegistry, ExerciseRegistryEntry } from '../src/domain/exercise-registry'
+import type { ExerciseRegistry, ExerciseRegistryEntry } from '../../src/domain/exercise-registry'
 import {
   bootstrapFromStems,
   createRegistry,
@@ -9,7 +9,7 @@ import {
   removeEntry,
   resolve,
   upsertEntry,
-} from '../src/domain/exercise-registry'
+} from '../../src/domain/exercise-registry'
 
 const squat: ExerciseRegistryEntry = {
   name: 'Squat',

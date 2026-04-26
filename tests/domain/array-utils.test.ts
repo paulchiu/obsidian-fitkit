@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { reorderArray } from '../src/domain/array-utils'
+import { reorderArray } from '../../src/domain/array-utils'
 
 describe('reorderArray', () => {
   it('moves an element forward', () => {
