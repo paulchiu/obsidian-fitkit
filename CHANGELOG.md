@@ -9,11 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Workout editor: per-card gear menu (switch kind, move up, move down, remove with confirmation).
+- Workout editor: drag-and-drop exercise reorder via a left-edge grip handle (mouse and touch).
+- Workout editor: editable workout name in the header.
+- Workout editor: per-set notes via a pencil icon and a modal; non-empty notes render as wrapping muted text below the row.
+- Workout editor: exercise rename via the existing picker (with "add new" support).
+
 ### Changed
+
+- Workout editor opens in the main area instead of the right sidebar.
+- Workout editor strength rows render as three equal columns (set, weight, reps) at all viewport widths; duration rows render as two equal columns (set, duration).
+- Per-row delete (set or duration entry) now asks for confirmation.
 
 ### Fixed
 
 ### Removed
+
+- Workout editor: legacy up and down buttons (replaced by drag-and-drop and the gear menu).
+- Workout editor: legacy remove-exercise X button (replaced by the gear menu).
+- Workout editor: inline strength/duration toggle buttons (replaced by the gear menu).
+- Workout editor: inline per-row notes input (replaced by the pencil icon and modal).
 
 ## [0.2.1] - 2026-04-26
 
