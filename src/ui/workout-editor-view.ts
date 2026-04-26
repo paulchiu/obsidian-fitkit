@@ -1,6 +1,7 @@
-import type { App, TFile, WorkspaceLeaf } from 'obsidian'
-import { ItemView, Modal, Notice, SuggestModal } from 'obsidian'
+import type { TFile, WorkspaceLeaf } from 'obsidian'
+import { ItemView, Menu, Notice, setIcon } from 'obsidian'
 
+import { reorderArray } from '../domain/array-utils'
 import {
   parseWorkoutNote,
   serializeWorkoutNote,
@@ -14,6 +15,20 @@ import {
 import type FitKitPlugin from '../main'
 import { exercisesFolder, workoutsFolder } from '../settings-paths'
 import { FileSession } from '../vault/file-session'
+import { ConfirmModal } from './confirm-modal'
+import { ExerciseSuggestModal } from './exercise-suggest-modal'
+import { SetNoteModal } from './set-note-modal'
+
+interface DragSession {
+  pointerId: number
+  fromIndex: number
+  toIndex: number
+  startY: number
+  card: HTMLElement
+  handle: HTMLElement
+  list: HTMLElement
+  indicator: HTMLElement
+}
 
 export const VIEW_TYPE_FITKIT_WORKOUT_EDITOR = 'fitkit-workout-editor'
 
@@ -56,6 +71,7 @@ export class WorkoutEditorView extends ItemView {
   private autoSaveTimer: number | null = null
   private autoSaveInflight = false
   private autoSaveRequeued = false
+  private dragSession: DragSession | null = null
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -81,7 +97,26 @@ export class WorkoutEditorView extends ItemView {
     this.resizeObserver = new ResizeObserver(() => this.updateNarrowState())
     this.resizeObserver.observe(this.contentEl)
     this.updateNarrowState()
+    this.registerDragLifetimeListeners()
     this.renderEmpty('Open a workout note to edit.')
+  }
+
+  private registerDragLifetimeListeners(): void {
+    const cancel = (evt: PointerEvent): void => {
+      if (!this.dragSession || evt.pointerId !== this.dragSession.pointerId) {
+        return
+      }
+      this.endDrag(false)
+    }
+    const finish = (evt: PointerEvent): void => {
+      if (!this.dragSession || evt.pointerId !== this.dragSession.pointerId) {
+        return
+      }
+      this.endDrag(true)
+    }
+    this.registerDomEvent(activeWindow, 'pointerup', finish)
+    this.registerDomEvent(activeWindow, 'pointercancel', cancel)
+    this.registerDomEvent(activeWindow, 'lostpointercapture', cancel)
   }
 
   async onClose(): Promise<void> {
@@ -92,6 +127,9 @@ export class WorkoutEditorView extends ItemView {
     await this.flushAutoSave()
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
+    if (this.dragSession) {
+      this.endDrag(false)
+    }
     this.contentEl.empty()
     this.session = null
     this.model = null
@@ -186,8 +224,33 @@ export class WorkoutEditorView extends ItemView {
     const header = container.createDiv({ cls: 'fitkit-header' })
     const file = this.session?.file
     header.createEl('h3', { cls: 'fitkit-file-title', text: file?.basename ?? 'Workout' })
+
     const meta = header.createDiv({ cls: 'fitkit-meta' })
-    meta.setText(this.metaText())
+    if (this.model?.isFitKitWorkout) {
+      const nameField = meta.createDiv({ cls: 'fitkit-name-field' })
+      nameField.createEl('label', {
+        cls: 'fitkit-label',
+        text: 'Workout name',
+        attr: { for: 'fitkit-workout-name' },
+      })
+      const nameInput = nameField.createEl('input', {
+        cls: 'fitkit-workout-name-input',
+        attr: {
+          type: 'text',
+          id: 'fitkit-workout-name',
+          placeholder: 'Untitled workout',
+        },
+      })
+      nameInput.value = this.model.name
+      nameInput.addEventListener('input', () => {
+        if (!this.model) {
+          return
+        }
+        this.model.name = nameInput.value
+        this.markDirty()
+      })
+    }
+    meta.createSpan({ cls: 'fitkit-meta-line', text: this.metaLineText() })
   }
 
   private renderExerciseCard(list: HTMLElement, index: number): void {
@@ -200,41 +263,34 @@ export class WorkoutEditorView extends ItemView {
     }
 
     const card = list.createDiv({ cls: 'fitkit-card' })
+    card.dataset.exerciseIndex = String(index)
 
     const top = card.createDiv({ cls: 'fitkit-card-top' })
-    const nameInput = top.createEl('input', {
-      cls: 'fitkit-name-input',
-      attr: { type: 'text' },
-    })
-    nameInput.value = ex.name
-    nameInput.addEventListener('input', () => {
-      ex.name = nameInput.value
-      this.markDirty()
-    })
 
-    const kindWrap = top.createDiv({ cls: 'fitkit-kind-toggle' })
-    const strengthBtn = kindWrap.createEl('button', {
-      cls: `fitkit-btn fitkit-btn-muted${ex.kind === 'strength' ? ' is-active' : ''}`,
-      text: 'Strength',
+    const handle = top.createEl('button', {
+      cls: 'fitkit-drag-handle',
+      attr: {
+        type: 'button',
+        'aria-label': 'Drag to reorder',
+        tabindex: '0',
+      },
     })
-    const durationBtn = kindWrap.createEl('button', {
-      cls: `fitkit-btn fitkit-btn-muted${ex.kind === 'duration' ? ' is-active' : ''}`,
-      text: 'Duration',
-    })
-    strengthBtn.addEventListener('click', () => void this.switchKind(index, 'strength'))
-    durationBtn.addEventListener('click', () => void this.switchKind(index, 'duration'))
+    setIcon(handle, 'grip-vertical')
+    this.installCardDrag(card, handle, list)
 
-    const moveUp = top.createEl('button', { cls: 'fitkit-btn fitkit-btn-muted', text: 'Up' })
-    moveUp.toggleAttribute('disabled', index === 0)
-    moveUp.addEventListener('click', () => this.moveExercise(index, -1))
-    const moveDown = top.createEl('button', { cls: 'fitkit-btn fitkit-btn-muted', text: 'Down' })
-    moveDown.toggleAttribute('disabled', index === this.model.exercises.length - 1)
-    moveDown.addEventListener('click', () => this.moveExercise(index, 1))
-    const removeBtn = top.createEl('button', {
-      cls: 'fitkit-btn fitkit-destructive-button',
-      text: 'Remove',
+    const nameButton = top.createEl('button', {
+      cls: 'fitkit-name-button',
+      attr: { type: 'button', 'aria-label': 'Change exercise' },
     })
-    removeBtn.addEventListener('click', () => this.removeExercise(index))
+    nameButton.setText(ex.name)
+    nameButton.addEventListener('click', () => void this.openRenameExerciseModal(index))
+
+    const gearBtn = top.createEl('button', {
+      cls: 'fitkit-btn fitkit-btn-muted fitkit-gear-button',
+      attr: { 'aria-label': 'Exercise options' },
+    })
+    setIcon(gearBtn, 'settings')
+    gearBtn.addEventListener('click', (evt) => this.openCardMenu(evt, index))
 
     const notesRow = card.createDiv({ cls: 'fitkit-field-row' })
     notesRow.createEl('label', { cls: 'fitkit-label', text: 'Exercise notes' })
@@ -259,8 +315,6 @@ export class WorkoutEditorView extends ItemView {
     header.createSpan({ cls: 'fitkit-set-label', text: 'Set' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Weight' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Reps' })
-    header.createSpan({ cls: 'fitkit-set-label', text: 'Notes' })
-    header.createSpan({ cls: 'fitkit-set-label', text: '' })
 
     for (let i = 0; i < ex.strengthSets.length; i++) {
       this.renderStrengthRow(wrap, ex, i)
@@ -299,7 +353,8 @@ export class WorkoutEditorView extends ItemView {
     if (!set) {
       return
     }
-    const row = wrap.createDiv({ cls: 'fitkit-set-row' })
+    const container = wrap.createDiv({ cls: 'fitkit-row' })
+    const row = container.createDiv({ cls: 'fitkit-set-row' })
 
     const setInput = this.createInputCell(row, 'Set', { type: 'number', inputmode: 'numeric' })
     setInput.value = set.set !== undefined ? String(set.set) : ''
@@ -326,22 +381,19 @@ export class WorkoutEditorView extends ItemView {
       this.markDirty()
     })
 
-    const notesInput = this.createInputCell(row, 'Notes', { type: 'text' })
-    notesInput.value = set.note ?? ''
-    notesInput.addEventListener('input', () => {
-      set.note = notesInput.value.length > 0 ? notesInput.value : undefined
-      this.markDirty()
-    })
-
-    const actionCell = this.createCell(row, 'Actions', 'fitkit-action-cell')
-    const rm = actionCell.createEl('button', {
-      cls: 'fitkit-btn fitkit-destructive-button',
-      text: 'X',
-    })
-    rm.addEventListener('click', () => {
-      ex.strengthSets.splice(i, 1)
-      this.markDirty()
-      this.render()
+    this.renderRowActions(container, {
+      label: `set ${i + 1}`,
+      currentNote: set.note,
+      onDelete: () => {
+        ex.strengthSets.splice(i, 1)
+        this.markDirty()
+        this.render()
+      },
+      onNoteSave: (next) => {
+        set.note = next
+        this.markDirty()
+        this.render()
+      },
     })
   }
 
@@ -349,9 +401,8 @@ export class WorkoutEditorView extends ItemView {
     const wrap = card.createDiv({ cls: 'fitkit-set-area' })
 
     const header = wrap.createDiv({ cls: 'fitkit-set-row fitkit-duration-row fitkit-set-head' })
+    header.createSpan({ cls: 'fitkit-set-label', text: 'Set' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Duration (s)' })
-    header.createSpan({ cls: 'fitkit-set-label', text: 'Notes' })
-    header.createSpan({ cls: 'fitkit-set-label', text: '' })
 
     for (let i = 0; i < ex.durationEntries.length; i++) {
       this.renderDurationRow(wrap, ex, i)
@@ -372,7 +423,15 @@ export class WorkoutEditorView extends ItemView {
     if (!durationEntry) {
       return
     }
-    const row = wrap.createDiv({ cls: 'fitkit-set-row fitkit-duration-row' })
+    const container = wrap.createDiv({ cls: 'fitkit-row' })
+    const row = container.createDiv({ cls: 'fitkit-set-row fitkit-duration-row' })
+
+    const setInput = this.createInputCell(row, 'Set', { type: 'number', inputmode: 'numeric' })
+    setInput.value = durationEntry.set !== undefined ? String(durationEntry.set) : String(i + 1)
+    setInput.addEventListener('input', () => {
+      durationEntry.set = parseNumberInput(setInput.value)
+      this.markDirty()
+    })
 
     const durationInput = this.createInputCell(row, 'Duration (s)', {
       type: 'number',
@@ -386,23 +445,87 @@ export class WorkoutEditorView extends ItemView {
       this.markDirty()
     })
 
-    const notesInput = this.createInputCell(row, 'Notes', { type: 'text' })
-    notesInput.value = durationEntry.note ?? ''
-    notesInput.addEventListener('input', () => {
-      durationEntry.note = notesInput.value.length > 0 ? notesInput.value : undefined
-      this.markDirty()
+    this.renderRowActions(container, {
+      label: `duration entry ${i + 1}`,
+      currentNote: durationEntry.note,
+      onDelete: () => {
+        ex.durationEntries.splice(i, 1)
+        this.markDirty()
+        this.render()
+      },
+      onNoteSave: (next) => {
+        durationEntry.note = next
+        this.markDirty()
+        this.render()
+      },
+    })
+  }
+
+  private renderRowActions(
+    container: HTMLElement,
+    opts: {
+      label: string
+      currentNote: string | undefined
+      onDelete: () => void
+      onNoteSave: (next: string | undefined) => void
+    },
+  ): void {
+    const strip = container.createDiv({ cls: 'fitkit-row-actions-strip' })
+    const noteBtn = strip.createEl('button', {
+      cls: 'fitkit-btn fitkit-row-action',
+      attr: { 'aria-label': `Edit note for ${opts.label}` },
+    })
+    setIcon(noteBtn, 'pencil')
+    const openNoteModal = (): void => {
+      new SetNoteModal(this.app, {
+        title: `Note for ${opts.label}`,
+        initial: opts.currentNote ?? '',
+        onSave: opts.onNoteSave,
+      }).open()
+    }
+    noteBtn.addEventListener('click', openNoteModal)
+
+    const trashBtn = strip.createEl('button', {
+      cls: 'fitkit-btn fitkit-destructive-button fitkit-row-action',
+      attr: { 'aria-label': `Remove ${opts.label}` },
+    })
+    setIcon(trashBtn, 'trash-2')
+    trashBtn.addEventListener('click', () => {
+      void this.confirmAndDeleteRow(opts.label, opts.onDelete)
     })
 
-    const actionCell = this.createCell(row, 'Actions', 'fitkit-action-cell')
-    const rm = actionCell.createEl('button', {
-      cls: 'fitkit-btn fitkit-destructive-button',
-      text: 'X',
+    if (opts.currentNote && opts.currentNote.length > 0) {
+      const line = container.createDiv({
+        cls: 'fitkit-note-line',
+        attr: { role: 'button', tabindex: '0' },
+      })
+      line.setText(opts.currentNote)
+      line.addEventListener('click', openNoteModal)
+      line.addEventListener('keydown', (evt) => {
+        if (evt.key === 'Enter' || evt.key === ' ') {
+          evt.preventDefault()
+          openNoteModal()
+        }
+      })
+    }
+  }
+
+  private async confirmAndDeleteRow(label: string, onDelete: () => void): Promise<void> {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      new ConfirmModal(
+        this.app,
+        {
+          title: 'Remove row?',
+          message: `Remove ${label}? This cannot be undone.`,
+          confirmText: 'Remove',
+          cancelText: 'Cancel',
+        },
+        resolve,
+      ).open()
     })
-    rm.addEventListener('click', () => {
-      ex.durationEntries.splice(i, 1)
-      this.markDirty()
-      this.render()
-    })
+    if (confirmed) {
+      onDelete()
+    }
   }
 
   private async switchKind(index: number, nextKind: ExerciseKind): Promise<void> {
@@ -481,7 +604,7 @@ export class WorkoutEditorView extends ItemView {
     if (!(card instanceof HTMLElement)) {
       return
     }
-    const rows = card.querySelectorAll('.fitkit-set-area > .fitkit-set-row:not(.fitkit-set-head)')
+    const rows = card.querySelectorAll('.fitkit-set-area > .fitkit-row')
     const row = rows.item(rowIndex)
     if (!(row instanceof HTMLElement)) {
       return
@@ -523,6 +646,183 @@ export class WorkoutEditorView extends ItemView {
     this.render()
   }
 
+  private openCardMenu(evt: MouseEvent, index: number): void {
+    if (!this.model) {
+      return
+    }
+    const ex = this.model.exercises[index]
+    if (!ex) {
+      return
+    }
+    const lastIndex = this.model.exercises.length - 1
+    const otherKind: ExerciseKind = ex.kind === 'strength' ? 'duration' : 'strength'
+    const switchLabel = otherKind === 'strength' ? 'Switch to strength' : 'Switch to duration'
+
+    const menu = new Menu()
+    menu.addItem((item) =>
+      item
+        .setTitle(switchLabel)
+        .setIcon('repeat')
+        .onClick(() => void this.switchKind(index, otherKind)),
+    )
+    menu.addSeparator()
+    menu.addItem((item) =>
+      item
+        .setTitle('Move up')
+        .setIcon('chevron-up')
+        .setDisabled(index === 0)
+        .onClick(() => this.moveExercise(index, -1)),
+    )
+    menu.addItem((item) =>
+      item
+        .setTitle('Move down')
+        .setIcon('chevron-down')
+        .setDisabled(index === lastIndex)
+        .onClick(() => this.moveExercise(index, 1)),
+    )
+    menu.addSeparator()
+    menu.addItem((item) =>
+      item
+        .setTitle('Remove exercise')
+        .setIcon('trash-2')
+        .setWarning(true)
+        .onClick(() => void this.confirmAndRemoveExercise(index)),
+    )
+
+    const target = evt.currentTarget
+    if (target instanceof HTMLElement) {
+      const rect = target.getBoundingClientRect()
+      menu.showAtPosition({ x: rect.left, y: rect.bottom })
+    } else {
+      menu.showAtMouseEvent(evt)
+    }
+  }
+
+  private installCardDrag(card: HTMLElement, handle: HTMLElement, list: HTMLElement): void {
+    handle.addEventListener('pointerdown', (evt) => {
+      if (evt.button !== 0) {
+        return
+      }
+      if (this.dragSession) {
+        return
+      }
+      const fromIndex = readCardIndex(card)
+      if (fromIndex === null) {
+        return
+      }
+      evt.preventDefault()
+      handle.setPointerCapture(evt.pointerId)
+      const indicator = list.createDiv({ cls: 'fitkit-drop-indicator' })
+      const session: DragSession = {
+        pointerId: evt.pointerId,
+        fromIndex,
+        toIndex: fromIndex,
+        startY: evt.clientY,
+        card,
+        handle,
+        list,
+        indicator,
+      }
+      this.dragSession = session
+      card.addClass('is-dragging')
+      this.positionDropIndicator(session)
+    })
+
+    handle.addEventListener('pointermove', (evt) => {
+      const session = this.dragSession
+      if (!session || evt.pointerId !== session.pointerId) {
+        return
+      }
+      const dy = evt.clientY - session.startY
+      session.card.style.setProperty('--fitkit-drag-offset', `${dy}px`)
+      session.toIndex = this.computeDropIndex(session, evt.clientY)
+      this.positionDropIndicator(session)
+    })
+  }
+
+  private computeDropIndex(session: DragSession, pointerY: number): number {
+    const cards = Array.from(session.list.querySelectorAll<HTMLElement>(':scope > .fitkit-card'))
+    let target = session.fromIndex
+    for (let i = 0; i < cards.length; i++) {
+      const sibling = cards[i]
+      if (!sibling || sibling === session.card) {
+        continue
+      }
+      const rect = sibling.getBoundingClientRect()
+      const midpoint = rect.top + rect.height / 2
+      if (pointerY < midpoint) {
+        target = i
+        break
+      }
+      target = i
+    }
+    return target
+  }
+
+  private positionDropIndicator(session: DragSession): void {
+    const cards = Array.from(session.list.querySelectorAll<HTMLElement>(':scope > .fitkit-card'))
+    const reference = cards[session.toIndex] ?? null
+    if (reference === session.indicator) {
+      return
+    }
+    if (reference) {
+      session.list.insertBefore(session.indicator, reference)
+    } else {
+      session.list.appendChild(session.indicator)
+    }
+  }
+
+  private endDrag(commit: boolean): void {
+    const session = this.dragSession
+    if (!session) {
+      return
+    }
+    this.dragSession = null
+    session.card.removeClass('is-dragging')
+    session.card.style.removeProperty('--fitkit-drag-offset')
+    if (session.handle.hasPointerCapture(session.pointerId)) {
+      session.handle.releasePointerCapture(session.pointerId)
+    }
+    session.indicator.remove()
+    if (!commit || !this.model) {
+      return
+    }
+    const { fromIndex, toIndex } = session
+    const targetIndex = toIndex > fromIndex ? toIndex - 1 : toIndex
+    if (fromIndex === targetIndex) {
+      return
+    }
+    this.model.exercises = reorderArray(this.model.exercises, fromIndex, targetIndex)
+    this.markDirty()
+    this.render()
+  }
+
+  private async confirmAndRemoveExercise(index: number): Promise<void> {
+    if (!this.model) {
+      return
+    }
+    const ex = this.model.exercises[index]
+    if (!ex) {
+      return
+    }
+    const confirmed = await new Promise<boolean>((resolve) => {
+      new ConfirmModal(
+        this.app,
+        {
+          title: 'Remove exercise?',
+          message: `Remove "${ex.name}"? This cannot be undone.`,
+          confirmText: 'Remove',
+          cancelText: 'Cancel',
+        },
+        resolve,
+      ).open()
+    })
+    if (!confirmed) {
+      return
+    }
+    this.removeExercise(index)
+  }
+
   private async openAddExerciseModal(): Promise<void> {
     if (!this.model) {
       return
@@ -544,6 +844,36 @@ export class WorkoutEditorView extends ItemView {
       this.render()
       this.focusRowCell(exerciseIndex, 0, 'Weight')
     }).open()
+  }
+
+  private async openRenameExerciseModal(index: number): Promise<void> {
+    if (!this.model) {
+      return
+    }
+    const ex = this.model.exercises[index]
+    if (!ex) {
+      return
+    }
+    const names = await this.collectExerciseSuggestions()
+    const modal = new ExerciseSuggestModal(this.app, names, (name) => {
+      const trimmed = name.trim()
+      if (!trimmed || !this.model) {
+        return
+      }
+      const target = this.model.exercises[index]
+      if (!target) {
+        return
+      }
+      if (target.name === trimmed) {
+        return
+      }
+      target.name = trimmed
+      this.markDirty()
+      this.render()
+    })
+    modal.open()
+    modal.inputEl.value = ex.name
+    modal.inputEl.dispatchEvent(new Event('input'))
   }
 
   private async collectExerciseSuggestions(): Promise<string[]> {
@@ -586,13 +916,10 @@ export class WorkoutEditorView extends ItemView {
     this.scheduleAutoSave()
   }
 
-  private metaText(): string {
+  private metaLineText(): string {
     const parts: string[] = []
     if (this.model?.date) {
       parts.push(`date: ${this.model.date}`)
-    }
-    if (this.model?.name) {
-      parts.push(`name: ${this.model.name}`)
     }
     if (this.dirty) {
       parts.push('unsaved')
@@ -601,11 +928,10 @@ export class WorkoutEditorView extends ItemView {
   }
 
   private updateMetaText(): void {
-    const meta = this.contentEl.querySelector('.fitkit-meta')
-    if (!meta) {
-      return
+    const line = this.contentEl.querySelector('.fitkit-meta-line')
+    if (line instanceof HTMLElement) {
+      line.setText(this.metaLineText())
     }
-    ;(meta as HTMLElement).setText(this.metaText())
   }
 
   private scheduleAutoSave(): void {
@@ -800,134 +1126,11 @@ function isInFolder(path: string, folder: string): boolean {
   return path !== folder && path.startsWith(`${folder}/`)
 }
 
-interface ConfirmModalOptions {
-  title: string
-  message: string
-  confirmText: string
-  cancelText: string
-}
-
-class ConfirmModal extends Modal {
-  private settled = false
-
-  constructor(
-    app: App,
-    private options: ConfirmModalOptions,
-    private resolveChoice: (confirmed: boolean) => void,
-  ) {
-    super(app)
+function readCardIndex(card: HTMLElement): number | null {
+  const raw = card.dataset.exerciseIndex
+  if (!raw) {
+    return null
   }
-
-  onOpen(): void {
-    const { contentEl } = this
-    contentEl.empty()
-    contentEl.addClass('fitkit-kind-confirm-modal')
-    contentEl.createEl('h2', { text: this.options.title })
-    contentEl.createEl('p', { text: this.options.message })
-
-    const actions = contentEl.createDiv({ cls: 'fitkit-confirm-actions' })
-    const cancel = actions.createEl('button', { cls: 'fitkit-btn', text: this.options.cancelText })
-    cancel.addEventListener('click', () => this.finish(false))
-    const confirm = actions.createEl('button', {
-      cls: 'fitkit-btn fitkit-destructive-button',
-      text: this.options.confirmText,
-    })
-    confirm.addEventListener('click', () => this.finish(true))
-  }
-
-  onClose(): void {
-    this.resolve(false)
-    this.contentEl.empty()
-  }
-
-  private finish(confirmed: boolean): void {
-    this.resolve(confirmed)
-    this.close()
-  }
-
-  private resolve(confirmed: boolean): void {
-    if (this.settled) {
-      return
-    }
-    this.settled = true
-    this.resolveChoice(confirmed)
-  }
-}
-
-type ExerciseChoice = {
-  type: 'existing' | 'new'
-  name: string
-}
-
-class ExerciseSuggestModal extends SuggestModal<ExerciseChoice> {
-  private handleEnterKeydown = (event: KeyboardEvent): void => {
-    if (event.key !== 'Enter') {
-      return
-    }
-    const first = this.getSuggestions(this.inputEl.value)[0]
-    if (!first) {
-      return
-    }
-    event.preventDefault()
-    event.stopPropagation()
-    this.onPick(first.name)
-    this.close()
-  }
-
-  constructor(
-    app: App,
-    private names: string[],
-    private onPick: (name: string) => void,
-  ) {
-    super(app)
-    this.setPlaceholder('Type an exercise name (or a new one) then press enter')
-    this.emptyStateText = 'Type an exercise name to add it'
-    this.limit = 20
-  }
-
-  async onOpen(): Promise<void> {
-    await super.onOpen()
-    this.inputEl.addEventListener('keydown', this.handleEnterKeydown, true)
-  }
-
-  onClose(): void {
-    this.inputEl.removeEventListener('keydown', this.handleEnterKeydown, true)
-    super.onClose()
-  }
-
-  getSuggestions(query: string): ExerciseChoice[] {
-    const trimmed = query.trim()
-    const normalized = trimmed.toLocaleLowerCase()
-    const exact = this.names.some((name) => name.toLocaleLowerCase() === normalized)
-    const matches: ExerciseChoice[] = this.names
-      .filter((name) => {
-        if (!normalized) {
-          return true
-        }
-        return name.toLocaleLowerCase().includes(normalized)
-      })
-      .map((name) => ({ type: 'existing' as const, name }))
-    if (trimmed && !exact) {
-      matches.unshift({ type: 'new', name: trimmed })
-    }
-    return matches.slice(0, this.limit)
-  }
-
-  renderSuggestion(item: ExerciseChoice, el: HTMLElement): void {
-    el.empty()
-    el.createDiv({
-      cls: item.type === 'new' ? 'fitkit-suggest-title is-new' : 'fitkit-suggest-title',
-      text: item.type === 'new' ? `Add "${item.name}"` : item.name,
-    })
-    if (item.type === 'new') {
-      el.createDiv({
-        cls: 'fitkit-suggest-note',
-        text: 'Creates a card only; no exercise note file is created.',
-      })
-    }
-  }
-
-  onChooseSuggestion(item: ExerciseChoice): void {
-    this.onPick(item.name)
-  }
+  const parsed = Number.parseInt(raw, 10)
+  return Number.isNaN(parsed) ? null : parsed
 }

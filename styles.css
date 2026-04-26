@@ -29,6 +29,30 @@
 }
 
 .fitkit-meta {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.fitkit-name-field {
+  display: grid;
+  gap: 4px;
+}
+
+.fitkit-workout-name-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 14px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.fitkit-meta-line {
   font-size: 12px;
   color: var(--text-muted);
 }
@@ -68,6 +92,45 @@
   padding: 10px;
   display: grid;
   gap: 10px;
+  transform: translateY(var(--fitkit-drag-offset, 0));
+}
+
+.fitkit-card.is-dragging {
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.fitkit-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;
+}
+
+.fitkit-drag-handle:hover,
+.fitkit-drag-handle:focus-visible {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.fitkit-drag-handle:active {
+  cursor: grabbing;
+}
+
+.fitkit-drop-indicator {
+  height: 2px;
+  margin: 2px 0;
+  background: var(--interactive-accent);
+  border-radius: 2px;
 }
 
 .fitkit-card-top {
@@ -77,7 +140,7 @@
   align-items: center;
 }
 
-.fitkit-name-input {
+.fitkit-name-button {
   flex: 1 1 160px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
@@ -86,11 +149,22 @@
   background: var(--background-primary);
   color: var(--text-normal);
   font-weight: 600;
+  text-align: left;
+  cursor: pointer;
 }
 
-.fitkit-kind-toggle {
-  display: flex;
-  gap: 4px;
+.fitkit-name-button:hover,
+.fitkit-name-button:focus-visible {
+  background: var(--background-modifier-hover);
+}
+
+.fitkit-gear-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  width: 32px;
+  height: 32px;
 }
 
 .fitkit-field-row {
@@ -129,26 +203,24 @@
   gap: 6px;
 }
 
+.fitkit-row {
+  display: grid;
+  gap: 4px;
+}
+
 .fitkit-set-row {
   display: grid;
-  grid-template-columns:
-    minmax(52px, 72px) minmax(86px, 1fr) minmax(64px, 0.8fr) minmax(120px, 2fr)
-    auto;
-  gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--size-4-2, 8px);
   align-items: center;
 }
 
 .fitkit-duration-row {
-  grid-template-columns: minmax(108px, 1fr) minmax(120px, 2fr) auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .fitkit-cell {
   min-width: 0;
-}
-
-.fitkit-action-cell {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .fitkit-set-head {
@@ -162,6 +234,54 @@
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.fitkit-row-actions-strip {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--size-4-1, 4px);
+}
+
+.fitkit-row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+
+.fitkit-note-line {
+  width: 100%;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  padding: var(--size-4-1, 4px) var(--size-4-2, 8px);
+  cursor: pointer;
+  white-space: pre-wrap;
+}
+
+.fitkit-note-line:hover,
+.fitkit-note-line:focus-visible {
+  color: var(--text-normal);
+  outline: none;
+}
+
+.fitkit-set-note-modal {
+  display: grid;
+  gap: 12px;
+}
+
+.fitkit-set-note-modal h2 {
+  margin: 0;
+}
+
+.fitkit-set-note-field {
+  display: grid;
+  gap: 4px;
+}
+
+.fitkit-set-note-textarea {
+  min-height: 100px;
 }
 
 .fitkit-footer {
@@ -378,46 +498,6 @@
   color: var(--text-muted);
   font-size: 12px;
   margin-top: 2px;
-}
-
-.fitkit-editor-root.is-narrow .fitkit-set-head {
-  display: none;
-}
-
-.fitkit-editor-root.is-narrow .fitkit-set-row,
-.fitkit-editor-root.is-narrow .fitkit-duration-row {
-  grid-template-columns: minmax(0, 1fr);
-  align-items: stretch;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.fitkit-editor-root.is-narrow .fitkit-set-row:last-child {
-  border-bottom: 0;
-}
-
-.fitkit-editor-root.is-narrow .fitkit-set-row:not(.fitkit-set-head) .fitkit-cell {
-  display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-}
-
-.fitkit-editor-root.is-narrow .fitkit-set-row:not(.fitkit-set-head) .fitkit-cell::before {
-  content: attr(data-label);
-  color: var(--text-muted);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.fitkit-editor-root.is-narrow .fitkit-action-cell {
-  justify-content: stretch;
-}
-
-.fitkit-editor-root.is-narrow .fitkit-action-cell .fitkit-btn {
-  width: fit-content;
 }
 
 @media (max-width: 720px) {
