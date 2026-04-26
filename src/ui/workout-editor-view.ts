@@ -1,6 +1,7 @@
 import type { App, TFile, WorkspaceLeaf } from 'obsidian'
 import { ItemView, Menu, Notice, SuggestModal, setIcon } from 'obsidian'
 
+import { reorderArray } from '../domain/array-utils'
 import {
   parseWorkoutNote,
   serializeWorkoutNote,
@@ -15,6 +16,17 @@ import type FitKitPlugin from '../main'
 import { exercisesFolder, workoutsFolder } from '../settings-paths'
 import { FileSession } from '../vault/file-session'
 import { ConfirmModal } from './confirm-modal'
+
+interface DragSession {
+  pointerId: number
+  fromIndex: number
+  toIndex: number
+  startY: number
+  card: HTMLElement
+  handle: HTMLElement
+  list: HTMLElement
+  indicator: HTMLElement
+}
 
 export const VIEW_TYPE_FITKIT_WORKOUT_EDITOR = 'fitkit-workout-editor'
 
@@ -57,6 +69,7 @@ export class WorkoutEditorView extends ItemView {
   private autoSaveTimer: number | null = null
   private autoSaveInflight = false
   private autoSaveRequeued = false
+  private dragSession: DragSession | null = null
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -82,7 +95,25 @@ export class WorkoutEditorView extends ItemView {
     this.resizeObserver = new ResizeObserver(() => this.updateNarrowState())
     this.resizeObserver.observe(this.contentEl)
     this.updateNarrowState()
+    this.registerDragLifetimeListeners()
     this.renderEmpty('Open a workout note to edit.')
+  }
+
+  private registerDragLifetimeListeners(): void {
+    const cancel = (evt: PointerEvent): void => {
+      if (!this.dragSession || evt.pointerId !== this.dragSession.pointerId) {
+        return
+      }
+      this.endDrag(false)
+    }
+    const finish = (evt: PointerEvent): void => {
+      if (!this.dragSession || evt.pointerId !== this.dragSession.pointerId) {
+        return
+      }
+      this.endDrag(true)
+    }
+    this.registerDomEvent(activeWindow, 'pointerup', finish)
+    this.registerDomEvent(activeWindow, 'pointercancel', cancel)
   }
 
   async onClose(): Promise<void> {
@@ -93,6 +124,9 @@ export class WorkoutEditorView extends ItemView {
     await this.flushAutoSave()
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
+    if (this.dragSession) {
+      this.endDrag(false)
+    }
     this.contentEl.empty()
     this.session = null
     this.model = null
@@ -226,8 +260,21 @@ export class WorkoutEditorView extends ItemView {
     }
 
     const card = list.createDiv({ cls: 'fitkit-card' })
+    card.dataset.exerciseIndex = String(index)
 
     const top = card.createDiv({ cls: 'fitkit-card-top' })
+
+    const handle = top.createEl('button', {
+      cls: 'fitkit-drag-handle',
+      attr: {
+        type: 'button',
+        'aria-label': 'Drag to reorder',
+        tabindex: '0',
+      },
+    })
+    setIcon(handle, 'grip-vertical')
+    this.installCardDrag(card, handle, list)
+
     const nameInput = top.createEl('input', {
       cls: 'fitkit-name-input',
       attr: { type: 'text' },
@@ -584,6 +631,111 @@ export class WorkoutEditorView extends ItemView {
     }
   }
 
+  private installCardDrag(card: HTMLElement, handle: HTMLElement, list: HTMLElement): void {
+    handle.addEventListener('pointerdown', (evt) => {
+      if (evt.button !== 0) {
+        return
+      }
+      if (this.dragSession) {
+        return
+      }
+      const fromIndex = readCardIndex(card)
+      if (fromIndex === null) {
+        return
+      }
+      evt.preventDefault()
+      handle.setPointerCapture(evt.pointerId)
+      const indicator = list.createDiv({ cls: 'fitkit-drop-indicator' })
+      const session: DragSession = {
+        pointerId: evt.pointerId,
+        fromIndex,
+        toIndex: fromIndex,
+        startY: evt.clientY,
+        card,
+        handle,
+        list,
+        indicator,
+      }
+      this.dragSession = session
+      card.addClass('is-dragging')
+      this.positionDropIndicator(session)
+    })
+
+    handle.addEventListener('pointermove', (evt) => {
+      const session = this.dragSession
+      if (!session || evt.pointerId !== session.pointerId) {
+        return
+      }
+      const dy = evt.clientY - session.startY
+      session.card.style.setProperty('--fitkit-drag-offset', `${dy}px`)
+      session.toIndex = this.computeDropIndex(session, evt.clientY)
+      this.positionDropIndicator(session)
+    })
+
+    handle.addEventListener('lostpointercapture', (evt) => {
+      const session = this.dragSession
+      if (!session || evt.pointerId !== session.pointerId) {
+        return
+      }
+      this.endDrag(false)
+    })
+  }
+
+  private computeDropIndex(session: DragSession, pointerY: number): number {
+    const cards = Array.from(session.list.querySelectorAll<HTMLElement>(':scope > .fitkit-card'))
+    let target = session.fromIndex
+    for (let i = 0; i < cards.length; i++) {
+      const sibling = cards[i]
+      if (!sibling || sibling === session.card) {
+        continue
+      }
+      const rect = sibling.getBoundingClientRect()
+      const midpoint = rect.top + rect.height / 2
+      if (pointerY < midpoint) {
+        target = i
+        break
+      }
+      target = i
+    }
+    return target
+  }
+
+  private positionDropIndicator(session: DragSession): void {
+    const cards = Array.from(session.list.querySelectorAll<HTMLElement>(':scope > .fitkit-card'))
+    const reference = cards[session.toIndex] ?? null
+    if (reference === session.indicator) {
+      return
+    }
+    if (reference) {
+      session.list.insertBefore(session.indicator, reference)
+    } else {
+      session.list.appendChild(session.indicator)
+    }
+  }
+
+  private endDrag(commit: boolean): void {
+    const session = this.dragSession
+    if (!session) {
+      return
+    }
+    this.dragSession = null
+    session.card.removeClass('is-dragging')
+    session.card.style.removeProperty('--fitkit-drag-offset')
+    if (session.handle.hasPointerCapture(session.pointerId)) {
+      session.handle.releasePointerCapture(session.pointerId)
+    }
+    session.indicator.remove()
+    if (!commit || !this.model) {
+      return
+    }
+    if (session.fromIndex === session.toIndex) {
+      return
+    }
+    this.model.exercises = reorderArray(this.model.exercises, session.fromIndex, session.toIndex)
+    this.markDirty()
+    this.render()
+  }
+
   private async confirmAndRemoveExercise(index: number): Promise<void> {
     if (!this.model) {
       return
@@ -881,6 +1033,15 @@ function toDurationEntry(entry: EditableDurationEntry): DurationEntry {
 
 function isInFolder(path: string, folder: string): boolean {
   return path !== folder && path.startsWith(`${folder}/`)
+}
+
+function readCardIndex(card: HTMLElement): number | null {
+  const raw = card.dataset.exerciseIndex
+  if (!raw) {
+    return null
+  }
+  const parsed = Number.parseInt(raw, 10)
+  return Number.isNaN(parsed) ? null : parsed
 }
 
 type ExerciseChoice = {

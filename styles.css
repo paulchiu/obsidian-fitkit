@@ -92,6 +92,45 @@
   padding: 10px;
   display: grid;
   gap: 10px;
+  transform: translateY(var(--fitkit-drag-offset, 0));
+}
+
+.fitkit-card.is-dragging {
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.fitkit-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;
+}
+
+.fitkit-drag-handle:hover,
+.fitkit-drag-handle:focus-visible {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.fitkit-drag-handle:active {
+  cursor: grabbing;
+}
+
+.fitkit-drop-indicator {
+  height: 2px;
+  margin: 2px 0;
+  background: var(--interactive-accent);
+  border-radius: 2px;
 }
 
 .fitkit-card-top {
