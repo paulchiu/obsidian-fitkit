@@ -79,6 +79,16 @@ function buildIndex(registry: ExerciseRegistry): Map<string, ExerciseRegistryEnt
   return index
 }
 
+/**
+ * Return the kind of the registry entry matching `rawName` exactly. Returns
+ * null when the name is unknown or resolves ambiguously across multiple
+ * entries; callers pick their own default.
+ */
+export function kindForName(registry: ExerciseRegistry, rawName: string): ExerciseKind | null {
+  const result = resolve(registry, rawName)
+  return result.kind === 'match' ? result.entry.kind : null
+}
+
 export function resolve(registry: ExerciseRegistry, rawName: string): ResolutionResult {
   const key = normalize(rawName)
   if (key.length === 0) {

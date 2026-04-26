@@ -2,6 +2,7 @@ import type { TFile, WorkspaceLeaf } from 'obsidian'
 import { ItemView, Menu, Notice, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
+import { createRegistry, kindForName } from '../domain/exercise-registry'
 import {
   parseWorkoutNote,
   serializeWorkoutNote,
@@ -14,6 +15,7 @@ import {
 } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
 import { exercisesFolder, workoutsFolder } from '../settings-paths'
+import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
 import { FileSession } from '../vault/file-session'
 import { ConfirmModal } from './confirm-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
@@ -574,6 +576,7 @@ export class WorkoutEditorView extends ItemView {
     ex.kind = nextKind
     ex.strengthSets = []
     ex.durationEntries = []
+    seedEmptyRow(ex)
     this.markDirty()
     this.render()
     if (clearedRows) {
@@ -828,21 +831,26 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     const names = await this.collectExerciseSuggestions()
+    const registry = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
     new ExerciseSuggestModal(this.app, names, (name) => {
       const trimmed = name.trim()
       if (!trimmed || !this.model) {
         return
       }
       const exerciseIndex = this.model.exercises.length
-      this.model.exercises.push({
+      const kind: ExerciseKind = kindForName(registry, trimmed) ?? 'strength'
+      const card: ExerciseCard = {
         name: trimmed,
-        kind: 'strength',
-        strengthSets: [{ set: 1 }],
+        kind,
+        strengthSets: [],
         durationEntries: [],
-      })
+      }
+      seedEmptyRow(card)
+      this.model.exercises.push(card)
       this.markDirty()
       this.render()
-      this.focusRowCell(exerciseIndex, 0, 'Weight')
+      const focusLabel = kind === 'strength' ? 'Weight' : 'Duration (s)'
+      this.focusRowCell(exerciseIndex, 0, focusLabel)
     }).open()
   }
 
@@ -855,25 +863,48 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     const names = await this.collectExerciseSuggestions()
+    const registry = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
     const modal = new ExerciseSuggestModal(this.app, names, (name) => {
       const trimmed = name.trim()
       if (!trimmed || !this.model) {
         return
       }
-      const target = this.model.exercises[index]
-      if (!target) {
-        return
-      }
-      if (target.name === trimmed) {
-        return
-      }
-      target.name = trimmed
-      this.markDirty()
-      this.render()
+      void this.applyRename(index, trimmed, registry)
     })
     modal.open()
     modal.inputEl.value = ex.name
     modal.inputEl.dispatchEvent(new Event('input'))
+  }
+
+  private async applyRename(
+    index: number,
+    trimmed: string,
+    registry: ReturnType<typeof createRegistry>,
+  ): Promise<void> {
+    if (!this.model) {
+      return
+    }
+    const target = this.model.exercises[index]
+    if (!target) {
+      return
+    }
+    if (target.name === trimmed) {
+      return
+    }
+    const nextKind = kindForName(registry, trimmed)
+    if (nextKind && nextKind !== target.kind) {
+      const hadRows = hasRows(target)
+      const confirmed = await this.confirmKindSwitch(target, nextKind)
+      if (!confirmed) {
+        return
+      }
+      target.name = trimmed
+      this.applyKindSwitch(index, nextKind, hadRows)
+      return
+    }
+    target.name = trimmed
+    this.markDirty()
+    this.render()
   }
 
   private async collectExerciseSuggestions(): Promise<string[]> {
@@ -997,6 +1028,14 @@ function parseNumberInput(raw: string): number | undefined {
 
 function hasRows(card: ExerciseCard): boolean {
   return card.strengthSets.length > 0 || card.durationEntries.length > 0
+}
+
+function seedEmptyRow(card: ExerciseCard): void {
+  if (card.kind === 'strength') {
+    card.strengthSets.push({ set: 1 })
+  } else {
+    card.durationEntries.push({})
+  }
 }
 
 function toEditorWorkoutModel(
