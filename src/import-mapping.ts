@@ -14,22 +14,29 @@ export function mappingWithSelection(
   rawName: string,
   value: string,
 ): ImportMappingState {
-  const next = new Map(mapping)
   const key = normalize(rawName)
   if (value === '__unresolved__') {
+    const next = new Map(mapping)
     next.set(key, { kind: 'unresolved' })
-  } else if (value === 'create-strength' || value === 'create-duration') {
+    return next
+  }
+  if (value === 'create-strength' || value === 'create-duration') {
     const exerciseKind: ExerciseKind = value === 'create-duration' ? 'duration' : 'strength'
+    const next = new Map(mapping)
     next.set(key, {
       kind: 'create-new',
       canonicalName: rawName,
       exerciseKind,
     })
-  } else if (value.startsWith('existing:')) {
-    const name = value.slice('existing:'.length)
-    next.set(key, { kind: 'resolved', canonicalName: name })
+    return next
   }
-  return next
+  if (value.startsWith('existing:')) {
+    const name = value.slice('existing:'.length)
+    const next = new Map(mapping)
+    next.set(key, { kind: 'resolved', canonicalName: name })
+    return next
+  }
+  return mapping
 }
 
 export function mappingWithParsedExercises(
@@ -85,22 +92,22 @@ export function registryWithImportMappingChanges(
     }
     const existing = next.entries.find((entry) => entry.name === choice.canonicalName)
     if (choice.kind === 'create-new') {
-      if (!existing) {
-        next = upsertEntry(next, {
-          name: choice.canonicalName,
-          kind: choice.exerciseKind,
-          aliases: [],
-        })
-        changed = true
+      if (existing) {
+        continue
       }
+      next = upsertEntry(next, {
+        name: choice.canonicalName,
+        kind: choice.exerciseKind,
+        aliases: [],
+      })
+      changed = true
       continue
     }
     if (!existing) {
       continue
     }
-    const rawKey = normalize(exercise.rawName)
     const knownKeys = new Set([existing.name, ...existing.aliases].map((value) => normalize(value)))
-    if (knownKeys.has(rawKey)) {
+    if (knownKeys.has(key)) {
       continue
     }
     next = upsertEntry(next, {
