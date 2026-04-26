@@ -16,6 +16,10 @@ To install manually: build with `npm run build`, copy main.js, manifest.json,
 and styles.css into `<vault>/.obsidian/plugins/fitkit/`, and reload
 Obsidian.
 
+## Requirements
+
+FitKit reads and writes plain Markdown. The dashboard relies on the [Dataview plugin](https://github.com/blacksmithgu/obsidian-dataview) to render per-exercise queries. Install Dataview to see history rendered, otherwise the dashboard sections appear as raw code blocks.
+
 ## Vault layout
 
 Default expectations under `Fitness/` (configurable):
@@ -121,7 +125,6 @@ Duration exercises use `[duration:: 60]` (seconds).
 
 ## Limitations in v0.1.0
 
-- LLM-assisted import
 - Merge conflict UI
 - SQL/WASM analytics
 - Custom fenced source format
@@ -131,7 +134,16 @@ Duration exercises use `[duration:: 60]` (seconds).
 
 ## Development
 
-npm install, npm run dev, npm run build, npm test, npm run lint, npm run format.
+Run `npm install` to install dependencies.
+
+Run `npm run dev` to start esbuild in watch mode. It produces `main.js` next to `manifest.json` at the repo root.
+
+To point a dev vault at the build, symlink `main.js`, `manifest.json`, and `styles.css` from the repo root into `<vault>/.obsidian/plugins/fitkit/`. Reload Obsidian (or toggle the plugin off and on) to pick up new builds.
+
+The local gate is `npm test` (Vitest), `npm run lint` (zero warnings tolerated), and `npm run format` (or `npm run format:check` to verify only). Run all three before pushing.
+
+On merge to `main`, the Release workflow stamps a version using the PR's label (`major`/`minor`/`patch`/`norelease`) and publishes a GitHub release with `main.js`, `manifest.json`, and `styles.css` attached.
+
 See AGENTS.md for conventions.
 
 ## License
