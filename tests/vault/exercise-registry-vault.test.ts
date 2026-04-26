@@ -1,8 +1,8 @@
 import type { App } from 'obsidian'
 import { describe, expect, it } from 'vitest'
 
-import type { FitKitSettings } from '../src/settings'
-import { exerciseRegistryWithVaultNotes } from '../src/vault/exercise-registry-vault'
+import type { FitKitSettings } from '../../src/settings'
+import { exerciseRegistryWithVaultNotes } from '../../src/vault/exercise-registry-vault'
 
 function mockApp(markdownFiles: Array<{ path: string; basename: string }>): App {
   return {

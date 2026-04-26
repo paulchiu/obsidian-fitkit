@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import type { CanonicalExercise, CanonicalWorkout } from '../src/domain/workout-note-serializer'
-import { serializeWorkout } from '../src/domain/workout-note-serializer'
+import type { CanonicalExercise, CanonicalWorkout } from '../../src/domain/workout-note-serializer'
+import { serializeWorkout } from '../../src/domain/workout-note-serializer'
 
 function serializeExercise(exercise: CanonicalExercise): string {
   const workout: CanonicalWorkout = {

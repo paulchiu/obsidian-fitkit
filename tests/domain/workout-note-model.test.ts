@@ -5,21 +5,21 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import type { ExerciseRegistryEntry } from '../src/domain/exercise-registry'
-import { createRegistry, resolve as resolveExercise } from '../src/domain/exercise-registry'
-import { parseJournal } from '../src/domain/journal-grammar'
-import type { WorkoutNoteModel } from '../src/domain/workout-note-model'
+import type { ExerciseRegistryEntry } from '../../src/domain/exercise-registry'
+import { createRegistry, resolve as resolveExercise } from '../../src/domain/exercise-registry'
+import { parseJournal } from '../../src/domain/journal-grammar'
+import type { WorkoutNoteModel } from '../../src/domain/workout-note-model'
 import {
   parseWorkoutNote,
   semanticEqual,
   serializeWorkoutNote,
-} from '../src/domain/workout-note-model'
-import type { CanonicalWorkout } from '../src/domain/workout-note-serializer'
-import { serializeWorkout } from '../src/domain/workout-note-serializer'
+} from '../../src/domain/workout-note-model'
+import type { CanonicalWorkout } from '../../src/domain/workout-note-serializer'
+import { serializeWorkout } from '../../src/domain/workout-note-serializer'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 function fixture(rel: string): string {
-  return readFileSync(resolve(here, 'fixtures', rel), 'utf8')
+  return readFileSync(resolve(here, '..', 'fixtures', rel), 'utf8')
 }
 
 const workoutFixtures = [
