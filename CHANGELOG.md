@@ -9,11 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Workout editor: per-row overflow kebab menu on desktop with Edit note and Delete row entries.
+- Workout editor: touch swipe gestures on rows (swipe right to edit note, swipe left to delete) on Obsidian Mobile.
+
 ### Changed
+
+- Workout editor: Add Exercise and Rename Exercise now take the kind from the matching exercise registry entry; unknown names still fall back to strength.
+- Workout editor: switching kind via the gear menu, or renaming into an exercise of a different kind, seeds one empty row of the new kind.
+- Workout editor: card top-row controls (drag handle, name button, gear button) now share a single height for visual alignment.
 
 ### Fixed
 
 ### Removed
+
+- Workout editor: per-row pencil and trash buttons replaced by the overflow kebab and the swipe gestures.
 
 ## [0.3.0] - 2026-04-26
 

@@ -1,5 +1,5 @@
 import type { TFile, WorkspaceLeaf } from 'obsidian'
-import { ItemView, Menu, Notice, setIcon } from 'obsidian'
+import { ItemView, Menu, Notice, Platform, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
 import { createRegistry, kindForName } from '../domain/exercise-registry'
@@ -356,7 +356,8 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     const container = wrap.createDiv({ cls: 'fitkit-row' })
-    const row = container.createDiv({ cls: 'fitkit-set-row' })
+    const body = container.createDiv({ cls: 'fitkit-row-body' })
+    const row = body.createDiv({ cls: 'fitkit-set-row' })
 
     const setInput = this.createInputCell(row, 'Set', { type: 'number', inputmode: 'numeric' })
     setInput.value = set.set !== undefined ? String(set.set) : ''
@@ -383,7 +384,7 @@ export class WorkoutEditorView extends ItemView {
       this.markDirty()
     })
 
-    this.renderRowActions(container, {
+    this.renderRowActions(container, body, {
       label: `set ${i + 1}`,
       currentNote: set.note,
       onDelete: () => {
@@ -426,7 +427,8 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     const container = wrap.createDiv({ cls: 'fitkit-row' })
-    const row = container.createDiv({ cls: 'fitkit-set-row fitkit-duration-row' })
+    const body = container.createDiv({ cls: 'fitkit-row-body' })
+    const row = body.createDiv({ cls: 'fitkit-set-row fitkit-duration-row' })
 
     const setInput = this.createInputCell(row, 'Set', { type: 'number', inputmode: 'numeric' })
     setInput.value = durationEntry.set !== undefined ? String(durationEntry.set) : String(i + 1)
@@ -447,7 +449,7 @@ export class WorkoutEditorView extends ItemView {
       this.markDirty()
     })
 
-    this.renderRowActions(container, {
+    this.renderRowActions(container, body, {
       label: `duration entry ${i + 1}`,
       currentNote: durationEntry.note,
       onDelete: () => {
@@ -465,6 +467,7 @@ export class WorkoutEditorView extends ItemView {
 
   private renderRowActions(
     container: HTMLElement,
+    body: HTMLElement,
     opts: {
       label: string
       currentNote: string | undefined
@@ -472,12 +475,6 @@ export class WorkoutEditorView extends ItemView {
       onNoteSave: (next: string | undefined) => void
     },
   ): void {
-    const strip = container.createDiv({ cls: 'fitkit-row-actions-strip' })
-    const noteBtn = strip.createEl('button', {
-      cls: 'fitkit-btn fitkit-row-action',
-      attr: { 'aria-label': `Edit note for ${opts.label}` },
-    })
-    setIcon(noteBtn, 'pencil')
     const openNoteModal = (): void => {
       new SetNoteModal(this.app, {
         title: `Note for ${opts.label}`,
@@ -485,16 +482,15 @@ export class WorkoutEditorView extends ItemView {
         onSave: opts.onNoteSave,
       }).open()
     }
-    noteBtn.addEventListener('click', openNoteModal)
-
-    const trashBtn = strip.createEl('button', {
-      cls: 'fitkit-btn fitkit-destructive-button fitkit-row-action',
-      attr: { 'aria-label': `Remove ${opts.label}` },
-    })
-    setIcon(trashBtn, 'trash-2')
-    trashBtn.addEventListener('click', () => {
+    const triggerDelete = (): void => {
       void this.confirmAndDeleteRow(opts.label, opts.onDelete)
-    })
+    }
+
+    if (Platform.isMobile) {
+      this.installRowSwipe(container, body, openNoteModal, triggerDelete)
+    } else {
+      this.renderRowKebab(body, opts.label, openNoteModal, triggerDelete)
+    }
 
     if (opts.currentNote && opts.currentNote.length > 0) {
       const line = container.createDiv({
@@ -510,6 +506,137 @@ export class WorkoutEditorView extends ItemView {
         }
       })
     }
+  }
+
+  private renderRowKebab(
+    body: HTMLElement,
+    label: string,
+    onNote: () => void,
+    onDelete: () => void,
+  ): void {
+    const kebab = body.createEl('button', {
+      cls: 'fitkit-btn fitkit-btn-muted fitkit-row-kebab',
+      attr: { type: 'button', 'aria-label': `Options for ${label}` },
+    })
+    setIcon(kebab, 'more-vertical')
+    kebab.addEventListener('click', (evt) => {
+      evt.stopPropagation()
+      const menu = new Menu()
+      menu.addItem((item) => item.setTitle('Edit note').setIcon('pencil').onClick(onNote))
+      menu.addItem((item) =>
+        item.setTitle('Delete row').setIcon('trash-2').setWarning(true).onClick(onDelete),
+      )
+      const rect = kebab.getBoundingClientRect()
+      menu.showAtPosition({ x: rect.left, y: rect.bottom })
+    })
+  }
+
+  private installRowSwipe(
+    container: HTMLElement,
+    body: HTMLElement,
+    onNote: () => void,
+    onDelete: () => void,
+  ): void {
+    /** Wrap the body in a track so the reveal layer is bounded to the row body's height,
+     * not the full container (which may include the note line below). */
+    const track = container.createDiv({ cls: 'fitkit-row-track' })
+    container.insertBefore(track, body)
+    const reveal = track.createDiv({ cls: 'fitkit-row-reveal' })
+    reveal.createSpan({ cls: 'fitkit-row-reveal-note', text: 'Note' })
+    reveal.createSpan({ cls: 'fitkit-row-reveal-delete', text: 'Delete' })
+    track.appendChild(body)
+
+    const THRESHOLD = 80
+    let pointerId: number | null = null
+    let startX = 0
+    let startY = 0
+    let dx = 0
+    let aborted = false
+
+    const reset = (): void => {
+      body.style.removeProperty('--fitkit-row-swipe-offset')
+      container.removeClass('is-swiping')
+      container.removeClass('is-swipe-right')
+      container.removeClass('is-swipe-left')
+    }
+
+    const finish = (commit: boolean): void => {
+      if (pointerId === null) {
+        return
+      }
+      const finalDx = dx
+      const wasAborted = aborted
+      if (body.hasPointerCapture(pointerId)) {
+        body.releasePointerCapture(pointerId)
+      }
+      pointerId = null
+      reset()
+      if (!commit || wasAborted) {
+        return
+      }
+      if (finalDx >= THRESHOLD) {
+        onNote()
+      } else if (finalDx <= -THRESHOLD) {
+        onDelete()
+      }
+    }
+
+    body.addEventListener('pointerdown', (evt) => {
+      if (pointerId !== null) {
+        return
+      }
+      const target = evt.target
+      if (!(target instanceof HTMLElement)) {
+        return
+      }
+      if (target.closest('input, textarea, button, .fitkit-row-kebab')) {
+        return
+      }
+      pointerId = evt.pointerId
+      startX = evt.clientX
+      startY = evt.clientY
+      dx = 0
+      aborted = false
+      body.setPointerCapture(evt.pointerId)
+      container.addClass('is-swiping')
+    })
+
+    body.addEventListener('pointermove', (evt) => {
+      if (pointerId === null || evt.pointerId !== pointerId || aborted) {
+        return
+      }
+      const cdx = evt.clientX - startX
+      const cdy = evt.clientY - startY
+      if (Math.abs(cdx) < 8 && Math.abs(cdy) < 8) {
+        return
+      }
+      if (Math.abs(cdy) > Math.abs(cdx)) {
+        aborted = true
+        if (body.hasPointerCapture(evt.pointerId)) {
+          body.releasePointerCapture(evt.pointerId)
+        }
+        reset()
+        pointerId = null
+        return
+      }
+      dx = cdx
+      body.style.setProperty('--fitkit-row-swipe-offset', `${dx}px`)
+      container.toggleClass('is-swipe-right', dx > 0)
+      container.toggleClass('is-swipe-left', dx < 0)
+    })
+
+    body.addEventListener('pointerup', (evt) => {
+      if (evt.pointerId !== pointerId) {
+        return
+      }
+      finish(true)
+    })
+    body.addEventListener('pointercancel', (evt) => {
+      if (evt.pointerId !== pointerId) {
+        return
+      }
+      finish(false)
+    })
   }
 
   private async confirmAndDeleteRow(label: string, onDelete: () => void): Promise<void> {

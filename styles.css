@@ -105,8 +105,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: var(--fitkit-card-control-size, 32px);
+  height: var(--fitkit-card-control-size, 32px);
   padding: 0;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -134,6 +134,7 @@
 }
 
 .fitkit-card-top {
+  --fitkit-card-control-size: 32px;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -142,10 +143,12 @@
 
 .fitkit-name-button {
   flex: 1 1 160px;
+  height: var(--fitkit-card-control-size);
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
-  padding: 6px 8px;
+  padding: 0 8px;
   font-size: 14px;
+  line-height: var(--fitkit-card-control-size);
   background: var(--background-primary);
   color: var(--text-normal);
   font-weight: 600;
@@ -162,9 +165,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
-  width: 32px;
-  height: 32px;
+  padding: 0;
+  width: var(--fitkit-card-control-size, 32px);
+  height: var(--fitkit-card-control-size, 32px);
 }
 
 .fitkit-field-row {
@@ -236,19 +239,73 @@
   flex-wrap: wrap;
 }
 
-.fitkit-row-actions-strip {
+.fitkit-row-body {
   display: flex;
-  justify-content: flex-end;
-  gap: var(--size-4-1, 4px);
+  align-items: center;
+  gap: 6px;
+  background: var(--background-secondary);
+  position: relative;
+  z-index: 1;
+  transform: translateX(var(--fitkit-row-swipe-offset, 0));
+  transition: transform 140ms ease-out;
+  touch-action: pan-y;
 }
 
-.fitkit-row-action {
+.fitkit-row.is-swiping .fitkit-row-body {
+  transition: none;
+}
+
+.fitkit-row-body > .fitkit-set-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fitkit-row-kebab {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  min-height: 44px;
+  width: 28px;
+  height: 28px;
   padding: 0;
+}
+
+.fitkit-row-track {
+  position: relative;
+  overflow: hidden;
+}
+
+.fitkit-row-reveal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  pointer-events: none;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  opacity: 0;
+}
+
+.fitkit-row.is-swipe-right .fitkit-row-reveal,
+.fitkit-row.is-swipe-left .fitkit-row-reveal {
+  opacity: 1;
+}
+
+.fitkit-row-reveal-note {
+  color: var(--interactive-accent);
+}
+
+.fitkit-row-reveal-delete {
+  color: var(--text-error);
+}
+
+.fitkit-row.is-swipe-left .fitkit-row-reveal-note,
+.fitkit-row.is-swipe-right .fitkit-row-reveal-delete {
+  visibility: hidden;
 }
 
 .fitkit-note-line {
