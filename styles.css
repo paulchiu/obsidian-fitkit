@@ -140,7 +140,7 @@
   align-items: center;
 }
 
-.fitkit-name-input {
+.fitkit-name-button {
   flex: 1 1 160px;
   border: 1px solid var(--background-modifier-border);
   border-radius: 6px;
@@ -149,6 +149,13 @@
   background: var(--background-primary);
   color: var(--text-normal);
   font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fitkit-name-button:hover,
+.fitkit-name-button:focus-visible {
+  background: var(--background-modifier-hover);
 }
 
 .fitkit-gear-button {
