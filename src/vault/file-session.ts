@@ -12,9 +12,7 @@ export interface LoadResult {
   mtime: number
 }
 
-export type SaveResult =
-  | { ok: true; hash: string; mtime: number }
-  | { ok: false; reason: 'mtime' | 'hash' }
+export type SaveResult = { ok: true; hash: string; mtime: number } | { ok: false; reason: 'hash' }
 
 /**
  * Tracks the last-known text hash and mtime of a TFile so stale writes can be blocked.
