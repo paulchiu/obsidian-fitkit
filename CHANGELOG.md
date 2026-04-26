@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Workout editor: Add Exercise and Rename Exercise now take the kind from the matching exercise registry entry; unknown names still fall back to strength.
 - Workout editor: switching kind via the gear menu, or renaming into an exercise of a different kind, seeds one empty row of the new kind.
 - Workout editor: card top-row controls (drag handle, name button, gear button) now share a single height for visual alignment.
+- Workout editor: gear menu kind switch now opens a three-button modal (Cancel, Just this workout, Update registry too) so users can persist the new kind back to the exercise registry without leaving the editor.
 
 ### Fixed
 

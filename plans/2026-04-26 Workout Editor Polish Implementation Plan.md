@@ -25,7 +25,7 @@ clean before commit. Conventional commits, sentence case, imperative mood (AGENT
 
 ## 1. Goal & Success Criteria
 
-Polish the redesigned workout editor along four axes:
+Polish the redesigned workout editor along five axes:
 
 1. **Kind follows the registry on add and rename.** When the user picks an exercise from the
    suggest modal (whether adding a new card or renaming an existing one), the resulting card's
@@ -41,6 +41,13 @@ Polish the redesigned workout editor along four axes:
    occupy a `fitkit-row-actions-strip` flex row beneath each set/duration row. Replace that
    strip with an inline overflow kebab on the row plus a touch swipe gesture (right = note,
    left = delete) so vertical density matches a typical Obsidian table.
+5. **Kind switch via the gear menu can persist back to the registry.** The settings tab does
+   not yet expose a registry editor, so a stretch entry mis-classified as strength has no
+   one-tap fix. Replace the implicit "this workout only" kind switch with an explicit
+   three-button modal: Cancel, Just this workout, Update registry too. Choosing the third
+   option upserts the registry entry (preserving aliases) and saves settings, so the gear
+   menu becomes the single place the user repairs both the in-file card and the registry
+   default for future workouts.
 
 **Definition of done:**
 
@@ -60,6 +67,8 @@ Polish the redesigned workout editor along four axes:
 - CSS adjustments for the card top row (uniform height, alignment).
 - Replacement of `.fitkit-row-actions-strip` with an inline overflow kebab and a pointer-events
   swipe gesture on the row.
+- A new `KindSwitchChoiceModal` for the gear-menu kind switch, plus the registry upsert and
+  `saveSettings` call when the user opts to update the registry.
 - New unit tests for the kind-lookup helper (pure module).
 - Manual QA matrix update.
 
@@ -71,6 +80,10 @@ Polish the redesigned workout editor along four axes:
 - Any change to the parse-diagnostics or create-missing-exercises modals.
 - A keyboard alternative for the new swipe gesture beyond what the kebab menu already provides.
   (The kebab is the keyboard-accessible path; swipe is touch-only sugar.)
+- A full settings-tab registry editor (add/edit/delete by row). The gear-menu choice modal is
+  the minimal path to flip a recorded kind; richer editing remains a follow-up.
+- Touching the rename path. Renaming to a registry-known name already adopts that entry's
+  kind, so the registry is by definition already correct for that name.
 
 ## 3. Architectural Notes
 
@@ -198,7 +211,42 @@ handle, name button, and gear button to that height. Keep `.fitkit-name-button` 
 - Non-empty `set.note` continues to render as the existing `.fitkit-note-line` below the row,
   unchanged. Tapping it opens the note modal pre-filled (existing behaviour).
 
-### Phase 5 - Manual QA + changelog
+### Phase 5 - Registry-aware kind switch from the gear menu
+
+**Files:**
+
+- `src/ui/kind-switch-choice-modal.ts` (new). Three-button modal: Cancel, Just this workout,
+  Update registry too. Suppresses the third button when `registryKind === nextKind`.
+- `src/ui/workout-editor-view.ts` (`switchKind`, new `chooseKindSwitch`, new
+  `persistRegistryKind`). Reads `registryKind` via `kindForName` against the merged
+  vault-aware registry. Calls `upsertEntry` on the saved registry only (not the vault-merged
+  view) and `plugin.saveSettings()` when the user opts in. Emits a `Notice` after persisting.
+- `CHANGELOG.md`.
+
+**Architectural notes:**
+
+- The merged registry from `exerciseRegistryWithVaultNotes` is used for the lookup so the
+  modal copy reflects "what the user would see", but we only write to
+  `plugin.settings.exerciseRegistry`. Vault-derived stems are not persisted; they continue to
+  surface via the existing bootstrap action.
+- Aliases on an existing registry entry must be preserved when flipping kind. `upsertEntry`
+  already handles dedupe by canonical name, so we read the current entry, clone its aliases,
+  override `kind`, and upsert.
+- The rename path keeps using `confirmKindSwitch` because the registry already records the
+  picked entry's kind by construction.
+
+**Acceptance:**
+
+- Gear menu Switch on a strength card with rows: modal opens with row-clear warning and three
+  buttons. Cancel exits without changes. Just-this-workout flips kind locally. Update-registry
+  flips kind locally and persists the new kind in `plugin.settings.exerciseRegistry`; reload
+  - revisit confirms the upsert took effect.
+- Gear menu Switch when the registry already records the new kind: third button is hidden;
+  modal degrades to a Cancel + Just-this-workout pair (the existing two-button confirm flow).
+- Gear menu Switch when the name is not in the registry: third button reads "Update registry
+  too" and the upsert creates a new entry with no aliases.
+
+### Phase 6 - Manual QA + changelog
 
 **Files:**
 

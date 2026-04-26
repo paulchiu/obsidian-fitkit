@@ -2,7 +2,12 @@ import type { TFile, WorkspaceLeaf } from 'obsidian'
 import { ItemView, Menu, Notice, Platform, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
-import { createRegistry, kindForName } from '../domain/exercise-registry'
+import {
+  createRegistry,
+  kindForName,
+  upsertEntry,
+  type ExerciseRegistryEntry,
+} from '../domain/exercise-registry'
 import {
   parseWorkoutNote,
   serializeWorkoutNote,
@@ -19,6 +24,7 @@ import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault
 import { FileSession } from '../vault/file-session'
 import { ConfirmModal } from './confirm-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
+import { KindSwitchChoiceModal, type KindSwitchChoice } from './kind-switch-choice-modal'
 import { SetNoteModal } from './set-note-modal'
 
 interface DragSession {
@@ -673,11 +679,53 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     const hadRows = hasRows(ex)
-    const confirmed = await this.confirmKindSwitch(ex, nextKind)
-    if (!confirmed) {
+    const registry = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
+    const registryKind = kindForName(registry, ex.name)
+    const choice = await this.chooseKindSwitch(ex, nextKind, registryKind)
+    if (choice === 'cancel') {
       return
     }
     this.applyKindSwitch(index, nextKind, hadRows)
+    if (choice === 'workout-and-registry') {
+      await this.persistRegistryKind(ex.name, nextKind)
+    }
+  }
+
+  private chooseKindSwitch(
+    card: ExerciseCard,
+    nextKind: ExerciseKind,
+    registryKind: ExerciseKind | null,
+  ): Promise<KindSwitchChoice> {
+    return new Promise((resolve) => {
+      new KindSwitchChoiceModal(
+        this.app,
+        {
+          exerciseName: card.name,
+          currentKind: card.kind,
+          nextKind,
+          hasRows: hasRows(card),
+          registryKind,
+        },
+        resolve,
+      ).open()
+    })
+  }
+
+  private async persistRegistryKind(name: string, nextKind: ExerciseKind): Promise<void> {
+    const settings = this.plugin.settings
+    const trimmed = name.trim()
+    if (!trimmed) {
+      return
+    }
+    const current = createRegistry(settings.exerciseRegistry)
+    const existing = current.entries.find((entry) => entry.name === trimmed)
+    const nextEntry: ExerciseRegistryEntry = existing
+      ? { ...existing, aliases: [...existing.aliases], kind: nextKind }
+      : { name: trimmed, kind: nextKind, aliases: [] }
+    const updated = upsertEntry(current, nextEntry)
+    settings.exerciseRegistry = updated.entries
+    await this.plugin.saveSettings()
+    new Notice(`Registry now records ${trimmed} as ${nextKind}.`)
   }
 
   private async confirmKindSwitch(card: ExerciseCard, nextKind: ExerciseKind): Promise<boolean> {
