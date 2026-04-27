@@ -9,11 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Workout editor: mobile row kebab menu is now reachable for Edit note and Delete row.
+
 ### Changed
 
 ### Fixed
 
 ### Removed
+
+- Workout editor: swipe row actions on mobile.
 
 ## [0.4.2] - 2026-04-27
 

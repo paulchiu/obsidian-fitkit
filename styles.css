@@ -244,15 +244,6 @@
   align-items: center;
   gap: 6px;
   background: var(--background-secondary);
-  position: relative;
-  z-index: 1;
-  transform: translateX(var(--fitkit-row-swipe-offset, 0));
-  transition: transform 140ms ease-out;
-  touch-action: pan-y;
-}
-
-.fitkit-row.is-swiping .fitkit-row-body {
-  transition: none;
 }
 
 .fitkit-row-body > .fitkit-set-row {
@@ -268,44 +259,6 @@
   width: 28px;
   height: 28px;
   padding: 0;
-}
-
-.fitkit-row-track {
-  position: relative;
-  overflow: hidden;
-}
-
-.fitkit-row-reveal {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  pointer-events: none;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-  opacity: 0;
-}
-
-.fitkit-row.is-swipe-right .fitkit-row-reveal,
-.fitkit-row.is-swipe-left .fitkit-row-reveal {
-  opacity: 1;
-}
-
-.fitkit-row-reveal-note {
-  color: var(--interactive-accent);
-}
-
-.fitkit-row-reveal-delete {
-  color: var(--text-error);
-}
-
-.fitkit-row.is-swipe-left .fitkit-row-reveal-note,
-.fitkit-row.is-swipe-right .fitkit-row-reveal-delete {
-  visibility: hidden;
 }
 
 .fitkit-note-line {
