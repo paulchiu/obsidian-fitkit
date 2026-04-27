@@ -168,12 +168,17 @@ interface TestPlugin {
 
 const makeEditorView = (
   file: TFile | null,
-): WorkoutEditorView & { loadFile: ReturnType<typeof vi.fn> } => {
+): WorkoutEditorView & {
+  loadFile: ReturnType<typeof vi.fn>
+  renderSkeleton: ReturnType<typeof vi.fn>
+} => {
   const view = Object.create(WorkoutEditorView.prototype) as WorkoutEditorView & {
     loadFile: ReturnType<typeof vi.fn>
+    renderSkeleton: ReturnType<typeof vi.fn>
     session: { file: TFile } | null
   }
   view.loadFile = vi.fn(async () => undefined)
+  view.renderSkeleton = vi.fn()
   view.session = file ? { file } : null
   return view
 }
@@ -211,11 +216,7 @@ const makeLeafShowingFile = (file: TFile): MockLeaf => {
     view: null,
     setViewState: vi.fn(async (state: SetViewStateArg) => {
       if (state.type === VIEW_TYPE_FITKIT_WORKOUT_EDITOR) {
-        const editorView = Object.create(WorkoutEditorView.prototype) as WorkoutEditorView & {
-          loadFile: ReturnType<typeof vi.fn>
-        }
-        editorView.loadFile = vi.fn(async () => undefined)
-        leaf.view = editorView
+        leaf.view = makeEditorView(file)
       }
     }),
     detach: vi.fn(),
@@ -460,11 +461,7 @@ describe('FitKitPlugin openWorkoutEditor command path', () => {
       },
       setViewState: vi.fn(async (state: SetViewStateArg) => {
         if (state.type === VIEW_TYPE_FITKIT_WORKOUT_EDITOR) {
-          const editorView = Object.create(WorkoutEditorView.prototype) as WorkoutEditorView & {
-            loadFile: ReturnType<typeof vi.fn>
-          }
-          editorView.loadFile = vi.fn(async () => undefined)
-          existingEditorLeaf.view = editorView
+          existingEditorLeaf.view = makeEditorView(file)
         }
       }),
       detach: vi.fn(),

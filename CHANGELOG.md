@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Workout editor now shows a skeleton placeholder while a workout file is loading, with a minimum visibility window so quick loads do not blink past it.
+
 ### Changed
 
 - When you switch the workout editor to a different file (or close the editor) while a duration timer is running, the timer's elapsed seconds are now saved to the row before the swap. Previously they were silently discarded.
