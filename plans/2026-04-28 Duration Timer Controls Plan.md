@@ -137,7 +137,7 @@ timing):
 
 - `onClose` (view tear-down).
 - `loadFile` (switching to a different workout).
-- `reloadFromDisk` (conflict-banner reload — model is replaced wholesale).
+- `reloadFromDisk` (conflict-banner reload, model is replaced wholesale).
 - The active duration row deleted via the row kebab.
 - The active exercise card deleted via the card menu.
 - The active card's kind switched via the kind-switch modal (rebuilds `durationEntries`).
@@ -390,6 +390,6 @@ timer-related test, restoring real timers in `afterEach`.
 - Rest timer between strength sets.
 - Audible / haptic / Notice on stop.
 - Per-card "Start next set" affordance.
-- Timer history (e.g. "you ran this for 45s last time, beat it") — already partially
+- Timer history (e.g. "you ran this for 45s last time, beat it"), already partially
   covered by the last-session-max badge from v0.6.0.
 - Cross-device timer sync.

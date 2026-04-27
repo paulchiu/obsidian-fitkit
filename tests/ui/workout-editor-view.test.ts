@@ -613,6 +613,66 @@ describe('WorkoutEditorView duration timer', () => {
     expect(view.activeTimer).toBeNull()
   })
 
+  it('clicking Add duration entry while a timer is running writes back and appends', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{}],
+    }
+    const view = createTimerView(ex)
+
+    view.startCardTimer(ex)
+    vi.setSystemTime(new Date('2026-04-28T00:00:08Z'))
+
+    const card = new TestElement('div')
+    view.renderDurationTable(card as unknown as HTMLElement, ex, 0)
+    const actions = card.findByClass('fitkit-row-actions')
+    const addBtn = actions?.children.find(
+      (c) => c.tagName === 'button' && c.textContent === 'Add duration entry',
+    )
+    addBtn?.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
+
+    expect(ex.durationEntries[0]?.durationSeconds).toBe(8)
+    expect(ex.durationEntries).toHaveLength(2)
+    expect(view.activeTimer).toBeNull()
+  })
+
+  it('deleting the active row aborts the timer without writing back', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 30 }],
+    }
+    const view = createTimerView(ex)
+    ;(
+      view as unknown as {
+        confirmAndDeleteRow: (label: string, onDelete: () => void) => Promise<void>
+      }
+    ).confirmAndDeleteRow = (_label: string, onDelete: () => void) => {
+      onDelete()
+      return Promise.resolve()
+    }
+    const originalEntry = ex.durationEntries[0]
+
+    view.startCardTimer(ex)
+    vi.setSystemTime(new Date('2026-04-28T00:00:05Z'))
+
+    const wrap = new TestElement('div')
+    view.renderDurationRow(wrap as unknown as HTMLElement, ex, 0, 0)
+
+    const kebab = wrap.findByClass('fitkit-row-kebab')
+    kebab?.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
+    const menu = obsidianMock.menus[obsidianMock.menus.length - 1]
+    const deleteItem = menu?.items.find((i) => i.title === 'Delete row')
+    deleteItem?.onClick?.()
+
+    expect(originalEntry?.durationSeconds).toBe(30)
+    expect(ex.durationEntries).toHaveLength(0)
+    expect(view.activeTimer).toBeNull()
+  })
+
   it('renderDurationRow shows the live counter, disables the input, and adds the timing class', () => {
     const ex: TimerExerciseCard = {
       name: 'Plank',
