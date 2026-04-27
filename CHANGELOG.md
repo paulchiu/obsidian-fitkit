@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.7.0] - 2026-04-27
+
+### Added
+
 - Workout editor duration cards now have a timer for the current set. Press Start timer to time the set, press Stop timer to record the elapsed seconds. If the row already has a duration, the timer resumes from there.
 
 ### Changed
