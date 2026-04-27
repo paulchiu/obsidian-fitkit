@@ -673,6 +673,44 @@ describe('WorkoutEditorView duration timer', () => {
     expect(view.activeTimer).toBeNull()
   })
 
+  it('loadFile flushes a running timer (writes elapsed seconds) before swapping to a new file', async () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 30 }],
+    }
+    const view = createTimerView(ex)
+    view.startCardTimer(ex)
+    vi.setSystemTime(new Date('2026-04-28T00:00:12Z'))
+
+    /** loadFile reaches FileSession.load after the timer flush; allow the unmocked vault call to throw and assert the flush effect. */
+    await (view as unknown as { loadFile: (f: unknown) => Promise<void> })
+      .loadFile({ path: 'Workouts/B.md', extension: 'md', basename: 'B', stat: { mtime: 0 } })
+      .catch(() => undefined)
+
+    expect(ex.durationEntries[0]?.durationSeconds).toBe(42)
+    expect(view.activeTimer).toBeNull()
+  })
+
+  it('onClose flushes a running timer (writes elapsed seconds) before tearing down', async () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 30 }],
+    }
+    const view = createTimerView(ex)
+    view.startCardTimer(ex)
+    vi.setSystemTime(new Date('2026-04-28T00:00:12Z'))
+
+    /** onClose calls contentEl.empty() after the timer flush; TestElement does not implement empty so absorb the throw and assert the flush effect. */
+    await (view as unknown as { onClose: () => Promise<void> }).onClose().catch(() => undefined)
+
+    expect(ex.durationEntries[0]?.durationSeconds).toBe(42)
+    expect(view.activeTimer).toBeNull()
+  })
+
   it('renderDurationRow shows the live counter, disables the input, and adds the timing class', () => {
     const ex: TimerExerciseCard = {
       name: 'Plank',

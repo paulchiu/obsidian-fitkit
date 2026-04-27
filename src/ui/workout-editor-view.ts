@@ -113,6 +113,10 @@ export class WorkoutEditorView extends ItemView {
     return 'dumbbell'
   }
 
+  get currentFile(): TFile | null {
+    return this.session?.file ?? null
+  }
+
   async onOpen(): Promise<void> {
     this.contentEl.addClass('fitkit-editor-root')
     this.resizeObserver = new ResizeObserver(() => this.updateNarrowState())
@@ -141,7 +145,7 @@ export class WorkoutEditorView extends ItemView {
   }
 
   async onClose(): Promise<void> {
-    this.abortTimer()
+    this.stopTimer({ write: true })
     if (this.autoSaveTimer !== null) {
       activeWindow.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null
@@ -163,7 +167,7 @@ export class WorkoutEditorView extends ItemView {
   }
 
   async loadFile(file: TFile): Promise<void> {
-    this.abortTimer()
+    this.stopTimer({ write: true })
     if (this.autoSaveTimer !== null) {
       activeWindow.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null
@@ -171,12 +175,27 @@ export class WorkoutEditorView extends ItemView {
     if (this.session && this.dirty && !this.conflictDetected) {
       await this.flushAutoSave()
     }
+    /** Fresh mount has no model yet; show a skeleton so the user is not staring at the onOpen empty state during the disk read. Retargets keep the previous content visible for a single-paint transition. */
+    let skeletonShownAt: number | null = null
+    if (!this.model) {
+      this.renderSkeleton()
+      skeletonShownAt = Date.now()
+    }
     this.session = new FileSession(this.app, file)
     const { model, isWorkout, warnings } = await this.session.load()
     this.model = toEditorWorkoutModel(model, isWorkout, file.path)
     this.exerciseHistory = await this.loadExerciseHistory()
     this.dirty = false
     this.conflictDetected = false
+    if (skeletonShownAt !== null) {
+      const elapsed = Date.now() - skeletonShownAt
+      const minSkeletonMs = 500
+      if (elapsed < minSkeletonMs) {
+        await new Promise<void>((resolve) =>
+          activeWindow.setTimeout(resolve, minSkeletonMs - elapsed),
+        )
+      }
+    }
     this.render()
     if (warnings.length > 0) {
       new Notice(`Loaded with ${warnings.length} parse warning(s).`)
@@ -207,6 +226,20 @@ export class WorkoutEditorView extends ItemView {
     this.contentEl.empty()
     const wrap = this.contentEl.createDiv({ cls: 'fitkit-empty' })
     wrap.setText(message)
+  }
+
+  renderSkeleton(): void {
+    this.contentEl.empty()
+    const wrap = this.contentEl.createDiv({ cls: 'fitkit-skeleton' })
+    for (let i = 0; i < 3; i++) {
+      const card = wrap.createDiv({ cls: 'fitkit-skeleton-card' })
+      const top = card.createDiv({ cls: 'fitkit-skeleton-row' })
+      top.createDiv({ cls: 'fitkit-skeleton-line is-tall is-medium' })
+      top.createDiv({ cls: 'fitkit-skeleton-line is-tall is-short' })
+      card.createDiv({ cls: 'fitkit-skeleton-line is-short' })
+      card.createDiv({ cls: 'fitkit-skeleton-line' })
+      card.createDiv({ cls: 'fitkit-skeleton-line is-medium' })
+    }
   }
 
   private render(): void {

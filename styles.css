@@ -11,6 +11,63 @@
   text-align: center;
 }
 
+.fitkit-skeleton {
+  display: grid;
+  gap: 14px;
+}
+
+.fitkit-skeleton-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  padding: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.fitkit-skeleton-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.fitkit-skeleton-line {
+  height: 12px;
+  background: var(--background-modifier-hover);
+  border-radius: 4px;
+  animation: fitkit-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.fitkit-skeleton-line.is-tall {
+  height: 32px;
+}
+
+.fitkit-skeleton-line.is-short {
+  width: 30%;
+  flex: 0 0 auto;
+}
+
+.fitkit-skeleton-line.is-medium {
+  width: 60%;
+  flex: 1 1 auto;
+}
+
+@keyframes fitkit-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fitkit-skeleton-line {
+    animation: none;
+  }
+}
+
 .fitkit-container {
   display: grid;
   gap: 14px;

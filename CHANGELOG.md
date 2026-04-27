@@ -9,9 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Workout editor now shows a skeleton placeholder while a workout file is loading, with a minimum visibility window so quick loads do not blink past it.
+
 ### Changed
 
+- When you switch the workout editor to a different file (or close the editor) while a duration timer is running, the timer's elapsed seconds are now saved to the row before the swap. Previously they were silently discarded.
+
 ### Fixed
+
+- Workout editor opens automatically when you click a `type: workout` note from the file explorer, a wikilink, search results, or a restored tab. Previously these entry points opened the raw markdown editor.
+- Workout editor now retargets in place to the clicked workout file instead of spawning a second editor leaf or requiring you to reopen via the command palette.
 
 ### Removed
 
