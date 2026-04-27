@@ -356,20 +356,26 @@ describe('WorkoutEditorView row actions', () => {
       history: {
         strength: {
           personalBest: { weight: 95, reps: 8 },
-          lastSessionMax: { weight: 90, reps: 8 },
+          lastSessionMax: {
+            value: { weight: 90, reps: 8 },
+            date: '2026-04-20',
+          },
         },
       },
-      texts: ['PB 95 kg x 8', 'Last 90 kg x 8'],
+      texts: ['PB 95 kg x 8', 'Last max: 90 kg x 8 (2026-04-20)'],
     },
     {
       kind: 'duration',
       history: {
         duration: {
           personalBestSeconds: 270,
-          lastSessionMaxSeconds: 240,
+          lastSessionMaxSeconds: {
+            value: 240,
+            date: '2026-04-20',
+          },
         },
       },
-      texts: ['PB 270s', 'Last 240s'],
+      texts: ['PB 270s', 'Last max: 240s (2026-04-20)'],
     },
   ])('renders $kind PB and Last badges when history exists', ({ kind, history, texts }) => {
     const view = createExerciseCardRenderView()
@@ -388,9 +394,22 @@ describe('WorkoutEditorView row actions', () => {
 
     view.renderExerciseCard(list as unknown as HTMLElement, 0)
 
-    expect(list.findAllByClass('fitkit-card-badge').map((badge) => badge.textContent)).toEqual(
-      texts,
+    const card = list.findByClass('fitkit-card')
+    const top = card?.children.find((child) => child.classes.has('fitkit-card-top'))
+    const historyRow = card?.children.find((child) => child.classes.has('fitkit-card-history'))
+    expect(card).not.toBeNull()
+    expect(top).toBeDefined()
+    expect(historyRow).toBeDefined()
+    expect(top?.parent).toBe(card)
+    expect(historyRow?.parent).toBe(card)
+    expect(card?.children.indexOf(historyRow as TestElement)).toBe(
+      (card?.children.indexOf(top as TestElement) ?? -2) + 1,
     )
+    const badgeTexts = historyRow
+      ?.findAllByClass('fitkit-card-badge')
+      .map((badge) => badge.textContent)
+    expect(badgeTexts).toEqual(texts)
+    expect(badgeTexts?.some((text) => /\d{4}-\d{2}-\d{2}/.test(text))).toBe(true)
   })
 
   it('omits PB and Last badges when history is absent', () => {
@@ -410,6 +429,6 @@ describe('WorkoutEditorView row actions', () => {
 
     view.renderExerciseCard(list as unknown as HTMLElement, 0)
 
-    expect(list.findByClass('fitkit-card-stats')).toBeNull()
+    expect(list.findByClass('fitkit-card-history')).toBeNull()
   })
 })

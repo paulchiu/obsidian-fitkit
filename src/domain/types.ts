@@ -9,6 +9,11 @@ export interface WeightSet {
   reps: number
 }
 
+export interface LastSessionMax<T> {
+  value: T
+  date: string
+}
+
 export interface ExerciseIndexRow {
   exerciseName: string
   kind: 'strength' | 'duration'

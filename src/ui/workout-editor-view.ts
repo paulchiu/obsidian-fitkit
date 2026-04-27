@@ -301,14 +301,14 @@ export class WorkoutEditorView extends ItemView {
     nameButton.setText(ex.name)
     nameButton.addEventListener('click', () => void this.openRenameExerciseModal(index))
 
-    this.renderExerciseHistoryBadges(top, ex)
-
     const gearBtn = top.createEl('button', {
       cls: 'fitkit-btn fitkit-btn-muted fitkit-gear-button',
       attr: { 'aria-label': 'Exercise options' },
     })
     setIcon(gearBtn, 'settings')
     gearBtn.addEventListener('click', (evt) => this.openCardMenu(evt, index))
+
+    this.renderExerciseHistoryBadges(card, ex)
 
     const notesRow = card.createDiv({ cls: 'fitkit-field-row' })
     notesRow.createEl('label', { cls: 'fitkit-label', text: 'Exercise notes' })
@@ -791,15 +791,15 @@ export class WorkoutEditorView extends ItemView {
     }
   }
 
-  private renderExerciseHistoryBadges(top: HTMLElement, ex: ExerciseCard): void {
+  private renderExerciseHistoryBadges(card: HTMLElement, ex: ExerciseCard): void {
     const badges = formatExerciseHistoryBadges(this.exerciseHistory?.get(ex.name), ex.kind)
     if (badges.length === 0) {
       return
     }
 
-    const stats = top.createDiv({ cls: 'fitkit-card-stats' })
+    const historyRow = card.createDiv({ cls: 'fitkit-card-history' })
     for (const badge of badges) {
-      stats.createSpan({
+      historyRow.createSpan({
         cls: 'fitkit-card-badge',
         text: badge.text,
         attr: {

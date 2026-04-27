@@ -161,9 +161,8 @@
   background: var(--background-modifier-hover);
 }
 
-.fitkit-card-stats {
-  display: inline-flex;
-  flex: 0 1 auto;
+.fitkit-card-history {
+  display: flex;
   gap: 4px;
   flex-wrap: wrap;
   align-items: center;

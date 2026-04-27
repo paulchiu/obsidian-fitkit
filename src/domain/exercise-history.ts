@@ -1,5 +1,5 @@
 import type { ExerciseKind } from './workout-note-model'
-import type { FitKitIndex, IndexEntry, WeightSet } from './types'
+import type { FitKitIndex, IndexEntry, LastSessionMax, WeightSet } from './types'
 
 export interface ExerciseHistoryAnchor {
   sourcePath: string
@@ -9,12 +9,12 @@ export interface ExerciseHistoryAnchor {
 
 export interface StrengthExerciseHistory {
   personalBest?: WeightSet
-  lastSessionMax?: WeightSet
+  lastSessionMax?: LastSessionMax<WeightSet>
 }
 
 export interface DurationExerciseHistory {
   personalBestSeconds?: number
-  lastSessionMaxSeconds?: number
+  lastSessionMaxSeconds?: LastSessionMax<number>
 }
 
 export interface ExerciseHistorySummary {
@@ -90,7 +90,7 @@ export function formatExerciseHistoryBadges(
         : null,
       history?.lastSessionMaxSeconds !== undefined
         ? {
-            text: `Last ${formatSeconds(history.lastSessionMaxSeconds)}`,
+            text: `Last max: ${formatSeconds(history.lastSessionMaxSeconds.value)} (${history.lastSessionMaxSeconds.date})`,
             title: 'Latest prior session total duration',
           }
         : null,
@@ -107,7 +107,7 @@ export function formatExerciseHistoryBadges(
       : null,
     history?.lastSessionMax
       ? {
-          text: `Last ${formatWeightSet(history.lastSessionMax)}`,
+          text: `Last max: ${formatWeightSet(history.lastSessionMax.value)} (${history.lastSessionMax.date})`,
           title: 'Heaviest weight in latest prior session',
         }
       : null,
@@ -204,7 +204,12 @@ function finalizeDrafts(drafts: Map<string, ExerciseHistoryDraft>): ExerciseHist
     if (draft.strengthPersonalBest || draft.strengthLastSessionMax) {
       summary.strength = {
         personalBest: draft.strengthPersonalBest,
-        lastSessionMax: draft.strengthLastSessionMax?.value,
+        lastSessionMax: draft.strengthLastSessionMax
+          ? {
+              value: draft.strengthLastSessionMax.value,
+              date: draft.strengthLastSessionMax.date,
+            }
+          : undefined,
       }
     }
     if (
@@ -213,7 +218,12 @@ function finalizeDrafts(drafts: Map<string, ExerciseHistoryDraft>): ExerciseHist
     ) {
       summary.duration = {
         personalBestSeconds: draft.durationPersonalBestSeconds,
-        lastSessionMaxSeconds: draft.durationLastSessionMaxSeconds?.value,
+        lastSessionMaxSeconds: draft.durationLastSessionMaxSeconds
+          ? {
+              value: draft.durationLastSessionMaxSeconds.value,
+              date: draft.durationLastSessionMaxSeconds.date,
+            }
+          : undefined,
       }
     }
     history.set(exerciseName, summary)

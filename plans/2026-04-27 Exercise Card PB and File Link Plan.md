@@ -198,6 +198,8 @@ the active leaf. Do not use the v0.4.2 `iterateRootLeaves` path or create a sepa
 not for same-pane navigation. Manual iOS smoke must confirm that replacing the editor with
 the exercise note is the observed behavior.
 
+**Resolved 2026-04-27 (post-impl iteration):** Badges live in a dedicated .fitkit-card-history row inserted between the card header and the notes/set rows. The last-max badge includes its source date (YYYY-MM-DD). Row is omitted entirely when no history exists.
+
 ## §5 Implementation outline
 
 **`src/domain/exercise-history.ts` (new):** Add pure types and helpers that summarize PB

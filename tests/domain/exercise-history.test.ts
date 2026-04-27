@@ -59,13 +59,17 @@ describe('exercise history aggregation', () => {
       },
     )
 
+    expect(history.get('Squat')?.strength?.lastSessionMax).toEqual({
+      value: { weight: 95, reps: 8 },
+      date: '2026-04-23',
+    })
     expect(formatExerciseHistoryBadges(history.get('Squat'), 'strength')).toEqual([
       {
         text: 'PB 100 kg x 1',
         title: 'Heaviest weight lifted (not 1RM)',
       },
       {
-        text: 'Last 95 kg x 8',
+        text: 'Last max: 95 kg x 8 (2026-04-23)',
         title: 'Heaviest weight in latest prior session',
       },
     ])
@@ -103,13 +107,17 @@ describe('exercise history aggregation', () => {
       },
     )
 
+    expect(history.get('Bench press')?.strength?.lastSessionMax).toEqual({
+      value: { weight: 80, reps: 5 },
+      date: '2026-04-22',
+    })
     expect(formatExerciseHistoryBadges(history.get('Bench press'), 'strength')).toEqual([
       {
         text: 'PB 80 kg x 5',
         title: 'Heaviest weight lifted (not 1RM)',
       },
       {
-        text: 'Last 80 kg x 5',
+        text: 'Last max: 80 kg x 5 (2026-04-22)',
         title: 'Heaviest weight in latest prior session',
       },
     ])
@@ -172,7 +180,7 @@ describe('exercise history aggregation', () => {
         title: 'Longest session total duration',
       },
       {
-        text: 'Last 240s',
+        text: 'Last max: 240s (2026-04-22)',
         title: 'Latest prior session total duration',
       },
     ])
