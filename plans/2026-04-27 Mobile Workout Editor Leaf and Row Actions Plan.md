@@ -20,13 +20,15 @@ This plan is written for coding subagents (Claude Code, Codex, etc.) and the hum
 
 ## 1. Goal & Success Criteria
 
-When the user runs `Open today's workout` or `Open workout editor for current file` on Obsidian Mobile, the editor opens in the main area (`workspace.rootSplit`) by default, not in a side leaf. Existing editor leaves are still reused if present.
+When the user runs `Open today's workout` or `Open workout editor for current file` on Obsidian Mobile, the editor opens in the main area (`workspace.rootSplit`) by default, not in a side leaf. When an existing editor leaf is already open, the main-area leaf is preferred; any sidebar leaf is a fallback.
 
 **Definition of done for 0.4.1:**
 
 - On Obsidian Mobile (real device, manual smoke), running `Open today's workout` from a clean state opens the editor in the main area.
-- On Obsidian Mobile, running the same command after closing the editor opens it in the main area again.
-- On Obsidian Mobile, running the same command while the editor is already open in any leaf reveals that existing leaf (no second leaf, no replacement).
+- On Obsidian Mobile, running `Open workout editor for current file` from a clean state also opens in the main area.
+- On Obsidian Mobile, running either command after closing the editor opens it in the main area again.
+- On Obsidian Mobile, running either command while the editor is already open in the main area reveals that leaf (no duplicate).
+- On Obsidian Mobile, running either command while the editor is stranded in a sidebar (e.g., a pre-upgrade state) reveals the sidebar leaf rather than creating a duplicate. Next fresh open after that leaf is closed will land in main area.
 - On desktop, the behaviour is unchanged for the common case (a tab in the main area).
 - `npm run lint && npm run format:check && npm run build && npm test` pass on the final commit.
 - PR carries the `patch` label.
@@ -70,7 +72,13 @@ private async openWorkoutEditor(file: TFile): Promise<void> {
 
 ### Target behaviour
 
-Use `workspace.getLeaf('tab')`, which always creates a new tab in the main area regardless of which leaf is currently active. The `'tab'` form is the documented Obsidian API for "I want a main-area tab". We keep the `existing` short-circuit so a second invocation reuses the open editor instead of opening a duplicate.
+Use a three-step selection:
+
+1. Find all existing editor leaves (`getLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR)`).
+2. Prefer a leaf whose root is `workspace.rootSplit` (main area); fall back to the first leaf found if none are in main.
+3. If no existing editor leaf exists at all, create a new tab with `getLeaf('tab')`, which always targets `rootSplit`.
+
+This means a user upgrading from the old code, whose editor is stranded in a sidebar, still has that leaf revealed on the first run (no duplicate). On the next fresh open after they close it, the new tab lands in main area.
 
 ### Why not `getMostRecentLeaf(rootSplit)`
 
@@ -82,18 +90,15 @@ Use `workspace.getLeaf('tab')`, which always creates a new tab in the main area 
 
 **Prereq:** branch `feature/mobile-editor-main-area-leaf` checked out off `main`. **Output:** one commit.
 
-1. In `src/main.ts:154-163`, replace `this.app.workspace.getLeaf(false)` with `this.app.workspace.getLeaf('tab')`.
-2. Add a JSDoc block above the `existing` / `leaf` lines explaining the non-obvious choice. Suggested wording (single block, no stacked `//`):
+1. In `src/main.ts:154-163`, replace the two-line `existing` / `leaf` selection with the three-step strategy. Suggested replacement (add a one-sentence JSDoc above, no stacked `//`):
    ```ts
-   /**
-    * Use `getLeaf('tab')` rather than `getLeaf(false)`. `false` returns the
-    * most-recently-active leaf, which on Obsidian Mobile can sit inside a side
-    * drawer; the editor would then open in the drawer instead of the main area.
-    * `'tab'` always creates a tab in `rootSplit`.
-    */
+   /** Prefer a rootSplit leaf so both commands open in the main area on mobile, not in a drawer. */
+   const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR)
+   const existing = leaves.find((l) => l.getRoot() === this.app.workspace.rootSplit) ?? leaves[0]
+   const leaf = existing ?? this.app.workspace.getLeaf('tab')
    ```
-3. Run the full gate: `npm run lint && npm run format:check && npm run build && npm test`.
-4. Commit:
+2. Run the full gate: `npm run lint && npm run format:check && npm run build && npm test`.
+3. Commit:
    ```
    fix(editor): Open workout editor in main area on Obsidian Mobile
    ```
@@ -101,12 +106,13 @@ Use `workspace.getLeaf('tab')`, which always creates a new tab in the main area 
 **Acceptance:**
 
 - Gate passes.
-- `git diff HEAD~..HEAD -- src/main.ts` is small: one argument change plus the JSDoc.
+- `git diff HEAD~..HEAD -- src/main.ts` is small: the three-line replacement plus the JSDoc.
 - No other files changed in this commit.
 
 **Risks:**
 
-- `getLeaf('tab')` behaviour differs slightly from `getLeaf(false)` on desktop: it always creates a new tab, whereas `false` may reuse the current empty tab. The `existing` short-circuit covers the "editor already open" case, so the only desktop-visible change is that running the command from an empty new tab now opens a sibling tab instead of reusing that empty one. Acceptable: the user cannot tell unless they were specifically using an empty tab as a parking slot.
+- `getLeaf('tab')` always creates a new tab, whereas `getLeaf(false)` may reuse the current empty tab on desktop. The `existing` short-circuit covers the "editor already open" case, so the only desktop-visible change is that running the command from an empty new tab now opens a sibling tab instead of reusing that empty one. Acceptable.
+- `WorkspaceLeaf.parent` may be `WorkspaceMobileDrawer` on mobile; `revealLeaf` will bring a drawer leaf forward rather than moving it. This is intentional: the first run after upgrade reveals the stranded leaf where it sits; next fresh open lands in main area.
 
 ### Phase 2. CHANGELOG bullet (sequential, single commit)
 
@@ -137,9 +143,11 @@ npm run lint && npm run format:check && npm run build && npm test
 Manual smoke (out-of-band; not part of CI):
 
 - Obsidian Mobile, fresh launch: tap into the right drawer, then run `Open today's workout` from the command palette. Expected: editor opens in the main area, not in the drawer.
-- Obsidian Mobile, editor already open in main area: run the same command. Expected: existing leaf is revealed, no duplicate.
-- Obsidian Mobile, editor manually dragged into a sidebar: run the same command. Expected: existing leaf is revealed (we keep the `existing` short-circuit, so the user's manual placement wins).
-- Desktop: same command sequence. Expected: a tab opens next to the current main-area tab; no regression in everyday use.
+- Obsidian Mobile, fresh launch: tap into the right drawer, then run `Open workout editor for current file` on an open workout note. Expected: same as above, main area.
+- Obsidian Mobile, editor already open in main area: run either command. Expected: existing leaf is revealed, no duplicate.
+- Obsidian Mobile, editor stranded in a sidebar (simulating pre-upgrade state): run either command. Expected: existing sidebar leaf is revealed (no duplicate). Close it, then run the command again. Expected: new leaf opens in main area.
+- Desktop: run `Open today's workout` with no existing editor tab. Expected: a new tab opens next to the current main-area tab. Run it again. Expected: existing tab is revealed, no duplicate.
+- Desktop: run `Open today's workout` with no existing editor tab, from a state where a split-pane editor might be in a sidebar panel. Expected: no regression.
 
 ## 6. Post-merge follow-up: mobile row-action ergonomics
 
