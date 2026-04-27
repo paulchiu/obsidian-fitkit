@@ -4,10 +4,21 @@ export interface BestSet {
   e1rm: number
 }
 
+export interface WeightSet {
+  weight: number
+  reps: number
+}
+
+export interface LastSessionMax<T> {
+  value: T
+  date: string
+}
+
 export interface ExerciseIndexRow {
   exerciseName: string
   kind: 'strength' | 'duration'
   bestSet?: BestSet
+  maxWeightSet?: WeightSet
   totalSets?: number
   totalDurationSeconds?: number
 }

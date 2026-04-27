@@ -161,6 +161,27 @@
   background: var(--background-modifier-hover);
 }
 
+.fitkit-card-history {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.fitkit-card-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 0 6px;
+  font-size: var(--font-ui-smaller);
+  line-height: 1;
+  color: var(--text-muted);
+  background: var(--background-primary);
+  white-space: nowrap;
+}
+
 .fitkit-gear-button {
   display: inline-flex;
   align-items: center;

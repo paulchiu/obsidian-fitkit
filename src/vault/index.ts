@@ -1,6 +1,7 @@
 import type { App, TAbstractFile, TFile } from 'obsidian'
 
 import { pickBestSet } from '../domain/epley'
+import { pickMaxWeightSet } from '../domain/exercise-history'
 import type { ExerciseIndexRow, FitKitIndex, IndexDiagnostic, IndexEntry } from '../domain/types'
 import {
   parseWorkoutNote,
@@ -122,6 +123,7 @@ function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
     exerciseName: exercise.exerciseName,
     kind: exercise.kind,
     bestSet: pickBestSet(strengthSets) ?? undefined,
+    maxWeightSet: pickMaxWeightSet(strengthSets) ?? undefined,
     totalSets: strengthSets.length,
   }
 }
