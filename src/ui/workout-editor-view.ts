@@ -401,7 +401,6 @@ export class WorkoutEditorView extends ItemView {
     })
 
     this.renderRowActions(container, body, {
-      exerciseName: ex.name,
       label: `set ${i + 1}`,
       currentNote: set.note,
       onDelete: () => {
@@ -467,7 +466,6 @@ export class WorkoutEditorView extends ItemView {
     })
 
     this.renderRowActions(container, body, {
-      exerciseName: ex.name,
       label: `duration entry ${i + 1}`,
       currentNote: durationEntry.note,
       onDelete: () => {
@@ -487,7 +485,6 @@ export class WorkoutEditorView extends ItemView {
     container: HTMLElement,
     body: HTMLElement,
     opts: {
-      exerciseName: string
       label: string
       currentNote: string | undefined
       onDelete: () => void
@@ -505,7 +502,7 @@ export class WorkoutEditorView extends ItemView {
       void this.confirmAndDeleteRow(opts.label, opts.onDelete)
     }
 
-    this.renderRowKebab(body, opts.exerciseName, opts.label, openNoteModal, triggerDelete)
+    this.renderRowKebab(body, opts.label, openNoteModal, triggerDelete)
 
     if (opts.currentNote && opts.currentNote.length > 0) {
       const line = container.createDiv({
@@ -525,7 +522,6 @@ export class WorkoutEditorView extends ItemView {
 
   private renderRowKebab(
     body: HTMLElement,
-    exerciseName: string,
     label: string,
     onNote: () => void,
     onDelete: () => void,
@@ -538,12 +534,6 @@ export class WorkoutEditorView extends ItemView {
     kebab.addEventListener('click', (evt) => {
       evt.stopPropagation()
       const menu = new Menu()
-      menu.addItem((item) =>
-        item
-          .setTitle('Open exercise file')
-          .setIcon('file-text')
-          .onClick(() => void this.openExerciseFile(exerciseName)),
-      )
       menu.addItem((item) => item.setTitle('Edit note').setIcon('pencil').onClick(onNote))
       menu.addItem((item) =>
         item.setTitle('Delete row').setIcon('trash-2').setWarning(true).onClick(onDelete),

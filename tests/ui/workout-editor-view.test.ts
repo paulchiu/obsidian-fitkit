@@ -254,7 +254,6 @@ interface RowActionView {
     container: HTMLElement,
     body: HTMLElement,
     opts: {
-      exerciseName: string
       label: string
       currentNote: string | undefined
       onDelete: () => void
@@ -297,7 +296,6 @@ describe('WorkoutEditorView row actions', () => {
     const body = container.createDiv({ cls: 'fitkit-row-body' })
 
     view.renderRowActions(container as unknown as HTMLElement, body as unknown as HTMLElement, {
-      exerciseName: 'Squat',
       label: 'set 1',
       currentNote: undefined,
       onDelete: vi.fn(),
@@ -316,10 +314,12 @@ describe('WorkoutEditorView row actions', () => {
 
     expect(obsidianMock.menus).toHaveLength(1)
     expect(obsidianMock.menus[0]?.items).toMatchObject([
-      { title: 'Open exercise file', icon: 'file-text' },
       { title: 'Edit note', icon: 'pencil' },
       { title: 'Delete row', icon: 'trash-2', warning: true },
     ])
+    expect(obsidianMock.menus[0]?.items.map((item) => item.title)).not.toContain(
+      'Open exercise file',
+    )
     expect(obsidianMock.menus[0]?.position).toEqual({ x: 10, y: 20 })
   })
 

@@ -200,6 +200,8 @@ the exercise note is the observed behavior.
 
 **Resolved 2026-04-27 (post-impl iteration):** Badges live in a dedicated .fitkit-card-history row inserted between the card header and the notes/set rows. The last-max badge includes its source date (YYYY-MM-DD). Row is omitted entirely when no history exists.
 
+**Resolved 2026-04-27 (post-impl iteration 2):** Open exercise file lives only in the exercise-card kebab, not the per-row/per-set kebab. Reason: keeps the per-set menu focused on set-level destructive actions.
+
 ## §5 Implementation outline
 
 **`src/domain/exercise-history.ts` (new):** Add pure types and helpers that summarize PB
