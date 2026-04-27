@@ -40,6 +40,15 @@ interface DragSession {
   indicator: HTMLElement
 }
 
+interface ActiveTimer {
+  card: ExerciseCard
+  entry: EditableDurationEntry
+  startedAtMs: number
+  accumulator: number
+  intervalId: number
+  inputEl: HTMLInputElement | null
+}
+
 export const VIEW_TYPE_FITKIT_WORKOUT_EDITOR = 'fitkit-workout-editor'
 
 interface EditableStrengthSet {
@@ -83,6 +92,7 @@ export class WorkoutEditorView extends ItemView {
   private autoSaveInflight = false
   private autoSaveRequeued = false
   private dragSession: DragSession | null = null
+  private activeTimer: ActiveTimer | null = null
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -131,6 +141,7 @@ export class WorkoutEditorView extends ItemView {
   }
 
   async onClose(): Promise<void> {
+    this.abortTimer()
     if (this.autoSaveTimer !== null) {
       activeWindow.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null
@@ -152,6 +163,7 @@ export class WorkoutEditorView extends ItemView {
   }
 
   async loadFile(file: TFile): Promise<void> {
+    this.abortTimer()
     if (this.autoSaveTimer !== null) {
       activeWindow.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null
@@ -175,6 +187,7 @@ export class WorkoutEditorView extends ItemView {
     if (!this.session) {
       return
     }
+    this.abortTimer()
     if (this.autoSaveTimer !== null) {
       activeWindow.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null
@@ -424,25 +437,52 @@ export class WorkoutEditorView extends ItemView {
     header.createSpan({ cls: 'fitkit-set-label', text: 'Duration (s)' })
 
     for (let i = 0; i < ex.durationEntries.length; i++) {
-      this.renderDurationRow(wrap, ex, i)
+      this.renderDurationRow(wrap, ex, i, exerciseIndex)
     }
 
     const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
     const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add duration entry' })
     addBtn.addEventListener('click', () => {
+      if (this.activeTimer && this.activeTimer.card === ex) {
+        this.stopTimer({ write: true })
+      }
       ex.durationEntries.push({})
       this.markDirty()
       this.render()
       this.focusRowCell(exerciseIndex, ex.durationEntries.length - 1, 'Duration (s)')
     })
+
+    const isRunningHere = this.activeTimer?.card === ex
+    const timerBtn = actions.createEl('button', {
+      cls: 'fitkit-btn fitkit-timer-button',
+      text: isRunningHere ? 'Stop timer' : 'Start timer',
+      attr: { 'aria-label': isRunningHere ? 'Stop timer' : 'Start timer' },
+    })
+    setIcon(timerBtn, isRunningHere ? 'square' : 'play')
+    timerBtn.addEventListener('click', () => {
+      if (this.activeTimer && this.activeTimer.card === ex) {
+        this.stopTimer({ write: true })
+      } else {
+        this.startCardTimer(ex)
+      }
+    })
   }
 
-  private renderDurationRow(wrap: HTMLElement, ex: ExerciseCard, i: number): void {
+  private renderDurationRow(
+    wrap: HTMLElement,
+    ex: ExerciseCard,
+    i: number,
+    exerciseIndex: number,
+  ): void {
     const durationEntry = ex.durationEntries[i]
     if (!durationEntry) {
       return
     }
-    const container = wrap.createDiv({ cls: 'fitkit-row' })
+    const isTiming = this.activeTimer?.entry === durationEntry
+    const container = wrap.createDiv({
+      cls: isTiming ? 'fitkit-row fitkit-row--timing' : 'fitkit-row',
+    })
+    container.dataset.fitkitTimerRow = `${exerciseIndex}:${i}`
     const body = container.createDiv({ cls: 'fitkit-row-body' })
     const row = body.createDiv({ cls: 'fitkit-set-row fitkit-duration-row' })
 
@@ -458,8 +498,14 @@ export class WorkoutEditorView extends ItemView {
       step: '1',
       inputmode: 'numeric',
     })
-    durationInput.value =
-      durationEntry.durationSeconds !== undefined ? String(durationEntry.durationSeconds) : ''
+    if (isTiming && this.activeTimer) {
+      durationInput.value = String(this.liveSeconds(this.activeTimer))
+      durationInput.toggleAttribute('disabled', true)
+      this.activeTimer.inputEl = durationInput
+    } else {
+      durationInput.value =
+        durationEntry.durationSeconds !== undefined ? String(durationEntry.durationSeconds) : ''
+    }
     durationInput.addEventListener('input', () => {
       durationEntry.durationSeconds = parseNumberInput(durationInput.value)
       this.markDirty()
@@ -469,6 +515,9 @@ export class WorkoutEditorView extends ItemView {
       label: `duration entry ${i + 1}`,
       currentNote: durationEntry.note,
       onDelete: () => {
+        if (this.activeTimer?.entry === durationEntry) {
+          this.abortTimer()
+        }
         ex.durationEntries.splice(i, 1)
         this.markDirty()
         this.render()
@@ -561,6 +610,64 @@ export class WorkoutEditorView extends ItemView {
     }
   }
 
+  private startCardTimer(card: ExerciseCard): void {
+    if (this.activeTimer && this.activeTimer.card !== card) {
+      this.stopTimer({ write: true })
+    }
+    if (card.durationEntries.length === 0) {
+      card.durationEntries.push({})
+    }
+    const entry = card.durationEntries[card.durationEntries.length - 1]
+    if (!entry) {
+      return
+    }
+    if (this.activeTimer && this.activeTimer.entry === entry) {
+      return
+    }
+    const accumulator = entry.durationSeconds ?? 0
+    const intervalId = activeWindow.setInterval(() => this.tickTimer(), 1000)
+    this.activeTimer = {
+      card,
+      entry,
+      startedAtMs: Date.now(),
+      accumulator,
+      intervalId,
+      inputEl: null,
+    }
+    this.markDirty()
+    this.render()
+  }
+
+  private stopTimer(opts: { write: boolean }): void {
+    const timer = this.activeTimer
+    if (!timer) {
+      return
+    }
+    activeWindow.clearInterval(timer.intervalId)
+    if (opts.write) {
+      timer.entry.durationSeconds = this.liveSeconds(timer)
+      this.markDirty()
+    }
+    this.activeTimer = null
+    this.render()
+  }
+
+  private abortTimer(): void {
+    this.stopTimer({ write: false })
+  }
+
+  private tickTimer(): void {
+    const timer = this.activeTimer
+    if (!timer || !timer.inputEl) {
+      return
+    }
+    timer.inputEl.value = String(this.liveSeconds(timer))
+  }
+
+  private liveSeconds(timer: ActiveTimer): number {
+    return timer.accumulator + Math.max(0, Math.floor((Date.now() - timer.startedAtMs) / 1000))
+  }
+
   private async switchKind(index: number, nextKind: ExerciseKind): Promise<void> {
     if (!this.model) {
       return
@@ -645,6 +752,9 @@ export class WorkoutEditorView extends ItemView {
     if (!ex || ex.kind === nextKind) {
       return
     }
+    if (this.activeTimer?.card === ex) {
+      this.abortTimer()
+    }
     const previousKind = ex.kind
     ex.kind = nextKind
     ex.strengthSets = []
@@ -716,6 +826,10 @@ export class WorkoutEditorView extends ItemView {
   private removeExercise(index: number): void {
     if (!this.model) {
       return
+    }
+    const ex = this.model.exercises[index]
+    if (ex && this.activeTimer?.card === ex) {
+      this.abortTimer()
     }
     this.model.exercises.splice(index, 1)
     this.markDirty()

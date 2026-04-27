@@ -282,6 +282,16 @@
   padding: 0;
 }
 
+.fitkit-timer-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fitkit-row--timing {
+  background: var(--background-modifier-active-hover);
+}
+
 .fitkit-note-line {
   width: 100%;
   font-size: var(--font-ui-smaller);
