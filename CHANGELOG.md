@@ -9,7 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Workout editor exercise cards now show PB and Last badges from prior workout history.
+- Workout editor exercise and row menus now include Open exercise file.
+
 ### Changed
+
+- Workout editor strength PBs now use the heaviest recorded weight at any rep count rather than estimated 1RM.
 
 ### Fixed
 

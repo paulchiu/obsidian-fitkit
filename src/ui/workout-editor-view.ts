@@ -1,7 +1,8 @@
-import type { TFile, WorkspaceLeaf } from 'obsidian'
-import { ItemView, Menu, Notice, setIcon } from 'obsidian'
+import type { WorkspaceLeaf } from 'obsidian'
+import { ItemView, Menu, Notice, TFile, normalizePath, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
+import { formatExerciseHistoryBadges, type ExerciseHistoryByName } from '../domain/exercise-history'
 import {
   createRegistry,
   kindForName,
@@ -20,6 +21,7 @@ import {
 } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
 import { exercisesFolder, workoutsFolder } from '../settings-paths'
+import { exerciseHistoryFromVault } from '../vault/exercise-history-vault'
 import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
 import { FileSession } from '../vault/file-session'
 import { ConfirmModal } from './confirm-modal'
@@ -73,6 +75,7 @@ interface EditorWorkoutModel {
 export class WorkoutEditorView extends ItemView {
   private session: FileSession | null = null
   private model: EditorWorkoutModel | null = null
+  private exerciseHistory: ExerciseHistoryByName | null = null
   private dirty = false
   private conflictDetected = false
   private resizeObserver: ResizeObserver | null = null
@@ -141,6 +144,7 @@ export class WorkoutEditorView extends ItemView {
     this.contentEl.empty()
     this.session = null
     this.model = null
+    this.exerciseHistory = null
   }
 
   private updateNarrowState(): void {
@@ -158,6 +162,7 @@ export class WorkoutEditorView extends ItemView {
     this.session = new FileSession(this.app, file)
     const { model, isWorkout, warnings } = await this.session.load()
     this.model = toEditorWorkoutModel(model, isWorkout, file.path)
+    this.exerciseHistory = await this.loadExerciseHistory()
     this.dirty = false
     this.conflictDetected = false
     this.render()
@@ -176,6 +181,9 @@ export class WorkoutEditorView extends ItemView {
     }
     const { model, isWorkout } = await this.session.load()
     this.model = toEditorWorkoutModel(model, isWorkout, this.session.file.path)
+    if (!this.model.isFitKitWorkout) {
+      this.exerciseHistory = null
+    }
     this.dirty = false
     this.conflictDetected = false
     this.render()
@@ -293,6 +301,8 @@ export class WorkoutEditorView extends ItemView {
     nameButton.setText(ex.name)
     nameButton.addEventListener('click', () => void this.openRenameExerciseModal(index))
 
+    this.renderExerciseHistoryBadges(top, ex)
+
     const gearBtn = top.createEl('button', {
       cls: 'fitkit-btn fitkit-btn-muted fitkit-gear-button',
       attr: { 'aria-label': 'Exercise options' },
@@ -391,6 +401,7 @@ export class WorkoutEditorView extends ItemView {
     })
 
     this.renderRowActions(container, body, {
+      exerciseName: ex.name,
       label: `set ${i + 1}`,
       currentNote: set.note,
       onDelete: () => {
@@ -456,6 +467,7 @@ export class WorkoutEditorView extends ItemView {
     })
 
     this.renderRowActions(container, body, {
+      exerciseName: ex.name,
       label: `duration entry ${i + 1}`,
       currentNote: durationEntry.note,
       onDelete: () => {
@@ -475,6 +487,7 @@ export class WorkoutEditorView extends ItemView {
     container: HTMLElement,
     body: HTMLElement,
     opts: {
+      exerciseName: string
       label: string
       currentNote: string | undefined
       onDelete: () => void
@@ -492,7 +505,7 @@ export class WorkoutEditorView extends ItemView {
       void this.confirmAndDeleteRow(opts.label, opts.onDelete)
     }
 
-    this.renderRowKebab(body, opts.label, openNoteModal, triggerDelete)
+    this.renderRowKebab(body, opts.exerciseName, opts.label, openNoteModal, triggerDelete)
 
     if (opts.currentNote && opts.currentNote.length > 0) {
       const line = container.createDiv({
@@ -512,6 +525,7 @@ export class WorkoutEditorView extends ItemView {
 
   private renderRowKebab(
     body: HTMLElement,
+    exerciseName: string,
     label: string,
     onNote: () => void,
     onDelete: () => void,
@@ -524,6 +538,12 @@ export class WorkoutEditorView extends ItemView {
     kebab.addEventListener('click', (evt) => {
       evt.stopPropagation()
       const menu = new Menu()
+      menu.addItem((item) =>
+        item
+          .setTitle('Open exercise file')
+          .setIcon('file-text')
+          .onClick(() => void this.openExerciseFile(exerciseName)),
+      )
       menu.addItem((item) => item.setTitle('Edit note').setIcon('pencil').onClick(onNote))
       menu.addItem((item) =>
         item.setTitle('Delete row').setIcon('trash-2').setWarning(true).onClick(onDelete),
@@ -727,6 +747,13 @@ export class WorkoutEditorView extends ItemView {
     const menu = new Menu()
     menu.addItem((item) =>
       item
+        .setTitle('Open exercise file')
+        .setIcon('file-text')
+        .onClick(() => void this.openExerciseFile(ex.name)),
+    )
+    menu.addSeparator()
+    menu.addItem((item) =>
+      item
         .setTitle(switchLabel)
         .setIcon('repeat')
         .onClick(() => void this.switchKind(index, otherKind)),
@@ -761,6 +788,62 @@ export class WorkoutEditorView extends ItemView {
       menu.showAtPosition({ x: rect.left, y: rect.bottom })
     } else {
       menu.showAtMouseEvent(evt)
+    }
+  }
+
+  private renderExerciseHistoryBadges(top: HTMLElement, ex: ExerciseCard): void {
+    const badges = formatExerciseHistoryBadges(this.exerciseHistory?.get(ex.name), ex.kind)
+    if (badges.length === 0) {
+      return
+    }
+
+    const stats = top.createDiv({ cls: 'fitkit-card-stats' })
+    for (const badge of badges) {
+      stats.createSpan({
+        cls: 'fitkit-card-badge',
+        text: badge.text,
+        attr: {
+          title: badge.title,
+          'aria-label': `${badge.text}: ${badge.title}`,
+        },
+      })
+    }
+  }
+
+  private async loadExerciseHistory(): Promise<ExerciseHistoryByName | null> {
+    if (!this.model?.isFitKitWorkout) {
+      return null
+    }
+    try {
+      return await exerciseHistoryFromVault(this.plugin, {
+        sourcePath: this.model.sourcePath,
+        date: this.model.date,
+      })
+    } catch (error) {
+      new Notice(`Could not load exercise history: ${formatError(error)}`)
+      return null
+    }
+  }
+
+  private async openExerciseFile(exerciseName: string): Promise<void> {
+    const trimmed = exerciseName.trim()
+    if (trimmed.length === 0) {
+      new Notice('No exercise file found.')
+      return
+    }
+
+    const path = normalizePath(`${exercisesFolder(this.plugin.settings)}/${trimmed}.md`)
+    const file = this.app.vault.getAbstractFileByPath(path)
+    if (!(file instanceof TFile)) {
+      new Notice('No exercise file found.')
+      return
+    }
+
+    try {
+      this.app.workspace.setActiveLeaf(this.leaf, { focus: true })
+      await this.app.workspace.openLinkText(path, this.model?.sourcePath ?? file.path, false)
+    } catch (error) {
+      new Notice(`Could not open exercise file: ${formatError(error)}`)
     }
   }
 
@@ -1235,4 +1318,8 @@ function readCardIndex(card: HTMLElement): number | null {
   }
   const parsed = Number.parseInt(raw, 10)
   return Number.isNaN(parsed) ? null : parsed
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 interface MockMenuItemState {
   title?: string
   icon?: string
+  disabled?: boolean
   warning?: boolean
   onClick?: () => void
 }
@@ -74,6 +75,7 @@ vi.mock('obsidian', () => {
     }
 
     setDisabled(_disabled: boolean): this {
+      this.state.disabled = _disabled
       return this
     }
 
@@ -113,6 +115,8 @@ vi.mock('obsidian', () => {
     constructor(readonly message: string) {}
   }
 
+  class TFile {}
+
   return {
     ItemView,
     Menu,
@@ -120,6 +124,8 @@ vi.mock('obsidian', () => {
     Notice,
     Platform: obsidianMock.platform,
     SuggestModal,
+    TFile,
+    normalizePath: (path: string) => path.replace(/\/+/g, '/'),
     setIcon: vi.fn((element: { setAttr?: (name: string, value: string) => void }, icon: string) => {
       element.setAttr?.('data-icon', icon)
     }),
@@ -144,6 +150,7 @@ class TestElement {
   readonly attributes = new Map<string, string>()
   readonly children: TestElement[] = []
   readonly classes = new Set<string>()
+  readonly dataset: Record<string, string> = {}
   readonly listeners = new Map<string, TestListener[]>()
   parent: TestElement | null = null
   textContent = ''
@@ -187,6 +194,16 @@ class TestElement {
     this.textContent = text
   }
 
+  toggleAttribute(name: string, force?: boolean): boolean {
+    const next = force ?? !this.attributes.has(name)
+    if (next) {
+      this.attributes.set(name, '')
+    } else {
+      this.attributes.delete(name)
+    }
+    return next
+  }
+
   getBoundingClientRect(): DOMRect {
     return {
       bottom: 20,
@@ -214,6 +231,11 @@ class TestElement {
     return null
   }
 
+  findAllByClass(cls: string): TestElement[] {
+    const own = this.classes.has(cls) ? [this] : []
+    return [...own, ...this.children.flatMap((child) => child.findAllByClass(cls))]
+  }
+
   listenersFor(type: string): TestListener[] {
     return this.listeners.get(type) ?? []
   }
@@ -232,6 +254,7 @@ interface RowActionView {
     container: HTMLElement,
     body: HTMLElement,
     opts: {
+      exerciseName: string
       label: string
       currentNote: string | undefined
       onDelete: () => void
@@ -243,10 +266,28 @@ interface RowActionView {
 const createRowActionView = (): RowActionView =>
   Object.create(WorkoutEditorView.prototype) as RowActionView
 
+interface CardMenuView {
+  model: unknown
+  openCardMenu(evt: MouseEvent, index: number): void
+}
+
+interface ExerciseCardRenderView {
+  model: unknown
+  exerciseHistory: unknown
+  renderExerciseCard(list: HTMLElement, index: number): void
+}
+
+const createCardMenuView = (): CardMenuView =>
+  Object.create(WorkoutEditorView.prototype) as CardMenuView
+
+const createExerciseCardRenderView = (): ExerciseCardRenderView =>
+  Object.create(WorkoutEditorView.prototype) as ExerciseCardRenderView
+
 describe('WorkoutEditorView row actions', () => {
   afterEach(() => {
     obsidianMock.menus = []
     obsidianMock.platform.isMobile = false
+    vi.unstubAllGlobals()
   })
 
   it('renders the kebab on mobile without installing swipe actions', () => {
@@ -256,6 +297,7 @@ describe('WorkoutEditorView row actions', () => {
     const body = container.createDiv({ cls: 'fitkit-row-body' })
 
     view.renderRowActions(container as unknown as HTMLElement, body as unknown as HTMLElement, {
+      exerciseName: 'Squat',
       label: 'set 1',
       currentNote: undefined,
       onDelete: vi.fn(),
@@ -274,9 +316,100 @@ describe('WorkoutEditorView row actions', () => {
 
     expect(obsidianMock.menus).toHaveLength(1)
     expect(obsidianMock.menus[0]?.items).toMatchObject([
+      { title: 'Open exercise file', icon: 'file-text' },
       { title: 'Edit note', icon: 'pencil' },
       { title: 'Delete row', icon: 'trash-2', warning: true },
     ])
     expect(obsidianMock.menus[0]?.position).toEqual({ x: 10, y: 20 })
+  })
+
+  it('adds Open exercise file to the exercise card menu before kind and move actions', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
+    const view = createCardMenuView()
+    view.model = {
+      exercises: [
+        {
+          name: 'Squat',
+          kind: 'strength',
+          strengthSets: [],
+          durationEntries: [],
+        },
+      ],
+    }
+    const button = new TestElement('button')
+
+    view.openCardMenu({ currentTarget: button } as unknown as MouseEvent, 0)
+
+    expect(obsidianMock.menus).toHaveLength(1)
+    expect(obsidianMock.menus[0]?.items.map((item) => item.title)).toEqual([
+      'Open exercise file',
+      'Switch to duration',
+      'Move up',
+      'Move down',
+      'Remove exercise',
+    ])
+  })
+
+  it.each([
+    {
+      kind: 'strength',
+      history: {
+        strength: {
+          personalBest: { weight: 95, reps: 8 },
+          lastSessionMax: { weight: 90, reps: 8 },
+        },
+      },
+      texts: ['PB 95 kg x 8', 'Last 90 kg x 8'],
+    },
+    {
+      kind: 'duration',
+      history: {
+        duration: {
+          personalBestSeconds: 270,
+          lastSessionMaxSeconds: 240,
+        },
+      },
+      texts: ['PB 270s', 'Last 240s'],
+    },
+  ])('renders $kind PB and Last badges when history exists', ({ kind, history, texts }) => {
+    const view = createExerciseCardRenderView()
+    view.model = {
+      exercises: [
+        {
+          name: 'Squat',
+          kind,
+          strengthSets: [],
+          durationEntries: [],
+        },
+      ],
+    }
+    view.exerciseHistory = new Map([['Squat', history]])
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    expect(list.findAllByClass('fitkit-card-badge').map((badge) => badge.textContent)).toEqual(
+      texts,
+    )
+  })
+
+  it('omits PB and Last badges when history is absent', () => {
+    const view = createExerciseCardRenderView()
+    view.model = {
+      exercises: [
+        {
+          name: 'Squat',
+          kind: 'strength',
+          strengthSets: [],
+          durationEntries: [],
+        },
+      ],
+    }
+    view.exerciseHistory = new Map()
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    expect(list.findByClass('fitkit-card-stats')).toBeNull()
   })
 })
