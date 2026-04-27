@@ -113,6 +113,10 @@ export class WorkoutEditorView extends ItemView {
     return 'dumbbell'
   }
 
+  get currentFile(): TFile | null {
+    return this.session?.file ?? null
+  }
+
   async onOpen(): Promise<void> {
     this.contentEl.addClass('fitkit-editor-root')
     this.resizeObserver = new ResizeObserver(() => this.updateNarrowState())
@@ -141,7 +145,7 @@ export class WorkoutEditorView extends ItemView {
   }
 
   async onClose(): Promise<void> {
-    this.abortTimer()
+    this.stopTimer({ write: true })
     if (this.autoSaveTimer !== null) {
       activeWindow.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null
@@ -163,7 +167,7 @@ export class WorkoutEditorView extends ItemView {
   }
 
   async loadFile(file: TFile): Promise<void> {
-    this.abortTimer()
+    this.stopTimer({ write: true })
     if (this.autoSaveTimer !== null) {
       activeWindow.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null

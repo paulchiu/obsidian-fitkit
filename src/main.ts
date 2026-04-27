@@ -1,4 +1,4 @@
-import { Notice, Plugin, TFile, type WorkspaceLeaf, normalizePath } from 'obsidian'
+import { MarkdownView, Notice, Plugin, TFile, type WorkspaceLeaf, normalizePath } from 'obsidian'
 
 import type { FitKitIndex, IndexDiagnostic } from './domain/types'
 import { parseWorkoutNote } from './domain/workout-note-model'
@@ -87,6 +87,17 @@ export default class FitKitPlugin extends Plugin {
 
     this.registerView(VIEW_TYPE_FITKIT_WORKOUT_EDITOR, (leaf) => new WorkoutEditorView(leaf, this))
 
+    this.registerEvent(
+      this.app.workspace.on('file-open', (file) => {
+        if (!file) {
+          return
+        }
+        void this.maybeRouteWorkoutFile(file)
+      }),
+    )
+
+    this.app.workspace.onLayoutReady(() => this.sweepLeavesForWorkout())
+
     this.addCommand({
       id: 'open-todays-workout',
       name: "Open today's workout",
@@ -165,12 +176,73 @@ export default class FitKitPlugin extends Plugin {
       }
     }
     const leaf = mainAreaLeaf ?? this.app.workspace.getLeaf('tab')
-    await leaf.setViewState({ type: VIEW_TYPE_FITKIT_WORKOUT_EDITOR, active: true })
+    await this.swapLeafToWorkoutEditor(leaf, file)
+  }
+
+  private async swapLeafToWorkoutEditor(leaf: WorkspaceLeaf, file: TFile): Promise<void> {
+    if (!(leaf.view instanceof WorkoutEditorView)) {
+      await leaf.setViewState({ type: VIEW_TYPE_FITKIT_WORKOUT_EDITOR, active: true })
+    }
     await this.app.workspace.revealLeaf(leaf)
     const view = leaf.view
     if (view instanceof WorkoutEditorView) {
       await view.loadFile(file)
     }
+  }
+
+  private async maybeRouteWorkoutFile(file: TFile): Promise<void> {
+    if (file.extension.toLowerCase() !== 'md') {
+      return
+    }
+    if (!this.isWorkoutFile(file)) {
+      return
+    }
+    /** Require an active markdown view for the event file. file-open fires for genuine clicks AND for internal Obsidian transitions (revealLeaf, leaf history). The markdown view is the user-click signal. */
+    const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView)
+    if (!markdownView || markdownView.file !== file) {
+      return
+    }
+    const editorLeaf = this.findExistingEditorLeaf()
+    if (editorLeaf) {
+      const view = editorLeaf.view
+      if (view instanceof WorkoutEditorView && view.currentFile?.path === file.path) {
+        return
+      }
+      if (markdownView.leaf !== editorLeaf) {
+        markdownView.leaf.detach()
+      }
+      await this.swapLeafToWorkoutEditor(editorLeaf, file)
+      return
+    }
+    await this.swapLeafToWorkoutEditor(markdownView.leaf, file)
+  }
+
+  private findExistingEditorLeaf(): WorkspaceLeaf | null {
+    let mainAreaLeaf: WorkspaceLeaf | null = null
+    this.app.workspace.iterateRootLeaves((leaf) => {
+      if (!mainAreaLeaf && leaf.view.getViewType() === VIEW_TYPE_FITKIT_WORKOUT_EDITOR) {
+        mainAreaLeaf = leaf
+      }
+    })
+    if (mainAreaLeaf) {
+      return mainAreaLeaf
+    }
+    return this.app.workspace.getLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR)[0] ?? null
+  }
+
+  private sweepLeavesForWorkout(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
+      const view = leaf.view
+      if (view instanceof MarkdownView && view.file && this.isWorkoutFile(view.file)) {
+        void this.swapLeafToWorkoutEditor(leaf, view.file)
+      }
+    }
+  }
+
+  private isWorkoutFile(file: TFile): boolean {
+    const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter
+    const type: unknown = frontmatter?.type
+    return typeof type === 'string' && type.toLowerCase() === 'workout'
   }
 
   private async openImporterForActiveFile(file: TFile): Promise<void> {
