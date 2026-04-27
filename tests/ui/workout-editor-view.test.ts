@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 interface MockMenuItemState {
   title?: string
@@ -430,5 +430,271 @@ describe('WorkoutEditorView row actions', () => {
     view.renderExerciseCard(list as unknown as HTMLElement, 0)
 
     expect(list.findByClass('fitkit-card-history')).toBeNull()
+  })
+})
+
+interface TimerExerciseCard {
+  name: string
+  kind: 'duration'
+  strengthSets: unknown[]
+  durationEntries: { durationSeconds?: number; set?: number; note?: string }[]
+}
+
+interface TimerView {
+  model: { exercises: TimerExerciseCard[] }
+  exerciseHistory: unknown
+  activeTimer: unknown
+  contentEl: TestElement
+  render: ReturnType<typeof vi.fn>
+  markDirty: ReturnType<typeof vi.fn>
+  focusRowCell: ReturnType<typeof vi.fn>
+  renderDurationTable(card: HTMLElement, ex: TimerExerciseCard, index: number): void
+  renderDurationRow(
+    wrap: HTMLElement,
+    ex: TimerExerciseCard,
+    i: number,
+    exerciseIndex: number,
+  ): void
+  startCardTimer(card: TimerExerciseCard): void
+  stopTimer(opts: { write: boolean }): void
+  abortTimer(): void
+  liveSeconds(timer: { accumulator: number; startedAtMs: number }): number
+}
+
+describe('WorkoutEditorView duration timer', () => {
+  const createTimerView = (ex: TimerExerciseCard): TimerView => {
+    const view = Object.create(WorkoutEditorView.prototype) as TimerView
+    view.model = { exercises: [ex] }
+    view.exerciseHistory = null
+    view.activeTimer = null
+    view.contentEl = new TestElement('div')
+    view.render = vi.fn()
+    view.markDirty = vi.fn()
+    view.focusRowCell = vi.fn()
+    return view
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-28T00:00:00Z'))
+    vi.stubGlobal('activeWindow', globalThis)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('renders Start timer next to Add duration entry when no timer is active', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{}],
+    }
+    const view = createTimerView(ex)
+    const card = new TestElement('div')
+
+    view.renderDurationTable(card as unknown as HTMLElement, ex, 0)
+
+    const actions = card.findByClass('fitkit-row-actions')
+    const buttons = actions?.children.filter((c) => c.tagName === 'button') ?? []
+    expect(buttons.map((b) => b.textContent)).toEqual(['Add duration entry', 'Start timer'])
+    expect(buttons[1]?.attributes.get('data-icon')).toBe('play')
+  })
+
+  it('renders Stop timer with square icon when the card is the active timer', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{}],
+    }
+    const view = createTimerView(ex)
+    view.activeTimer = {
+      card: ex,
+      entry: ex.durationEntries[0],
+      startedAtMs: Date.now(),
+      accumulator: 0,
+      intervalId: 0,
+      inputEl: null,
+    }
+    const card = new TestElement('div')
+
+    view.renderDurationTable(card as unknown as HTMLElement, ex, 0)
+
+    const actions = card.findByClass('fitkit-row-actions')
+    const buttons = actions?.children.filter((c) => c.tagName === 'button') ?? []
+    expect(buttons.map((b) => b.textContent)).toEqual(['Add duration entry', 'Stop timer'])
+    expect(buttons[1]?.attributes.get('data-icon')).toBe('square')
+  })
+
+  it('startCardTimer auto-creates a row when none exist and sets the active timer', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [],
+    }
+    const view = createTimerView(ex)
+
+    view.startCardTimer(ex)
+
+    expect(ex.durationEntries).toHaveLength(1)
+    const timer = view.activeTimer as { card: unknown; entry: unknown; accumulator: number }
+    expect(timer.card).toBe(ex)
+    expect(timer.entry).toBe(ex.durationEntries[0])
+    expect(timer.accumulator).toBe(0)
+    expect(view.markDirty).toHaveBeenCalled()
+    expect(view.render).toHaveBeenCalled()
+  })
+
+  it('startCardTimer accumulates from the existing duration value', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 30 }],
+    }
+    const view = createTimerView(ex)
+
+    view.startCardTimer(ex)
+
+    const timer = view.activeTimer as { accumulator: number }
+    expect(timer.accumulator).toBe(30)
+  })
+
+  it('liveSeconds returns accumulator plus elapsed wall-clock seconds', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 30 }],
+    }
+    const view = createTimerView(ex)
+
+    view.startCardTimer(ex)
+    vi.setSystemTime(new Date('2026-04-28T00:00:05Z'))
+    const timer = view.activeTimer as { accumulator: number; startedAtMs: number }
+    expect(view.liveSeconds(timer)).toBe(35)
+  })
+
+  it('stopTimer writes accumulator + elapsed back into the row and clears the timer', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 30 }],
+    }
+    const view = createTimerView(ex)
+
+    view.startCardTimer(ex)
+    vi.setSystemTime(new Date('2026-04-28T00:00:12Z'))
+    view.stopTimer({ write: true })
+
+    expect(ex.durationEntries[0]?.durationSeconds).toBe(42)
+    expect(view.activeTimer).toBeNull()
+  })
+
+  it('abortTimer clears the timer without writing back', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 10 }],
+    }
+    const view = createTimerView(ex)
+
+    view.startCardTimer(ex)
+    vi.setSystemTime(new Date('2026-04-28T00:00:05Z'))
+    view.abortTimer()
+
+    expect(ex.durationEntries[0]?.durationSeconds).toBe(10)
+    expect(view.activeTimer).toBeNull()
+  })
+
+  it('clicking Add duration entry while a timer is running writes back and appends', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{}],
+    }
+    const view = createTimerView(ex)
+
+    view.startCardTimer(ex)
+    vi.setSystemTime(new Date('2026-04-28T00:00:08Z'))
+
+    const card = new TestElement('div')
+    view.renderDurationTable(card as unknown as HTMLElement, ex, 0)
+    const actions = card.findByClass('fitkit-row-actions')
+    const addBtn = actions?.children.find(
+      (c) => c.tagName === 'button' && c.textContent === 'Add duration entry',
+    )
+    addBtn?.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
+
+    expect(ex.durationEntries[0]?.durationSeconds).toBe(8)
+    expect(ex.durationEntries).toHaveLength(2)
+    expect(view.activeTimer).toBeNull()
+  })
+
+  it('deleting the active row aborts the timer without writing back', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 30 }],
+    }
+    const view = createTimerView(ex)
+    ;(
+      view as unknown as {
+        confirmAndDeleteRow: (label: string, onDelete: () => void) => Promise<void>
+      }
+    ).confirmAndDeleteRow = (_label: string, onDelete: () => void) => {
+      onDelete()
+      return Promise.resolve()
+    }
+    const originalEntry = ex.durationEntries[0]
+
+    view.startCardTimer(ex)
+    vi.setSystemTime(new Date('2026-04-28T00:00:05Z'))
+
+    const wrap = new TestElement('div')
+    view.renderDurationRow(wrap as unknown as HTMLElement, ex, 0, 0)
+
+    const kebab = wrap.findByClass('fitkit-row-kebab')
+    kebab?.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
+    const menu = obsidianMock.menus[obsidianMock.menus.length - 1]
+    const deleteItem = menu?.items.find((i) => i.title === 'Delete row')
+    deleteItem?.onClick?.()
+
+    expect(originalEntry?.durationSeconds).toBe(30)
+    expect(ex.durationEntries).toHaveLength(0)
+    expect(view.activeTimer).toBeNull()
+  })
+
+  it('renderDurationRow shows the live counter, disables the input, and adds the timing class', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{}],
+    }
+    const view = createTimerView(ex)
+    view.startCardTimer(ex)
+    vi.setSystemTime(new Date('2026-04-28T00:00:07Z'))
+
+    const wrap = new TestElement('div')
+    view.renderDurationRow(wrap as unknown as HTMLElement, ex, 0, 0)
+
+    const row = wrap.findByClass('fitkit-row')
+    expect(row?.classes.has('fitkit-row--timing')).toBe(true)
+    expect(row?.dataset.fitkitTimerRow).toBe('0:0')
+    const durationCell = row
+      ?.findAllByClass('fitkit-cell')
+      .find((c) => c.dataset.label === 'Duration (s)')
+    const input = durationCell?.children[0]
+    expect(input?.attributes.has('disabled')).toBe(true)
+    expect((input as unknown as { value?: string } | undefined)?.value).toBe('7')
   })
 })
