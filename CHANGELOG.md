@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [0.4.1] - 2026-04-27
+
+### Added
+
+### Changed
+
+### Fixed
+
 - Workout editor: "Open today's workout" and "Open workout for active note" now open in the main editor area on Obsidian Mobile instead of the side or right drawer.
 
 ### Removed
