@@ -1,4 +1,4 @@
-import { Notice, Plugin, TFile, normalizePath } from 'obsidian'
+import { Notice, Plugin, TFile, type WorkspaceLeaf, normalizePath } from 'obsidian'
 
 import type { FitKitIndex, IndexDiagnostic } from './domain/types'
 import { parseWorkoutNote } from './domain/workout-note-model'
@@ -152,10 +152,19 @@ export default class FitKitPlugin extends Plugin {
   }
 
   private async openWorkoutEditor(file: TFile): Promise<void> {
-    /** Prefer a rootSplit leaf so both commands open in the main area on mobile, not in a drawer. */
-    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR)
-    const existing = leaves.find((l) => l.getRoot() === this.app.workspace.rootSplit) ?? leaves[0]
-    const leaf = existing ?? this.app.workspace.getLeaf('tab')
+    /** iterateRootLeaves walks main-area leaves only; detach any others so a drawer leaf stranded by an earlier version is cleaned up. */
+    let mainAreaLeaf: WorkspaceLeaf | null = null
+    this.app.workspace.iterateRootLeaves((leaf) => {
+      if (!mainAreaLeaf && leaf.view.getViewType() === VIEW_TYPE_FITKIT_WORKOUT_EDITOR) {
+        mainAreaLeaf = leaf
+      }
+    })
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR)) {
+      if (leaf !== mainAreaLeaf) {
+        leaf.detach()
+      }
+    }
+    const leaf = mainAreaLeaf ?? this.app.workspace.getLeaf('tab')
     await leaf.setViewState({ type: VIEW_TYPE_FITKIT_WORKOUT_EDITOR, active: true })
     await this.app.workspace.revealLeaf(leaf)
     const view = leaf.view

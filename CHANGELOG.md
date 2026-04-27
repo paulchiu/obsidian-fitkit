@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Workout editor: "Open today's workout" and "Open workout editor for current file" now reliably open in the main area on Obsidian Mobile, including the case where a previous version stranded the editor in a side drawer (the stranded leaf is detached on next open).
+
 ### Removed
 
 ## [0.4.1] - 2026-04-27
