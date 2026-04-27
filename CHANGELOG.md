@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.8.0] - 2026-04-27
+
+### Added
+
 - Workout editor now shows a skeleton placeholder while a workout file is loading, with a minimum visibility window so quick loads do not blink past it.
 
 ### Changed
