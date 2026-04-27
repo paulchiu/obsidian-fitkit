@@ -152,8 +152,10 @@ export default class FitKitPlugin extends Plugin {
   }
 
   private async openWorkoutEditor(file: TFile): Promise<void> {
-    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR)[0]
-    const leaf = existing ?? this.app.workspace.getLeaf(false)
+    /** Prefer a rootSplit leaf so both commands open in the main area on mobile, not in a drawer. */
+    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR)
+    const existing = leaves.find((l) => l.getRoot() === this.app.workspace.rootSplit) ?? leaves[0]
+    const leaf = existing ?? this.app.workspace.getLeaf('tab')
     await leaf.setViewState({ type: VIEW_TYPE_FITKIT_WORKOUT_EDITOR, active: true })
     await this.app.workspace.revealLeaf(leaf)
     const view = leaf.view
