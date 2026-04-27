@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.6.0] - 2026-04-27
+
+### Added
+
 - Workout editor exercise cards now show PB and Last badges from prior workout history.
 - Workout editor exercise and row menus now include Open exercise file.
 
