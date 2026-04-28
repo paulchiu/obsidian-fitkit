@@ -4,7 +4,8 @@ import type { ExerciseKind, ExerciseRegistry } from '../domain/exercise-registry
 import { createRegistry, resolve, upsertEntry } from '../domain/exercise-registry'
 import type { ExerciseEntry, WorkoutNoteModel } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
-import { exercisesFolder } from '../settings-paths'
+import { exercisesFolder, workoutsFolder } from '../settings-paths'
+import { composeExerciseNote } from '../vault/exercise-note'
 import { ensureParentFolder } from '../vault/vault-utils'
 
 type Row = {
@@ -160,6 +161,7 @@ export class CreateMissingExercisesModal extends Modal {
     }
 
     const folder = exercisesFolder(this.plugin.settings)
+    const workouts = workoutsFolder(this.plugin.settings)
     for (const row of this.rows) {
       if (row.noteExists || !row.createNote) {
         continue
@@ -169,8 +171,8 @@ export class CreateMissingExercisesModal extends Modal {
         continue
       }
       await ensureParentFolder(this.plugin.app, path)
-      const placeholder = `---\ntype: exercise\nkind: ${row.kind}\n---\n`
-      await this.plugin.app.vault.create(path, placeholder)
+      const body = composeExerciseNote(row.rawName, row.kind, workouts)
+      await this.plugin.app.vault.create(path, body)
       notesAdded += 1
     }
 

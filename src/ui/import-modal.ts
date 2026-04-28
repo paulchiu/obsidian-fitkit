@@ -17,6 +17,7 @@ import { serializeWorkout } from '../domain/workout-note-serializer'
 import type FitKitPlugin from '../main'
 import { exercisesFolder, workoutFilename, workoutsFolder } from '../settings-paths'
 import { regenerateDashboard } from '../vault/dashboard'
+import { composeExerciseNote } from '../vault/exercise-note'
 import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
 import { rebuildIndex, updateIndexEntry } from '../vault/index'
 import { ensureParentFolder } from '../vault/vault-utils'
@@ -436,6 +437,7 @@ export class ImportModal extends Modal {
 
   private async createMissingExerciseNotes(): Promise<void> {
     const folder = exercisesFolder(this.plugin.settings)
+    const workouts = workoutsFolder(this.plugin.settings)
     for (const choice of this.mapping.values()) {
       if (choice.kind !== 'create-new') {
         continue
@@ -447,8 +449,8 @@ export class ImportModal extends Modal {
       }
       try {
         await ensureParentFolder(this.plugin.app, path)
-        const placeholder = `---\ntype: exercise\nkind: ${choice.exerciseKind}\n---\n`
-        await this.plugin.app.vault.create(path, placeholder)
+        const body = composeExerciseNote(choice.canonicalName, choice.exerciseKind, workouts)
+        await this.plugin.app.vault.create(path, body)
       } catch (error) {
         new Notice(`Could not create ${path}: ${formatError(error)}`)
       }
