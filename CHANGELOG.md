@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [0.9.1] - 2026-04-28
+
+### Added
+
+### Changed
+
+### Fixed
+
 - Importing a journal or creating missing exercises now seeds the new exercise note with Recent sessions and Notes Dataview sections instead of an empty stub.
 
 ### Removed
