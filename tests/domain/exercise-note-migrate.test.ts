@@ -1,149 +1,145 @@
 import { describe, expect, it } from 'vitest'
 
+import { createRegistry, type ExerciseRegistry } from '../../src/domain/exercise-registry'
 import { migrateExerciseNote } from '../../src/domain/exercise-note-migrate'
+import { buildRecentSessionsBlock } from '../../src/domain/exercise-note-template'
+
+const registry = createRegistry([
+  { name: 'Squat', kind: 'strength', aliases: [] },
+  { name: 'Plank', kind: 'duration', aliases: [] },
+])
+
+function migrate(
+  source: string,
+  options: { name?: string; registry?: ExerciseRegistry; fitnessRoot?: string } = {},
+): ReturnType<typeof migrateExerciseNote> {
+  return migrateExerciseNote(source, {
+    name: options.name ?? 'Squat',
+    registry: options.registry ?? registry,
+    fitnessRoot: options.fitnessRoot ?? 'Fitness',
+  })
+}
+
+function completeStrengthNote(
+  recent = buildRecentSessionsBlock('Squat', 'strength', 'Fitness'),
+): string {
+  return `---
+type: exercise
+kind: strength
+metric: e1rm
+---
+
+## Recent sessions
+
+${recent}
+
+## Progress chart
+
+\`\`\`fitkit-chart
+\`\`\`
+
+## Notes
+`
+}
 
 describe('migrateExerciseNote', () => {
-  it('inserts a Progress chart section before ## Notes', () => {
-    const source = `---
-type: exercise
-kind: strength
----
-
-## Recent sessions
-
-\`\`\`dataview
-TABLE
-\`\`\`
+  it('prepends missing frontmatter with strength kind and metric from the registry', () => {
+    const source = `Existing prose.
 
 ## Notes
 
-\`\`\`dataview
-TABLE
-\`\`\`
+Keep this.
 `
-    const next = migrateExerciseNote(source)
-    expect(next).toContain('## Progress chart')
-    expect(next).toContain('```fitkit-chart\n```')
-    expect(next.indexOf('## Progress chart')).toBeLessThan(next.indexOf('## Notes'))
-  })
+    const result = migrate(source)
 
-  it('appends Progress chart section when no ## Notes heading exists', () => {
-    const source = `---
-type: exercise
-kind: strength
----
-
-## Recent sessions
-
-\`\`\`dataview
-TABLE
-\`\`\`
-`
-    const next = migrateExerciseNote(source)
-    expect(next).toContain('## Progress chart')
-    expect(next).toContain('```fitkit-chart\n```')
-    expect(next.endsWith('\n')).toBe(true)
-  })
-
-  it('returns the source unchanged when a real fitkit-chart fence is already present', () => {
-    const source = `---
+    expect(result.status).toBe('updated')
+    expect(result.unknownKind).toBe(false)
+    expect(result.markdown).toContain(`---
 type: exercise
 kind: strength
 metric: e1rm
+---`)
+    expect(result.markdown.indexOf('## Recent sessions')).toBeLessThan(
+      result.markdown.indexOf('## Progress chart'),
+    )
+    expect(result.markdown.indexOf('## Progress chart')).toBeLessThan(
+      result.markdown.indexOf('## Notes'),
+    )
+    expect(result.markdown).toContain('Keep this.')
+  })
+
+  it('leaves a note with a non-exercise type alone', () => {
+    const source = `---
+type: workout
+---
+
+## Notes
+`
+    const result = migrate(source)
+
+    expect(result.markdown).toBe(source)
+    expect(result.status).toBe('skipped-non-exercise-type')
+    expect(result.changed).toBe(false)
+  })
+
+  it('omits kind, metric, and Recent sessions when the registry has no kind', () => {
+    const source = `Loose exercise note.
+`
+    const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
+
+    expect(result.status).toBe('updated')
+    expect(result.unknownKind).toBe(true)
+    expect(result.markdown).toContain(`---
+type: exercise
+---`)
+    expect(result.markdown).not.toContain('kind:')
+    expect(result.markdown).not.toContain('metric:')
+    expect(result.markdown).not.toContain('## Recent sessions')
+    expect(result.markdown).toContain('## Progress chart')
+    expect(result.markdown).toContain('## Notes')
+  })
+
+  it('adds missing type to existing frontmatter', () => {
+    const source = `---
+kind: duration
 ---
 
 ## Progress chart
 
 \`\`\`fitkit-chart
-window: 60
 \`\`\`
 
 ## Notes
 `
-    expect(migrateExerciseNote(source)).toBe(source)
+    const result = migrate(source, { name: 'Plank' })
+
+    expect(result.markdown).toContain(`---
+type: exercise
+kind: duration
+---`)
   })
 
-  it('treats a fitkit-chart string inside another fenced block as missing (still inserts)', () => {
+  it('adds missing kind from the registry and metric for strength notes', () => {
     const source = `---
 type: exercise
-kind: strength
 ---
 
-\`\`\`text
+## Progress chart
+
 \`\`\`fitkit-chart
 \`\`\`
-\`\`\`
 
 ## Notes
 `
-    const next = migrateExerciseNote(source)
-    expect(next).not.toBe(source)
-    expect(next).toContain('## Progress chart')
-  })
+    const result = migrate(source)
 
-  it('does not recognise indented fences as chart blocks', () => {
-    const source = `---
-type: exercise
-kind: strength
----
-
-   \`\`\`fitkit-chart
-   \`\`\`
-
-## Notes
-`
-    const next = migrateExerciseNote(source)
-    expect(next).not.toBe(source)
-    expect(next).toContain('## Progress chart')
-  })
-
-  it('recognises 4-backtick chart fences', () => {
-    const source = `---
-type: exercise
+    expect(result.markdown).toContain(`type: exercise
 kind: strength
 metric: e1rm
----
-
-\`\`\`\`fitkit-chart
-\`\`\`\`
-
-## Notes
-`
-    expect(migrateExerciseNote(source)).toBe(source)
+---`)
   })
 
-  it('does not match ### Notes (h3) when looking for the Notes heading', () => {
-    const source = `---
-type: exercise
-kind: strength
----
-
-### Notes
-
-something
-`
-    const next = migrateExerciseNote(source)
-    const progressIndex = next.indexOf('## Progress chart')
-    const subNotesIndex = next.indexOf('### Notes')
-    expect(progressIndex).toBeGreaterThan(subNotesIndex)
-  })
-
-  it('is idempotent', () => {
-    const source = `---
-type: exercise
-kind: strength
----
-
-## Recent sessions
-
-## Notes
-`
-    const once = migrateExerciseNote(source)
-    const twice = migrateExerciseNote(once)
-    expect(twice).toBe(once)
-  })
-
-  it('adds default e1rm metric to strength frontmatter when missing', () => {
+  it('adds default e1rm metric to existing strength frontmatter when missing', () => {
     const source = `---
 type: exercise
 kind: strength
@@ -153,29 +149,21 @@ kind: strength
 
 \`\`\`fitkit-chart
 \`\`\`
-`
-    const next = migrateExerciseNote(source)
 
-    expect(next).toContain(`type: exercise
+## Notes
+`
+    const result = migrate(source)
+
+    expect(result.markdown).toContain(`type: exercise
 kind: strength
 metric: e1rm
 ---`)
   })
 
   it('leaves an existing metric key unchanged', () => {
-    const source = `---
-type: exercise
-kind: strength
-metric: weight
----
+    const source = completeStrengthNote().replace('metric: e1rm', 'metric: weight')
 
-## Progress chart
-
-\`\`\`fitkit-chart
-\`\`\`
-`
-
-    expect(migrateExerciseNote(source)).toBe(source)
+    expect(migrate(source).markdown).toBe(source)
   })
 
   it('does not add metric frontmatter for duration exercise notes', () => {
@@ -184,59 +172,359 @@ type: exercise
 kind: duration
 ---
 
+## Recent sessions
+
+${buildRecentSessionsBlock('Plank', 'duration', 'Fitness')}
+
 ## Progress chart
 
 \`\`\`fitkit-chart
 \`\`\`
+
+## Notes
 `
 
-    expect(migrateExerciseNote(source)).toBe(source)
+    expect(migrate(source, { name: 'Plank' }).markdown).toBe(source)
   })
 
-  it('does not add metric frontmatter when kind is missing', () => {
+  it('inserts a Progress chart section before ## Notes', () => {
     const source = `---
 type: exercise
+kind: strength
+metric: e1rm
+---
+
+## Recent sessions
+
+${buildRecentSessionsBlock('Squat', 'strength', 'Fitness')}
+
+## Notes
+
+\`\`\`dataview
+TABLE
+\`\`\`
+`
+    const result = migrate(source)
+
+    expect(result.markdown).toContain('## Progress chart')
+    expect(result.markdown).toContain('```fitkit-chart\n```')
+    expect(result.markdown.indexOf('## Progress chart')).toBeLessThan(
+      result.markdown.indexOf('## Notes'),
+    )
+  })
+
+  it('appends Progress chart section when no ## Notes heading exists', () => {
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
+---
+
+## Recent sessions
+
+${buildRecentSessionsBlock('Squat', 'strength', 'Fitness')}
+`
+    const result = migrate(source)
+
+    expect(result.markdown).toContain('## Progress chart')
+    expect(result.markdown).toContain('```fitkit-chart\n```')
+    expect(result.markdown.endsWith('\n')).toBe(true)
+  })
+
+  it('inserts a chart block even when a dataview fence precedes the insertion point', () => {
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
+---
+
+## Recent sessions
+
+${buildRecentSessionsBlock('Squat', 'strength', 'Fitness')}
+
+## Notes
+
+\`\`\`dataview
+TABLE WITHOUT ID
+  file.link AS Workout
+FROM "Fitness/Workouts"
+\`\`\`
+`
+    const result = migrate(source)
+
+    expect(result.markdown).toContain('## Progress chart')
+    expect(result.markdown.indexOf('## Progress chart')).toBeLessThan(
+      result.markdown.indexOf('## Notes'),
+    )
+  })
+
+  it('returns the source unchanged when it already matches the current template', () => {
+    const source = completeStrengthNote()
+
+    expect(migrate(source).markdown).toBe(source)
+    expect(migrate(source).status).toBe('already')
+  })
+
+  it('treats a fitkit-chart string inside another fenced block as missing', () => {
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
+---
+
+## Recent sessions
+
+${buildRecentSessionsBlock('Squat', 'strength', 'Fitness')}
+
+\`\`\`text
+\`\`\`fitkit-chart
+\`\`\`
+\`\`\`
+
+## Notes
+`
+    const result = migrate(source)
+
+    expect(result.markdown).not.toBe(source)
+    expect(result.markdown).toContain('## Progress chart')
+  })
+
+  it('does not recognise indented fences as chart blocks', () => {
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
+---
+
+## Recent sessions
+
+${buildRecentSessionsBlock('Squat', 'strength', 'Fitness')}
+
+   \`\`\`fitkit-chart
+   \`\`\`
+
+## Notes
+`
+    const result = migrate(source)
+
+    expect(result.markdown).not.toBe(source)
+    expect(result.markdown).toContain('## Progress chart')
+  })
+
+  it('recognises 4-backtick chart fences', () => {
+    const source = completeStrengthNote().replace('```fitkit-chart\n```', '````fitkit-chart\n````')
+
+    expect(migrate(source).markdown).toBe(source)
+  })
+
+  it('does not match ### Notes when looking for the Notes heading', () => {
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
+---
+
+## Recent sessions
+
+${buildRecentSessionsBlock('Squat', 'strength', 'Fitness')}
+
+### Notes
+
+something
+`
+    const result = migrate(source)
+    const progressIndex = result.markdown.indexOf('## Progress chart')
+    const subNotesIndex = result.markdown.indexOf('### Notes')
+
+    expect(progressIndex).toBeGreaterThan(subNotesIndex)
+    expect(result.markdown).toContain('## Notes')
+  })
+
+  it('inserts a missing Recent sessions section before the chart and Notes sections', () => {
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
 ---
 
 ## Progress chart
 
 \`\`\`fitkit-chart
 \`\`\`
-`
 
-    expect(migrateExerciseNote(source)).toBe(source)
+## Notes
+`
+    const result = migrate(source)
+
+    expect(result.markdown.indexOf('## Recent sessions')).toBeLessThan(
+      result.markdown.indexOf('## Progress chart'),
+    )
+    expect(result.markdown).toContain(buildRecentSessionsBlock('Squat', 'strength', 'Fitness'))
   })
 
-  it('preserves the original trailing newline (presence)', () => {
+  it('inserts a Recent sessions dataview block after an empty heading', () => {
     const source = `---
 type: exercise
+kind: strength
+metric: e1rm
+---
+
+## Recent sessions
+
+## Progress chart
+
+\`\`\`fitkit-chart
+\`\`\`
+
+## Notes
+`
+    const result = migrate(source)
+
+    expect(result.markdown).toContain(`## Recent sessions
+
+${buildRecentSessionsBlock('Squat', 'strength', 'Fitness')}
+
+## Progress chart`)
+  })
+
+  it('replaces a stale Recent sessions FROM path without touching surrounding prose', () => {
+    const staleRecent = buildRecentSessionsBlock('Squat', 'strength', 'Area/Fitness')
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
+---
+
+## Recent sessions
+
+Pinned explanation.
+
+${staleRecent}
+
+## Progress chart
+
+\`\`\`fitkit-chart
+\`\`\`
+
+## Notes
+`
+    const result = migrate(source)
+
+    expect(result.markdown).toContain('Pinned explanation.')
+    expect(result.markdown).toContain(buildRecentSessionsBlock('Squat', 'strength', 'Fitness'))
+    expect(result.markdown).not.toContain('FROM "Area/Fitness/Workouts"')
+  })
+
+  it('replaces a stale Recent sessions link target', () => {
+    const staleRecent = buildRecentSessionsBlock('Back Squat', 'strength', 'Fitness')
+    const source = completeStrengthNote(staleRecent)
+    const result = migrate(source)
+
+    expect(result.markdown).toContain('WHERE L.exercise = link("Squat") AND L.set')
+    expect(result.markdown).not.toContain('WHERE L.exercise = link("Back Squat") AND L.set')
+  })
+
+  it('keeps a current Recent sessions FROM path unchanged', () => {
+    const source = completeStrengthNote()
+
+    expect(migrate(source).markdown).toBe(source)
+  })
+
+  it('leaves customised Recent sessions dataview blocks alone', () => {
+    const customRecent = `\`\`\`dataview
+TABLE WITHOUT ID
+  file.link AS Workout,
+  L.set AS Set,
+  L.weight AS Weight,
+  L.reps AS Reps,
+  L.e1rm AS E1RM
+FROM "Area/Fitness/Workouts"
+FLATTEN file.lists AS L
+WHERE L.exercise = link("Squat") AND L.set
+SORT file.name DESC, L.set ASC
+LIMIT 10
+\`\`\``
+    const source = completeStrengthNote(customRecent)
+    const result = migrate(source)
+
+    expect(result.markdown).toBe(source)
+    expect(result.warnings).toEqual([{ kind: 'custom-recent-sessions' }])
+  })
+
+  it('is idempotent on a repaired note', () => {
+    const source = `---
+type: exercise
+---
+
+## Recent sessions
+
+\`\`\`dataview
+TABLE WITHOUT ID
+  file.link AS Workout,
+  L.set AS Set,
+  L.weight AS Weight,
+  L.reps AS Reps
+FROM "Area/Fitness/Workouts"
+FLATTEN file.lists AS L
+WHERE L.exercise = link("Squat") AND L.set
+SORT file.name DESC, L.set ASC
+LIMIT 10
+\`\`\`
+
+## Notes
+`
+    const once = migrate(source).markdown
+    const twice = migrate(once).markdown
+
+    expect(twice).toBe(once)
+  })
+
+  it('preserves the original trailing newline when inserting before existing content', () => {
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
 ---
 
 ## Notes
 `
-    expect(migrateExerciseNote(source).endsWith('\n')).toBe(true)
+    expect(migrate(source).markdown.endsWith('\n')).toBe(true)
   })
 
-  it('preserves the original trailing newline (absence)', () => {
+  it('preserves the original trailing newline absence when content follows the insertion', () => {
     const source = `---
 type: exercise
+kind: strength
+metric: e1rm
 ---
 
 ## Notes`
-    expect(migrateExerciseNote(source).endsWith('\n')).toBe(false)
+    expect(migrate(source).markdown.endsWith('\n')).toBe(false)
   })
 
-  it('preserves frontmatter byte-for-byte', () => {
+  it('preserves frontmatter byte-for-byte when no frontmatter repair is needed', () => {
     const source = `---
 type: exercise
 kind: duration
 foo: bar
 ---
 
+## Recent sessions
+
+${buildRecentSessionsBlock('Plank', 'duration', 'Fitness')}
+
+## Progress chart
+
+\`\`\`fitkit-chart
+\`\`\`
+
 ## Notes
 `
-    const next = migrateExerciseNote(source)
-    const frontmatterEnd = next.indexOf('---', 4) + 3
-    expect(next.slice(0, frontmatterEnd)).toBe(source.slice(0, source.indexOf('---', 4) + 3))
+    const result = migrate(source, { name: 'Plank' })
+    const frontmatterEnd = result.markdown.indexOf('---', 4) + 3
+
+    expect(result.markdown.slice(0, frontmatterEnd)).toBe(
+      source.slice(0, source.indexOf('---', 4) + 3),
+    )
   })
 })

@@ -1,5 +1,6 @@
 import { MarkdownView, Notice, Plugin, TFile, type WorkspaceLeaf, normalizePath } from 'obsidian'
 
+import { createRegistry } from './domain/exercise-registry'
 import { migrateExerciseNote } from './domain/exercise-note-migrate'
 import type { FitKitIndex, IndexDiagnostic } from './domain/types'
 import { parseWorkoutNote } from './domain/workout-note-model'
@@ -89,7 +90,7 @@ export default class FitKitPlugin extends Plugin {
 
     this.addCommand({
       id: 'sync-exercise-notes',
-      name: 'Sync exercise notes',
+      name: 'Sync and repair exercise notes',
       callback: () => void this.syncExerciseNotes(),
     })
 
@@ -284,31 +285,49 @@ export default class FitKitPlugin extends Plugin {
     const files = this.app.vault
       .getMarkdownFiles()
       .filter((file) => file.path.startsWith(`${folder}/`))
-      .filter((file) => {
-        const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter
-        const type: unknown = frontmatter?.type
-        return typeof type === 'string' && type.toLowerCase() === 'exercise'
-      })
+    const registry = createRegistry(this.settings.exerciseRegistry)
 
     let updated = 0
     let already = 0
+    let skipped = 0
+    let unknown = 0
     let failed = 0
     for (const file of files) {
       try {
         const snapshot = await this.app.vault.read(file)
-        if (migrateExerciseNote(snapshot) === snapshot) {
+        const input = {
+          name: file.basename,
+          registry,
+          fitnessRoot: this.settings.fitnessRoot,
+        }
+        const result = migrateExerciseNote(snapshot, input)
+        if (result.status === 'skipped-non-exercise-type') {
+          skipped += 1
+          continue
+        }
+        if (result.unknownKind) {
+          unknown += 1
+        }
+        for (const warning of result.warnings) {
+          if (warning.kind === 'custom-recent-sessions') {
+            new Notice(
+              `Recent Sessions block on '${file.basename}' looks customised; not auto-replacing`,
+            )
+          }
+        }
+        if (!result.changed) {
           already += 1
           continue
         }
-        await this.app.vault.process(file, (live) => migrateExerciseNote(live))
+        await this.app.vault.process(file, (live) => migrateExerciseNote(live, input).markdown)
         updated += 1
       } catch (error) {
+        void error
         failed += 1
-        console.error(`FitKit: failed to sync exercise note ${file.path}`, error)
       }
     }
 
-    const summary = `Synced ${files.length} exercise note${files.length === 1 ? '' : 's'}; ${updated} updated, ${already} already current${failed > 0 ? `, ${failed} failed (see console)` : ''}.`
+    const summary = `Synced ${files.length} exercise note${files.length === 1 ? '' : 's'}; ${updated} updated, ${already} already current, ${skipped} skipped (non-exercise type), ${unknown} unknown (no registry kind), ${failed} failed.`
     new Notice(summary)
   }
 

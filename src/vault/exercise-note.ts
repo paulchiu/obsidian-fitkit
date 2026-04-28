@@ -1,4 +1,5 @@
 import type { ExerciseKind } from '../domain/exercise-registry'
+import { buildRecentSessionsBlock } from '../domain/exercise-note-template'
 
 /**
  * Pure: build the seeded markdown body for a freshly-created exercise note.
@@ -25,9 +26,9 @@ export function composeExerciseNote(
   lines.push('')
   lines.push('## Recent sessions')
   lines.push('')
-  lines.push('```dataview')
-  lines.push(...recentSessionsQuery(exerciseName, kind, workoutsFolderPath))
-  lines.push('```')
+  lines.push(
+    buildRecentSessionsBlock(exerciseName, kind, fitnessRootFromWorkouts(workoutsFolderPath)),
+  )
   lines.push('')
   lines.push('## Progress chart')
   lines.push('')
@@ -42,33 +43,8 @@ export function composeExerciseNote(
   return `${lines.join('\n')}\n`
 }
 
-function recentSessionsQuery(
-  exerciseName: string,
-  kind: ExerciseKind,
-  workoutsFolderPath: string,
-): string[] {
-  if (kind === 'duration') {
-    return [
-      'table without id file.link as Session, duration + "s" as Duration',
-      `from "${workoutsFolderPath}"`,
-      'flatten file.lists as item',
-      `where contains(item.text, "[exercise:: [[${exerciseName}]]]") and item.duration`,
-      'sort file.name desc',
-      'limit 12',
-    ]
-  }
-  return [
-    'TABLE WITHOUT ID',
-    '  file.link AS Workout,',
-    '  L.set AS Set,',
-    '  L.weight AS Weight,',
-    '  L.reps AS Reps',
-    `FROM "${workoutsFolderPath}"`,
-    'FLATTEN file.lists AS L',
-    `WHERE L.exercise = link("${exerciseName}") AND L.set`,
-    'SORT file.name DESC, L.set ASC',
-    'LIMIT 10',
-  ]
+function fitnessRootFromWorkouts(workoutsFolderPath: string): string {
+  return workoutsFolderPath.replace(/\/Workouts$/, '')
 }
 
 function notesQuery(exerciseName: string, workoutsFolderPath: string): string[] {
