@@ -1,7 +1,10 @@
-import { App, Notice, PluginSettingTab, Setting, normalizePath } from 'obsidian'
+import { App, Notice, PluginSettingTab, Setting, TFile, normalizePath } from 'obsidian'
 
 import type { ExerciseRegistryEntry } from './domain/exercise-registry'
+import { createRegistry, normalize, removeEntry } from './domain/exercise-registry'
 import type FitKitPlugin from './main'
+import { DeleteRegistryEntryModal } from './ui/delete-registry-entry-modal'
+import { ExerciseRegistryEntryModal } from './ui/exercise-registry-entry-modal'
 import { dashboardPath, exercisesFolder, workoutsFolder } from './settings-paths'
 import { exerciseRegistryWithVaultNotes } from './vault/exercise-registry-vault'
 
@@ -129,19 +132,189 @@ export class FitKitSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName('Registry').setHeading()
 
-    new Setting(containerEl)
-      .setName('Bootstrap from vault')
-      .setDesc(
-        'Scan <fitnessRoot>/Exercises and add an entry per stem. Existing aliases are preserved.',
+    containerEl.createEl('div', {
+      text:
+        'Curate canonical exercise names, kinds, and aliases. The registry is consulted whenever you add, rename, or import an exercise. Filenames in your Exercises folder also count at runtime, even if they are not listed here; run Bootstrap from vault to materialize them.',
+      cls: 'setting-item-description',
+    })
+
+    let searchQuery = ''
+    const registrySection = containerEl.createDiv({ cls: 'fitkit-registry-section' })
+
+    const renderRegistrySection = (): void => {
+      registrySection.empty()
+
+      const actions = registrySection.createDiv({ cls: 'fitkit-registry-actions' })
+      const addBtn = actions.createEl('button', {
+        cls: 'fitkit-btn fitkit-btn-primary',
+        text: 'Add entry',
+      })
+      addBtn.addEventListener('click', () => {
+        new ExerciseRegistryEntryModal(this.plugin, { kind: 'create' }, () => {
+          renderRegistrySection()
+        }).open()
+      })
+      const bootstrapBtn = actions.createEl('button', {
+        cls: 'fitkit-btn',
+        text: 'Bootstrap from vault',
+      })
+      bootstrapBtn.addEventListener('click', async () => {
+        const merged = exerciseRegistryWithVaultNotes(this.plugin.app, settings)
+        settings.exerciseRegistry = merged
+        await this.plugin.saveSettings()
+        new Notice(`Registry now has ${merged.length} entries.`)
+        renderRegistrySection()
+      })
+
+      const search = registrySection.createEl('input', {
+        type: 'search',
+        cls: 'fitkit-registry-search',
+      })
+      search.placeholder = 'Search by name or alias'
+      search.value = searchQuery
+      search.addEventListener('input', () => {
+        searchQuery = search.value
+        renderTable()
+      })
+
+      const tableWrap = registrySection.createDiv({ cls: 'fitkit-registry-table-wrap' })
+      const empty = registrySection.createDiv({ cls: 'fitkit-registry-empty' })
+
+      const renderTable = (): void => {
+        tableWrap.empty()
+        empty.empty()
+
+        const entries = settings.exerciseRegistry.slice().sort((left, right) =>
+          left.name.localeCompare(right.name),
+        )
+        if (entries.length === 0) {
+          empty.setText('No entries yet. Add one or bootstrap from your Exercises folder.')
+          return
+        }
+
+        const queryKey = normalize(searchQuery)
+        const visible = queryKey
+          ? entries.filter((entry) => {
+              if (normalize(entry.name).includes(queryKey)) {
+                return true
+              }
+              return entry.aliases.some((alias) => normalize(alias).includes(queryKey))
+            })
+          : entries
+
+        if (visible.length === 0) {
+          empty.setText(`No matches for '${searchQuery}'.`)
+          return
+        }
+
+        const table = tableWrap.createEl('table', { cls: 'fitkit-import-table' })
+        const head = table.createEl('tr')
+        head.createEl('th', { text: 'Name' })
+        head.createEl('th', { text: 'Kind' })
+        head.createEl('th', { text: 'Aliases' })
+        head.createEl('th', { text: '' })
+
+        for (const entry of visible) {
+          this.renderRegistryRow(table, entry, renderRegistrySection)
+        }
+      }
+
+      renderTable()
+    }
+
+    renderRegistrySection()
+  }
+
+  private renderRegistryRow(
+    table: HTMLElement,
+    entry: ExerciseRegistryEntry,
+    rerender: () => void,
+  ): void {
+    const tr = table.createEl('tr')
+    tr.createEl('td', { text: entry.name })
+    tr.createEl('td', { text: entry.kind })
+
+    const aliasCell = tr.createEl('td')
+    if (entry.aliases.length === 0) {
+      aliasCell.setText('none')
+      aliasCell.addClass('fitkit-registry-aliases-muted')
+    } else {
+      const joined = entry.aliases.join(', ')
+      aliasCell.setText(joined)
+      aliasCell.setAttr('title', joined)
+    }
+
+    const actions = tr.createEl('td', { cls: 'fitkit-registry-action-cell' })
+    const editBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Edit' })
+    editBtn.addEventListener('click', () => {
+      new ExerciseRegistryEntryModal(
+        this.plugin,
+        { kind: 'edit', original: entry },
+        rerender,
+      ).open()
+    })
+    const deleteBtn = actions.createEl('button', {
+      cls: 'fitkit-btn fitkit-destructive-button',
+      text: 'Delete',
+    })
+    deleteBtn.addEventListener('click', () => {
+      const notePath = this.lookupExerciseNotePath(entry.name)
+      new DeleteRegistryEntryModal(
+        this.plugin.app,
+        { entryName: entry.name, notePath },
+        ({ confirmed, alsoDeleteFile }) => {
+          if (!confirmed) {
+            return
+          }
+          void this.deleteRegistryEntry(entry.name, alsoDeleteFile, rerender)
+        },
+      ).open()
+    })
+  }
+
+  private lookupExerciseNotePath(name: string): string | null {
+    const path = normalizePath(`${exercisesFolder(this.plugin.settings)}/${name}.md`)
+    const file = this.plugin.app.vault.getAbstractFileByPath(path)
+    return file instanceof TFile ? path : null
+  }
+
+  private async deleteRegistryEntry(
+    name: string,
+    alsoDeleteFile: boolean,
+    rerender: () => void,
+  ): Promise<void> {
+    const fresh = createRegistry(this.plugin.settings.exerciseRegistry)
+    const targetKey = normalize(name)
+    const target = fresh.entries.find((entry) => normalize(entry.name) === targetKey)
+    if (!target) {
+      new Notice('That entry was already removed.')
+      rerender()
+      return
+    }
+    const next = removeEntry(fresh, target.name)
+    this.plugin.settings.exerciseRegistry = next.entries
+    await this.plugin.saveSettings()
+
+    if (alsoDeleteFile) {
+      const notePath = normalizePath(
+        `${exercisesFolder(this.plugin.settings)}/${target.name}.md`,
       )
-      .addButton((button) =>
-        button.setButtonText('Bootstrap').onClick(async () => {
-          const merged = exerciseRegistryWithVaultNotes(this.plugin.app, settings)
-          settings.exerciseRegistry = merged
-          await this.plugin.saveSettings()
-          new Notice(`Registry now has ${merged.length} entries.`)
-          this.display()
-        }),
-      )
+      const file = this.plugin.app.vault.getAbstractFileByPath(notePath)
+      if (file instanceof TFile) {
+        try {
+          await this.plugin.app.fileManager.trashFile(file)
+          new Notice(`Removed entry '${target.name}' and trashed note file.`)
+        } catch (error) {
+          console.error('FitKit: failed to trash exercise note file', error)
+          new Notice(
+            `Removed entry '${target.name}', but failed to trash the note file. See console for details.`,
+          )
+        }
+      } else {
+        new Notice(`Removed entry '${target.name}'. Note file was already missing.`)
+      }
+    }
+
+    rerender()
   }
 }

@@ -610,3 +610,82 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.fitkit-registry-section {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.fitkit-registry-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fitkit-registry-search {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.fitkit-registry-table-wrap {
+  overflow-x: auto;
+  margin-bottom: 0.5rem;
+}
+
+.fitkit-registry-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.fitkit-registry-aliases-muted {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.fitkit-registry-section .fitkit-import-table td:nth-child(3) {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fitkit-registry-action-cell {
+  white-space: nowrap;
+}
+
+.fitkit-registry-action-cell .fitkit-btn {
+  margin-right: 4px;
+}
+
+.fitkit-registry-entry-modal .fitkit-registry-field {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.fitkit-registry-entry-modal .fitkit-registry-field-label {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.fitkit-registry-entry-modal .fitkit-registry-input,
+.fitkit-registry-entry-modal .fitkit-registry-select,
+.fitkit-registry-entry-modal .fitkit-registry-textarea {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.fitkit-registry-entry-modal .fitkit-registry-textarea {
+  font-family: var(--font-monospace, monospace);
+  resize: vertical;
+}
+
+.fitkit-registry-entry-modal .fitkit-registry-field-error {
+  color: var(--text-error);
+  font-size: 12px;
+  min-height: 1em;
+}
