@@ -29,14 +29,14 @@ kind: strength
 metric: e1rm
 ---
 
-## Recent sessions
-
-${recent}
-
 ## Progress chart
 
 \`\`\`fitkit-chart
 \`\`\`
+
+## Recent sessions
+
+${recent}
 
 ## Notes
 `
@@ -71,10 +71,10 @@ type: exercise
 kind: strength
 metric: e1rm
 ---`)
-    expect(result.markdown.indexOf('## Recent sessions')).toBeLessThan(
-      result.markdown.indexOf('## Progress chart'),
-    )
     expect(result.markdown.indexOf('## Progress chart')).toBeLessThan(
+      result.markdown.indexOf('## Recent sessions'),
+    )
+    expect(result.markdown.indexOf('## Recent sessions')).toBeLessThan(
       result.markdown.indexOf('## Notes'),
     )
     expect(result.markdown).toContain('Keep this.')
@@ -184,14 +184,14 @@ type: exercise
 kind: duration
 ---
 
-## Recent sessions
-
-${buildRecentSessionsBlock('Plank', 'duration', 'Fitness')}
-
 ## Progress chart
 
 \`\`\`fitkit-chart
 \`\`\`
+
+## Recent sessions
+
+${buildRecentSessionsBlock('Plank', 'duration', 'Fitness')}
 
 ## Notes
 `
@@ -199,7 +199,43 @@ ${buildRecentSessionsBlock('Plank', 'duration', 'Fitness')}
     expect(migrate(source, { name: 'Plank' }).markdown).toBe(source)
   })
 
-  it('inserts a Progress chart section before ## Notes', () => {
+  it('moves a v0 Progress chart section above Recent sessions and preserves content', () => {
+    const recent = buildRecentSessionsBlock('Squat', 'strength', 'Fitness')
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
+---
+
+## Recent sessions
+
+${recent}
+
+## Progress chart
+
+\`\`\`fitkit-chart
+window: 12
+\`\`\`
+
+## Notes
+
+Keep these notes.
+`
+    const result = migrate(source)
+
+    expect(result.status).toBe('updated')
+    expect(result.markdown.indexOf('## Progress chart')).toBeLessThan(
+      result.markdown.indexOf('## Recent sessions'),
+    )
+    expect(result.markdown.indexOf('## Recent sessions')).toBeLessThan(
+      result.markdown.indexOf('## Notes'),
+    )
+    expect(result.markdown).toContain(recent)
+    expect(result.markdown).toContain('window: 12')
+    expect(result.markdown).toContain('Keep these notes.')
+  })
+
+  it('inserts a missing Progress chart section above Recent sessions', () => {
     const source = `---
 type: exercise
 kind: strength
@@ -221,11 +257,14 @@ TABLE
     expect(result.markdown).toContain('## Progress chart')
     expect(result.markdown).toContain('```fitkit-chart\n```')
     expect(result.markdown.indexOf('## Progress chart')).toBeLessThan(
+      result.markdown.indexOf('## Recent sessions'),
+    )
+    expect(result.markdown.indexOf('## Recent sessions')).toBeLessThan(
       result.markdown.indexOf('## Notes'),
     )
   })
 
-  it('appends Progress chart section when no ## Notes heading exists', () => {
+  it('inserts a missing Progress chart section above Recent sessions when Notes is missing', () => {
     const source = `---
 type: exercise
 kind: strength
@@ -240,6 +279,9 @@ ${buildRecentSessionsBlock('Squat', 'strength', 'Fitness')}
 
     expect(result.markdown).toContain('## Progress chart')
     expect(result.markdown).toContain('```fitkit-chart\n```')
+    expect(result.markdown.indexOf('## Progress chart')).toBeLessThan(
+      result.markdown.indexOf('## Recent sessions'),
+    )
     expect(result.markdown.endsWith('\n')).toBe(true)
   })
 
@@ -266,6 +308,9 @@ FROM "Fitness/Workouts"
 
     expect(result.markdown).toContain('## Progress chart')
     expect(result.markdown.indexOf('## Progress chart')).toBeLessThan(
+      result.markdown.indexOf('## Recent sessions'),
+    )
+    expect(result.markdown.indexOf('## Recent sessions')).toBeLessThan(
       result.markdown.indexOf('## Notes'),
     )
   })
@@ -274,6 +319,7 @@ FROM "Fitness/Workouts"
     const source = completeStrengthNote()
 
     expect(migrate(source).markdown).toBe(source)
+    expect(migrate(source).changed).toBe(false)
     expect(migrate(source).status).toBe('already')
   })
 
@@ -346,13 +392,16 @@ something
 `
     const result = migrate(source)
     const progressIndex = result.markdown.indexOf('## Progress chart')
+    const recentIndex = result.markdown.indexOf('## Recent sessions')
     const subNotesIndex = result.markdown.indexOf('### Notes')
+    const notesIndex = result.markdown.indexOf('\n## Notes')
 
-    expect(progressIndex).toBeGreaterThan(subNotesIndex)
+    expect(progressIndex).toBeLessThan(recentIndex)
+    expect(notesIndex).toBeGreaterThan(subNotesIndex)
     expect(result.markdown).toContain('## Notes')
   })
 
-  it('inserts a missing Recent sessions section before the chart and Notes sections', () => {
+  it('inserts a missing Recent sessions section after the chart and before Notes', () => {
     const source = `---
 type: exercise
 kind: strength
@@ -368,8 +417,11 @@ metric: e1rm
 `
     const result = migrate(source)
 
+    expect(result.markdown.indexOf('## Progress chart')).toBeLessThan(
+      result.markdown.indexOf('## Recent sessions'),
+    )
     expect(result.markdown.indexOf('## Recent sessions')).toBeLessThan(
-      result.markdown.indexOf('## Progress chart'),
+      result.markdown.indexOf('## Notes'),
     )
     expect(result.markdown).toContain(buildRecentSessionsBlock('Squat', 'strength', 'Fitness'))
   })
@@ -396,7 +448,10 @@ metric: e1rm
 
 ${buildRecentSessionsBlock('Squat', 'strength', 'Fitness')}
 
-## Progress chart`)
+## Notes`)
+    expect(result.markdown.indexOf('## Progress chart')).toBeLessThan(
+      result.markdown.indexOf('## Recent sessions'),
+    )
   })
 
   it('replaces a stale Recent sessions FROM path without touching surrounding prose', () => {

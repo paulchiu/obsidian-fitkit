@@ -375,13 +375,27 @@ function firstInlineExerciseTarget(block: string): string | null {
 }
 
 function ensureChartBlock(source: string): string {
+  const document = splitMarkdown(source)
+  const insertionIndex = firstSectionIndexAfterFrontmatter(document.lines)
+  const existingSection = findProgressChartSection(document.lines)
+  if (existingSection) {
+    if (existingSection.start === insertionIndex) {
+      return source
+    }
+    const sectionLines = document.lines.slice(existingSection.start, existingSection.end)
+    const withoutSection = [
+      ...document.lines.slice(0, existingSection.start),
+      ...document.lines.slice(existingSection.end),
+    ]
+    const nextInsertionIndex =
+      existingSection.start < insertionIndex ? insertionIndex - sectionLines.length : insertionIndex
+    const next = insertSection(withoutSection, nextInsertionIndex, sectionLines)
+    return joinMarkdown({ ...document, lines: next })
+  }
   if (hasFitKitChartBlock(source)) {
     return source
   }
 
-  const document = splitMarkdown(source)
-  const notesIndex = findHeadingIndex(document.lines, isNotesHeading)
-  const insertionIndex = notesIndex >= 0 ? notesIndex : document.lines.length
   const next = insertSection(document.lines, insertionIndex, [
     '## Progress chart',
     '',
@@ -390,6 +404,36 @@ function ensureChartBlock(source: string): string {
     '',
   ])
   return joinMarkdown({ ...document, lines: next })
+}
+
+function findProgressChartSection(
+  lines: ReadonlyArray<string>,
+): { start: number; end: number } | null {
+  const start = findHeadingIndex(lines, isProgressChartHeading)
+  if (start < 0) {
+    return null
+  }
+  const nextHeading = findNextH2HeadingIndex(lines, start + 1)
+  const end = nextHeading >= 0 ? nextHeading : lines.length
+  const block = findFitKitChartBlockInRange(lines, start + 1, end)
+  return block ? { start, end } : null
+}
+
+function firstSectionIndexAfterFrontmatter(lines: ReadonlyArray<string>): number {
+  if (frontmatterProbeLine(lines[0] ?? '', 0) !== '---') {
+    return 0
+  }
+  for (let index = 1; index < lines.length; index++) {
+    if (frontmatterProbeLine(lines[index] ?? '', index) !== '---') {
+      continue
+    }
+    let insertionIndex = index + 1
+    while (lines[insertionIndex] === '') {
+      insertionIndex += 1
+    }
+    return insertionIndex
+  }
+  return 0
 }
 
 function ensureNotesSection(source: string): string {
@@ -403,11 +447,21 @@ function ensureNotesSection(source: string): string {
 
 function hasFitKitChartBlock(source: string): boolean {
   const lines = source.split('\n')
+  return findFitKitChartBlockInRange(lines, 0, lines.length) !== null
+}
+
+function findFitKitChartBlockInRange(
+  lines: ReadonlyArray<string>,
+  start: number,
+  end: number,
+): FencedBlock | null {
   let openFence: string | null = null
-  for (const line of lines) {
+  let openStart = -1
+  for (let index = start; index < end; index++) {
+    const line = lines[index] ?? ''
     if (openFence !== null) {
       if (isClosingFence(line, openFence)) {
-        openFence = null
+        return { start: openStart, end: index }
       }
       continue
     }
@@ -416,11 +470,20 @@ function hasFitKitChartBlock(source: string): boolean {
       continue
     }
     if (opening.info.toLowerCase() === 'fitkit-chart') {
-      return true
+      openFence = opening.fence
+      openStart = index
+      continue
     }
     openFence = opening.fence
+    while (index + 1 < end) {
+      index += 1
+      if (isClosingFence(lines[index] ?? '', openFence)) {
+        openFence = null
+        break
+      }
+    }
   }
-  return false
+  return null
 }
 
 function parseOpeningFence(line: string): { fence: string; info: string } | null {

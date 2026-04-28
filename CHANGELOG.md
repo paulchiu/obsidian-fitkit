@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Exercise note templates and repair now place Progress chart immediately after frontmatter, before Recent sessions and Notes.
 - Chart strength default shifted from max-weight to e1rm (breaking for existing chart embeds without explicit metric: weight).
 
 ### Fixed

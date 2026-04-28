@@ -24,16 +24,16 @@ export function composeExerciseNote(
   }
   lines.push('---')
   lines.push('')
+  lines.push('## Progress chart')
+  lines.push('')
+  lines.push('```fitkit-chart')
+  lines.push('```')
+  lines.push('')
   lines.push('## Recent sessions')
   lines.push('')
   lines.push(
     buildRecentSessionsBlock(exerciseName, kind, fitnessRootFromWorkouts(workoutsFolderPath)),
   )
-  lines.push('')
-  lines.push('## Progress chart')
-  lines.push('')
-  lines.push('```fitkit-chart')
-  lines.push('```')
   lines.push('')
   lines.push('## Notes')
   lines.push('')
