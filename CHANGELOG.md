@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Exercise chart blocks now distinguish missing and invalid exercise-note `kind:` frontmatter when showing fallback notes.
+- Bodyweight strength charts and dashboard PBs consistently keep zero-weight sets.
+
 ### Removed
 
 ## [0.9.1] - 2026-04-28

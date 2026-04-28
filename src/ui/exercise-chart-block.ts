@@ -23,6 +23,11 @@ import { rebuildIndex } from '../vault/index'
 import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
 import { renderExerciseChartSvg } from './exercise-chart-svg'
 
+type KindFrontmatterResult =
+  | { kind: ExerciseKind }
+  | { kind: null; reason: 'missing' }
+  | { kind: null; reason: 'invalid'; raw: string }
+
 export async function renderExerciseChartBlock(
   plugin: FitKitPlugin,
   source: string,
@@ -78,8 +83,8 @@ async function renderInternal(
 
   let kind = parsed.kind
   const frontmatterKind = kindFromFrontmatter(exerciseFrontmatter)
-  if (!kind) {
-    kind = frontmatterKind
+  if (!kind && frontmatterKind.kind) {
+    kind = frontmatterKind.kind
   }
   if (!kind) {
     kind = kindForName(registry, exerciseName)
@@ -92,15 +97,25 @@ async function renderInternal(
       `No 'kind:' supplied; defaulting to ${kind}. Add 'kind: strength' or 'kind: duration' to be explicit.`,
     )
   }
+  /**
+   * Registry-resolved duration means the chart did not fall back to the strength default.
+   * Only show the exercise-note frontmatter nudge when the resolved kind remains strength.
+   */
   if (
     parsed.kind === null &&
     sourceIsExerciseNote &&
-    frontmatterKind === null &&
+    frontmatterKind.kind === null &&
     kind === 'strength'
   ) {
-    notes.push(
-      "Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add 'kind: strength' or 'kind: duration' to be explicit.",
-    )
+    if (frontmatterKind.reason === 'invalid') {
+      notes.push(
+        `Exercise note frontmatter has unrecognised 'kind: ${frontmatterKind.raw}'; defaulting to strength. Use 'kind: strength' or 'kind: duration'.`,
+      )
+    } else {
+      notes.push(
+        "Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add 'kind: strength' or 'kind: duration' to be explicit.",
+      )
+    }
   }
 
   const metric = resolveExerciseChartMetric(parsed, exerciseFrontmatter, kind, notes)
@@ -160,16 +175,23 @@ function isExerciseSourceFile(file: TFile | null, plugin: FitKitPlugin): boolean
 
 function kindFromFrontmatter(
   frontmatter: CachedMetadata['frontmatter'] | undefined,
-): ExerciseKind | null {
+): KindFrontmatterResult {
   const value = readFrontmatterField(frontmatter, 'kind')
+  if (value === undefined || value === null) {
+    return { kind: null, reason: 'missing' }
+  }
   if (typeof value !== 'string') {
-    return null
+    return { kind: null, reason: 'missing' }
   }
-  const lowered = value.toLowerCase().trim()
+  const raw = value.trim()
+  if (raw.length === 0) {
+    return { kind: null, reason: 'missing' }
+  }
+  const lowered = raw.toLowerCase()
   if (lowered === 'strength' || lowered === 'duration') {
-    return lowered
+    return { kind: lowered }
   }
-  return null
+  return { kind: null, reason: 'invalid', raw }
 }
 
 function readFrontmatterField(

@@ -37,9 +37,39 @@ describe('exercise chart block parsing', () => {
     expect(notes).toEqual([])
   })
 
-  it('treats an empty metric value as unspecified', () => {
+  it('metric: with empty value is silently treated as unspecified and falls through to frontmatter', () => {
     const notes: string[] = []
     const parsed = parseExerciseChartBlock('metric: ')
+
+    const metric = resolveExerciseChartMetric(parsed, { metric: 'weight' }, 'strength', notes)
+
+    expect(metric).toBe('weight')
+    expect(notes).toEqual([])
+  })
+
+  it('metric: "" is silently treated as unspecified and falls through to frontmatter', () => {
+    const notes: string[] = []
+    const parsed = parseExerciseChartBlock('metric: ""')
+
+    const metric = resolveExerciseChartMetric(parsed, { metric: 'weight' }, 'strength', notes)
+
+    expect(metric).toBe('weight')
+    expect(notes).toEqual([])
+  })
+
+  it("metric: '' is silently treated as unspecified and falls through to frontmatter", () => {
+    const notes: string[] = []
+    const parsed = parseExerciseChartBlock("metric: ''")
+
+    const metric = resolveExerciseChartMetric(parsed, { metric: 'weight' }, 'strength', notes)
+
+    expect(metric).toBe('weight')
+    expect(notes).toEqual([])
+  })
+
+  it("metric: ' is silently treated as unspecified and falls through to frontmatter", () => {
+    const notes: string[] = []
+    const parsed = parseExerciseChartBlock("metric: '")
 
     const metric = resolveExerciseChartMetric(parsed, { metric: 'weight' }, 'strength', notes)
 

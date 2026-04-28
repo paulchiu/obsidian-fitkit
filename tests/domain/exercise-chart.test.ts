@@ -409,6 +409,25 @@ describe('buildExerciseChartSeries', () => {
     ])
   })
 
+  it('plots a zero-weight series point for bodyweight strength sets', () => {
+    const series = buildExerciseChartSeries(
+      fitKitIndex([
+        entry('w/2026-04-02.md', '2026-04-02', [
+          { exerciseName: 'Bench Press', kind: 'strength', maxWeightSet: { weight: 0, reps: 8 } },
+        ]),
+      ]),
+      registry,
+      'Bench Press',
+      'strength',
+      30,
+      'weight',
+    )
+
+    expect(series.points).toEqual([
+      { date: '2026-04-02', value: 0, workoutPath: 'w/2026-04-02.md' },
+    ])
+  })
+
   it('skips strength rows where weight is NaN or non-finite', () => {
     const series = buildExerciseChartSeries(
       fitKitIndex([

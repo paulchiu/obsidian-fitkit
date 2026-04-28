@@ -56,12 +56,10 @@ export function pickHeaviestSet(
   }
 
   const positiveWeightSets = candidates.filter((set) => set.weight > 0)
-  const picked =
-    positiveWeightSets.length > 0
-      ? positiveWeightSets
-          .slice(1)
-          .reduce(pickHeavierSet, positiveWeightSets[0] as WeightSetCandidate)
-      : candidates.slice(1).reduce(pickMoreRepsSet, first)
+  const firstPositive = positiveWeightSets[0]
+  const picked = firstPositive
+    ? positiveWeightSets.slice(1).reduce(pickHeavierSet, firstPositive)
+    : candidates.slice(1).reduce(pickMoreRepsSet, first)
   return toWeightSet(picked)
 }
 

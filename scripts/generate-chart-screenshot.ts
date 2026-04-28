@@ -4,12 +4,23 @@
  * Usage: node scripts/generate-chart-screenshot.ts
  *
  * Regenerates dated Calf Raise chart screenshots from the seeded dev-vault workout notes.
+ * PNGs are written to <repo>/tmp/ by default.
+ *
+ * Environment variables:
+ * - EXERCISE_NAME: Exercise to chart. Defaults to Calf Raise.
+ * - WORKOUTS_DIR: Folder containing workout notes. Defaults to the local dev vault.
+ * - OUTPUT_DATE: Date stamped into filenames and the generated index. Defaults to today.
+ *
+ * DOM polyfill:
+ * - Covers only what the current renderer uses.
+ * - Inspect src/ui/exercise-chart-svg.ts before extending the renderer.
+ * - If the renderer touches a new Obsidian element extension, extend this polyfill to match it.
  */
 
 import { Resvg } from '@resvg/resvg-js'
 import { createJiti } from 'jiti'
 import { JSDOM } from 'jsdom'
-import { readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 const jiti = createJiti(import.meta.url)
@@ -20,9 +31,11 @@ const { parseWorkoutNote } = await jiti.import('../src/domain/workout-note-model
 const { renderExerciseChartSvg } = await jiti.import('../src/ui/exercise-chart-svg.ts')
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..')
-const WORKOUTS_DIR = '/Users/paul/dev-misc/dev-vault/dev/Fitness/Workouts'
-const OUTPUT_DATE = '2026-04-29'
-const EXERCISE_NAME = 'Calf Raise'
+const EXERCISE_NAME = process.env.EXERCISE_NAME ?? 'Calf Raise'
+const WORKOUTS_DIR =
+  process.env.WORKOUTS_DIR ?? '/Users/paul/dev-misc/dev-vault/dev/Fitness/Workouts'
+const OUTPUT_DATE = process.env.OUTPUT_DATE ?? new Date().toISOString().slice(0, 10)
+const OUTPUT_DIR = path.join(REPO_ROOT, 'tmp')
 const CHART_WIDTH = 800
 const CHART_HEIGHT = 320
 const CHART_STYLE = `
@@ -34,11 +47,13 @@ const CHART_STYLE = `
 `
 
 setupDom()
+await assertWorkoutsDir()
+await mkdir(OUTPUT_DIR, { recursive: true })
 
 const index = {
   schemaVersion: 1,
   builtAt: Date.parse(`${OUTPUT_DATE}T00:00:00.000Z`),
-  entries: await readCalfRaiseEntries(),
+  entries: await readWorkoutEntries(),
   diagnostics: [],
 }
 const registry = createRegistry([{ name: EXERCISE_NAME, kind: 'strength', aliases: [] }])
@@ -49,26 +64,62 @@ for (const metric of ['e1rm', 'weight']) {
   const container = activeDocument.createElement('div')
   renderExerciseChartSvg(container, series)
   const svg = serializeRenderedSvg(container)
-  const png = new Resvg(svg, {
-    background: 'white',
-    fitTo: {
-      mode: 'width',
-      value: CHART_WIDTH,
-    },
-  })
-    .render()
-    .asPng()
   const metricName = metric === 'e1rm' ? 'e1rm' : 'Weight'
-  const outputPath = path.join(REPO_ROOT, `${OUTPUT_DATE} ${EXERCISE_NAME} Chart ${metricName}.png`)
+  const outputPath = path.join(
+    OUTPUT_DIR,
+    `${OUTPUT_DATE} ${EXERCISE_NAME} Chart ${metricName}.png`,
+  )
+  let png
+  try {
+    png = new Resvg(svg, {
+      background: 'white',
+      fitTo: {
+        mode: 'width',
+        value: CHART_WIDTH,
+      },
+    })
+      .render()
+      .asPng()
+  } catch (error) {
+    console.error(
+      [
+        `Could not render ${EXERCISE_NAME} chart to ${outputPath}.`,
+        `Underlying error: ${formatErrorMessage(error)}`,
+      ].join('\n'),
+    )
+    process.exit(1)
+  }
   await writeFile(outputPath, png)
   outputs.push(outputPath)
 }
 
 console.log(outputs.join('\n'))
 
-async function readCalfRaiseEntries() {
+async function assertWorkoutsDir() {
+  try {
+    const directory = await stat(WORKOUTS_DIR)
+    if (directory.isDirectory()) {
+      return
+    }
+  } catch {
+    console.error(
+      `Workout notes directory does not exist: ${WORKOUTS_DIR}\nSet WORKOUTS_DIR to the Fitness/Workouts folder you want to chart.`,
+    )
+    process.exit(1)
+  }
+
+  console.error(
+    `WORKOUTS_DIR is not a directory: ${WORKOUTS_DIR}\nSet WORKOUTS_DIR to the Fitness/Workouts folder you want to chart.`,
+  )
+  process.exit(1)
+}
+
+async function readWorkoutEntries() {
+  const workoutFilenamePattern = new RegExp(
+    `^\\d{4}-\\d{2}-\\d{2} ${escapeRegExp(EXERCISE_NAME)}\\.md$`,
+  )
   const filenames = (await readdir(WORKOUTS_DIR))
-    .filter((filename) => /^\d{4}-\d{2}-\d{2} Calf Raise\.md$/.test(filename))
+    .filter((filename) => workoutFilenamePattern.test(filename))
     .sort()
   const entries = []
 
@@ -91,6 +142,10 @@ async function readCalfRaiseEntries() {
   }
 
   return entries
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function toIndexRow(exercise) {
@@ -193,4 +248,8 @@ function createSvgStyle() {
   const style = activeDocument.createElementNS('http://www.w3.org/2000/svg', 'style')
   style.textContent = CHART_STYLE
   return style
+}
+
+function formatErrorMessage(error) {
+  return error instanceof Error ? error.message : String(error)
 }
