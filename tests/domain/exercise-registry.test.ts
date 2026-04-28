@@ -252,9 +252,7 @@ describe('validateEntryDraft', () => {
       kind: 'strength',
       aliases: [],
     })
-    expect(errors).toEqual([
-      { field: 'name', message: 'Name must contain a letter or number.' },
-    ])
+    expect(errors).toEqual([{ field: 'name', message: 'Name must contain a letter or number.' }])
   })
 
   it('allows self-collision in edit mode via excludeOriginalName', () => {

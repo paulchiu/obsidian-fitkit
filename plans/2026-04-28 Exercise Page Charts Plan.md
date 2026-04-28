@@ -35,7 +35,7 @@ User-visible behaviour:
 Add one field to `FitKitSettings` in `src/settings.ts`:
 
 ```ts
-chartSessionsWindow: number  // default 30, min 5, max 365
+chartSessionsWindow: number // default 30, min 5, max 365
 ```
 
 UI under a new `Charts` heading in the settings tab:
@@ -81,18 +81,18 @@ New file `src/domain/exercise-chart.ts`. All exported functions pure, unit-teste
 
 ```ts
 export interface ChartPoint {
-  date: string         // 'YYYY-MM-DD'
-  value: number        // weight in kg (strength) or seconds (duration)
-  workoutPath: string  // path of the workout that contributed this date's max
+  date: string // 'YYYY-MM-DD'
+  value: number // weight in kg (strength) or seconds (duration)
+  workoutPath: string // path of the workout that contributed this date's max
 }
 
 export interface ChartSeries {
-  exerciseName: string  // canonical name as queried (echoes the input)
+  exerciseName: string // canonical name as queried (echoes the input)
   kind: 'strength' | 'duration'
   unit: 'kg' | 's'
-  points: ChartPoint[]   // sorted by date asc, post-aggregation, post-window
+  points: ChartPoint[] // sorted by date asc, post-aggregation, post-window
   windowRequested: number
-  totalDates: number     // total qualifying date buckets, before windowing
+  totalDates: number // total qualifying date buckets, before windowing
 }
 
 export function buildExerciseChartSeries(
@@ -117,6 +117,7 @@ Behaviour:
 7. `totalDates` reflects the count of distinct date buckets **after** aggregation but **before** windowing. The chart caption uses this for "last N of M" copy so the numbers in the title agree with the buckets actually plotted. In all user-facing copy (chart title, settings name, changelog) we call a date bucket a "session"; this is the same convention the existing dashboard "Recent sessions" copy already uses, and `totalDates` is the implementation-side name for the same concept.
 
 Edge cases:
+
 - Zero matching entries → `points: []`, `totalDates: 0`.
 - Non-ISO dates: `entry.date` from the index is already an ISO `YYYY-MM-DD` string (set by `parseWorkoutNote`); we trust that. If it's malformed, it sorts wrong but won't crash. No special handling.
 - Multiple workouts on the same date with the same max value: tie-break `workoutPath` by lexicographic comparison so the result is deterministic for tests.
@@ -145,7 +146,7 @@ Mobile note: SVG `width="100%"` + a fixed `viewBox` keeps the chart legible at a
 
 Extend `composeExerciseNote` in `src/vault/exercise-note.ts`:
 
-```
+````
 ---
 type: exercise
 kind: <kind>
@@ -157,9 +158,10 @@ kind: <kind>
 ## Progress chart
 
 ```fitkit-chart
-```
+````
 
 ## Notes
+
 <existing dataview block>
 ```
 
@@ -188,15 +190,19 @@ For each, read with `await app.vault.read(file)`, call the pure helper `migrateE
 
 The helper `migrateExerciseNote` lives in `src/domain/exercise-note-migrate.ts`:
 
-- Detect existing `fitkit-chart` blocks via a small line-by-line fence scanner (mirrors the bounded scanner in `workout-note-model.ts`): track open/close state on backtick fence lines matching `^\`{3,}` at column 0 (no leading spaces), recording the info string only on opening fences. We deliberately do **not** treat CommonMark indented fences (1–3 leading spaces) as fences here, because (a) our own composer never emits them and (b) tightening to column-0 keeps the scanner simple and avoids false positives where indented backticks appear in narrative prose. If any opening fence's info string equals `fitkit-chart` (case-insensitive, trimmed), return `source` unchanged. This avoids false positives when the literal text `\`\`\`fitkit-chart` appears inside a different fenced block (a documentation note quoting the syntax) or in inline code.
+- Detect existing `fitkit-chart` blocks via a small line-by-line fence scanner (mirrors the bounded scanner in `workout-note-model.ts`): track open/close state on backtick fence lines matching `^\`{3,}`at column 0 (no leading spaces), recording the info string only on opening fences. We deliberately do **not** treat CommonMark indented fences (1–3 leading spaces) as fences here, because (a) our own composer never emits them and (b) tightening to column-0 keeps the scanner simple and avoids false positives where indented backticks appear in narrative prose. If any opening fence's info string equals`fitkit-chart`(case-insensitive, trimmed), return`source`unchanged. This avoids false positives when the literal text`\`\`\`fitkit-chart` appears inside a different fenced block (a documentation note quoting the syntax) or in inline code.
 - Otherwise, insert a new section before the first **top-level** `## Notes` heading (lines starting with exactly `## Notes`, ignoring `### Notes` etc.). Format:
-  ```
+
+  ````
   ## Progress chart
 
   ```fitkit-chart
+  ````
+
   ```
 
   ```
+
 - If no top-level `## Notes` heading exists, append the new section at end of file.
 - Preserves frontmatter byte-for-byte and the original trailing newline (or lack thereof).
 
@@ -276,7 +282,7 @@ New tests in `tests/domain/exercise-note-migrate.test.ts`:
 
 - Note with no chart block, has `## Notes` → inserts `## Progress chart` block before `## Notes`.
 - Note with no chart block, no `## Notes` → appends `## Progress chart` block at end.
-- Note already containing ```` ```fitkit-chart ```` as a real opening fence → returns input unchanged.
+- Note already containing ` ```fitkit-chart ` as a real opening fence → returns input unchanged.
 - Note where the literal text `\`\`\`fitkit-chart` appears inside an unrelated fenced code sample (a doc note quoting the syntax) → still treated as missing; helper inserts a real chart block.
 - Indented fences (` ```fitkit-chart` with leading spaces) are NOT recognised as chart blocks (CommonMark allows ≤3 leading spaces but our composer never emits them; covered by a negative test).
 - Longer backtick fences (4+ backticks) opening a `fitkit-chart` block are recognised.

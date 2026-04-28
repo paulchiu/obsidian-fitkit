@@ -1,8 +1,4 @@
-import {
-  niceRange,
-  pickXTickIndices,
-  type ChartSeries,
-} from '../domain/exercise-chart'
+import { niceRange, pickXTickIndices, type ChartSeries } from '../domain/exercise-chart'
 
 const VIEW_WIDTH = 800
 const VIEW_HEIGHT = 320

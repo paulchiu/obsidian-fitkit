@@ -42,7 +42,13 @@ describe('buildExerciseChartSeries', () => {
   ])
 
   it('returns empty series when the index has no entries', () => {
-    const series = buildExerciseChartSeries(fitKitIndex([]), registry, 'Bench Press', 'strength', 30)
+    const series = buildExerciseChartSeries(
+      fitKitIndex([]),
+      registry,
+      'Bench Press',
+      'strength',
+      30,
+    )
     expect(series.points).toEqual([])
     expect(series.totalDates).toBe(0)
     expect(series.unit).toBe('kg')
@@ -269,9 +275,7 @@ describe('buildExerciseChartSeries', () => {
   it('skips strength rows with missing or non-positive weight', () => {
     const series = buildExerciseChartSeries(
       fitKitIndex([
-        entry('w/2026-04-01.md', '2026-04-01', [
-          { exerciseName: 'Bench Press', kind: 'strength' },
-        ]),
+        entry('w/2026-04-01.md', '2026-04-01', [{ exerciseName: 'Bench Press', kind: 'strength' }]),
         entry('w/2026-04-02.md', '2026-04-02', [
           { exerciseName: 'Bench Press', kind: 'strength', maxWeightSet: { weight: 0, reps: 5 } },
         ]),
@@ -318,9 +322,7 @@ describe('buildExerciseChartSeries', () => {
   it('skips duration rows where totalDurationSeconds is missing, zero, NaN, or non-finite', () => {
     const series = buildExerciseChartSeries(
       fitKitIndex([
-        entry('w/2026-04-01.md', '2026-04-01', [
-          { exerciseName: 'Plank', kind: 'duration' },
-        ]),
+        entry('w/2026-04-01.md', '2026-04-01', [{ exerciseName: 'Plank', kind: 'duration' }]),
         entry('w/2026-04-02.md', '2026-04-02', [
           { exerciseName: 'Plank', kind: 'duration', totalDurationSeconds: 0 },
         ]),

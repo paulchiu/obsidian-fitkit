@@ -287,8 +287,7 @@ export function renameEntry(
 ): ExerciseRegistry {
   const oldKey = normalize(oldName)
   const newKey = normalize(next.name)
-  const aliasesWithOld =
-    oldKey === newKey ? [...next.aliases] : [oldName, ...next.aliases]
+  const aliasesWithOld = oldKey === newKey ? [...next.aliases] : [oldName, ...next.aliases]
   const seen = new Set<string>()
   const dedupedAliases: string[] = []
   for (const alias of aliasesWithOld) {

@@ -6,11 +6,7 @@ import {
 } from 'obsidian'
 
 import { buildExerciseChartSeries } from '../domain/exercise-chart'
-import {
-  createRegistry,
-  kindForName,
-  type ExerciseKind,
-} from '../domain/exercise-registry'
+import { createRegistry, kindForName, type ExerciseKind } from '../domain/exercise-registry'
 import type FitKitPlugin from '../main'
 import { exercisesFolder } from '../settings-paths'
 import { rebuildIndex } from '../vault/index'
@@ -98,13 +94,7 @@ async function renderInternal(
     plugin.lastDiagnostics = plugin.cachedIndex.diagnostics
   }
 
-  const series = buildExerciseChartSeries(
-    plugin.cachedIndex,
-    registry,
-    exerciseName,
-    kind,
-    window,
-  )
+  const series = buildExerciseChartSeries(plugin.cachedIndex, registry, exerciseName, kind, window)
   renderExerciseChartSvg(el, series, { notes })
 }
 
@@ -152,10 +142,7 @@ function parseBlock(source: string): ParsedBlock {
   return result
 }
 
-function resolveSourceFile(
-  plugin: FitKitPlugin,
-  ctx: MarkdownPostProcessorContext,
-): TFile | null {
+function resolveSourceFile(plugin: FitKitPlugin, ctx: MarkdownPostProcessorContext): TFile | null {
   const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath)
   return file instanceof TFile ? file : null
 }

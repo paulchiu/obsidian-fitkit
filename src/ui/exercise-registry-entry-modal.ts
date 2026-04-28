@@ -1,6 +1,10 @@
 import { Modal, Notice } from 'obsidian'
 
-import type { ExerciseKind, ExerciseRegistryEntry, ValidationError } from '../domain/exercise-registry'
+import type {
+  ExerciseKind,
+  ExerciseRegistryEntry,
+  ValidationError,
+} from '../domain/exercise-registry'
 import {
   createRegistry,
   normalize,
@@ -75,7 +79,10 @@ export class ExerciseRegistryEntryModal extends Modal {
     })
 
     const aliasField = contentEl.createDiv({ cls: 'fitkit-registry-field' })
-    aliasField.createEl('label', { text: 'Aliases (one per line)', cls: 'fitkit-registry-field-label' })
+    aliasField.createEl('label', {
+      text: 'Aliases (one per line)',
+      cls: 'fitkit-registry-field-label',
+    })
     this.aliasesTextarea = aliasField.createEl('textarea', { cls: 'fitkit-registry-textarea' })
     this.aliasesTextarea.value = this.aliasesText
     this.aliasesTextarea.rows = 5

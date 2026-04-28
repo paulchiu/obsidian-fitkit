@@ -53,8 +53,7 @@ export function buildExerciseChartSeries(
   const ordered = [...buckets.values()].sort((left, right) => compareByDate(left, right))
   const totalDates = ordered.length
   const safeWindow = Math.max(1, Math.floor(window))
-  const sliced =
-    ordered.length > safeWindow ? ordered.slice(ordered.length - safeWindow) : ordered
+  const sliced = ordered.length > safeWindow ? ordered.slice(ordered.length - safeWindow) : ordered
 
   return {
     exerciseName,

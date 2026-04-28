@@ -212,9 +212,9 @@ export class FitKitSettingTab extends PluginSettingTab {
         tableWrap.empty()
         empty.empty()
 
-        const entries = settings.exerciseRegistry.slice().sort((left, right) =>
-          left.name.localeCompare(right.name),
-        )
+        const entries = settings.exerciseRegistry
+          .slice()
+          .sort((left, right) => left.name.localeCompare(right.name))
         if (entries.length === 0) {
           empty.setText('No entries yet. Add one or bootstrap from your exercises folder.')
           return
@@ -324,9 +324,7 @@ export class FitKitSettingTab extends PluginSettingTab {
     await this.plugin.saveSettings()
 
     if (alsoDeleteFile) {
-      const notePath = normalizePath(
-        `${exercisesFolder(this.plugin.settings)}/${target.name}.md`,
-      )
+      const notePath = normalizePath(`${exercisesFolder(this.plugin.settings)}/${target.name}.md`)
       const file = this.plugin.app.vault.getAbstractFileByPath(notePath)
       if (file instanceof TFile) {
         try {
