@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.9.0] - 2026-04-28
+
+### Added
+
 - Dashboard exercise sections now include a wikilink to the matching exercise note.
 
 ### Changed
