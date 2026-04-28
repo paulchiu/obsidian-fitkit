@@ -290,8 +290,10 @@ export default class FitKitPlugin extends Plugin {
     let updated = 0
     let already = 0
     let skipped = 0
+    let skippedMalformedFrontmatter = 0
     let unknown = 0
     let failed = 0
+    let customisedRecentSessions = 0
     for (const file of files) {
       try {
         const snapshot = await this.app.vault.read(file)
@@ -305,29 +307,40 @@ export default class FitKitPlugin extends Plugin {
           skipped += 1
           continue
         }
-        if (result.unknownKind) {
-          unknown += 1
-        }
-        for (const warning of result.warnings) {
-          if (warning.kind === 'custom-recent-sessions') {
-            new Notice(
-              `Recent Sessions block on '${file.basename}' looks customised; not auto-replacing`,
-            )
-          }
-        }
-        if (!result.changed) {
-          already += 1
+        if (result.status === 'skipped-malformed-frontmatter') {
+          skippedMalformedFrontmatter += 1
           continue
         }
-        await this.app.vault.process(file, (live) => migrateExerciseNote(live, input).markdown)
-        updated += 1
+
+        if (result.warnings.some((warning) => warning.kind === 'custom-recent-sessions')) {
+          customisedRecentSessions += 1
+        }
+
+        if (result.changed) {
+          await this.app.vault.process(file, (live) => migrateExerciseNote(live, input).markdown)
+        }
+
+        if (result.status === 'unknown') {
+          unknown += 1
+        } else if (result.changed) {
+          updated += 1
+        } else {
+          already += 1
+        }
       } catch (error) {
-        void error
+        console.error(`FitKit: failed to sync exercise note '${file.path}'`, error)
         failed += 1
       }
     }
 
-    const summary = `Synced ${files.length} exercise note${files.length === 1 ? '' : 's'}; ${updated} updated, ${already} already current, ${skipped} skipped (non-exercise type), ${unknown} unknown (no registry kind), ${failed} failed.`
+    const failedHint = failed > 0 ? ' (see console)' : ''
+    const customisedSummary =
+      customisedRecentSessions > 0
+        ? ` ${customisedRecentSessions} customised recent sessions block${
+            customisedRecentSessions === 1 ? '' : 's'
+          } left alone.`
+        : ''
+    const summary = `Synced ${files.length} exercise note${files.length === 1 ? '' : 's'}; ${updated} updated, ${already} already current, ${skipped} skipped (non-exercise type), ${skippedMalformedFrontmatter} skipped (malformed frontmatter), ${unknown} unknown (no registry kind), ${failed} failed${failedHint}.${customisedSummary}`
     new Notice(summary)
   }
 

@@ -42,6 +42,18 @@ ${recent}
 `
 }
 
+function frontmatterMarkerCount(markdown: string): number {
+  return markdown.split(/\r?\n/).filter((line) => line === '---' || line === '\ufeff---').length
+}
+
+function leadingFrontmatterLines(markdown: string): string[] {
+  const lines = markdown.split(/\r?\n/)
+  expect(lines[0] === '---' || lines[0] === '\ufeff---').toBe(true)
+  const end = lines.findIndex((line, index) => index > 0 && line === '---')
+  expect(end).toBeGreaterThan(0)
+  return lines.slice(1, end)
+}
+
 describe('migrateExerciseNote', () => {
   it('prepends missing frontmatter with strength kind and metric from the registry', () => {
     const source = `Existing prose.
@@ -87,7 +99,7 @@ type: workout
 `
     const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
 
-    expect(result.status).toBe('updated')
+    expect(result.status).toBe('unknown')
     expect(result.unknownKind).toBe(true)
     expect(result.markdown).toContain(`---
 type: exercise
@@ -526,5 +538,77 @@ ${buildRecentSessionsBlock('Plank', 'duration', 'Fitness')}
     expect(result.markdown.slice(0, frontmatterEnd)).toBe(
       source.slice(0, source.indexOf('---', 4) + 3),
     )
+  })
+
+  it('recognises CRLF frontmatter and preserves CRLF in migrated output', () => {
+    const source = [
+      '---',
+      'type: exercise',
+      'kind: strength',
+      'metric: e1rm',
+      '---',
+      '',
+      'Existing notes.',
+    ].join('\r\n')
+
+    const result = migrate(source)
+
+    expect(result.status).toBe('updated')
+    expect(frontmatterMarkerCount(result.markdown)).toBe(2)
+    expect(leadingFrontmatterLines(result.markdown)).toEqual([
+      'type: exercise',
+      'kind: strength',
+      'metric: e1rm',
+    ])
+    expect(result.markdown.replace(/\r\n/g, '')).not.toContain('\n')
+    expect(result.markdown.startsWith('---\r\ntype: exercise')).toBe(true)
+    expect(result.markdown).toContain('## Progress chart')
+    const second = migrate(result.markdown)
+    expect(second.status).toBe('already')
+    expect(second.markdown).toBe(result.markdown)
+  })
+
+  it('recognises BOM-prefixed frontmatter and preserves the BOM', () => {
+    const source = `\ufeff---
+type: exercise
+kind: strength
+metric: e1rm
+---
+
+Existing notes.
+`
+
+    const result = migrate(source)
+
+    expect(result.status).toBe('updated')
+    expect(result.markdown.startsWith('\ufeff---\n')).toBe(true)
+    expect(frontmatterMarkerCount(result.markdown)).toBe(2)
+    expect(leadingFrontmatterLines(result.markdown)).toEqual([
+      'type: exercise',
+      'kind: strength',
+      'metric: e1rm',
+    ])
+    expect(result.markdown).toContain('## Progress chart')
+    const second = migrate(result.markdown)
+    expect(second.status).toBe('already')
+    expect(second.markdown).toBe(result.markdown)
+  })
+
+  it('skips malformed frontmatter without changing the file content', () => {
+    const source = `---
+type: exercise
+kind: strength
+
+Existing notes.
+`
+
+    const result = migrate(source)
+
+    expect(result.status).toBe('skipped-malformed-frontmatter')
+    expect(result.changed).toBe(false)
+    expect(result.markdown).toBe(source)
+    const second = migrate(result.markdown)
+    expect(second.status).toBe('skipped-malformed-frontmatter')
+    expect(second.markdown).toBe(source)
   })
 })

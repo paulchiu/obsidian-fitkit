@@ -11,7 +11,17 @@ export interface ExerciseNoteMigrationOptions {
   fitnessRoot: string
 }
 
-export type ExerciseNoteMigrationStatus = 'already' | 'updated' | 'skipped-non-exercise-type'
+export type ExerciseNoteMigrationStatus =
+  | 'already'
+  | 'updated'
+  | 'unknown'
+  | 'skipped-non-exercise-type'
+  | 'skipped-malformed-frontmatter'
+
+type SkippedExerciseNoteMigrationStatus = Extract<
+  ExerciseNoteMigrationStatus,
+  'skipped-non-exercise-type' | 'skipped-malformed-frontmatter'
+>
 
 export interface ExerciseNoteMigrationWarning {
   kind: 'custom-recent-sessions'
@@ -29,7 +39,7 @@ interface FrontmatterRepairResult {
   markdown: string
   kind: ExerciseKind | null
   unknownKind: boolean
-  skipped: boolean
+  skippedStatus: SkippedExerciseNoteMigrationStatus | null
 }
 
 interface MarkdownLines {
@@ -37,10 +47,21 @@ interface MarkdownLines {
   trailingNewline: boolean
 }
 
+interface NormalizedMarkdownSource {
+  markdown: string
+  lineEnding: '\n' | '\r\n'
+  hasBom: boolean
+}
+
 interface FencedBlock {
   start: number
   end: number
 }
+
+type FrontmatterBoundsResult =
+  | { status: 'found'; start: number; end: number }
+  | { status: 'missing' }
+  | { status: 'malformed' }
 
 interface RecentSessionsRepairResult {
   markdown: string
@@ -51,12 +72,13 @@ export function migrateExerciseNote(
   source: string,
   options: ExerciseNoteMigrationOptions,
 ): ExerciseNoteMigrationResult {
-  const frontmatter = repairFrontmatter(source, options)
-  if (frontmatter.skipped) {
+  const normalizedSource = normalizeMarkdownSource(source)
+  const frontmatter = repairFrontmatter(normalizedSource.markdown, options)
+  if (frontmatter.skippedStatus) {
     return {
       markdown: source,
       changed: false,
-      status: 'skipped-non-exercise-type',
+      status: frontmatter.skippedStatus,
       unknownKind: false,
       warnings: [],
     }
@@ -66,12 +88,13 @@ export function migrateExerciseNote(
     ? repairRecentSessions(frontmatter.markdown, options, frontmatter.kind)
     : { markdown: frontmatter.markdown, warnings: [] }
   const withChart = ensureChartBlock(recent.markdown)
-  const markdown = ensureNotesSection(withChart)
+  const normalizedMarkdown = ensureNotesSection(withChart)
+  const markdown = restoreMarkdownSource(normalizedMarkdown, normalizedSource)
 
   return {
     markdown,
     changed: markdown !== source,
-    status: markdown === source ? 'already' : 'updated',
+    status: frontmatter.unknownKind ? 'unknown' : markdown === source ? 'already' : 'updated',
     unknownKind: frontmatter.unknownKind,
     warnings: recent.warnings,
   }
@@ -83,12 +106,20 @@ function repairFrontmatter(
 ): FrontmatterRepairResult {
   const registryKind = kindForName(options.registry, options.name)
   const bounds = findFrontmatterBounds(source)
-  if (!bounds) {
+  if (bounds.status === 'malformed') {
+    return {
+      markdown: source,
+      kind: null,
+      unknownKind: false,
+      skippedStatus: 'skipped-malformed-frontmatter',
+    }
+  }
+  if (bounds.status === 'missing') {
     return {
       markdown: `${frontmatterBlock(registryKind)}${source}`,
       kind: registryKind,
       unknownKind: registryKind === null,
-      skipped: false,
+      skippedStatus: null,
     }
   }
 
@@ -100,7 +131,7 @@ function repairFrontmatter(
       markdown: source,
       kind: null,
       unknownKind: false,
-      skipped: true,
+      skippedStatus: 'skipped-non-exercise-type',
     }
   }
 
@@ -140,7 +171,7 @@ function repairFrontmatter(
     markdown,
     kind: effectiveKind,
     unknownKind,
-    skipped: false,
+    skippedStatus: null,
   }
 }
 
@@ -410,17 +441,23 @@ function isClosingFence(line: string, openFence: string): boolean {
   return trimmedRight.length >= openFence.length
 }
 
-function findFrontmatterBounds(source: string): { start: number; end: number } | null {
-  const lines = source.split('\n')
+function findFrontmatterBounds(source: string): FrontmatterBoundsResult {
+  /** Frontmatter probing strips BOM and CR while writes preserve the original file shape. */
+  const lines = source.split('\n').map((line, index) => frontmatterProbeLine(line, index))
   if (lines[0] !== '---') {
-    return null
+    return { status: 'missing' }
   }
   for (let index = 1; index < lines.length; index++) {
     if (lines[index] === '---') {
-      return { start: 0, end: index }
+      return { status: 'found', start: 0, end: index }
     }
   }
-  return null
+  return { status: 'malformed' }
+}
+
+function frontmatterProbeLine(line: string, index: number): string {
+  const withoutBom = index === 0 ? line.replace(/^\uFEFF/, '') : line
+  return withoutBom.replace(/\r$/, '')
 }
 
 function findFrontmatterKeyLine(lines: ReadonlyArray<string>, key: string): number {
@@ -470,6 +507,21 @@ function splitMarkdown(source: string): MarkdownLines {
 function joinMarkdown(document: MarkdownLines): string {
   const joined = document.lines.join('\n')
   return document.trailingNewline ? `${joined}\n` : joined
+}
+
+function normalizeMarkdownSource(source: string): NormalizedMarkdownSource {
+  const hasBom = source.startsWith('\uFEFF')
+  const withoutBom = hasBom ? source.slice(1) : source
+  return {
+    markdown: withoutBom.replace(/\r\n/g, '\n'),
+    lineEnding: withoutBom.includes('\r\n') ? '\r\n' : '\n',
+    hasBom,
+  }
+}
+
+function restoreMarkdownSource(markdown: string, source: NormalizedMarkdownSource): string {
+  const withLineEnding = source.lineEnding === '\r\n' ? markdown.replace(/\n/g, '\r\n') : markdown
+  return source.hasBom ? `\uFEFF${withLineEnding}` : withLineEnding
 }
 
 function insertLines<T>(lines: ReadonlyArray<T>, index: number, insertion: ReadonlyArray<T>): T[] {
@@ -569,6 +621,7 @@ function findDataviewBlockInRange(
     if (openFence !== null) {
       if (isClosingFence(line, openFence)) {
         if (openInfo.toLowerCase() === 'dataview') {
+          /** Multiple Dataview blocks are conservative, only the first can be canonical. */
           return { start: openStart, end: index }
         }
         openFence = null
