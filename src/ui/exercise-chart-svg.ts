@@ -50,7 +50,8 @@ export function renderExerciseChartSvg(
   const range = niceRange(values)
   drawGrid(svg, range)
   drawAxes(svg)
-  drawYLabels(svg, range, series.unit)
+  drawMetricLabel(svg, series)
+  drawYLabels(svg, range, series)
   drawXLabels(svg, series)
   drawSeries(svg, series, range)
 }
@@ -111,7 +112,7 @@ function drawAxes(svg: SVGSVGElement): void {
 function drawYLabels(
   svg: SVGSVGElement,
   range: { min: number; max: number },
-  unit: 'kg' | 's',
+  series: ChartSeries,
 ): void {
   for (let tick = 0; tick <= Y_TICKS; tick++) {
     const ratio = tick / Y_TICKS
@@ -125,8 +126,24 @@ function drawYLabels(
         'text-anchor': 'end',
       },
     })
-    label.textContent = formatYValue(value, unit)
+    label.textContent = formatChartValue(value, series)
   }
+}
+
+function drawMetricLabel(svg: SVGSVGElement, series: ChartSeries): void {
+  const label = chartYAxisTitle(series)
+  if (!label) {
+    return
+  }
+  const title = svg.createSvg('text', {
+    cls: 'fitkit-chart-axis-label',
+    attr: {
+      x: MARGIN_LEFT,
+      y: MARGIN_TOP - 4,
+      'text-anchor': 'start',
+    },
+  })
+  title.textContent = label
 }
 
 function drawXLabels(svg: SVGSVGElement, series: ChartSeries): void {
@@ -182,9 +199,8 @@ function drawSeries(
         r: 3.5,
       },
     })
-    const tooltip = `${point.date}: ${formatYValue(point.value, series.unit)}`
     const titleEl = dot.createSvg('title')
-    titleEl.textContent = tooltip
+    titleEl.textContent = formatChartTooltip(point.date, point.value, series)
   }
 }
 
@@ -203,8 +219,22 @@ function computeY(value: number, range: { min: number; max: number }): number {
   return MARGIN_TOP + (1 - ratio) * PLOT_HEIGHT
 }
 
-function formatYValue(value: number, unit: 'kg' | 's'): string {
-  if (unit === 'kg') {
+export function formatChartTooltip(date: string, value: number, series: ChartSeries): string {
+  if (series.metric === 'e1rm') {
+    return `${date}: e1rm ${formatChartValue(value, series)}`
+  }
+  return `${date}: ${formatChartValue(value, series)}`
+}
+
+export function chartYAxisTitle(series: ChartSeries): string | null {
+  return series.metric === 'e1rm' ? 'e1rm' : null
+}
+
+export function formatChartValue(value: number, series: ChartSeries): string {
+  if (series.metric === 'e1rm') {
+    return value.toFixed(1)
+  }
+  if (series.unit === 'kg') {
     return `${formatNumber(value)}kg`
   }
   if (value < 60) {

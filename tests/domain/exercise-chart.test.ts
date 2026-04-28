@@ -7,6 +7,11 @@ import {
 } from '../../src/domain/exercise-chart'
 import { createRegistry } from '../../src/domain/exercise-registry'
 import type { ExerciseIndexRow, FitKitIndex, IndexEntry } from '../../src/domain/types'
+import {
+  chartYAxisTitle,
+  formatChartTooltip,
+  formatChartValue,
+} from '../../src/ui/exercise-chart-svg'
 
 function fitKitIndex(entries: IndexEntry[]): FitKitIndex {
   return {
@@ -48,6 +53,7 @@ describe('buildExerciseChartSeries', () => {
       'Bench Press',
       'strength',
       30,
+      'weight',
     )
     expect(series.points).toEqual([])
     expect(series.totalDates).toBe(0)
@@ -69,6 +75,7 @@ describe('buildExerciseChartSeries', () => {
       'Bench Press',
       'strength',
       30,
+      'weight',
     )
     expect(series.points).toEqual([
       { date: '2026-04-01', value: 80, workoutPath: 'w/2026-04-01.md' },
@@ -106,6 +113,7 @@ describe('buildExerciseChartSeries', () => {
       'Bench Press',
       'strength',
       30,
+      'weight',
     )
     expect(series.points).toEqual([])
   })
@@ -121,6 +129,7 @@ describe('buildExerciseChartSeries', () => {
       'Bench Press',
       'strength',
       30,
+      'weight',
     )
     expect(series.points).toHaveLength(1)
   })
@@ -143,6 +152,7 @@ describe('buildExerciseChartSeries', () => {
       'Bench Press',
       'strength',
       30,
+      'weight',
     )
     expect(series.points.map((point) => point.value)).toEqual([70, 75])
   })
@@ -158,6 +168,7 @@ describe('buildExerciseChartSeries', () => {
       'Mystery Lift',
       'strength',
       30,
+      'weight',
     )
     expect(series.points).toHaveLength(1)
   })
@@ -176,11 +187,107 @@ describe('buildExerciseChartSeries', () => {
       'Bench Press',
       'strength',
       30,
+      'weight',
     )
     expect(series.points).toEqual([
       { date: '2026-04-01', value: 90, workoutPath: 'w/2026-04-01-B.md' },
     ])
     expect(series.totalDates).toBe(1)
+  })
+
+  it('plots e1rm by picking the highest estimated max per workout date', () => {
+    const series = buildExerciseChartSeries(
+      fitKitIndex([
+        entry('w/2026-04-01-A.md', '2026-04-01', [
+          {
+            exerciseName: 'Bench Press',
+            kind: 'strength',
+            bestSet: { weight: 100, reps: 3, e1rm: 0 },
+            maxWeightSet: { weight: 100, reps: 3 },
+          },
+        ]),
+        entry('w/2026-04-01-B.md', '2026-04-01', [
+          {
+            exerciseName: 'Bench Press',
+            kind: 'strength',
+            bestSet: { weight: 90, reps: 8, e1rm: 0 },
+            maxWeightSet: { weight: 90, reps: 8 },
+          },
+        ]),
+        entry('w/2026-04-08.md', '2026-04-08', [
+          {
+            exerciseName: 'Bench Press',
+            kind: 'strength',
+            bestSet: { weight: 105, reps: 5, e1rm: 0 },
+            maxWeightSet: { weight: 105, reps: 5 },
+          },
+        ]),
+      ]),
+      registry,
+      'Bench Press',
+      'strength',
+      30,
+      'e1rm',
+    )
+
+    expect(series.metric).toBe('e1rm')
+    expect(
+      series.points.map((point) => ({ date: point.date, workoutPath: point.workoutPath })),
+    ).toEqual([
+      { date: '2026-04-01', workoutPath: 'w/2026-04-01-B.md' },
+      { date: '2026-04-08', workoutPath: 'w/2026-04-08.md' },
+    ])
+    expect(series.points[0]?.value).toBeCloseTo(114)
+    expect(series.points[1]?.value).toBeCloseTo(122.5)
+  })
+
+  it('defaults strength series to e1rm when no metric is supplied', () => {
+    const series = buildExerciseChartSeries(
+      fitKitIndex([
+        entry('w/2026-04-01.md', '2026-04-01', [
+          {
+            exerciseName: 'Bench Press',
+            kind: 'strength',
+            bestSet: { weight: 100, reps: 10, e1rm: 0 },
+            maxWeightSet: { weight: 120, reps: 1 },
+          },
+        ]),
+      ]),
+      registry,
+      'Bench Press',
+      'strength',
+      30,
+    )
+
+    expect(series.metric).toBe('e1rm')
+    expect(series.points[0]?.value).toBeCloseTo(133.3333333333)
+  })
+
+  it('formats e1rm chart axis values and tooltips without kg', () => {
+    const series = buildExerciseChartSeries(
+      fitKitIndex([
+        entry('w/2026-04-01.md', '2026-04-01', [
+          {
+            exerciseName: 'Bench Press',
+            kind: 'strength',
+            bestSet: { weight: 90, reps: 8, e1rm: 0 },
+          },
+        ]),
+      ]),
+      registry,
+      'Bench Press',
+      'strength',
+      30,
+      'e1rm',
+    )
+    const point = series.points[0]
+    if (!point) {
+      throw new Error('Expected chart point')
+    }
+
+    expect(chartYAxisTitle(series)).toBe('e1rm')
+    expect(formatChartValue(point.value, series)).toBe('114.0')
+    expect(formatChartTooltip(point.date, point.value, series)).toBe('2026-04-01: e1rm 114.0')
   })
 
   it('breaks same-date same-value ties on lexicographic workoutPath', () => {
@@ -197,6 +304,7 @@ describe('buildExerciseChartSeries', () => {
       'Bench Press',
       'strength',
       30,
+      'weight',
     )
     expect(series.points[0]?.workoutPath).toBe('w/2026-04-01-A.md')
   })
@@ -218,6 +326,7 @@ describe('buildExerciseChartSeries', () => {
       'Bench Press',
       'strength',
       30,
+      'weight',
     )
     expect(series.totalDates).toBe(2)
   })
@@ -242,6 +351,7 @@ describe('buildExerciseChartSeries', () => {
       'Bench Press',
       'strength',
       3,
+      'weight',
     )
     expect(series.points.map((point) => point.date)).toEqual([
       '2026-04-03',
@@ -266,6 +376,7 @@ describe('buildExerciseChartSeries', () => {
       'Bench Press',
       'strength',
       1,
+      'weight',
     )
     expect(series.points).toEqual([
       { date: '2026-04-02', value: 75, workoutPath: 'w/2026-04-02.md' },
@@ -287,6 +398,7 @@ describe('buildExerciseChartSeries', () => {
       'Bench Press',
       'strength',
       30,
+      'weight',
     )
     expect(series.points).toEqual([
       { date: '2026-04-03', value: 75, workoutPath: 'w/2026-04-03.md' },
@@ -315,6 +427,7 @@ describe('buildExerciseChartSeries', () => {
       'Bench Press',
       'strength',
       30,
+      'weight',
     )
     expect(series.points).toEqual([])
   })
@@ -367,6 +480,7 @@ describe('buildExerciseChartSeries', () => {
       'Bench Press',
       'strength',
       30,
+      'weight',
     )
     expect(series.points.map((point) => point.date)).toEqual([
       '2026-04-01',

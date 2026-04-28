@@ -49,6 +49,7 @@ TABLE
     const source = `---
 type: exercise
 kind: strength
+metric: e1rm
 ---
 
 ## Progress chart
@@ -100,6 +101,7 @@ kind: strength
     const source = `---
 type: exercise
 kind: strength
+metric: e1rm
 ---
 
 \`\`\`\`fitkit-chart
@@ -139,6 +141,70 @@ kind: strength
     const once = migrateExerciseNote(source)
     const twice = migrateExerciseNote(once)
     expect(twice).toBe(once)
+  })
+
+  it('adds default e1rm metric to strength frontmatter when missing', () => {
+    const source = `---
+type: exercise
+kind: strength
+---
+
+## Progress chart
+
+\`\`\`fitkit-chart
+\`\`\`
+`
+    const next = migrateExerciseNote(source)
+
+    expect(next).toContain(`type: exercise
+kind: strength
+metric: e1rm
+---`)
+  })
+
+  it('leaves an existing metric key unchanged', () => {
+    const source = `---
+type: exercise
+kind: strength
+metric: weight
+---
+
+## Progress chart
+
+\`\`\`fitkit-chart
+\`\`\`
+`
+
+    expect(migrateExerciseNote(source)).toBe(source)
+  })
+
+  it('does not add metric frontmatter for duration exercise notes', () => {
+    const source = `---
+type: exercise
+kind: duration
+---
+
+## Progress chart
+
+\`\`\`fitkit-chart
+\`\`\`
+`
+
+    expect(migrateExerciseNote(source)).toBe(source)
+  })
+
+  it('does not add metric frontmatter when kind is missing', () => {
+    const source = `---
+type: exercise
+---
+
+## Progress chart
+
+\`\`\`fitkit-chart
+\`\`\`
+`
+
+    expect(migrateExerciseNote(source)).toBe(source)
   })
 
   it('preserves the original trailing newline (presence)', () => {

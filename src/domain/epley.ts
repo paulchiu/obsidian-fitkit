@@ -1,4 +1,4 @@
-import type { BestSet } from './types'
+import type { BestSet, WeightSet } from './types'
 
 /** Epley formula: weight * (1 + reps / 30). */
 export function epleyE1rm(weight: number, reps: number): number {
@@ -46,11 +46,34 @@ export function pickBestSet(
   }
 }
 
+export function pickHeaviestSet(
+  sets: ReadonlyArray<{ weight?: number; reps?: number }>,
+): WeightSet | null {
+  const candidates = sets.filter(isWeightedSetCandidate)
+  const first = candidates[0]
+  if (!first) {
+    return null
+  }
+
+  return candidates.slice(1).reduce(pickHeavierSet, first)
+}
+
 function isBestSetCandidate(set: { weight?: number; reps?: number }): set is {
   weight: number
   reps: number
 } {
   return set.weight !== undefined && set.reps !== undefined && set.reps !== 0
+}
+
+function isWeightedSetCandidate(set: { weight?: number; reps?: number }): set is WeightSet {
+  return (
+    set.weight !== undefined &&
+    set.reps !== undefined &&
+    Number.isFinite(set.weight) &&
+    Number.isFinite(set.reps) &&
+    set.weight > 0 &&
+    set.reps > 0
+  )
 }
 
 function pickMaxE1rm(sets: ReadonlyArray<{ weight: number; reps: number }>): BestSet | null {
@@ -64,6 +87,16 @@ function pickMaxE1rm(sets: ReadonlyArray<{ weight: number; reps: number }>): Bes
     reps: best.reps,
     e1rm: epleyE1rm(best.weight, best.reps),
   }
+}
+
+function pickHeavierSet(left: WeightSet, right: WeightSet): WeightSet {
+  if (right.weight > left.weight) {
+    return right
+  }
+  if (right.weight === left.weight && right.reps > left.reps) {
+    return right
+  }
+  return left
 }
 
 function pickByScore<T>(items: ReadonlyArray<T>, score: (item: T) => number): T {

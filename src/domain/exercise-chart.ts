@@ -1,5 +1,9 @@
+import { epleyE1rm } from './epley'
+import { DEFAULT_EXERCISE_METRIC, type ExerciseMetric } from './exercise-metric'
 import { normalize, resolve, type ExerciseKind, type ExerciseRegistry } from './exercise-registry'
 import type { FitKitIndex } from './types'
+
+export type ChartSeriesMetric = ExerciseMetric | 'duration'
 
 export interface ChartPoint {
   date: string
@@ -10,6 +14,7 @@ export interface ChartPoint {
 export interface ChartSeries {
   exerciseName: string
   kind: ExerciseKind
+  metric: ChartSeriesMetric
   unit: 'kg' | 's'
   points: ChartPoint[]
   windowRequested: number
@@ -22,6 +27,7 @@ export function buildExerciseChartSeries(
   exerciseName: string,
   kind: ExerciseKind,
   window: number,
+  metric: ExerciseMetric = DEFAULT_EXERCISE_METRIC,
 ): ChartSeries {
   const matchKeys = buildMatchKeys(registry, exerciseName)
   const buckets = new Map<string, ChartPoint>()
@@ -34,7 +40,7 @@ export function buildExerciseChartSeries(
       if (!matchKeys.has(normalize(row.exerciseName))) {
         continue
       }
-      const value = pickMetric(row, kind)
+      const value = pickMetric(row, kind, metric)
       if (value === null) {
         continue
       }
@@ -58,6 +64,7 @@ export function buildExerciseChartSeries(
   return {
     exerciseName,
     kind,
+    metric: kind === 'duration' ? 'duration' : metric,
     unit: kind === 'duration' ? 's' : 'kg',
     points: sliced,
     windowRequested: safeWindow,
@@ -90,6 +97,7 @@ function buildMatchKeys(registry: ExerciseRegistry, exerciseName: string): Set<s
 function pickMetric(
   row: FitKitIndex['entries'][number]['exercises'][number],
   kind: ExerciseKind,
+  metric: ExerciseMetric,
 ): number | null {
   if (kind === 'duration') {
     const value = row.totalDurationSeconds
@@ -98,11 +106,31 @@ function pickMetric(
     }
     return value
   }
-  const weight = row.maxWeightSet?.weight
-  if (weight === undefined || !Number.isFinite(weight) || weight <= 0) {
+  if (metric === 'weight') {
+    const weight = row.maxWeightSet?.weight
+    if (weight === undefined || !Number.isFinite(weight) || weight <= 0) {
+      return null
+    }
+    return weight
+  }
+
+  const bestSet = row.bestSet
+  if (!bestSet) {
     return null
   }
-  return weight
+  if (
+    !Number.isFinite(bestSet.weight) ||
+    !Number.isFinite(bestSet.reps) ||
+    bestSet.weight <= 0 ||
+    bestSet.reps <= 0
+  ) {
+    return null
+  }
+  const value = epleyE1rm(bestSet.weight, bestSet.reps)
+  if (!Number.isFinite(value) || value <= 0) {
+    return null
+  }
+  return value
 }
 
 function isBetterCandidate(candidate: ChartPoint, existing: ChartPoint): boolean {

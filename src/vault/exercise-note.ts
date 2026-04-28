@@ -18,6 +18,9 @@ export function composeExerciseNote(
   lines.push('---')
   lines.push('type: exercise')
   lines.push(`kind: ${kind}`)
+  if (kind === 'strength') {
+    lines.push('metric: e1rm')
+  }
   lines.push('---')
   lines.push('')
   lines.push('## Recent sessions')

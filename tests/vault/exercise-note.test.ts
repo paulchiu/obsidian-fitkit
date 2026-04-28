@@ -13,6 +13,7 @@ describe('exercise-note composer', () => {
         '---',
         'type: exercise',
         'kind: strength',
+        'metric: e1rm',
         '---',
         '',
         '## Recent sessions',

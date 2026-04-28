@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { epleyE1rm, pickBestSet } from '../../src/domain/epley'
+import { epleyE1rm, pickBestSet, pickHeaviestSet } from '../../src/domain/epley'
 
 describe('index helpers', () => {
   it('calculates Epley e1RM', () => {
@@ -72,5 +72,25 @@ describe('index helpers', () => {
       reps: 3,
       e1rm: epleyE1rm(90, 3),
     })
+  })
+
+  it('picks the heaviest set and breaks ties by reps', () => {
+    expect(
+      pickHeaviestSet([
+        { weight: 100, reps: 3 },
+        { weight: 95, reps: 8 },
+        { weight: 100, reps: 5 },
+      ]),
+    ).toEqual({ weight: 100, reps: 5 })
+  })
+
+  it('ignores incomplete heaviest-set candidates', () => {
+    expect(
+      pickHeaviestSet([
+        { weight: 100, reps: 0 },
+        { weight: Number.POSITIVE_INFINITY, reps: 5 },
+        { weight: 90, reps: 8 },
+      ]),
+    ).toEqual({ weight: 90, reps: 8 })
   })
 })
