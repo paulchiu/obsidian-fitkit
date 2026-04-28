@@ -156,3 +156,157 @@ export function bootstrapFromStems(
   entries.sort((left, right) => left.name.localeCompare(right.name))
   return { entries }
 }
+
+export type RegistryEntryDraft = {
+  name: string
+  kind: ExerciseKind
+  aliases: string[]
+}
+
+export type ValidationError = {
+  field: 'name' | 'alias'
+  index?: number
+  message: string
+}
+
+/**
+ * Trim and dedupe a raw form draft. Drops empty aliases, dedupes aliases
+ * by normalized form (first occurrence wins, original casing kept). Self
+ * aliases (those that normalize to the draft's own canonical) are dropped.
+ * Idempotent.
+ */
+export function sanitizeEntryDraft(draft: RegistryEntryDraft): RegistryEntryDraft {
+  const name = draft.name.trim()
+  const canonicalKey = normalize(name)
+  const seen = new Set<string>()
+  const aliases: string[] = []
+  for (const raw of draft.aliases) {
+    const trimmed = raw.trim()
+    if (trimmed.length === 0) {
+      continue
+    }
+    const key = normalize(trimmed)
+    if (key.length === 0) {
+      continue
+    }
+    if (key === canonicalKey) {
+      continue
+    }
+    if (seen.has(key)) {
+      continue
+    }
+    seen.add(key)
+    aliases.push(trimmed)
+  }
+  return { name, kind: draft.kind, aliases }
+}
+
+/**
+ * Validate a sanitized draft against an existing registry. `excludeOriginalName`
+ * lets edit mode ignore self collisions. Returns [] when valid.
+ */
+export function validateEntryDraft(
+  registry: ExerciseRegistry,
+  draft: RegistryEntryDraft,
+  options: { excludeOriginalName?: string } = {},
+): ValidationError[] {
+  const errors: ValidationError[] = []
+  const name = draft.name.trim()
+  if (name.length === 0) {
+    errors.push({ field: 'name', message: 'Name cannot be empty.' })
+    return errors
+  }
+  const nameKey = normalize(name)
+  if (nameKey.length === 0) {
+    errors.push({ field: 'name', message: 'Name must contain a letter or number.' })
+    return errors
+  }
+
+  const excludeKey =
+    options.excludeOriginalName !== undefined ? normalize(options.excludeOriginalName) : null
+  type Owner = { entry: ExerciseRegistryEntry; source: 'name' | 'alias' }
+  const ownerByKey = new Map<string, Owner>()
+  for (const entry of registry.entries) {
+    if (excludeKey !== null && normalize(entry.name) === excludeKey) {
+      continue
+    }
+    const canonicalKey = normalize(entry.name)
+    if (canonicalKey.length > 0 && !ownerByKey.has(canonicalKey)) {
+      ownerByKey.set(canonicalKey, { entry, source: 'name' })
+    }
+    for (const alias of entry.aliases) {
+      const aliasKey = normalize(alias)
+      if (aliasKey.length === 0 || ownerByKey.has(aliasKey)) {
+        continue
+      }
+      ownerByKey.set(aliasKey, { entry, source: 'alias' })
+    }
+  }
+
+  const nameOwner = ownerByKey.get(nameKey)
+  if (nameOwner) {
+    const subject = nameOwner.source === 'name' ? 'entry' : 'alias on entry'
+    errors.push({
+      field: 'name',
+      message: `Name '${name}' conflicts with ${subject} '${nameOwner.entry.name}'.`,
+    })
+  }
+
+  draft.aliases.forEach((alias, index) => {
+    const key = normalize(alias)
+    if (key.length === 0) {
+      return
+    }
+    if (key === nameKey) {
+      return
+    }
+    const owner = ownerByKey.get(key)
+    if (owner) {
+      const subject = owner.source === 'name' ? 'entry' : 'alias on entry'
+      errors.push({
+        field: 'alias',
+        index,
+        message: `Alias '${alias}' conflicts with ${subject} '${owner.entry.name}'.`,
+      })
+    }
+  })
+
+  return errors
+}
+
+/**
+ * Return an updated registry with the entry under `oldName` replaced by `next`.
+ * If the canonical name changes (under normalize), the old name is prepended to
+ * `next.aliases` (deduped on normalized form). Aliases that normalize to the
+ * new canonical are dropped. Caller passes a sanitized draft.
+ */
+export function renameEntry(
+  registry: ExerciseRegistry,
+  oldName: string,
+  next: RegistryEntryDraft,
+): ExerciseRegistry {
+  const oldKey = normalize(oldName)
+  const newKey = normalize(next.name)
+  const aliasesWithOld =
+    oldKey === newKey ? [...next.aliases] : [oldName, ...next.aliases]
+  const seen = new Set<string>()
+  const dedupedAliases: string[] = []
+  for (const alias of aliasesWithOld) {
+    const trimmed = alias.trim()
+    if (trimmed.length === 0) {
+      continue
+    }
+    const key = normalize(trimmed)
+    if (key.length === 0 || key === newKey || seen.has(key)) {
+      continue
+    }
+    seen.add(key)
+    dedupedAliases.push(trimmed)
+  }
+  const without = removeEntry(registry, oldName)
+  return upsertEntry(without, {
+    name: next.name,
+    kind: next.kind,
+    aliases: dedupedAliases,
+  })
+}

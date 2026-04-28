@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Edit and curate the exercise registry directly from settings: list, search, add, edit, and delete entries (canonical name, kind, aliases) without touching `data.json`. Renaming an entry keeps the old name as an alias so existing workout references still resolve. Deleting an entry can optionally trash the matching note file in your Exercises folder.
+
 ### Changed
 
 ### Fixed
