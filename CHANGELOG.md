@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Settings: editing the Fitness root no longer loses focus after every character; the derived-paths preview now updates in place.
+
 ### Removed
 
 ## [0.8.0] - 2026-04-27

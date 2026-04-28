@@ -51,7 +51,7 @@ export class FitKitSettingTab extends PluginSettingTab {
         text.setValue(settings.fitnessRoot).onChange(async (value) => {
           settings.fitnessRoot = normalizePath(value)
           await this.plugin.saveSettings()
-          this.display()
+          refreshDerivedPaths()
         }),
       )
 
@@ -69,18 +69,21 @@ export class FitKitSettingTab extends PluginSettingTab {
       text: 'Derived paths:',
       cls: 'setting-item-name',
     })
-    containerEl.createEl('div', {
-      text: `Workouts folder: ${workoutsFolder(settings)}`,
-      cls: 'setting-item-description',
-    })
-    containerEl.createEl('div', {
-      text: `Exercises folder: ${exercisesFolder(settings)}`,
-      cls: 'setting-item-description',
-    })
-    containerEl.createEl('div', {
-      text: `Dashboard: ${dashboardPath(settings)}`,
-      cls: 'setting-item-description',
-    })
+    const workoutsLine = containerEl.createEl('div', { cls: 'setting-item-description' })
+    workoutsLine.createSpan({ text: 'Workouts folder: ' })
+    const workoutsValue = workoutsLine.createSpan()
+    const exercisesLine = containerEl.createEl('div', { cls: 'setting-item-description' })
+    exercisesLine.createSpan({ text: 'Exercises folder: ' })
+    const exercisesValue = exercisesLine.createSpan()
+    const dashboardLine = containerEl.createEl('div', { cls: 'setting-item-description' })
+    dashboardLine.createSpan({ text: 'Dashboard: ' })
+    const dashboardValue = dashboardLine.createSpan()
+    const refreshDerivedPaths = (): void => {
+      workoutsValue.setText(workoutsFolder(settings))
+      exercisesValue.setText(exercisesFolder(settings))
+      dashboardValue.setText(dashboardPath(settings))
+    }
+    refreshDerivedPaths()
 
     new Setting(containerEl).setName('Behavior').setHeading()
 
