@@ -2,7 +2,7 @@ import type { App, TAbstractFile, TFile } from 'obsidian'
 
 import type { BestSet, ExerciseIndexRow, FitKitIndex } from '../domain/types'
 import type { FitKitSettings } from '../settings'
-import { dashboardPath, normalizeFolder, workoutsFolder } from '../settings-paths'
+import { dashboardPath, exercisesFolder, normalizeFolder, workoutsFolder } from '../settings-paths'
 
 interface ExerciseAggregate {
   exerciseName: string
@@ -17,11 +17,13 @@ interface ExerciseAggregate {
  * Pure: build full dashboard markdown from index.
  * @param index - The FitKit index.
  * @param workoutsFolderPath - Resolved folder path for Dataview queries.
+ * @param exercisesFolderPath - Resolved folder path for path-qualified exercise wikilinks.
  * @param hiddenKeys - Set of keys like 'exercise:Squat' to exclude.
  */
 export function composeDashboard(
   index: FitKitIndex,
   workoutsFolderPath: string,
+  exercisesFolderPath: string,
   hiddenKeys: ReadonlySet<string>,
 ): string {
   const exercises = aggregateExercises(index)
@@ -46,6 +48,8 @@ export function composeDashboard(
     lines.push('')
     lines.push(`## ${exercise.exerciseName}`)
     lines.push('')
+    lines.push(`[[${exercisesFolderPath}/${exercise.exerciseName}|${exercise.exerciseName}]]`)
+    lines.push('')
     lines.push('```dataview')
     lines.push(...dataviewQuery(exercise, workoutsFolderPath))
     lines.push('```')
@@ -62,7 +66,8 @@ export async function regenerateDashboard(
   const path = normalizeFolder(dashboardPath(settings))
   const hiddenKeys = new Set(settings.hiddenDashboardSectionsByPath[path] ?? [])
   const folder = workoutsFolder(settings)
-  const markdown = composeDashboard(index, folder, hiddenKeys)
+  const exercisesPath = exercisesFolder(settings)
+  const markdown = composeDashboard(index, folder, exercisesPath, hiddenKeys)
   const existing = app.vault.getAbstractFileByPath(path)
 
   if (isMarkdownFile(existing)) {
@@ -126,16 +131,18 @@ function getAggregate(
 }
 
 function formatPb(exercise: ExerciseAggregate): string {
+  const link = `[[#${exercise.exerciseName}|${exercise.exerciseName}]]`
+
   if (exercise.kind === 'duration') {
     const sessionLabel = exercise.sessionCount === 1 ? 'session' : 'sessions'
-    return `- **${exercise.exerciseName}:** total ${exercise.totalDurationSeconds}s across ${exercise.sessionCount} ${sessionLabel}`
+    return `- **${link}:** total ${exercise.totalDurationSeconds}s across ${exercise.sessionCount} ${sessionLabel}`
   }
 
   if (!exercise.bestSet) {
-    return `- **${exercise.exerciseName}:** no completed sets`
+    return `- **${link}:** no completed sets`
   }
 
-  return `- **${exercise.exerciseName}:** ${exercise.bestSet.weight} kg x ${exercise.bestSet.reps} (e1rm ${exercise.bestSet.e1rm.toFixed(1)})`
+  return `- **${link}:** ${exercise.bestSet.weight} kg x ${exercise.bestSet.reps} (e1rm ${exercise.bestSet.e1rm.toFixed(1)})`
 }
 
 function dataviewQuery(exercise: ExerciseAggregate, workoutsFolderPath: string): string[] {

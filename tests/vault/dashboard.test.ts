@@ -44,32 +44,49 @@ const mixedIndex: FitKitIndex = {
 
 describe('dashboard composer', () => {
   it('renders an empty dashboard', () => {
-    expect(composeDashboard(emptyIndex, 'Fitness/Workouts', new Set())).toMatch(
-      /^# FitKit Dashboard/,
-    )
+    expect(
+      composeDashboard(emptyIndex, 'Fitness/Workouts', 'Fitness/Exercises', new Set()),
+    ).toMatch(/^# FitKit Dashboard/)
   })
 
   it('renders PBs and an exercise section for strength entries', () => {
-    const markdown = composeDashboard(mixedIndex, 'Fitness/Workouts', new Set())
+    const markdown = composeDashboard(
+      mixedIndex,
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+    )
 
     expect(markdown).toContain('## PBs')
     expect(markdown).toContain('## Squat')
   })
 
   it('hides exercise sections by hidden key', () => {
-    const markdown = composeDashboard(mixedIndex, 'Fitness/Workouts', new Set(['exercise:Squat']))
+    const markdown = composeDashboard(
+      mixedIndex,
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(['exercise:Squat']),
+    )
 
     expect(markdown).not.toContain('## Squat')
+    expect(markdown).not.toContain('[[#Squat|Squat]]')
+    expect(markdown).not.toContain('[[Fitness/Exercises/Squat|Squat]]')
   })
 
   it('is idempotent for the same index input', () => {
-    expect(composeDashboard(mixedIndex, 'Fitness/Workouts', new Set())).toBe(
-      composeDashboard(mixedIndex, 'Fitness/Workouts', new Set()),
+    expect(composeDashboard(mixedIndex, 'Fitness/Workouts', 'Fitness/Exercises', new Set())).toBe(
+      composeDashboard(mixedIndex, 'Fitness/Workouts', 'Fitness/Exercises', new Set()),
     )
   })
 
   it('renders strength and duration exercise phrasing', () => {
-    const markdown = composeDashboard(mixedIndex, 'Fitness/Workouts', new Set())
+    const markdown = composeDashboard(
+      mixedIndex,
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+    )
 
     expect(markdown).toContain('50 kg x 20')
     expect(markdown).toContain('e1rm 73.3')
@@ -77,8 +94,37 @@ describe('dashboard composer', () => {
     expect(markdown).toContain('duration + "s" as Duration')
   })
 
+  it('links each PB row to its dashboard section', () => {
+    const markdown = composeDashboard(
+      mixedIndex,
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+    )
+
+    expect(markdown).toContain('- **[[#Squat|Squat]]:** 50 kg x 20')
+    expect(markdown).toContain('- **[[#Plank|Plank]]:** total 120s across 1 session')
+  })
+
+  it('places a path-qualified wikilink to the exercise note under each section heading', () => {
+    const markdown = composeDashboard(
+      mixedIndex,
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+    )
+
+    expect(markdown).toContain('## Squat\n\n[[Fitness/Exercises/Squat|Squat]]\n\n```dataview')
+    expect(markdown).toContain('## Plank\n\n[[Fitness/Exercises/Plank|Plank]]\n\n```dataview')
+  })
+
   it('renders strength Dataview tables using list fields', () => {
-    const markdown = composeDashboard(mixedIndex, 'Fitness/Workouts', new Set())
+    const markdown = composeDashboard(
+      mixedIndex,
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+    )
 
     expect(markdown).toContain(
       [
@@ -123,9 +169,10 @@ describe('dashboard composer', () => {
         ],
       },
       'Fitness/Workouts',
+      'Fitness/Exercises',
       new Set(),
     )
 
-    expect(markdown).toContain('- **Machine Pushdown:** no completed sets')
+    expect(markdown).toContain('- **[[#Machine Pushdown|Machine Pushdown]]:** no completed sets')
   })
 })

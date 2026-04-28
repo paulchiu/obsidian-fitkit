@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Dashboard exercise sections now include a wikilink to the matching exercise note.
+
 ### Changed
+
+- Dashboard PB list now links each entry to the matching exercise section in the dashboard.
 
 ### Fixed
 
