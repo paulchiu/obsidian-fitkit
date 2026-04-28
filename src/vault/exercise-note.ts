@@ -4,7 +4,10 @@ import type { ExerciseKind } from '../domain/exercise-registry'
  * Pure: build the seeded markdown body for a freshly-created exercise note.
  *
  * The Recent sessions Dataview block must stay byte-aligned with `dataviewQuery`
- * in `src/vault/dashboard.ts` so the two views over the same data agree.
+ * in `src/vault/dashboard.ts` so the two views over the same data agree. The
+ * Progress chart block is rendered by the plugin's `fitkit-chart` code-block
+ * processor; an empty body inherits all defaults (name from filename, kind
+ * from frontmatter, window from settings).
  */
 export function composeExerciseNote(
   exerciseName: string,
@@ -21,6 +24,11 @@ export function composeExerciseNote(
   lines.push('')
   lines.push('```dataview')
   lines.push(...recentSessionsQuery(exerciseName, kind, workoutsFolderPath))
+  lines.push('```')
+  lines.push('')
+  lines.push('## Progress chart')
+  lines.push('')
+  lines.push('```fitkit-chart')
   lines.push('```')
   lines.push('')
   lines.push('## Notes')

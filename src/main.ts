@@ -1,10 +1,12 @@
 import { MarkdownView, Notice, Plugin, TFile, type WorkspaceLeaf, normalizePath } from 'obsidian'
 
+import { migrateExerciseNote } from './domain/exercise-note-migrate'
 import type { FitKitIndex, IndexDiagnostic } from './domain/types'
 import { parseWorkoutNote } from './domain/workout-note-model'
 import { DEFAULT_SETTINGS, FitKitSettingTab, type FitKitSettings } from './settings'
-import { dashboardPath, workoutFilename, workoutsFolder } from './settings-paths'
+import { dashboardPath, exercisesFolder, workoutFilename, workoutsFolder } from './settings-paths'
 import { CreateMissingExercisesModal } from './ui/create-missing-exercises-modal'
+import { renderExerciseChartBlock } from './ui/exercise-chart-block'
 import { ImportModal } from './ui/import-modal'
 import { ParseDiagnosticsModal } from './ui/parse-diagnostics-modal'
 import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from './ui/workout-editor-view'
@@ -84,6 +86,16 @@ export default class FitKitPlugin extends Plugin {
         new ParseDiagnosticsModal(this.app, this.lastDiagnostics).open()
       },
     })
+
+    this.addCommand({
+      id: 'sync-exercise-notes',
+      name: 'Sync exercise notes',
+      callback: () => void this.syncExerciseNotes(),
+    })
+
+    this.registerMarkdownCodeBlockProcessor('fitkit-chart', (source, el, ctx) =>
+      renderExerciseChartBlock(this, source, el, ctx),
+    )
 
     this.registerView(VIEW_TYPE_FITKIT_WORKOUT_EDITOR, (leaf) => new WorkoutEditorView(leaf, this))
 
@@ -265,6 +277,39 @@ export default class FitKitPlugin extends Plugin {
       readOnly: false,
       defaultFilenameDate: defaultDate,
     }).open()
+  }
+
+  private async syncExerciseNotes(): Promise<void> {
+    const folder = exercisesFolder(this.settings)
+    const files = this.app.vault
+      .getMarkdownFiles()
+      .filter((file) => file.path.startsWith(`${folder}/`))
+      .filter((file) => {
+        const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter
+        const type: unknown = frontmatter?.type
+        return typeof type === 'string' && type.toLowerCase() === 'exercise'
+      })
+
+    let updated = 0
+    let already = 0
+    let failed = 0
+    for (const file of files) {
+      try {
+        const snapshot = await this.app.vault.read(file)
+        if (migrateExerciseNote(snapshot) === snapshot) {
+          already += 1
+          continue
+        }
+        await this.app.vault.process(file, (live) => migrateExerciseNote(live))
+        updated += 1
+      } catch (error) {
+        failed += 1
+        console.error(`FitKit: failed to sync exercise note ${file.path}`, error)
+      }
+    }
+
+    const summary = `Synced ${files.length} exercise note${files.length === 1 ? '' : 's'}; ${updated} updated, ${already} already current${failed > 0 ? `, ${failed} failed (see console)` : ''}.`
+    new Notice(summary)
   }
 
   async loadSettings(): Promise<void> {

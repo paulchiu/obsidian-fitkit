@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Edit and curate the exercise registry directly from settings: list, search, add, edit, and delete entries (canonical name, kind, aliases) without touching `data.json`. Renaming an entry keeps the old name as an alias so existing workout references still resolve. Deleting an entry can optionally trash the matching note file in your Exercises folder.
+- Exercise pages now include a progression chart: heaviest weight per workout date for strength exercises, total session duration for duration exercises. Shows the last 30 sessions by default; configurable via the new `Chart sessions` setting or per-block with `window: <N>` inside a `fitkit-chart` block. Charts read from the cached workout index; if a freshly logged workout doesn't appear, run `Rebuild index`.
+- New command `Sync exercise notes`: walks every `type: exercise` note in your Exercises folder and inserts the chart block where missing, so existing notes pick up the chart without manual editing. Idempotent.
 
 ### Changed
 

@@ -16,6 +16,7 @@ export interface FitKitSettings {
   autoCreateMissingExercises: boolean
   autoUpdateDashboard: boolean
   autosaveDebounceMs: number
+  chartSessionsWindow: number
   exerciseRegistry: ExerciseRegistryEntry[]
   hiddenDashboardSectionsByPath: Record<string, string[]>
   schemaVersion: 1
@@ -27,10 +28,14 @@ export const DEFAULT_SETTINGS: FitKitSettings = {
   autoCreateMissingExercises: false,
   autoUpdateDashboard: true,
   autosaveDebounceMs: 600,
+  chartSessionsWindow: 30,
   exerciseRegistry: [],
   hiddenDashboardSectionsByPath: {},
   schemaVersion: 1,
 }
+
+const CHART_WINDOW_MIN = 5
+const CHART_WINDOW_MAX = 365
 
 export class FitKitSettingTab extends PluginSettingTab {
   plugin: FitKitPlugin
@@ -130,11 +135,32 @@ export class FitKitSettingTab extends PluginSettingTab {
         })
       })
 
+    new Setting(containerEl).setName('Charts').setHeading()
+
+    new Setting(containerEl)
+      .setName('Chart sessions')
+      .setDesc(
+        "How many recent workout dates to plot on the exercise progression chart. Each chart block can override this with 'window: <N>'.",
+      )
+      .addText((text) => {
+        text.inputEl.type = 'number'
+        text.inputEl.min = String(CHART_WINDOW_MIN)
+        text.inputEl.max = String(CHART_WINDOW_MAX)
+        text.setValue(String(settings.chartSessionsWindow)).onChange(async (value) => {
+          const parsed = Number.parseInt(value, 10)
+          const fallback = Number.isFinite(parsed)
+            ? Math.min(Math.max(parsed, CHART_WINDOW_MIN), CHART_WINDOW_MAX)
+            : DEFAULT_SETTINGS.chartSessionsWindow
+          settings.chartSessionsWindow = fallback
+          text.setValue(String(fallback))
+          await this.plugin.saveSettings()
+        })
+      })
+
     new Setting(containerEl).setName('Registry').setHeading()
 
     containerEl.createEl('div', {
-      text:
-        'Curate canonical exercise names, kinds, and aliases. The registry is consulted whenever you add, rename, or import an exercise. Filenames in your Exercises folder also count at runtime, even if they are not listed here; run Bootstrap from vault to materialize them.',
+      text: 'Curate canonical exercise names, kinds, and aliases. The registry is consulted whenever you add, rename, or import an exercise. Filenames in your exercises folder also count at runtime, even if they are not listed here; use the bootstrap action below to materialise them.',
       cls: 'setting-item-description',
     })
 
@@ -158,12 +184,14 @@ export class FitKitSettingTab extends PluginSettingTab {
         cls: 'fitkit-btn',
         text: 'Bootstrap from vault',
       })
-      bootstrapBtn.addEventListener('click', async () => {
-        const merged = exerciseRegistryWithVaultNotes(this.plugin.app, settings)
-        settings.exerciseRegistry = merged
-        await this.plugin.saveSettings()
-        new Notice(`Registry now has ${merged.length} entries.`)
-        renderRegistrySection()
+      bootstrapBtn.addEventListener('click', () => {
+        void (async () => {
+          const merged = exerciseRegistryWithVaultNotes(this.plugin.app, settings)
+          settings.exerciseRegistry = merged
+          await this.plugin.saveSettings()
+          new Notice(`Registry now has ${merged.length} entries.`)
+          renderRegistrySection()
+        })()
       })
 
       const search = registrySection.createEl('input', {
@@ -188,7 +216,7 @@ export class FitKitSettingTab extends PluginSettingTab {
           left.name.localeCompare(right.name),
         )
         if (entries.length === 0) {
-          empty.setText('No entries yet. Add one or bootstrap from your Exercises folder.')
+          empty.setText('No entries yet. Add one or bootstrap from your exercises folder.')
           return
         }
 
@@ -236,7 +264,7 @@ export class FitKitSettingTab extends PluginSettingTab {
 
     const aliasCell = tr.createEl('td')
     if (entry.aliases.length === 0) {
-      aliasCell.setText('none')
+      aliasCell.setText('None')
       aliasCell.addClass('fitkit-registry-aliases-muted')
     } else {
       const joined = entry.aliases.join(', ')
