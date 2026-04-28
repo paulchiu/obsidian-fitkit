@@ -33,6 +33,7 @@ vi.mock('../../src/ui/exercise-chart-svg', () => ({
 import type { MarkdownPostProcessorContext } from 'obsidian'
 import { TFile } from 'obsidian'
 
+import type { ChartSeries } from '../../src/domain/exercise-chart'
 import type { FitKitIndex } from '../../src/domain/types'
 import type { FitKitSettings } from '../../src/settings'
 import { renderExerciseChartBlock } from '../../src/ui/exercise-chart-block'
@@ -130,6 +131,14 @@ function renderedNotes(): string[] {
   return options?.notes ?? []
 }
 
+function renderedSeries(): ChartSeries {
+  const call = chartSvgMock.renderExerciseChartSvg.mock.calls[0]
+  if (!call) {
+    throw new Error('Expected chart renderer to be called.')
+  }
+  return call[1] as ChartSeries
+}
+
 describe('exercise chart block rendering', () => {
   beforeEach(() => {
     chartSvgMock.renderExerciseChartSvg.mockReset()
@@ -188,5 +197,28 @@ describe('exercise chart block rendering', () => {
     )
 
     expect(renderedNotes()).toEqual([])
+  })
+
+  it('shows an invalid kind note when the registry resolves the exercise to duration', async () => {
+    const file = new TFile('Fitness/Exercises/Plank.md')
+    const plugin = createPlugin(
+      [file],
+      new Map([[file.path, { type: 'exercise', kind: 'cardio' }]]),
+      createSettings({
+        exerciseRegistry: [{ name: 'Plank', kind: 'duration', aliases: [] }],
+      }),
+    )
+
+    await renderExerciseChartBlock(
+      plugin,
+      '',
+      new TestElement('div') as unknown as HTMLElement,
+      createContext(file.path),
+    )
+
+    expect(renderedSeries().kind).toBe('duration')
+    expect(renderedNotes()).toEqual([
+      "Exercise note frontmatter has unrecognised 'kind: cardio'; using duration from the exercise registry. Use 'kind: strength' or 'kind: duration'.",
+    ])
   })
 })

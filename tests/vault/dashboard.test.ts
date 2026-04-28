@@ -216,11 +216,25 @@ describe('dashboard composer', () => {
     expect(markdown).toContain('- **[[#Push-up|Push-up]]:** 0 kg x 12')
   })
 
-  it('renders zero-weight eight-rep PBs in weight metric mode', () => {
+  it('ranks zero-weight PBs by reps in weight metric mode', () => {
     const markdown = composeDashboard(
       {
         ...emptyIndex,
         entries: [
+          {
+            path: 'Fitness/Workouts/2026-04-24.md',
+            mtime: 1,
+            date: '2026-04-24',
+            name: 'Workout',
+            exercises: [
+              {
+                exerciseName: 'Push-up',
+                kind: 'strength',
+                maxWeightSet: { weight: 0, reps: 8 },
+                totalSets: 1,
+              },
+            ],
+          },
           {
             path: 'Fitness/Workouts/2026-04-25.md',
             mtime: 1,
@@ -230,7 +244,7 @@ describe('dashboard composer', () => {
               {
                 exerciseName: 'Push-up',
                 kind: 'strength',
-                maxWeightSet: { weight: 0, reps: 8 },
+                maxWeightSet: { weight: 0, reps: 12 },
                 totalSets: 1,
               },
             ],
@@ -243,7 +257,8 @@ describe('dashboard composer', () => {
       new Map([['Push-up', 'weight'] as const]),
     )
 
-    expect(markdown).toContain('- **[[#Push-up|Push-up]]:** 0 kg x 8')
+    expect(markdown).toContain('- **[[#Push-up|Push-up]]:** 0 kg x 12')
+    expect(markdown).not.toContain('- **[[#Push-up|Push-up]]:** 0 kg x 8')
   })
 
   it('links each PB row to its dashboard section', () => {

@@ -83,11 +83,12 @@ async function renderInternal(
 
   let kind = parsed.kind
   const frontmatterKind = kindFromFrontmatter(exerciseFrontmatter)
+  const registryKind = kindForName(registry, exerciseName)
   if (!kind && frontmatterKind.kind) {
     kind = frontmatterKind.kind
   }
-  if (!kind) {
-    kind = kindForName(registry, exerciseName)
+  if (!kind && registryKind) {
+    kind = registryKind
   }
   if (!kind) {
     kind = 'strength'
@@ -97,21 +98,18 @@ async function renderInternal(
       `No 'kind:' supplied; defaulting to ${kind}. Add 'kind: strength' or 'kind: duration' to be explicit.`,
     )
   }
-  /**
-   * Registry-resolved duration means the chart did not fall back to the strength default.
-   * Only show the exercise-note frontmatter nudge when the resolved kind remains strength.
-   */
-  if (
-    parsed.kind === null &&
-    sourceIsExerciseNote &&
-    frontmatterKind.kind === null &&
-    kind === 'strength'
-  ) {
+  if (parsed.kind === null && sourceIsExerciseNote && frontmatterKind.kind === null) {
     if (frontmatterKind.reason === 'invalid') {
-      notes.push(
-        `Exercise note frontmatter has unrecognised 'kind: ${frontmatterKind.raw}'; defaulting to strength. Use 'kind: strength' or 'kind: duration'.`,
-      )
-    } else {
+      if (registryKind === 'duration') {
+        notes.push(
+          `Exercise note frontmatter has unrecognised 'kind: ${frontmatterKind.raw}'; using duration from the exercise registry. Use 'kind: strength' or 'kind: duration'.`,
+        )
+      } else {
+        notes.push(
+          `Exercise note frontmatter has unrecognised 'kind: ${frontmatterKind.raw}'; defaulting to strength. Use 'kind: strength' or 'kind: duration'.`,
+        )
+      }
+    } else if (kind === 'strength') {
       notes.push(
         "Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add 'kind: strength' or 'kind: duration' to be explicit.",
       )

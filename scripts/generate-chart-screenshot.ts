@@ -3,7 +3,7 @@
 /**
  * Usage: node scripts/generate-chart-screenshot.ts
  *
- * Regenerates dated Calf Raise chart screenshots from the seeded dev-vault workout notes.
+ * Regenerates dated chart screenshots for the configured exercise (default Calf Raise).
  * PNGs are written to <repo>/tmp/ by default.
  *
  * Environment variables:
@@ -31,10 +31,11 @@ const { parseWorkoutNote } = await jiti.import('../src/domain/workout-note-model
 const { renderExerciseChartSvg } = await jiti.import('../src/ui/exercise-chart-svg.ts')
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..')
+const DEFAULT_WORKOUTS_DIR = '/Users/paul/dev-misc/dev-vault/dev/Fitness/Workouts'
+const OUTPUT_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 const EXERCISE_NAME = process.env.EXERCISE_NAME ?? 'Calf Raise'
-const WORKOUTS_DIR =
-  process.env.WORKOUTS_DIR ?? '/Users/paul/dev-misc/dev-vault/dev/Fitness/Workouts'
-const OUTPUT_DATE = process.env.OUTPUT_DATE ?? new Date().toISOString().slice(0, 10)
+const WORKOUTS_DIR = resolveWorkoutsDir()
+const OUTPUT_DATE = resolveOutputDate()
 const OUTPUT_DIR = path.join(REPO_ROOT, 'tmp')
 const CHART_WIDTH = 800
 const CHART_HEIGHT = 320
@@ -70,6 +71,7 @@ for (const metric of ['e1rm', 'weight']) {
     `${OUTPUT_DATE} ${EXERCISE_NAME} Chart ${metricName}.png`,
   )
   let png
+  // If the second metric fails, the first metric's PNG remains on disk.
   try {
     png = new Resvg(svg, {
       background: 'white',
@@ -83,7 +85,7 @@ for (const metric of ['e1rm', 'weight']) {
   } catch (error) {
     console.error(
       [
-        `Could not render ${EXERCISE_NAME} chart to ${outputPath}.`,
+        `Could not render ${EXERCISE_NAME} chart (target: ${outputPath}).`,
         `Underlying error: ${formatErrorMessage(error)}`,
       ].join('\n'),
     )
@@ -94,6 +96,34 @@ for (const metric of ['e1rm', 'weight']) {
 }
 
 console.log(outputs.join('\n'))
+
+function resolveWorkoutsDir() {
+  const value = process.env.WORKOUTS_DIR
+  if (value === undefined) {
+    return DEFAULT_WORKOUTS_DIR
+  }
+
+  const trimmed = value.trim()
+  if (trimmed.length === 0) {
+    console.error(
+      'WORKOUTS_DIR env var is empty; set it to a real workouts folder or unset to use the default.',
+    )
+    process.exit(1)
+  }
+  return trimmed
+}
+
+function resolveOutputDate() {
+  const value = process.env.OUTPUT_DATE ?? new Date().toLocaleDateString('sv-SE')
+  if (OUTPUT_DATE_PATTERN.test(value)) {
+    return value
+  }
+
+  console.error(
+    `OUTPUT_DATE env var must use YYYY-MM-DD: ${value}\nSet OUTPUT_DATE to a date like 2026-04-29 or unset to use today's local date.`,
+  )
+  process.exit(1)
+}
 
 async function assertWorkoutsDir() {
   try {

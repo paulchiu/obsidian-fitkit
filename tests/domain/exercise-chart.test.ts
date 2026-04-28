@@ -428,6 +428,27 @@ describe('buildExerciseChartSeries', () => {
     ])
   })
 
+  it('skips zero-weight sets in e1rm metric mode', () => {
+    const series = buildExerciseChartSeries(
+      fitKitIndex([
+        entry('w/2026-04-02.md', '2026-04-02', [
+          {
+            exerciseName: 'Bench Press',
+            kind: 'strength',
+            bestSet: { weight: 0, reps: 8, e1rm: 0 },
+          },
+        ]),
+      ]),
+      registry,
+      'Bench Press',
+      'strength',
+      30,
+      'e1rm',
+    )
+
+    expect(series.points).toEqual([])
+  })
+
   it('skips strength rows where weight is NaN or non-finite', () => {
     const series = buildExerciseChartSeries(
       fitKitIndex([
