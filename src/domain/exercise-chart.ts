@@ -107,11 +107,17 @@ function pickMetric(
     return value
   }
   if (metric === 'weight') {
-    const weight = row.maxWeightSet?.weight
-    if (weight === undefined || !Number.isFinite(weight) || weight <= 0) {
+    const set = row.maxWeightSet
+    if (
+      !set ||
+      !Number.isFinite(set.weight) ||
+      !Number.isFinite(set.reps) ||
+      set.weight < 0 ||
+      set.reps <= 0
+    ) {
       return null
     }
-    return weight
+    return set.weight
   }
 
   const bestSet = row.bestSet

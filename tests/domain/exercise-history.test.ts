@@ -186,8 +186,11 @@ describe('exercise history aggregation', () => {
     ])
   })
 
-  it('ignores zero-weight and missing strength values', () => {
-    expect(pickMaxWeightSet([{ weight: 0, reps: 10 }, { weight: 50 }, { reps: 5 }])).toBeNull()
+  it('keeps zero-weight strength values and ignores missing strength values', () => {
+    expect(pickMaxWeightSet([{ weight: 0, reps: 10 }, { weight: 50 }, { reps: 5 }])).toEqual({
+      weight: 0,
+      reps: 10,
+    })
   })
 
   it('resolves the current workout anchor date from frontmatter, filename, then today', () => {

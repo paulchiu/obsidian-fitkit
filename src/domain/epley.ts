@@ -47,15 +47,22 @@ export function pickBestSet(
 }
 
 export function pickHeaviestSet(
-  sets: ReadonlyArray<{ weight?: number; reps?: number }>,
+  sets: ReadonlyArray<{ weight?: number; reps?: number; set?: number }>,
 ): WeightSet | null {
-  const candidates = sets.filter(isWeightedSetCandidate)
+  const candidates = sets.map(toHeaviestSetCandidate).filter((set) => set !== null)
   const first = candidates[0]
   if (!first) {
     return null
   }
 
-  return candidates.slice(1).reduce(pickHeavierSet, first)
+  const positiveWeightSets = candidates.filter((set) => set.weight > 0)
+  const picked =
+    positiveWeightSets.length > 0
+      ? positiveWeightSets
+          .slice(1)
+          .reduce(pickHeavierSet, positiveWeightSets[0] as WeightSetCandidate)
+      : candidates.slice(1).reduce(pickMoreRepsSet, first)
+  return toWeightSet(picked)
 }
 
 function isBestSetCandidate(set: { weight?: number; reps?: number }): set is {
@@ -65,15 +72,39 @@ function isBestSetCandidate(set: { weight?: number; reps?: number }): set is {
   return set.weight !== undefined && set.reps !== undefined && set.reps !== 0
 }
 
-function isWeightedSetCandidate(set: { weight?: number; reps?: number }): set is WeightSet {
-  return (
-    set.weight !== undefined &&
-    set.reps !== undefined &&
-    Number.isFinite(set.weight) &&
-    Number.isFinite(set.reps) &&
-    set.weight > 0 &&
-    set.reps > 0
-  )
+interface WeightSetCandidate extends WeightSet {
+  set?: number
+  setNumber: number
+}
+
+function toHeaviestSetCandidate(
+  set: { weight?: number; reps?: number; set?: number },
+  index: number,
+): WeightSetCandidate | null {
+  if (
+    set.weight === undefined ||
+    set.reps === undefined ||
+    !Number.isFinite(set.weight) ||
+    !Number.isFinite(set.reps) ||
+    set.weight < 0 ||
+    set.reps <= 0
+  ) {
+    return null
+  }
+  return {
+    weight: set.weight,
+    reps: set.reps,
+    set: set.set,
+    setNumber: set.set ?? index + 1,
+  }
+}
+
+function toWeightSet(candidate: WeightSetCandidate): WeightSet {
+  if (candidate.set === undefined) {
+    return { weight: candidate.weight, reps: candidate.reps }
+  }
+  const result = { weight: candidate.weight, reps: candidate.reps, set: candidate.set }
+  return result
 }
 
 function pickMaxE1rm(sets: ReadonlyArray<{ weight: number; reps: number }>): BestSet | null {
@@ -89,11 +120,28 @@ function pickMaxE1rm(sets: ReadonlyArray<{ weight: number; reps: number }>): Bes
   }
 }
 
-function pickHeavierSet(left: WeightSet, right: WeightSet): WeightSet {
+function pickHeavierSet(left: WeightSetCandidate, right: WeightSetCandidate): WeightSetCandidate {
   if (right.weight > left.weight) {
     return right
   }
   if (right.weight === left.weight && right.reps > left.reps) {
+    return right
+  }
+  if (
+    right.weight === left.weight &&
+    right.reps === left.reps &&
+    right.setNumber < left.setNumber
+  ) {
+    return right
+  }
+  return left
+}
+
+function pickMoreRepsSet(left: WeightSetCandidate, right: WeightSetCandidate): WeightSetCandidate {
+  if (right.reps > left.reps) {
+    return right
+  }
+  if (right.reps === left.reps && right.setNumber < left.setNumber) {
     return right
   }
   return left

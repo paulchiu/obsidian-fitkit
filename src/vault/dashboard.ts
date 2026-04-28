@@ -42,9 +42,42 @@ export function composeDashboard(
   hiddenKeys: ReadonlySet<string>,
   exerciseMetrics: ReadonlyMap<string, ExerciseMetric> = new Map(),
 ): string {
-  const exercises = aggregateExercises(index, exerciseMetrics)
-    .filter((exercise) => !hiddenKeys.has(`exercise:${exercise.exerciseName}`))
-    .sort((left, right) => left.exerciseName.localeCompare(right.exerciseName))
+  const exercises = visibleExerciseAggregates(index, hiddenKeys, exerciseMetrics)
+  return composeDashboardFromAggregates(index, workoutsFolderPath, exercisesFolderPath, exercises)
+}
+
+export async function regenerateDashboard(
+  app: App,
+  settings: FitKitSettings,
+  index: FitKitIndex,
+): Promise<{ path: string; sectionCount: number }> {
+  const path = normalizeFolder(dashboardPath(settings))
+  const hiddenKeys = new Set(settings.hiddenDashboardSectionsByPath[path] ?? [])
+  const folder = workoutsFolder(settings)
+  const exercisesPath = exercisesFolder(settings)
+  const exerciseMetrics = buildExerciseMetricMap(app, settings, index)
+  const exercises = visibleExerciseAggregates(index, hiddenKeys, exerciseMetrics)
+  const markdown = composeDashboardFromAggregates(index, folder, exercisesPath, exercises)
+  const existing = app.vault.getAbstractFileByPath(path)
+
+  if (isMarkdownFile(existing)) {
+    await app.vault.process(existing, () => markdown)
+  } else {
+    await app.vault.create(path, markdown)
+  }
+
+  return {
+    path,
+    sectionCount: exercises.length,
+  }
+}
+
+function composeDashboardFromAggregates(
+  index: FitKitIndex,
+  workoutsFolderPath: string,
+  exercisesFolderPath: string,
+  exercises: ReadonlyArray<ExerciseAggregate>,
+): string {
   const lines: string[] = []
 
   lines.push('# FitKit Dashboard')
@@ -74,31 +107,14 @@ export function composeDashboard(
   return `${lines.join('\n').trimEnd()}\n`
 }
 
-export async function regenerateDashboard(
-  app: App,
-  settings: FitKitSettings,
+function visibleExerciseAggregates(
   index: FitKitIndex,
-): Promise<{ path: string; sectionCount: number }> {
-  const path = normalizeFolder(dashboardPath(settings))
-  const hiddenKeys = new Set(settings.hiddenDashboardSectionsByPath[path] ?? [])
-  const folder = workoutsFolder(settings)
-  const exercisesPath = exercisesFolder(settings)
-  const exerciseMetrics = buildExerciseMetricMap(app, settings, index)
-  const markdown = composeDashboard(index, folder, exercisesPath, hiddenKeys, exerciseMetrics)
-  const existing = app.vault.getAbstractFileByPath(path)
-
-  if (isMarkdownFile(existing)) {
-    await app.vault.process(existing, () => markdown)
-  } else {
-    await app.vault.create(path, markdown)
-  }
-
-  return {
-    path,
-    sectionCount: aggregateExercises(index, exerciseMetrics).filter(
-      (exercise) => !hiddenKeys.has(`exercise:${exercise.exerciseName}`),
-    ).length,
-  }
+  hiddenKeys: ReadonlySet<string>,
+  exerciseMetrics: ReadonlyMap<string, ExerciseMetric>,
+): ExerciseAggregate[] {
+  return aggregateExercises(index, exerciseMetrics)
+    .filter((exercise) => !hiddenKeys.has(`exercise:${exercise.exerciseName}`))
+    .sort((left, right) => left.exerciseName.localeCompare(right.exerciseName))
 }
 
 function aggregateExercises(
@@ -226,7 +242,7 @@ function validWeightSet(set: WeightSet | undefined): set is WeightSet {
     set !== undefined &&
     Number.isFinite(set.weight) &&
     Number.isFinite(set.reps) &&
-    set.weight > 0 &&
+    set.weight >= 0 &&
     set.reps > 0
   )
 }

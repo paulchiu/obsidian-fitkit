@@ -383,12 +383,15 @@ describe('buildExerciseChartSeries', () => {
     ])
   })
 
-  it('skips strength rows with missing or non-positive weight', () => {
+  it('plots zero-weight strength rows and skips missing or negative weight', () => {
     const series = buildExerciseChartSeries(
       fitKitIndex([
         entry('w/2026-04-01.md', '2026-04-01', [{ exerciseName: 'Bench Press', kind: 'strength' }]),
         entry('w/2026-04-02.md', '2026-04-02', [
           { exerciseName: 'Bench Press', kind: 'strength', maxWeightSet: { weight: 0, reps: 5 } },
+        ]),
+        entry('w/2026-04-02-B.md', '2026-04-02', [
+          { exerciseName: 'Bench Press', kind: 'strength', maxWeightSet: { weight: -5, reps: 5 } },
         ]),
         entry('w/2026-04-03.md', '2026-04-03', [
           { exerciseName: 'Bench Press', kind: 'strength', maxWeightSet: { weight: 75, reps: 5 } },
@@ -401,6 +404,7 @@ describe('buildExerciseChartSeries', () => {
       'weight',
     )
     expect(series.points).toEqual([
+      { date: '2026-04-02', value: 0, workoutPath: 'w/2026-04-02.md' },
       { date: '2026-04-03', value: 75, workoutPath: 'w/2026-04-03.md' },
     ])
   })
