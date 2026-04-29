@@ -294,6 +294,7 @@ export default class FitKitPlugin extends Plugin {
     let unknown = 0
     let failed = 0
     let customisedRecentSessions = 0
+    let customisedNotesSections = 0
     for (const file of files) {
       try {
         const snapshot = await this.app.vault.read(file)
@@ -315,6 +316,9 @@ export default class FitKitPlugin extends Plugin {
         if (result.warnings.some((warning) => warning.kind === 'custom-recent-sessions')) {
           customisedRecentSessions += 1
         }
+        if (result.warnings.some((warning) => warning.kind === 'custom-notes-section')) {
+          customisedNotesSections += 1
+        }
 
         if (result.changed) {
           await this.app.vault.process(file, (live) => migrateExerciseNote(live, input).markdown)
@@ -334,12 +338,20 @@ export default class FitKitPlugin extends Plugin {
     }
 
     const failedHint = failed > 0 ? ' (see console)' : ''
-    const customisedSummary =
+    const customisedWarnings = [
       customisedRecentSessions > 0
-        ? ` ${customisedRecentSessions} customised recent sessions block${
+        ? `${customisedRecentSessions} customised recent sessions block${
             customisedRecentSessions === 1 ? '' : 's'
-          } left alone.`
-        : ''
+          }`
+        : null,
+      customisedNotesSections > 0
+        ? `${customisedNotesSections} customised notes section${
+            customisedNotesSections === 1 ? '' : 's'
+          }`
+        : null,
+    ].filter((warning): warning is string => warning !== null)
+    const customisedSummary =
+      customisedWarnings.length > 0 ? ` ${customisedWarnings.join(', ')} left alone.` : ''
     const summary = `Synced ${files.length} exercise note${files.length === 1 ? '' : 's'}; ${updated} updated, ${already} already current, ${skipped} skipped (non-exercise type), ${skippedMalformedFrontmatter} skipped (malformed frontmatter), ${unknown} unknown (no registry kind), ${failed} failed${failedHint}.${customisedSummary}`
     new Notice(summary)
   }

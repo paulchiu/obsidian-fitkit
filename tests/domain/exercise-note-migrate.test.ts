@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { createRegistry, type ExerciseRegistry } from '../../src/domain/exercise-registry'
 import { migrateExerciseNote } from '../../src/domain/exercise-note-migrate'
-import { buildRecentSessionsBlock } from '../../src/domain/exercise-note-template'
+import { buildNotesBlock, buildRecentSessionsBlock } from '../../src/domain/exercise-note-template'
 
 const registry = createRegistry([
   { name: 'Squat', kind: 'strength', aliases: [] },
@@ -22,6 +22,7 @@ function migrate(
 
 function completeStrengthNote(
   recent = buildRecentSessionsBlock('Squat', 'strength', 'Fitness'),
+  notes = buildNotesBlock('Squat', 'Fitness'),
 ): string {
   return `---
 type: exercise
@@ -39,7 +40,26 @@ metric: e1rm
 ${recent}
 
 ## Notes
+
+${notes}
 `
+}
+
+function withLineEnding(markdown: string, lineEnding: '\n' | '\r\n'): string {
+  return lineEnding === '\n' ? markdown : markdown.replace(/\n/g, '\r\n')
+}
+
+function extractDataviewBlockAfter(markdown: string, heading: string): string {
+  const headingText = `## ${heading}`
+  const headingIndex = markdown.indexOf(headingText)
+  expect(headingIndex).toBeGreaterThanOrEqual(0)
+  const afterHeadingIndex = headingIndex + headingText.length
+  const blockOffset = markdown.slice(afterHeadingIndex).indexOf('```dataview')
+  expect(blockOffset).toBeGreaterThanOrEqual(0)
+  const blockStart = afterHeadingIndex + blockOffset
+  const blockEnd = markdown.indexOf('\n```', blockStart + '```dataview'.length)
+  expect(blockEnd).toBeGreaterThanOrEqual(0)
+  return markdown.slice(blockStart, blockEnd + '\n```'.length)
 }
 
 function frontmatterMarkerCount(markdown: string): number {
@@ -194,6 +214,8 @@ kind: duration
 ${buildRecentSessionsBlock('Plank', 'duration', 'Fitness')}
 
 ## Notes
+
+${buildNotesBlock('Plank', 'Fitness')}
 `
 
     expect(migrate(source, { name: 'Plank' }).markdown).toBe(source)
@@ -399,6 +421,114 @@ something
     expect(progressIndex).toBeLessThan(recentIndex)
     expect(notesIndex).toBeGreaterThan(subNotesIndex)
     expect(result.markdown).toContain('## Notes')
+  })
+
+  it('appends a missing Notes heading with the canonical dataview block', () => {
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
+---
+
+## Progress chart
+
+\`\`\`fitkit-chart
+\`\`\`
+
+## Recent sessions
+
+${buildRecentSessionsBlock('Squat', 'strength', 'Fitness')}
+`
+    const result = migrate(source)
+    const canonicalNotes = buildNotesBlock('Squat', 'Fitness')
+
+    expect(result.status).toBe('updated')
+    expect(result.markdown.endsWith(`## Notes\n\n${canonicalNotes}\n`)).toBe(true)
+    expect(extractDataviewBlockAfter(result.markdown, 'Notes')).toBe(canonicalNotes)
+  })
+
+  it('inserts the canonical Notes block under an empty Notes heading', () => {
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
+---
+
+## Progress chart
+
+\`\`\`fitkit-chart
+\`\`\`
+
+## Recent sessions
+
+${buildRecentSessionsBlock('Squat', 'strength', 'Fitness')}
+
+## Notes
+`
+    const result = migrate(source)
+    const canonicalNotes = buildNotesBlock('Squat', 'Fitness')
+
+    expect(result.status).toBe('updated')
+    expect(result.markdown).toContain(`## Notes\n\n${canonicalNotes}\n`)
+    expect(extractDataviewBlockAfter(result.markdown, 'Notes')).toBe(canonicalNotes)
+  })
+
+  it('leaves a canonical Notes block unchanged', () => {
+    const source = completeStrengthNote()
+    const once = migrate(source)
+    const twice = migrate(once.markdown)
+
+    expect(once.markdown).toBe(source)
+    expect(once.changed).toBe(false)
+    expect(once.status).toBe('already')
+    expect(once.warnings).toEqual([])
+    expect(twice.markdown).toBe(source)
+    expect(twice.changed).toBe(false)
+    expect(twice.status).toBe('already')
+  })
+
+  it('preserves prose under Notes and emits a custom Notes warning', () => {
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
+---
+
+## Progress chart
+
+\`\`\`fitkit-chart
+\`\`\`
+
+## Recent sessions
+
+${buildRecentSessionsBlock('Squat', 'strength', 'Fitness')}
+
+## Notes
+
+Keep these notes.
+`
+    const result = migrate(source)
+
+    expect(result.markdown).toBe(source)
+    expect(result.changed).toBe(false)
+    expect(result.warnings).toEqual([{ kind: 'custom-notes-section' }])
+  })
+
+  it('preserves non-canonical Notes dataview and emits a custom Notes warning', () => {
+    const customNotes = `\`\`\`dataview
+TABLE file.link
+FROM "Fitness/Workouts"
+WHERE contains(file.outlinks, [[Squat]])
+\`\`\``
+    const source = completeStrengthNote(
+      buildRecentSessionsBlock('Squat', 'strength', 'Fitness'),
+      customNotes,
+    )
+    const result = migrate(source)
+
+    expect(result.markdown).toBe(source)
+    expect(result.changed).toBe(false)
+    expect(result.warnings).toEqual([{ kind: 'custom-notes-section' }])
   })
 
   it('inserts a missing Recent sessions section after the chart and before Notes', () => {
@@ -620,6 +750,41 @@ ${buildRecentSessionsBlock('Plank', 'duration', 'Fitness')}
     expect(result.markdown).toContain('## Progress chart')
     const second = migrate(result.markdown)
     expect(second.status).toBe('already')
+    expect(second.markdown).toBe(result.markdown)
+  })
+
+  it('seeds an empty Notes section in a CRLF note without changing line endings', () => {
+    const source = [
+      '---',
+      'type: exercise',
+      'kind: strength',
+      'metric: e1rm',
+      '---',
+      '',
+      '## Progress chart',
+      '',
+      '```fitkit-chart',
+      '```',
+      '',
+      '## Recent sessions',
+      '',
+      withLineEnding(buildRecentSessionsBlock('Squat', 'strength', 'Fitness'), '\r\n'),
+      '',
+      '## Notes',
+      '',
+    ].join('\r\n')
+    const result = migrate(source)
+    const canonicalNotes = withLineEnding(buildNotesBlock('Squat', 'Fitness'), '\r\n')
+
+    expect(result.status).toBe('updated')
+    expect(result.markdown.replace(/\r\n/g, '')).not.toContain('\n')
+    expect(result.markdown).not.toContain('\r\r\n')
+    expect(result.markdown).toContain(`## Notes\r\n\r\n${canonicalNotes}\r\n`)
+    expect(extractDataviewBlockAfter(result.markdown, 'Notes')).toBe(canonicalNotes)
+
+    const second = migrate(result.markdown)
+    expect(second.status).toBe('already')
+    expect(second.changed).toBe(false)
     expect(second.markdown).toBe(result.markdown)
   })
 

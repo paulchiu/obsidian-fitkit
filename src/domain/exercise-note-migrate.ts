@@ -1,5 +1,5 @@
 import { kindForName, type ExerciseKind, type ExerciseRegistry } from './exercise-registry'
-import { buildRecentSessionsBlock } from './exercise-note-template'
+import { buildNotesBlock, buildRecentSessionsBlock } from './exercise-note-template'
 
 const FENCE_OPEN = /^(`{3,})([^`]*)$/
 const LIMIT_MIN = 5
@@ -24,7 +24,7 @@ type SkippedExerciseNoteMigrationStatus = Extract<
 >
 
 export interface ExerciseNoteMigrationWarning {
-  kind: 'custom-recent-sessions'
+  kind: 'custom-recent-sessions' | 'custom-notes-section'
 }
 
 export interface ExerciseNoteMigrationResult {
@@ -63,7 +63,7 @@ type FrontmatterBoundsResult =
   | { status: 'missing' }
   | { status: 'malformed' }
 
-interface RecentSessionsRepairResult {
+interface SectionRepairResult {
   markdown: string
   warnings: ExerciseNoteMigrationWarning[]
 }
@@ -88,15 +88,15 @@ export function migrateExerciseNote(
     ? repairRecentSessions(frontmatter.markdown, options, frontmatter.kind)
     : { markdown: frontmatter.markdown, warnings: [] }
   const withChart = ensureChartBlock(recent.markdown)
-  const normalizedMarkdown = ensureNotesSection(withChart)
-  const markdown = restoreMarkdownSource(normalizedMarkdown, normalizedSource)
+  const notes = repairNotesSection(withChart, options)
+  const markdown = restoreMarkdownSource(notes.markdown, normalizedSource)
 
   return {
     markdown,
     changed: markdown !== source,
     status: frontmatter.unknownKind ? 'unknown' : markdown === source ? 'already' : 'updated',
     unknownKind: frontmatter.unknownKind,
-    warnings: recent.warnings,
+    warnings: [...recent.warnings, ...notes.warnings],
   }
 }
 
@@ -203,7 +203,7 @@ function repairRecentSessions(
   source: string,
   options: ExerciseNoteMigrationOptions,
   kind: ExerciseKind,
-): RecentSessionsRepairResult {
+): SectionRepairResult {
   const canonicalBlock = buildRecentSessionsBlock(options.name, kind, options.fitnessRoot)
   const canonicalLines = canonicalBlock.split('\n')
   const document = splitMarkdown(source)
@@ -253,6 +253,47 @@ function repairRecentSessions(
     ...document.lines.slice(block.end + 1),
   ]
   return { markdown: joinMarkdown({ ...document, lines: next }), warnings: [] }
+}
+
+function repairNotesSection(
+  source: string,
+  options: ExerciseNoteMigrationOptions,
+): SectionRepairResult {
+  const canonicalBlock = buildNotesBlock(options.name, options.fitnessRoot)
+  const canonicalLines = canonicalBlock.split('\n')
+  const document = splitMarkdown(source)
+  const headingIndex = findHeadingIndex(document.lines, isNotesHeading)
+  if (headingIndex < 0) {
+    const next = insertSection(document.lines, document.lines.length, [
+      '## Notes',
+      '',
+      ...canonicalLines,
+    ])
+    return { markdown: joinMarkdown({ ...document, lines: next }), warnings: [] }
+  }
+
+  const sectionEnd = findNextH2HeadingIndex(document.lines, headingIndex + 1)
+  const end = sectionEnd >= 0 ? sectionEnd : document.lines.length
+  if (!hasNonEmptyContentInRange(document.lines, headingIndex + 1, end)) {
+    const next = insertBlockAfterHeading(document.lines, headingIndex, canonicalLines)
+    return { markdown: joinMarkdown({ ...document, lines: next }), warnings: [] }
+  }
+
+  const block = findDataviewBlockInRange(document.lines, headingIndex + 1, end)
+  if (block) {
+    const currentBlock = document.lines.slice(block.start, block.end + 1).join('\n')
+    if (
+      currentBlock === canonicalBlock &&
+      isRangeEmptyExcept(document.lines, headingIndex + 1, end, block.start, block.end + 1)
+    ) {
+      return { markdown: source, warnings: [] }
+    }
+  }
+
+  return {
+    markdown: source,
+    warnings: [{ kind: 'custom-notes-section' }],
+  }
 }
 
 function hasStaleRecentSessionsTarget(currentBlock: string, canonicalBlock: string): boolean {
@@ -436,15 +477,6 @@ function firstSectionIndexAfterFrontmatter(lines: ReadonlyArray<string>): number
   return 0
 }
 
-function ensureNotesSection(source: string): string {
-  const document = splitMarkdown(source)
-  if (findHeadingIndex(document.lines, isNotesHeading) >= 0) {
-    return source
-  }
-  const next = insertSection(document.lines, document.lines.length, ['## Notes', ''])
-  return joinMarkdown({ ...document, lines: next })
-}
-
 function hasFitKitChartBlock(source: string): boolean {
   const lines = source.split('\n')
   return findFitKitChartBlockInRange(lines, 0, lines.length) !== null
@@ -625,6 +657,37 @@ function insertBlockAfterHeading(
     ...(suffix.length > 0 && suffix[0] !== '' ? [''] : []),
     ...suffix,
   ]
+}
+
+function hasNonEmptyContentInRange(
+  lines: ReadonlyArray<string>,
+  start: number,
+  end: number,
+): boolean {
+  for (let index = start; index < end; index++) {
+    if ((lines[index] ?? '').trim() !== '') {
+      return true
+    }
+  }
+  return false
+}
+
+function isRangeEmptyExcept(
+  lines: ReadonlyArray<string>,
+  start: number,
+  end: number,
+  exceptStart: number,
+  exceptEnd: number,
+): boolean {
+  for (let index = start; index < end; index++) {
+    if (index >= exceptStart && index < exceptEnd) {
+      continue
+    }
+    if ((lines[index] ?? '').trim() !== '') {
+      return false
+    }
+  }
+  return true
 }
 
 function firstExistingSectionIndex(

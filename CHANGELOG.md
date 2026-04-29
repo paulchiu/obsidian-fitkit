@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Exercise chart blocks now distinguish missing and invalid exercise-note `kind:` frontmatter when showing fallback notes.
 - Bodyweight strength charts and dashboard PBs consistently keep zero-weight sets.
 - `Sync exercise notes` now scans every note in the Exercises folder, so notes without frontmatter can receive missing chart blocks and other template repairs.
+- `Sync exercise notes` now seeds the Notes Dataview block when repairing missing or empty Notes sections.
 
 ### Removed
 

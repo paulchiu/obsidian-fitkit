@@ -9,6 +9,10 @@ export function buildRecentSessionsBlock(
   return ['```dataview', ...recentSessionsQuery(name, kind, fitnessRoot), '```'].join('\n')
 }
 
+export function buildNotesBlock(name: string, fitnessRoot: string): string {
+  return ['```dataview', ...notesQuery(name, fitnessRoot), '```'].join('\n')
+}
+
 function recentSessionsQuery(name: string, kind: ExerciseKind, fitnessRoot: string): string[] {
   const workouts = workoutsFolder({ fitnessRoot })
   if (kind === 'duration') {
@@ -32,5 +36,19 @@ function recentSessionsQuery(name: string, kind: ExerciseKind, fitnessRoot: stri
     `WHERE L.exercise = link("${name}") AND L.set`,
     'SORT file.name DESC, L.set ASC',
     'LIMIT 10',
+  ]
+}
+
+function notesQuery(name: string, fitnessRoot: string): string[] {
+  const workouts = workoutsFolder({ fitnessRoot })
+  return [
+    'TABLE WITHOUT ID',
+    '  file.link AS Workout,',
+    '  L.notes AS Note',
+    `FROM "${workouts}"`,
+    'FLATTEN file.lists AS L',
+    `WHERE L.exercise = link("${name}") AND L.notes`,
+    'SORT file.name DESC',
+    'LIMIT 20',
   ]
 }

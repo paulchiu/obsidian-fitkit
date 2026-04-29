@@ -1,5 +1,5 @@
 import type { ExerciseKind } from '../domain/exercise-registry'
-import { buildRecentSessionsBlock } from '../domain/exercise-note-template'
+import { buildNotesBlock, buildRecentSessionsBlock } from '../domain/exercise-note-template'
 
 /**
  * Pure: build the seeded markdown body for a freshly-created exercise note.
@@ -37,25 +37,10 @@ export function composeExerciseNote(
   lines.push('')
   lines.push('## Notes')
   lines.push('')
-  lines.push('```dataview')
-  lines.push(...notesQuery(exerciseName, workoutsFolderPath))
-  lines.push('```')
+  lines.push(buildNotesBlock(exerciseName, fitnessRootFromWorkouts(workoutsFolderPath)))
   return `${lines.join('\n')}\n`
 }
 
 function fitnessRootFromWorkouts(workoutsFolderPath: string): string {
   return workoutsFolderPath.replace(/\/Workouts$/, '')
-}
-
-function notesQuery(exerciseName: string, workoutsFolderPath: string): string[] {
-  return [
-    'TABLE WITHOUT ID',
-    '  file.link AS Workout,',
-    '  L.notes AS Note',
-    `FROM "${workoutsFolderPath}"`,
-    'FLATTEN file.lists AS L',
-    `WHERE L.exercise = link("${exerciseName}") AND L.notes`,
-    'SORT file.name DESC',
-    'LIMIT 20',
-  ]
 }
