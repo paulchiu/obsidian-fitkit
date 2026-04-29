@@ -1,17 +1,32 @@
-import type { App, TAbstractFile, TFile } from 'obsidian'
+import type { App, CachedMetadata, TAbstractFile, TFile } from 'obsidian'
 
-import type { BestSet, ExerciseIndexRow, FitKitIndex } from '../domain/types'
+import {
+  DEFAULT_EXERCISE_METRIC,
+  parseExerciseMetric,
+  type ExerciseMetric,
+} from '../domain/exercise-metric'
+import {
+  createRegistry,
+  normalize,
+  resolve,
+  type ExerciseRegistry,
+} from '../domain/exercise-registry'
+import type { BestSet, ExerciseIndexRow, FitKitIndex, WeightSet } from '../domain/types'
 import type { FitKitSettings } from '../settings'
 import { dashboardPath, exercisesFolder, normalizeFolder, workoutsFolder } from '../settings-paths'
+import { exerciseRegistryWithVaultNotes } from './exercise-registry-vault'
 
 interface ExerciseAggregate {
   exerciseName: string
   kind: 'strength' | 'duration'
-  bestSet?: BestSet
+  metric: ExerciseMetric
+  pbSet?: StrengthPbSet
   totalSets: number
   totalDurationSeconds: number
   sessionCount: number
 }
+
+type StrengthPbSet = WeightSet & { e1rm?: number }
 
 /**
  * Pure: build full dashboard markdown from index.
@@ -25,10 +40,44 @@ export function composeDashboard(
   workoutsFolderPath: string,
   exercisesFolderPath: string,
   hiddenKeys: ReadonlySet<string>,
+  exerciseMetrics: ReadonlyMap<string, ExerciseMetric> = new Map(),
 ): string {
-  const exercises = aggregateExercises(index)
-    .filter((exercise) => !hiddenKeys.has(`exercise:${exercise.exerciseName}`))
-    .sort((left, right) => left.exerciseName.localeCompare(right.exerciseName))
+  const exercises = visibleExerciseAggregates(index, hiddenKeys, exerciseMetrics)
+  return composeDashboardFromAggregates(index, workoutsFolderPath, exercisesFolderPath, exercises)
+}
+
+export async function regenerateDashboard(
+  app: App,
+  settings: FitKitSettings,
+  index: FitKitIndex,
+): Promise<{ path: string; sectionCount: number }> {
+  const path = normalizeFolder(dashboardPath(settings))
+  const hiddenKeys = new Set(settings.hiddenDashboardSectionsByPath[path] ?? [])
+  const folder = workoutsFolder(settings)
+  const exercisesPath = exercisesFolder(settings)
+  const exerciseMetrics = buildExerciseMetricMap(app, settings, index)
+  const exercises = visibleExerciseAggregates(index, hiddenKeys, exerciseMetrics)
+  const markdown = composeDashboardFromAggregates(index, folder, exercisesPath, exercises)
+  const existing = app.vault.getAbstractFileByPath(path)
+
+  if (isMarkdownFile(existing)) {
+    await app.vault.process(existing, () => markdown)
+  } else {
+    await app.vault.create(path, markdown)
+  }
+
+  return {
+    path,
+    sectionCount: exercises.length,
+  }
+}
+
+function composeDashboardFromAggregates(
+  index: FitKitIndex,
+  workoutsFolderPath: string,
+  exercisesFolderPath: string,
+  exercises: ReadonlyArray<ExerciseAggregate>,
+): string {
   const lines: string[] = []
 
   lines.push('# FitKit Dashboard')
@@ -58,51 +107,35 @@ export function composeDashboard(
   return `${lines.join('\n').trimEnd()}\n`
 }
 
-export async function regenerateDashboard(
-  app: App,
-  settings: FitKitSettings,
+function visibleExerciseAggregates(
   index: FitKitIndex,
-): Promise<{ path: string; sectionCount: number }> {
-  const path = normalizeFolder(dashboardPath(settings))
-  const hiddenKeys = new Set(settings.hiddenDashboardSectionsByPath[path] ?? [])
-  const folder = workoutsFolder(settings)
-  const exercisesPath = exercisesFolder(settings)
-  const markdown = composeDashboard(index, folder, exercisesPath, hiddenKeys)
-  const existing = app.vault.getAbstractFileByPath(path)
-
-  if (isMarkdownFile(existing)) {
-    await app.vault.process(existing, () => markdown)
-  } else {
-    await app.vault.create(path, markdown)
-  }
-
-  return {
-    path,
-    sectionCount: aggregateExercises(index).filter(
-      (exercise) => !hiddenKeys.has(`exercise:${exercise.exerciseName}`),
-    ).length,
-  }
+  hiddenKeys: ReadonlySet<string>,
+  exerciseMetrics: ReadonlyMap<string, ExerciseMetric>,
+): ExerciseAggregate[] {
+  return aggregateExercises(index, exerciseMetrics)
+    .filter((exercise) => !hiddenKeys.has(`exercise:${exercise.exerciseName}`))
+    .sort((left, right) => left.exerciseName.localeCompare(right.exerciseName))
 }
 
-function aggregateExercises(index: FitKitIndex): ExerciseAggregate[] {
+function aggregateExercises(
+  index: FitKitIndex,
+  exerciseMetrics: ReadonlyMap<string, ExerciseMetric>,
+): ExerciseAggregate[] {
   const exercises = new Map<string, ExerciseAggregate>()
 
   for (const entry of index.entries) {
     const sessionExercises = new Set<string>()
     for (const row of entry.exercises) {
-      const aggregate = getAggregate(exercises, row)
+      const aggregate = getAggregate(exercises, row, exerciseMetrics)
       aggregate.totalSets += row.totalSets ?? 0
       aggregate.totalDurationSeconds += row.totalDurationSeconds ?? 0
       if (!sessionExercises.has(row.exerciseName)) {
         aggregate.sessionCount += 1
         sessionExercises.add(row.exerciseName)
       }
-      if (
-        row.bestSet &&
-        row.bestSet.reps !== 0 &&
-        (!aggregate.bestSet || row.bestSet.e1rm > aggregate.bestSet.e1rm)
-      ) {
-        aggregate.bestSet = row.bestSet
+      const candidate = pickDashboardSet(row, aggregate.metric)
+      if (candidate && isBetterDashboardSet(candidate, aggregate.pbSet, aggregate.metric)) {
+        aggregate.pbSet = candidate
       }
     }
   }
@@ -113,6 +146,7 @@ function aggregateExercises(index: FitKitIndex): ExerciseAggregate[] {
 function getAggregate(
   exercises: Map<string, ExerciseAggregate>,
   row: ExerciseIndexRow,
+  exerciseMetrics: ReadonlyMap<string, ExerciseMetric>,
 ): ExerciseAggregate {
   const existing = exercises.get(row.exerciseName)
   if (existing) {
@@ -122,6 +156,7 @@ function getAggregate(
   const created: ExerciseAggregate = {
     exerciseName: row.exerciseName,
     kind: row.kind,
+    metric: exerciseMetrics.get(row.exerciseName) ?? DEFAULT_EXERCISE_METRIC,
     totalSets: 0,
     totalDurationSeconds: 0,
     sessionCount: 0,
@@ -138,11 +173,11 @@ function formatPb(exercise: ExerciseAggregate): string {
     return `- **${link}:** total ${exercise.totalDurationSeconds}s across ${exercise.sessionCount} ${sessionLabel}`
   }
 
-  if (!exercise.bestSet) {
+  if (!exercise.pbSet) {
     return `- **${link}:** no completed sets`
   }
 
-  return `- **${link}:** ${exercise.bestSet.weight} kg x ${exercise.bestSet.reps} (e1rm ${exercise.bestSet.e1rm.toFixed(1)})`
+  return `- **${link}:** ${formatDashboardSet(exercise.pbSet, exercise.metric)}`
 }
 
 function dataviewQuery(exercise: ExerciseAggregate, workoutsFolderPath: string): string[] {
@@ -173,4 +208,129 @@ function dataviewQuery(exercise: ExerciseAggregate, workoutsFolderPath: string):
 
 function isMarkdownFile(file: TAbstractFile | null): file is TFile {
   return file !== null && (file as { extension?: unknown }).extension === 'md'
+}
+
+function pickDashboardSet(row: ExerciseIndexRow, metric: ExerciseMetric): StrengthPbSet | null {
+  if (row.kind !== 'strength') {
+    return null
+  }
+  if (metric === 'weight') {
+    return validWeightSet(row.maxWeightSet) ? row.maxWeightSet : null
+  }
+  return validBestSet(row.bestSet) ? row.bestSet : null
+}
+
+function isBetterDashboardSet(
+  candidate: StrengthPbSet,
+  current: StrengthPbSet | undefined,
+  metric: ExerciseMetric,
+): boolean {
+  if (!current) {
+    return true
+  }
+  if (metric === 'weight') {
+    if (candidate.weight !== current.weight) {
+      return candidate.weight > current.weight
+    }
+    return candidate.reps > current.reps
+  }
+  return (candidate.e1rm ?? 0) > (current.e1rm ?? 0)
+}
+
+function validWeightSet(set: WeightSet | undefined): set is WeightSet {
+  return (
+    set !== undefined &&
+    Number.isFinite(set.weight) &&
+    Number.isFinite(set.reps) &&
+    set.weight >= 0 &&
+    set.reps > 0
+  )
+}
+
+function validBestSet(set: BestSet | undefined): set is BestSet {
+  return validWeightSet(set) && Number.isFinite(set.e1rm) && set.e1rm > 0
+}
+
+function formatDashboardSet(set: StrengthPbSet, metric: ExerciseMetric): string {
+  const topSet = `${set.weight} kg x ${set.reps}`
+  if (metric === 'weight') {
+    return topSet
+  }
+  return `${topSet} (e1rm ${(set.e1rm ?? 0).toFixed(1)})`
+}
+
+function buildExerciseMetricMap(
+  app: App,
+  settings: FitKitSettings,
+  index: FitKitIndex,
+): Map<string, ExerciseMetric> {
+  const noteMetrics = readExerciseNoteMetrics(app, settings)
+  const registry = createRegistry(exerciseRegistryWithVaultNotes(app, settings))
+  const metrics = new Map<string, ExerciseMetric>()
+
+  for (const entry of index.entries) {
+    for (const row of entry.exercises) {
+      if (row.kind !== 'strength' || metrics.has(row.exerciseName)) {
+        continue
+      }
+      metrics.set(row.exerciseName, getExerciseMetric(row.exerciseName, noteMetrics, registry))
+    }
+  }
+
+  return metrics
+}
+
+function readExerciseNoteMetrics(app: App, settings: FitKitSettings): Map<string, ExerciseMetric> {
+  const folder = exercisesFolder(settings)
+  const metrics = new Map<string, ExerciseMetric>()
+
+  for (const file of app.vault.getMarkdownFiles()) {
+    if (!file.path.startsWith(`${folder}/`)) {
+      continue
+    }
+
+    const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter
+    const type = readFrontmatterField(frontmatter, 'type')
+    const kind = readFrontmatterField(frontmatter, 'kind')
+    if (
+      typeof type !== 'string' ||
+      type.toLowerCase().trim() !== 'exercise' ||
+      typeof kind !== 'string' ||
+      kind.toLowerCase().trim() !== 'strength'
+    ) {
+      continue
+    }
+
+    const metric =
+      parseExerciseMetric(readFrontmatterField(frontmatter, 'metric')) ?? DEFAULT_EXERCISE_METRIC
+    metrics.set(normalize(file.basename), metric)
+  }
+
+  return metrics
+}
+
+function getExerciseMetric(
+  exerciseName: string,
+  noteMetrics: ReadonlyMap<string, ExerciseMetric>,
+  registry: ExerciseRegistry,
+): ExerciseMetric {
+  const direct = noteMetrics.get(normalize(exerciseName))
+  if (direct) {
+    return direct
+  }
+
+  const resolved = resolve(registry, exerciseName)
+  if (resolved.kind !== 'match') {
+    return DEFAULT_EXERCISE_METRIC
+  }
+
+  return noteMetrics.get(normalize(resolved.entry.name)) ?? DEFAULT_EXERCISE_METRIC
+}
+
+function readFrontmatterField(
+  frontmatter: CachedMetadata['frontmatter'] | undefined,
+  key: string,
+): unknown {
+  const record: Record<string, unknown> | null = frontmatter ?? null
+  return record === null ? undefined : record[key]
 }

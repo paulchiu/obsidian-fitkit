@@ -18,7 +18,7 @@ The exercise registry (`plugin.settings.exerciseRegistry`, an array of `{ name, 
 Today the only ways to mutate it are:
 
 1. **Bootstrap from vault** in settings (`src/settings.ts:132-145`): regenerates from `Exercises/` folder stems, keeping existing aliases.
-2. The import modal's confirm path (`src/ui/import-modal.ts:333` plus `registryWithImportMappingChanges` in `src/domain/import-mapping.ts:85-119`), which both *adds entries* and *appends raw names as aliases* on existing entries when the user maps a journal name.
+2. The import modal's confirm path (`src/ui/import-modal.ts:333` plus `registryWithImportMappingChanges` in `src/domain/import-mapping.ts:85-119`), which both _adds entries_ and _appends raw names as aliases_ on existing entries when the user maps a journal name.
 3. The create-missing-exercises modal (`src/ui/create-missing-exercises-modal.ts:159`).
 4. **Workout editor kind switch** (`src/ui/workout-editor-view.ts:745-758`, `persistRegistryKind`): toggling strength↔duration on a card writes the registry.
 5. Hand-editing `data.json`.
@@ -53,11 +53,10 @@ Layout, top to bottom:
 - Search input (`type=search`, placeholder "Search by name or alias"); filter is case-insensitive substring on the **normalized** form (`normalize()` from the domain module), against the canonical name and every alias.
 - A scrollable wrapper `<div class="fitkit-registry-table-wrap">` with `overflow-x: auto`, around a table:
 
-  | Name | Kind | Aliases | |
-  |------|------|---------|---|
+  | Name  | Kind     | Aliases              |                 |
+  | ----- | -------- | -------------------- | --------------- |
   | Squat | strength | Back Squat, BB Squat | [Edit] [Delete] |
-  | Plank | duration | none | [Edit] [Delete] |
-
+  | Plank | duration | none                 | [Edit] [Delete] |
   - Aliases column: comma-joined; if empty, show muted "none". Truncate visually with CSS, full text in `title=` attribute.
   - Action cell uses `white-space: nowrap` so the buttons stay together.
   - Empty state when there are no entries: "No entries yet. Add one or bootstrap from your Exercises folder."
@@ -73,9 +72,7 @@ Add `src/ui/exercise-registry-entry-modal.ts`:
 export class ExerciseRegistryEntryModal extends Modal {
   constructor(
     plugin: FitKitPlugin,
-    mode:
-      | { kind: 'create' }
-      | { kind: 'edit'; original: ExerciseRegistryEntry },
+    mode: { kind: 'create' } | { kind: 'edit'; original: ExerciseRegistryEntry },
     onSaved: () => void,
   )
 }
@@ -115,12 +112,18 @@ Buttons: `Cancel` / `Save`. Save is disabled while validation fails; inline erro
 Reuse the existing `ConfirmModal` (`src/ui/confirm-modal.ts:10-55`) — same shape we need, no new modal class:
 
 ```ts
-new ConfirmModal(this.app, {
-  title: 'Delete entry?',
-  message: `Delete '${name}'? This removes only the registry entry. The note file in <Exercises folder>, if any, is left untouched, and existing workouts that reference '${name}' will resolve as Unknown until you re-add the entry.`,
-  confirmText: 'Delete',
-  cancelText: 'Cancel',
-}, (confirmed) => { if (confirmed) void doDelete() }).open()
+new ConfirmModal(
+  this.app,
+  {
+    title: 'Delete entry?',
+    message: `Delete '${name}'? This removes only the registry entry. The note file in <Exercises folder>, if any, is left untouched, and existing workouts that reference '${name}' will resolve as Unknown until you re-add the entry.`,
+    confirmText: 'Delete',
+    cancelText: 'Cancel',
+  },
+  (confirmed) => {
+    if (confirmed) void doDelete()
+  },
+).open()
 ```
 
 `ConfirmModal` already styles the confirm button with `.fitkit-destructive-button`. The destructive-at-rest styling that conflicts with AGENTS.md §57 is pre-existing in `styles.css:420-433` and across other call sites; fixing it is out of scope here so the registry editor stays consistent with the rest of the plugin. (Tracked separately: see §4.)
@@ -129,7 +132,7 @@ On confirm: `removeEntry(registry, name)` → save → re-render. Delete is regi
 
 ### 3.4 Stale-save and stale-delete handling
 
-`Save` and `Delete` both *re-read* `plugin.settings.exerciseRegistry` immediately before mutating, not the snapshot taken when the modal opened. This matters because the import modal, create-missing-exercises modal, and `persistRegistryKind` from the workout editor can all mutate the registry between the editor opening and the user clicking Save / Delete.
+`Save` and `Delete` both _re-read_ `plugin.settings.exerciseRegistry` immediately before mutating, not the snapshot taken when the modal opened. This matters because the import modal, create-missing-exercises modal, and `persistRegistryKind` from the workout editor can all mutate the registry between the editor opening and the user clicking Save / Delete.
 
 **Save (create or edit)**:
 
@@ -232,6 +235,7 @@ This is the simplest contract and avoids the editor having two display-only rows
 New tests in `tests/domain/exercise-registry.test.ts`:
 
 **`sanitizeEntryDraft`**
+
 - Trims canonical name and aliases.
 - Drops empty-after-trim aliases.
 - Dedupes aliases by normalized form, keeping first occurrence's original casing.
@@ -239,6 +243,7 @@ New tests in `tests/domain/exercise-registry.test.ts`:
 - Idempotent: `sanitize(sanitize(x))` deep-equals `sanitize(x)`.
 
 **`validateEntryDraft`** (caller has already sanitized)
+
 - Returns `[]` for a valid draft (name + non-conflicting aliases).
 - Empty trimmed name returns a `field: 'name'` error.
 - Canonical name colliding with another entry's canonical returns a `field: 'name'` error with the conflicting entry's name in the message.
@@ -250,6 +255,7 @@ New tests in `tests/domain/exercise-registry.test.ts`:
 - Punctuation/case-only collision counts (uses `normalize`).
 
 **`renameEntry`** (caller has already sanitized)
+
 - No-rename (same canonical name): kind/aliases update; old name NOT added to aliases.
 - Normalize-equivalent rename (e.g., `'Squat '` → `'Squat'`): treated as no-rename; no self-alias added.
 - True rename: old name is prepended to aliases.

@@ -689,3 +689,60 @@
   font-size: 12px;
   min-height: 1em;
 }
+
+.fitkit-chart {
+  margin: 0.5rem 0;
+}
+
+.fitkit-chart-title {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.fitkit-chart-note {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 4px;
+  font-style: italic;
+}
+
+.fitkit-chart-svg {
+  width: 100%;
+  height: auto;
+  max-width: 720px;
+  display: block;
+}
+
+.fitkit-chart-axis {
+  stroke: var(--background-modifier-border);
+  stroke-width: 1;
+}
+
+.fitkit-chart-grid {
+  stroke: var(--background-modifier-border);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  opacity: 0.6;
+}
+
+.fitkit-chart-axis-label {
+  fill: var(--text-muted);
+  font-size: 11px;
+}
+
+.fitkit-chart-line {
+  stroke: var(--interactive-accent);
+  stroke-width: 2;
+  fill: none;
+}
+
+.fitkit-chart-dot {
+  fill: var(--interactive-accent);
+}
+
+.fitkit-chart-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 0.5rem 0;
+}

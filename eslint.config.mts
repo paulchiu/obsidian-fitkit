@@ -51,5 +51,12 @@ export default tseslint.config(
       },
     },
   },
-  globalIgnores(['node_modules', 'dist', 'esbuild.config.mjs', 'versions.json', 'main.js']),
+  globalIgnores([
+    'node_modules',
+    'dist',
+    'esbuild.config.mjs',
+    'versions.json',
+    'main.js',
+    'scripts/**/*.ts',
+  ]),
 )

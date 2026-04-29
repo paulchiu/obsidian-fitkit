@@ -1,4 +1,5 @@
 import type { ExerciseKind } from './workout-note-model'
+import { pickHeaviestSet } from './epley'
 import type { FitKitIndex, IndexEntry, LastSessionMax, WeightSet } from './types'
 
 export interface ExerciseHistoryAnchor {
@@ -117,13 +118,7 @@ export function formatExerciseHistoryBadges(
 export function pickMaxWeightSet(
   sets: ReadonlyArray<{ weight?: number; reps?: number }>,
 ): WeightSet | null {
-  const candidates = sets.filter(isWeightedSetCandidate)
-  const first = candidates[0]
-  if (!first) {
-    return null
-  }
-
-  return candidates.slice(1).reduce(pickHeavierWeightSet, first)
+  return pickHeaviestSet(sets)
 }
 
 export function resolveWorkoutAnchorDate(anchor: ExerciseHistoryAnchor): string {
@@ -230,17 +225,6 @@ function finalizeDrafts(drafts: Map<string, ExerciseHistoryDraft>): ExerciseHist
   }
 
   return history
-}
-
-function isWeightedSetCandidate(set: { weight?: number; reps?: number }): set is WeightSet {
-  return (
-    set.weight !== undefined &&
-    set.reps !== undefined &&
-    Number.isFinite(set.weight) &&
-    Number.isFinite(set.reps) &&
-    set.weight > 0 &&
-    set.reps > 0
-  )
 }
 
 function pickHeavierWeightSet(left: WeightSet, right: WeightSet): WeightSet {

@@ -1,10 +1,13 @@
 import { MarkdownView, Notice, Plugin, TFile, type WorkspaceLeaf, normalizePath } from 'obsidian'
 
+import { createRegistry } from './domain/exercise-registry'
+import { migrateExerciseNote } from './domain/exercise-note-migrate'
 import type { FitKitIndex, IndexDiagnostic } from './domain/types'
 import { parseWorkoutNote } from './domain/workout-note-model'
 import { DEFAULT_SETTINGS, FitKitSettingTab, type FitKitSettings } from './settings'
-import { dashboardPath, workoutFilename, workoutsFolder } from './settings-paths'
+import { dashboardPath, exercisesFolder, workoutFilename, workoutsFolder } from './settings-paths'
 import { CreateMissingExercisesModal } from './ui/create-missing-exercises-modal'
+import { renderExerciseChartBlock } from './ui/exercise-chart-block'
 import { ImportModal } from './ui/import-modal'
 import { ParseDiagnosticsModal } from './ui/parse-diagnostics-modal'
 import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from './ui/workout-editor-view'
@@ -84,6 +87,16 @@ export default class FitKitPlugin extends Plugin {
         new ParseDiagnosticsModal(this.app, this.lastDiagnostics).open()
       },
     })
+
+    this.addCommand({
+      id: 'sync-exercise-notes',
+      name: 'Sync and repair exercise notes',
+      callback: () => void this.syncExerciseNotes(),
+    })
+
+    this.registerMarkdownCodeBlockProcessor('fitkit-chart', (source, el, ctx) =>
+      renderExerciseChartBlock(this, source, el, ctx),
+    )
 
     this.registerView(VIEW_TYPE_FITKIT_WORKOUT_EDITOR, (leaf) => new WorkoutEditorView(leaf, this))
 
@@ -265,6 +278,82 @@ export default class FitKitPlugin extends Plugin {
       readOnly: false,
       defaultFilenameDate: defaultDate,
     }).open()
+  }
+
+  private async syncExerciseNotes(): Promise<void> {
+    const folder = exercisesFolder(this.settings)
+    const files = this.app.vault
+      .getMarkdownFiles()
+      .filter((file) => file.path.startsWith(`${folder}/`))
+    const registry = createRegistry(this.settings.exerciseRegistry)
+
+    let updated = 0
+    let already = 0
+    let skipped = 0
+    let skippedMalformedFrontmatter = 0
+    let unknown = 0
+    let failed = 0
+    let customisedRecentSessions = 0
+    let customisedNotesSections = 0
+    for (const file of files) {
+      try {
+        const snapshot = await this.app.vault.read(file)
+        const input = {
+          name: file.basename,
+          registry,
+          fitnessRoot: this.settings.fitnessRoot,
+        }
+        const result = migrateExerciseNote(snapshot, input)
+        if (result.status === 'skipped-non-exercise-type') {
+          skipped += 1
+          continue
+        }
+        if (result.status === 'skipped-malformed-frontmatter') {
+          skippedMalformedFrontmatter += 1
+          continue
+        }
+
+        if (result.warnings.some((warning) => warning.kind === 'custom-recent-sessions')) {
+          customisedRecentSessions += 1
+        }
+        if (result.warnings.some((warning) => warning.kind === 'custom-notes-section')) {
+          customisedNotesSections += 1
+        }
+
+        if (result.changed) {
+          await this.app.vault.process(file, (live) => migrateExerciseNote(live, input).markdown)
+        }
+
+        if (result.status === 'unknown') {
+          unknown += 1
+        } else if (result.changed) {
+          updated += 1
+        } else {
+          already += 1
+        }
+      } catch (error) {
+        console.error(`FitKit: failed to sync exercise note '${file.path}'`, error)
+        failed += 1
+      }
+    }
+
+    const failedHint = failed > 0 ? ' (see console)' : ''
+    const customisedWarnings = [
+      customisedRecentSessions > 0
+        ? `${customisedRecentSessions} customised recent sessions block${
+            customisedRecentSessions === 1 ? '' : 's'
+          }`
+        : null,
+      customisedNotesSections > 0
+        ? `${customisedNotesSections} customised notes section${
+            customisedNotesSections === 1 ? '' : 's'
+          }`
+        : null,
+    ].filter((warning): warning is string => warning !== null)
+    const customisedSummary =
+      customisedWarnings.length > 0 ? ` ${customisedWarnings.join(', ')} left alone.` : ''
+    const summary = `Synced ${files.length} exercise note${files.length === 1 ? '' : 's'}; ${updated} updated, ${already} already current, ${skipped} skipped (non-exercise type), ${skippedMalformedFrontmatter} skipped (malformed frontmatter), ${unknown} unknown (no registry kind), ${failed} failed${failedHint}.${customisedSummary}`
+    new Notice(summary)
   }
 
   async loadSettings(): Promise<void> {

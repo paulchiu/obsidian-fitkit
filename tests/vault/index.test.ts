@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { epleyE1rm, pickBestSet } from '../../src/domain/epley'
+import { epleyE1rm, pickBestSet, pickHeaviestSet } from '../../src/domain/epley'
 
 describe('index helpers', () => {
   it('calculates Epley e1RM', () => {
@@ -72,5 +72,57 @@ describe('index helpers', () => {
       reps: 3,
       e1rm: epleyE1rm(90, 3),
     })
+  })
+
+  it('picks the heaviest set and breaks ties by reps', () => {
+    expect(
+      pickHeaviestSet([
+        { weight: 100, reps: 3 },
+        { weight: 95, reps: 8 },
+        { weight: 100, reps: 5 },
+      ]),
+    ).toEqual({ weight: 100, reps: 5 })
+  })
+
+  it('picks positive-weight sets before zero-weight sets', () => {
+    expect(
+      pickHeaviestSet([
+        { set: 1, weight: 0, reps: 20 },
+        { set: 2, weight: 15, reps: 5 },
+      ]),
+    ).toEqual({ weight: 15, reps: 5, set: 2 })
+  })
+
+  it('picks the most reps from zero-weight sets when there are no positive weights', () => {
+    expect(
+      pickHeaviestSet([
+        { set: 1, weight: 0, reps: 8 },
+        { set: 2, weight: 0, reps: 12 },
+        { set: 3, weight: 0, reps: 10 },
+      ]),
+    ).toEqual({ weight: 0, reps: 12, set: 2 })
+  })
+
+  it('returns null when heaviest-set candidates are all empty', () => {
+    expect(pickHeaviestSet([{ set: 1 }, { set: 2, weight: 0 }, { set: 3, reps: 8 }])).toBeNull()
+  })
+
+  it('breaks zero-weight heaviest-set ties by lower set number', () => {
+    expect(
+      pickHeaviestSet([
+        { set: 3, weight: 0, reps: 12 },
+        { set: 2, weight: 0, reps: 12 },
+      ]),
+    ).toEqual({ weight: 0, reps: 12, set: 2 })
+  })
+
+  it('ignores incomplete heaviest-set candidates', () => {
+    expect(
+      pickHeaviestSet([
+        { weight: 100, reps: 0 },
+        { weight: Number.POSITIVE_INFINITY, reps: 5 },
+        { weight: 90, reps: 8 },
+      ]),
+    ).toEqual({ weight: 90, reps: 8 })
   })
 })

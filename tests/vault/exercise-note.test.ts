@@ -1,10 +1,28 @@
 import { describe, expect, it } from 'vitest'
 
+import { buildNotesBlock } from '../../src/domain/exercise-note-template'
 import type { FitKitIndex } from '../../src/domain/types'
 import { composeDashboard } from '../../src/vault/dashboard'
 import { composeExerciseNote } from '../../src/vault/exercise-note'
 
 describe('exercise-note composer', () => {
+  it('builds the Notes Dataview block literal contract', () => {
+    expect(buildNotesBlock('Squat', 'Fitness')).toBe(
+      [
+        '```dataview',
+        'TABLE WITHOUT ID',
+        '  file.link AS Workout,',
+        '  L.notes AS Note',
+        'FROM "Fitness/Workouts"',
+        'FLATTEN file.lists AS L',
+        'WHERE L.exercise = link("Squat") AND L.notes',
+        'SORT file.name DESC',
+        'LIMIT 20',
+        '```',
+      ].join('\n'),
+    )
+  })
+
   it('seeds a strength exercise note with Recent sessions and Notes Dataview blocks', () => {
     const markdown = composeExerciseNote('Squat', 'strength', 'Fitness/Workouts')
 
@@ -13,7 +31,13 @@ describe('exercise-note composer', () => {
         '---',
         'type: exercise',
         'kind: strength',
+        'metric: e1rm',
         '---',
+        '',
+        '## Progress chart',
+        '',
+        '```fitkit-chart',
+        '```',
         '',
         '## Recent sessions',
         '',
@@ -32,16 +56,7 @@ describe('exercise-note composer', () => {
         '',
         '## Notes',
         '',
-        '```dataview',
-        'TABLE WITHOUT ID',
-        '  file.link AS Workout,',
-        '  L.notes AS Note',
-        'FROM "Fitness/Workouts"',
-        'FLATTEN file.lists AS L',
-        'WHERE L.exercise = link("Squat") AND L.notes',
-        'SORT file.name DESC',
-        'LIMIT 20',
-        '```',
+        buildNotesBlock('Squat', 'Fitness'),
         '',
       ].join('\n'),
     )
@@ -57,6 +72,11 @@ describe('exercise-note composer', () => {
         'kind: duration',
         '---',
         '',
+        '## Progress chart',
+        '',
+        '```fitkit-chart',
+        '```',
+        '',
         '## Recent sessions',
         '',
         '```dataview',
@@ -70,16 +90,7 @@ describe('exercise-note composer', () => {
         '',
         '## Notes',
         '',
-        '```dataview',
-        'TABLE WITHOUT ID',
-        '  file.link AS Workout,',
-        '  L.notes AS Note',
-        'FROM "Fitness/Workouts"',
-        'FLATTEN file.lists AS L',
-        'WHERE L.exercise = link("Plank") AND L.notes',
-        'SORT file.name DESC',
-        'LIMIT 20',
-        '```',
+        buildNotesBlock('Plank', 'Fitness'),
         '',
       ].join('\n'),
     )
@@ -90,13 +101,14 @@ describe('exercise-note composer', () => {
 
     expect(markdown).toContain('FROM "Custom/Path/Workouts"')
     expect(markdown).not.toContain('FROM "Fitness/Workouts"')
+    expect(markdown).toContain(buildNotesBlock('Bench', 'Custom/Path'))
   })
 
   it('passes unusual exercise names through verbatim', () => {
     const markdown = composeExerciseNote('Machine Pushdown', 'strength', 'Fitness/Workouts')
 
     expect(markdown).toContain('WHERE L.exercise = link("Machine Pushdown") AND L.set')
-    expect(markdown).toContain('WHERE L.exercise = link("Machine Pushdown") AND L.notes')
+    expect(markdown).toContain(buildNotesBlock('Machine Pushdown', 'Fitness'))
   })
 
   it('is idempotent for the same inputs', () => {
