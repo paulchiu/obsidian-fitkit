@@ -371,9 +371,19 @@ body.is-mobile .fitkit-editor-root {
   outline: none;
 }
 
+.fitkit-set-note-modal-shell {
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+}
+
 .fitkit-set-note-modal {
   display: grid;
   gap: 12px;
+  max-height: inherit;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
 }
 
 .fitkit-set-note-modal h2 {
@@ -383,10 +393,20 @@ body.is-mobile .fitkit-editor-root {
 .fitkit-set-note-field {
   display: grid;
   gap: 4px;
+  min-height: 0;
 }
 
 .fitkit-set-note-textarea {
   min-height: 100px;
+}
+
+.fitkit-set-note-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin-top: 4px;
+  padding: 10px 0 max(8px, env(safe-area-inset-bottom));
+  background: var(--modal-background, var(--background-primary));
 }
 
 .fitkit-footer {
