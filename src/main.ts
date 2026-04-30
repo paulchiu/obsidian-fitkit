@@ -10,6 +10,7 @@ import { CreateMissingExercisesModal } from './ui/create-missing-exercises-modal
 import { renderExerciseChartBlock } from './ui/exercise-chart-block'
 import { ImportModal } from './ui/import-modal'
 import { ParseDiagnosticsModal } from './ui/parse-diagnostics-modal'
+import { renderWorkoutReadingModeSection } from './ui/workout-reading-mode'
 import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from './ui/workout-editor-view'
 import { regenerateDashboard } from './vault/dashboard'
 import { rebuildIndex } from './vault/index'
@@ -97,6 +98,7 @@ export default class FitKitPlugin extends Plugin {
     this.registerMarkdownCodeBlockProcessor('fitkit-chart', (source, el, ctx) =>
       renderExerciseChartBlock(this, source, el, ctx),
     )
+    this.registerMarkdownPostProcessor((el, ctx) => renderWorkoutReadingModeSection(this, el, ctx))
 
     this.registerView(VIEW_TYPE_FITKIT_WORKOUT_EDITOR, (leaf) => new WorkoutEditorView(leaf, this))
 
@@ -210,6 +212,9 @@ export default class FitKitPlugin extends Plugin {
   }
 
   private async maybeRouteWorkoutFile(file: TFile): Promise<void> {
+    if (!this.shouldAutoOpenWorkoutEditor()) {
+      return
+    }
     if (file.extension.toLowerCase() !== 'md') {
       return
     }
@@ -250,12 +255,19 @@ export default class FitKitPlugin extends Plugin {
   }
 
   private sweepLeavesForWorkout(): void {
+    if (!this.shouldAutoOpenWorkoutEditor()) {
+      return
+    }
     for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
       const view = leaf.view
       if (view instanceof MarkdownView && view.file && this.isWorkoutFile(view.file)) {
         void this.swapLeafToWorkoutEditor(leaf, view.file)
       }
     }
+  }
+
+  private shouldAutoOpenWorkoutEditor(): boolean {
+    return this.settings?.autoOpenWorkoutEditor !== false
   }
 
   private isWorkoutFile(file: TFile): boolean {

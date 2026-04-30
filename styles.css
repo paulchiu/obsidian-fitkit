@@ -773,3 +773,88 @@ body.is-mobile .fitkit-editor-root {
   font-size: 13px;
   padding: 0.5rem 0;
 }
+
+.fitkit-reading-hidden-source-row {
+  display: none;
+}
+
+.fitkit-reading-preview {
+  margin: 0.65rem 0 1rem;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  overflow: hidden;
+}
+
+.fitkit-reading-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.fitkit-reading-kind {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+}
+
+.fitkit-reading-count {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.fitkit-reading-note {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  white-space: pre-wrap;
+}
+
+.fitkit-reading-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+  font-size: var(--font-ui-small);
+}
+
+.fitkit-reading-table th,
+.fitkit-reading-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.fitkit-reading-table th {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  letter-spacing: 0;
+  background: var(--background-primary);
+}
+
+.fitkit-reading-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.fitkit-reading-empty {
+  padding: 10px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+@media (max-width: 520px) {
+  .fitkit-reading-preview {
+    overflow-x: auto;
+  }
+
+  .fitkit-reading-table {
+    min-width: 420px;
+  }
+}
