@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatDurationInput, parseDurationInput } from '../../src/domain/duration-input'
+import {
+  durationPartsFromSeconds,
+  formatDurationInput,
+  secondsFromDurationParts,
+} from '../../src/domain/duration-input'
 
 describe('duration input helpers', () => {
   it.each([
@@ -16,21 +20,16 @@ describe('duration input helpers', () => {
   })
 
   it.each([
-    ['90', 90],
-    ['90s', 90],
-    ['90 sec', 90],
-    ['3min', 180],
-    ['3 minutes', 180],
-    ['1.5h', 5400],
-    ['1h 2m 3s', 3723],
-    ['1 hour, 2 minutes and 3 seconds', 3723],
-    ['1:30', 90],
-    ['1:02:03', 3723],
-  ] as const)('parses %s as %s seconds', (input, expected) => {
-    expect(parseDurationInput(input)).toBe(expected)
+    [undefined, { hours: 0, minutes: 0, seconds: 0 }],
+    [45, { hours: 0, minutes: 0, seconds: 45 }],
+    [90, { hours: 0, minutes: 1, seconds: 30 }],
+    [3723, { hours: 1, minutes: 2, seconds: 3 }],
+  ] as const)('splits %s seconds into parts', (seconds, expected) => {
+    expect(durationPartsFromSeconds(seconds)).toEqual(expected)
   })
 
-  it.each(['', '   ', 'soon', '1:75', '1:70:00', '3min later'])('rejects %s', (input) => {
-    expect(parseDurationInput(input)).toBeNull()
+  it('combines structured duration parts into seconds', () => {
+    expect(secondsFromDurationParts({ hours: 1, minutes: 2, seconds: 3 })).toBe(3723)
+    expect(secondsFromDurationParts({ hours: 0, minutes: 90, seconds: 0 })).toBe(5400)
   })
 })
