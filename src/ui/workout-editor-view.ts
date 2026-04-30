@@ -2,6 +2,7 @@ import type { WorkspaceLeaf } from 'obsidian'
 import { ItemView, Menu, Notice, TFile, normalizePath, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
+import { formatDurationInput, parseDurationInput } from '../domain/duration-input'
 import { formatExerciseHistoryBadges, type ExerciseHistoryByName } from '../domain/exercise-history'
 import {
   createRegistry,
@@ -467,7 +468,7 @@ export class WorkoutEditorView extends ItemView {
 
     const header = wrap.createDiv({ cls: 'fitkit-set-row fitkit-duration-row fitkit-set-head' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Set' })
-    header.createSpan({ cls: 'fitkit-set-label', text: 'Duration (s)' })
+    header.createSpan({ cls: 'fitkit-set-label', text: 'Duration' })
 
     for (let i = 0; i < ex.durationEntries.length; i++) {
       this.renderDurationRow(wrap, ex, i, exerciseIndex)
@@ -482,7 +483,7 @@ export class WorkoutEditorView extends ItemView {
       ex.durationEntries.push({})
       this.markDirty()
       this.render()
-      this.focusRowCell(exerciseIndex, ex.durationEntries.length - 1, 'Duration (s)')
+      this.focusRowCell(exerciseIndex, ex.durationEntries.length - 1, 'Duration')
     })
 
     const isRunningHere = this.activeTimer?.card === ex
@@ -526,22 +527,43 @@ export class WorkoutEditorView extends ItemView {
       this.markDirty()
     })
 
-    const durationInput = this.createInputCell(row, 'Duration (s)', {
-      type: 'number',
-      step: '1',
-      inputmode: 'numeric',
+    const durationInput = this.createInputCell(row, 'Duration', {
+      type: 'text',
+      inputmode: 'text',
+      placeholder: '3min, 90s, 1:30',
     })
     if (isTiming && this.activeTimer) {
-      durationInput.value = String(this.liveSeconds(this.activeTimer))
+      durationInput.value = formatDurationInput(this.liveSeconds(this.activeTimer))
       durationInput.toggleAttribute('disabled', true)
       this.activeTimer.inputEl = durationInput
     } else {
-      durationInput.value =
-        durationEntry.durationSeconds !== undefined ? String(durationEntry.durationSeconds) : ''
+      durationInput.value = formatDurationInput(durationEntry.durationSeconds)
     }
     durationInput.addEventListener('input', () => {
-      durationEntry.durationSeconds = parseNumberInput(durationInput.value)
-      this.markDirty()
+      const parsed = parseDurationInput(durationInput.value)
+      if (parsed !== null) {
+        durationEntry.durationSeconds = parsed
+        durationInput.toggleAttribute('aria-invalid', false)
+        this.markDirty()
+        return
+      }
+      if (durationInput.value.trim().length === 0) {
+        durationEntry.durationSeconds = undefined
+        durationInput.toggleAttribute('aria-invalid', false)
+        this.markDirty()
+        return
+      }
+      durationInput.toggleAttribute('aria-invalid', true)
+    })
+    durationInput.addEventListener('blur', () => {
+      const parsed = parseDurationInput(durationInput.value)
+      if (parsed !== null) {
+        durationEntry.durationSeconds = parsed
+      } else if (durationInput.value.trim().length === 0) {
+        durationEntry.durationSeconds = undefined
+      }
+      durationInput.value = formatDurationInput(durationEntry.durationSeconds)
+      durationInput.toggleAttribute('aria-invalid', false)
     })
 
     this.renderRowActions(container, body, {
@@ -694,7 +716,7 @@ export class WorkoutEditorView extends ItemView {
     if (!timer || !timer.inputEl) {
       return
     }
-    timer.inputEl.value = String(this.liveSeconds(timer))
+    timer.inputEl.value = formatDurationInput(this.liveSeconds(timer))
   }
 
   private liveSeconds(timer: ActiveTimer): number {
@@ -1132,7 +1154,7 @@ export class WorkoutEditorView extends ItemView {
       this.model.exercises.push(card)
       this.markDirty()
       this.render()
-      const focusLabel = kind === 'strength' ? 'Weight' : 'Duration (s)'
+      const focusLabel = kind === 'strength' ? 'Weight' : 'Duration'
       this.focusRowCell(exerciseIndex, 0, focusLabel)
     }).open()
   }

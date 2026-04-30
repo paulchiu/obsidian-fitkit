@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Workout editor duration fields now display compact time values and accept smart input such as `3min`, `90s`, `1:30`, and `1:02:03` while keeping workout files stored as seconds.
+
 ### Changed
 
 ### Fixed

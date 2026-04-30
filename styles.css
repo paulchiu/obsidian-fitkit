@@ -279,6 +279,10 @@
   resize: vertical;
 }
 
+.fitkit-input[aria-invalid='true'] {
+  border-color: var(--text-error);
+}
+
 .fitkit-set-area {
   display: grid;
   gap: 6px;

@@ -711,6 +711,81 @@ describe('WorkoutEditorView duration timer', () => {
     expect(view.activeTimer).toBeNull()
   })
 
+  it('renderDurationRow formats stored seconds for display', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 90 }],
+    }
+    const view = createTimerView(ex)
+
+    const wrap = new TestElement('div')
+    view.renderDurationRow(wrap as unknown as HTMLElement, ex, 0, 0)
+
+    const durationCell = wrap
+      .findAllByClass('fitkit-cell')
+      .find((c) => c.dataset.label === 'Duration')
+    const input = durationCell?.children[0]
+    expect(input?.attributes.get('type')).toBe('text')
+    expect(input?.attributes.get('inputmode')).toBe('text')
+    expect(input?.attributes.get('placeholder')).toBe('3min, 90s, 1:30')
+    expect((input as unknown as { value?: string } | undefined)?.value).toBe('1:30')
+  })
+
+  it('renderDurationRow parses smart duration input into seconds', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{}],
+    }
+    const view = createTimerView(ex)
+    const wrap = new TestElement('div')
+    view.renderDurationRow(wrap as unknown as HTMLElement, ex, 0, 0)
+    const durationCell = wrap
+      .findAllByClass('fitkit-cell')
+      .find((c) => c.dataset.label === 'Duration')
+    const input = durationCell?.children[0]
+
+    ;(input as unknown as { value: string }).value = '3min'
+    input?.listenersFor('input')[0]?.({})
+    input?.listenersFor('blur')[0]?.({})
+
+    expect(ex.durationEntries[0]?.durationSeconds).toBe(180)
+    expect(input?.attributes.has('aria-invalid')).toBe(false)
+    expect((input as unknown as { value?: string } | undefined)?.value).toBe('3:00')
+    expect(view.markDirty).toHaveBeenCalled()
+  })
+
+  it('renderDurationRow preserves stored seconds while typed duration input is invalid', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 90 }],
+    }
+    const view = createTimerView(ex)
+    const wrap = new TestElement('div')
+    view.renderDurationRow(wrap as unknown as HTMLElement, ex, 0, 0)
+    const durationCell = wrap
+      .findAllByClass('fitkit-cell')
+      .find((c) => c.dataset.label === 'Duration')
+    const input = durationCell?.children[0]
+    view.markDirty.mockClear()
+    ;(input as unknown as { value: string }).value = 'soon'
+    input?.listenersFor('input')[0]?.({})
+
+    expect(ex.durationEntries[0]?.durationSeconds).toBe(90)
+    expect(input?.attributes.has('aria-invalid')).toBe(true)
+    expect(view.markDirty).not.toHaveBeenCalled()
+
+    input?.listenersFor('blur')[0]?.({})
+
+    expect(input?.attributes.has('aria-invalid')).toBe(false)
+    expect((input as unknown as { value?: string } | undefined)?.value).toBe('1:30')
+  })
+
   it('renderDurationRow shows the live counter, disables the input, and adds the timing class', () => {
     const ex: TimerExerciseCard = {
       name: 'Plank',
@@ -730,9 +805,9 @@ describe('WorkoutEditorView duration timer', () => {
     expect(row?.dataset.fitkitTimerRow).toBe('0:0')
     const durationCell = row
       ?.findAllByClass('fitkit-cell')
-      .find((c) => c.dataset.label === 'Duration (s)')
+      .find((c) => c.dataset.label === 'Duration')
     const input = durationCell?.children[0]
     expect(input?.attributes.has('disabled')).toBe(true)
-    expect((input as unknown as { value?: string } | undefined)?.value).toBe('7')
+    expect((input as unknown as { value?: string } | undefined)?.value).toBe('7s')
   })
 })
