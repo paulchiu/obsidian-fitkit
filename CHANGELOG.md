@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `Sync and repair exercise notes` now repairs invalid or stale exercise note `kind:` frontmatter, invalid strength `metric:` values, and stale generated Recent sessions blocks during rebuild.
+
 ### Removed
 
 ## [0.12.0] - 2026-05-02

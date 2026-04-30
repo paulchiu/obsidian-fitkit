@@ -1,4 +1,9 @@
 import { kindForName, type ExerciseKind, type ExerciseRegistry } from './exercise-registry'
+import {
+  DEFAULT_EXERCISE_METRIC,
+  parseExerciseMetric,
+  type ExerciseMetric,
+} from './exercise-metric'
 import { buildNotesBlock, buildRecentSessionsBlock } from './exercise-note-template'
 
 const FENCE_OPEN = /^(`{3,})([^`]*)$/
@@ -140,25 +145,41 @@ function repairFrontmatter(
     nextFrontmatterLines = ['type: exercise', ...nextFrontmatterLines]
   }
 
-  const kindLineIndex = findFrontmatterKeyLine(nextFrontmatterLines, 'kind')
+  let kindLineIndex = findFrontmatterKeyLine(nextFrontmatterLines, 'kind')
+  let effectiveKind = frontmatterKind(nextFrontmatterLines)
   let unknownKind = false
-  if (kindLineIndex < 0) {
-    if (registryKind) {
+  if (registryKind) {
+    if (kindLineIndex < 0) {
       const typeIndex = findFrontmatterKeyLine(nextFrontmatterLines, 'type')
       nextFrontmatterLines = insertLines(nextFrontmatterLines, typeIndex + 1, [
         `kind: ${registryKind}`,
       ])
-    } else {
-      unknownKind = true
+    } else if (effectiveKind !== registryKind) {
+      nextFrontmatterLines = replaceLine(
+        nextFrontmatterLines,
+        kindLineIndex,
+        `kind: ${registryKind}`,
+      )
     }
+    effectiveKind = registryKind
+  } else if (kindLineIndex < 0 || effectiveKind === null) {
+    unknownKind = true
   }
 
-  const effectiveKind = frontmatterKind(nextFrontmatterLines)
-  if (effectiveKind === 'strength' && findFrontmatterKeyLine(nextFrontmatterLines, 'metric') < 0) {
-    const updatedKindLineIndex = findFrontmatterKeyLine(nextFrontmatterLines, 'kind')
-    nextFrontmatterLines = insertLines(nextFrontmatterLines, updatedKindLineIndex + 1, [
-      'metric: e1rm',
-    ])
+  if (effectiveKind === 'strength') {
+    const metricLineIndex = findFrontmatterKeyLine(nextFrontmatterLines, 'metric')
+    if (metricLineIndex < 0) {
+      kindLineIndex = findFrontmatterKeyLine(nextFrontmatterLines, 'kind')
+      nextFrontmatterLines = insertLines(nextFrontmatterLines, kindLineIndex + 1, [
+        `metric: ${DEFAULT_EXERCISE_METRIC}`,
+      ])
+    } else if (frontmatterMetric(nextFrontmatterLines[metricLineIndex] ?? '') === null) {
+      nextFrontmatterLines = replaceLine(
+        nextFrontmatterLines,
+        metricLineIndex,
+        `metric: ${DEFAULT_EXERCISE_METRIC}`,
+      )
+    }
   }
 
   const markdown = [
@@ -199,6 +220,10 @@ function frontmatterKind(lines: ReadonlyArray<string>): ExerciseKind | null {
   return null
 }
 
+function frontmatterMetric(line: string): ExerciseMetric | null {
+  return parseExerciseMetric(scalarValue(line))
+}
+
 function repairRecentSessions(
   source: string,
   options: ExerciseNoteMigrationOptions,
@@ -237,6 +262,19 @@ function repairRecentSessions(
   if (currentBlock === canonicalBlock) {
     return { markdown: source, warnings: [] }
   }
+  const alternateCanonicalBlock = buildRecentSessionsBlock(
+    options.name,
+    alternateExerciseKind(kind),
+    options.fitnessRoot,
+  )
+  if (!isCustomRecentSessionsBlock(currentBlock, alternateCanonicalBlock)) {
+    const next = [
+      ...document.lines.slice(0, block.start),
+      ...canonicalLines,
+      ...document.lines.slice(block.end + 1),
+    ]
+    return { markdown: joinMarkdown({ ...document, lines: next }), warnings: [] }
+  }
   if (isCustomRecentSessionsBlock(currentBlock, canonicalBlock)) {
     return {
       markdown: source,
@@ -253,6 +291,10 @@ function repairRecentSessions(
     ...document.lines.slice(block.end + 1),
   ]
   return { markdown: joinMarkdown({ ...document, lines: next }), warnings: [] }
+}
+
+function alternateExerciseKind(kind: ExerciseKind): ExerciseKind {
+  return kind === 'strength' ? 'duration' : 'strength'
 }
 
 function repairNotesSection(
@@ -575,7 +617,26 @@ function scalarValue(line: string): string {
   if (colon < 0) {
     return ''
   }
-  return stripScalarQuotes(line.slice(colon + 1).trim()).toLowerCase()
+  return stripScalarQuotes(stripInlineComment(line.slice(colon + 1)).trim()).toLowerCase()
+}
+
+function stripInlineComment(value: string): string {
+  let quote: '"' | "'" | null = null
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index]
+    if ((char === '"' || char === "'") && quote === null) {
+      quote = char
+      continue
+    }
+    if (char === quote) {
+      quote = null
+      continue
+    }
+    if (char === '#' && quote === null) {
+      return value.slice(0, index).trimEnd()
+    }
+  }
+  return value
 }
 
 function stripScalarQuotes(value: string): string {
@@ -621,6 +682,10 @@ function restoreMarkdownSource(markdown: string, source: NormalizedMarkdownSourc
 
 function insertLines<T>(lines: ReadonlyArray<T>, index: number, insertion: ReadonlyArray<T>): T[] {
   return [...lines.slice(0, index), ...insertion, ...lines.slice(index)]
+}
+
+function replaceLine<T>(lines: ReadonlyArray<T>, index: number, line: T): T[] {
+  return [...lines.slice(0, index), line, ...lines.slice(index + 1)]
 }
 
 function insertSection(
