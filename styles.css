@@ -286,6 +286,35 @@ body.is-mobile .fitkit-editor-root {
   resize: vertical;
 }
 
+.fitkit-input[aria-invalid='true'] {
+  border-color: var(--text-error);
+}
+
+.fitkit-duration-parts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.fitkit-duration-part {
+  position: relative;
+  min-width: 0;
+}
+
+.fitkit-duration-part-input {
+  padding-right: 20px;
+}
+
+.fitkit-duration-part-label {
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  font-size: 11px;
+  pointer-events: none;
+}
+
 .fitkit-set-area {
   display: grid;
   gap: 6px;
