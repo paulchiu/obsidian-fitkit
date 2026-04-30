@@ -14,6 +14,7 @@ export interface FitKitSettings {
   fitnessRoot: string
   journalFolder: string
   autoCreateMissingExercises: boolean
+  autoOpenWorkoutEditor: boolean
   autoUpdateDashboard: boolean
   autosaveDebounceMs: number
   chartSessionsWindow: number
@@ -26,6 +27,7 @@ export const DEFAULT_SETTINGS: FitKitSettings = {
   fitnessRoot: 'Fitness',
   journalFolder: '',
   autoCreateMissingExercises: false,
+  autoOpenWorkoutEditor: true,
   autoUpdateDashboard: true,
   autosaveDebounceMs: 600,
   chartSessionsWindow: 30,
@@ -103,6 +105,18 @@ export class FitKitSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle.setValue(settings.autoCreateMissingExercises).onChange(async (value) => {
           settings.autoCreateMissingExercises = value
+          await this.plugin.saveSettings()
+        }),
+      )
+
+    new Setting(containerEl)
+      .setName('Auto-open workout editor')
+      .setDesc(
+        'When opening a workout note, switch it into the editor automatically; turn this off to use normal Markdown reading mode by default.',
+      )
+      .addToggle((toggle) =>
+        toggle.setValue(settings.autoOpenWorkoutEditor).onChange(async (value) => {
+          settings.autoOpenWorkoutEditor = value
           await this.plugin.saveSettings()
         }),
       )

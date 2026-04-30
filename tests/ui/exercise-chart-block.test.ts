@@ -87,6 +87,7 @@ function createSettings(overrides: Partial<FitKitSettings> = {}): FitKitSettings
     fitnessRoot: 'Fitness',
     journalFolder: '',
     autoCreateMissingExercises: false,
+    autoOpenWorkoutEditor: true,
     autoUpdateDashboard: true,
     autosaveDebounceMs: 600,
     chartSessionsWindow: 30,

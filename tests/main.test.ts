@@ -127,6 +127,7 @@ vi.mock('obsidian', () => {
 import { MarkdownView, TFile } from 'obsidian'
 
 import FitKitPlugin from '../src/main'
+import { DEFAULT_SETTINGS, type FitKitSettings } from '../src/settings'
 import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from '../src/ui/workout-editor-view'
 
 interface SetViewStateArg {
@@ -161,6 +162,7 @@ interface MockApp {
 
 interface TestPlugin {
   app: MockApp
+  settings: FitKitSettings
   maybeRouteWorkoutFile(file: TFile): Promise<void>
   sweepLeavesForWorkout(): void
   openWorkoutEditor(file: TFile): Promise<void>
@@ -197,9 +199,13 @@ const makeEditorLeaf = (currentFile: TFile | null): MockLeaf => {
   return leaf
 }
 
-const createPlugin = (app: MockApp): TestPlugin => {
+const createPlugin = (
+  app: MockApp,
+  settings: FitKitSettings = { ...DEFAULT_SETTINGS },
+): TestPlugin => {
   const plugin = Object.create(FitKitPlugin.prototype) as TestPlugin
   plugin.app = app
+  plugin.settings = settings
   return plugin
 }
 
@@ -321,6 +327,19 @@ describe('FitKitPlugin file-open routing (no editor open)', () => {
     await plugin.maybeRouteWorkoutFile(file)
 
     expect(app.workspace.getActiveViewOfType).toHaveBeenCalled()
+  })
+
+  it('leaves workout markdown open when auto-open editor is disabled', async () => {
+    const file = makeWorkoutFile()
+    const leaf = makeLeafShowingFile(file)
+    app.workspace.getActiveViewOfType = vi.fn(() => leaf.view)
+    app.metadataCache.getFileCache = vi.fn(() => ({ frontmatter: { type: 'workout' } }))
+    plugin.settings = { ...DEFAULT_SETTINGS, autoOpenWorkoutEditor: false }
+
+    await plugin.maybeRouteWorkoutFile(file)
+
+    expect(leaf.setViewState).not.toHaveBeenCalled()
+    expect(app.workspace.getActiveViewOfType).not.toHaveBeenCalled()
   })
 })
 
@@ -449,6 +468,21 @@ describe('FitKitPlugin layout-ready sweep', () => {
       active: true,
     })
     expect(journalLeaf.setViewState).not.toHaveBeenCalled()
+  })
+
+  it('does not sweep workout markdown leaves when auto-open editor is disabled', () => {
+    const workoutFile = makeWorkoutFile('Workouts/A.md')
+    const workoutLeaf = makeLeafShowingFile(workoutFile)
+    const app = makeApp({
+      getLeavesOfType: vi.fn((type: string) => (type === 'markdown' ? [workoutLeaf] : [])),
+    })
+    app.metadataCache.getFileCache = vi.fn(() => ({ frontmatter: { type: 'workout' } }))
+    const plugin = createPlugin(app, { ...DEFAULT_SETTINGS, autoOpenWorkoutEditor: false })
+
+    plugin.sweepLeavesForWorkout()
+
+    expect(workoutLeaf.setViewState).not.toHaveBeenCalled()
+    expect(app.workspace.getLeavesOfType).not.toHaveBeenCalled()
   })
 })
 

@@ -37,6 +37,11 @@ as structured rows while the note remains plain Markdown. The editor autosaves
 after the configured debounce and tracks file changes (mtime + content hash) to
 warn on conflicts.
 
+In normal Obsidian reading mode, FitKit renders workout rows as compact read-only
+tables while keeping the raw note format unchanged. Turn off `Auto-open workout
+editor` if you prefer workout notes to open as Markdown by default, then use the
+editor command when you want the data-entry surface.
+
 Per-card controls live in a top row that lines up the drag handle, exercise
 name, and a gear menu at a uniform height. The gear menu offers switch kind,
 move up, move down, and remove (with confirmation). Drag the left-edge grip
@@ -109,6 +114,7 @@ Values are stored by Obsidian plugin settings.
 | `fitnessRoot`                   | `Fitness`    | Folder under the vault root where workouts, exercises, and the dashboard live.                                  |
 | `journalFolder`                 | empty string | Optional folder where rough journal notes live, used by the import command.                                     |
 | `autoCreateMissingExercises`    | `false`      | When the importer or editor sees an unknown exercise, also create a stub note under `<fitnessRoot>/Exercises/`. |
+| `autoOpenWorkoutEditor`         | `true`       | When opening a workout note, automatically switch it into the FitKit editor instead of staying in Markdown.     |
 | `autoUpdateDashboard`           | `true`       | When a workout note is saved, refresh the index entry and regenerate the dashboard.                             |
 | `autosaveDebounceMs`            | `600`        | How long to wait after the last edit before persisting changes in the workout editor view.                      |
 | `exerciseRegistry`              | `[]`         | Stored exercise registry entries used for canonical exercise names and aliases.                                 |
