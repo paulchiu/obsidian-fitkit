@@ -5,6 +5,13 @@
   overflow-y: auto;
 }
 
+body.is-mobile .fitkit-editor-root {
+  --fitkit-mobile-bottom-toolbar-space: calc(96px + env(safe-area-inset-bottom));
+
+  padding-bottom: var(--fitkit-mobile-bottom-toolbar-space);
+  scroll-padding-bottom: var(--fitkit-mobile-bottom-toolbar-space);
+}
+
 .fitkit-empty {
   color: var(--text-muted);
   padding: 24px 8px;
