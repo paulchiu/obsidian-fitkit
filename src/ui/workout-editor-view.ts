@@ -2,6 +2,11 @@ import type { WorkspaceLeaf } from 'obsidian'
 import { ItemView, Menu, Notice, TFile, normalizePath, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
+import {
+  durationPartsFromSeconds,
+  formatDurationInput,
+  secondsFromDurationParts,
+} from '../domain/duration-input'
 import { formatExerciseHistoryBadges, type ExerciseHistoryByName } from '../domain/exercise-history'
 import {
   createRegistry,
@@ -467,7 +472,7 @@ export class WorkoutEditorView extends ItemView {
 
     const header = wrap.createDiv({ cls: 'fitkit-set-row fitkit-duration-row fitkit-set-head' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Set' })
-    header.createSpan({ cls: 'fitkit-set-label', text: 'Duration (s)' })
+    header.createSpan({ cls: 'fitkit-set-label', text: 'Duration' })
 
     for (let i = 0; i < ex.durationEntries.length; i++) {
       this.renderDurationRow(wrap, ex, i, exerciseIndex)
@@ -482,7 +487,7 @@ export class WorkoutEditorView extends ItemView {
       ex.durationEntries.push({})
       this.markDirty()
       this.render()
-      this.focusRowCell(exerciseIndex, ex.durationEntries.length - 1, 'Duration (s)')
+      this.focusRowCell(exerciseIndex, ex.durationEntries.length - 1, 'Duration')
     })
 
     const isRunningHere = this.activeTimer?.card === ex
@@ -526,23 +531,18 @@ export class WorkoutEditorView extends ItemView {
       this.markDirty()
     })
 
-    const durationInput = this.createInputCell(row, 'Duration (s)', {
-      type: 'number',
-      step: '1',
-      inputmode: 'numeric',
-    })
+    const durationCell = this.createCell(row, 'Duration')
     if (isTiming && this.activeTimer) {
-      durationInput.value = String(this.liveSeconds(this.activeTimer))
+      const durationInput = durationCell.createEl('input', {
+        cls: 'fitkit-input',
+        attr: { type: 'text', 'aria-label': 'Duration' },
+      })
+      durationInput.value = formatDurationInput(this.liveSeconds(this.activeTimer))
       durationInput.toggleAttribute('disabled', true)
       this.activeTimer.inputEl = durationInput
     } else {
-      durationInput.value =
-        durationEntry.durationSeconds !== undefined ? String(durationEntry.durationSeconds) : ''
+      this.renderDurationPartInputs(durationCell, durationEntry)
     }
-    durationInput.addEventListener('input', () => {
-      durationEntry.durationSeconds = parseNumberInput(durationInput.value)
-      this.markDirty()
-    })
 
     this.renderRowActions(container, body, {
       label: `duration entry ${i + 1}`,
@@ -561,6 +561,81 @@ export class WorkoutEditorView extends ItemView {
         this.render()
       },
     })
+  }
+
+  private renderDurationPartInputs(cell: HTMLElement, durationEntry: EditableDurationEntry): void {
+    const group = cell.createDiv({
+      cls: 'fitkit-duration-parts',
+      attr: { role: 'group', 'aria-label': 'Duration' },
+    })
+    const hoursInput = this.createDurationPartInput(group, 'Hours', 'h')
+    const minutesInput = this.createDurationPartInput(group, 'Minutes', 'm', true)
+    const secondsInput = this.createDurationPartInput(group, 'Seconds', 's')
+    const inputs = { hours: hoursInput, minutes: minutesInput, seconds: secondsInput }
+    setDurationPartInputValues(inputs, durationEntry.durationSeconds)
+
+    const sync = (mark: boolean): boolean => {
+      const hours = parseDurationPartInput(hoursInput.value)
+      const minutes = parseDurationPartInput(minutesInput.value)
+      const seconds = parseDurationPartInput(secondsInput.value)
+      const invalid = hours === null || minutes === null || seconds === null
+      group.toggleAttribute('aria-invalid', invalid)
+      hoursInput.toggleAttribute('aria-invalid', hours === null)
+      minutesInput.toggleAttribute('aria-invalid', minutes === null)
+      secondsInput.toggleAttribute('aria-invalid', seconds === null)
+      if (hours === null || minutes === null || seconds === null) {
+        return false
+      }
+      const hasValue = [hoursInput, minutesInput, secondsInput].some(
+        (input) => input.value.trim().length > 0,
+      )
+      durationEntry.durationSeconds = hasValue
+        ? secondsFromDurationParts({ hours, minutes, seconds })
+        : undefined
+      if (mark) {
+        this.markDirty()
+      }
+      return true
+    }
+
+    const normalize = (): void => {
+      void sync(false)
+      setDurationPartInputValues(inputs, durationEntry.durationSeconds)
+      group.toggleAttribute('aria-invalid', false)
+      for (const input of [hoursInput, minutesInput, secondsInput]) {
+        input.toggleAttribute('aria-invalid', false)
+      }
+    }
+
+    for (const input of [hoursInput, minutesInput, secondsInput]) {
+      input.addEventListener('input', () => void sync(true))
+      input.addEventListener('blur', normalize)
+    }
+  }
+
+  private createDurationPartInput(
+    group: HTMLElement,
+    label: string,
+    suffix: string,
+    defaultFocus = false,
+  ): HTMLInputElement {
+    const field = group.createDiv({ cls: 'fitkit-duration-part' })
+    const input = field.createEl('input', {
+      cls: 'fitkit-input fitkit-duration-part-input',
+      attr: {
+        type: 'number',
+        min: '0',
+        step: '1',
+        inputmode: 'numeric',
+        placeholder: suffix,
+      },
+    })
+    input.setAttr('aria-label', label)
+    if (defaultFocus) {
+      input.setAttr('data-fitkit-default-focus', 'true')
+    }
+    field.createSpan({ cls: 'fitkit-duration-part-label', text: suffix })
+    return input
   }
 
   private renderRowActions(
@@ -694,7 +769,7 @@ export class WorkoutEditorView extends ItemView {
     if (!timer || !timer.inputEl) {
       return
     }
-    timer.inputEl.value = String(this.liveSeconds(timer))
+    timer.inputEl.value = formatDurationInput(this.liveSeconds(timer))
   }
 
   private liveSeconds(timer: ActiveTimer): number {
@@ -829,7 +904,8 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     const selector = `.fitkit-cell[data-label="${label}"] input.fitkit-input`
-    const input = row.querySelector(selector)
+    const preferredInput = row.querySelector(`${selector}[data-fitkit-default-focus="true"]`)
+    const input = preferredInput ?? row.querySelector(selector)
     if (input instanceof HTMLInputElement) {
       input.focus()
       input.select()
@@ -1132,7 +1208,7 @@ export class WorkoutEditorView extends ItemView {
       this.model.exercises.push(card)
       this.markDirty()
       this.render()
-      const focusLabel = kind === 'strength' ? 'Weight' : 'Duration (s)'
+      const focusLabel = kind === 'strength' ? 'Weight' : 'Duration'
       this.focusRowCell(exerciseIndex, 0, focusLabel)
     }).open()
   }
@@ -1307,6 +1383,28 @@ function parseNumberInput(raw: string): number | undefined {
     return undefined
   }
   return n
+}
+
+function parseDurationPartInput(raw: string): number | null {
+  const trimmed = raw.trim()
+  if (trimmed.length === 0) {
+    return 0
+  }
+  if (!/^\d+$/.test(trimmed)) {
+    return null
+  }
+  const value = Number.parseInt(trimmed, 10)
+  return Number.isFinite(value) ? value : null
+}
+
+function setDurationPartInputValues(
+  inputs: Record<'hours' | 'minutes' | 'seconds', HTMLInputElement>,
+  seconds: number | undefined,
+): void {
+  const parts = durationPartsFromSeconds(seconds)
+  inputs.hours.value = parts.hours > 0 ? String(parts.hours) : ''
+  inputs.minutes.value = parts.minutes > 0 || parts.hours > 0 ? String(parts.minutes) : ''
+  inputs.seconds.value = parts.seconds > 0 || seconds !== undefined ? String(parts.seconds) : ''
 }
 
 function hasRows(card: ExerciseCard): boolean {
