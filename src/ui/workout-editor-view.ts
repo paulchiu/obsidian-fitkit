@@ -2,6 +2,7 @@ import type { WorkspaceLeaf } from 'obsidian'
 import { ItemView, Menu, Notice, TFile, normalizePath, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
+import { formatDurationInput, parseDurationInput } from '../domain/duration-input'
 import { formatExerciseHistoryBadges, type ExerciseHistoryByName } from '../domain/exercise-history'
 import {
   createRegistry,
@@ -467,7 +468,7 @@ export class WorkoutEditorView extends ItemView {
 
     const header = wrap.createDiv({ cls: 'fitkit-set-row fitkit-duration-row fitkit-set-head' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Set' })
-    header.createSpan({ cls: 'fitkit-set-label', text: 'Duration (s)' })
+    header.createSpan({ cls: 'fitkit-set-label', text: 'Duration' })
 
     for (let i = 0; i < ex.durationEntries.length; i++) {
       this.renderDurationRow(wrap, ex, i, exerciseIndex)
@@ -482,7 +483,7 @@ export class WorkoutEditorView extends ItemView {
       ex.durationEntries.push({})
       this.markDirty()
       this.render()
-      this.focusRowCell(exerciseIndex, ex.durationEntries.length - 1, 'Duration (s)')
+      this.focusRowCell(exerciseIndex, ex.durationEntries.length - 1, 'Duration')
     })
 
     const isRunningHere = this.activeTimer?.card === ex
@@ -526,23 +527,18 @@ export class WorkoutEditorView extends ItemView {
       this.markDirty()
     })
 
-    const durationInput = this.createInputCell(row, 'Duration (s)', {
-      type: 'number',
-      step: '1',
-      inputmode: 'numeric',
-    })
+    const durationCell = this.createCell(row, 'Duration')
     if (isTiming && this.activeTimer) {
-      durationInput.value = String(this.liveSeconds(this.activeTimer))
+      const durationInput = durationCell.createEl('input', {
+        cls: 'fitkit-input fitkit-duration-input',
+        attr: { type: 'text', 'aria-label': 'Duration' },
+      })
+      durationInput.value = formatDurationInput(this.liveSeconds(this.activeTimer))
       durationInput.toggleAttribute('disabled', true)
       this.activeTimer.inputEl = durationInput
     } else {
-      durationInput.value =
-        durationEntry.durationSeconds !== undefined ? String(durationEntry.durationSeconds) : ''
+      this.renderDurationInput(durationCell, durationEntry)
     }
-    durationInput.addEventListener('input', () => {
-      durationEntry.durationSeconds = parseNumberInput(durationInput.value)
-      this.markDirty()
-    })
 
     this.renderRowActions(container, body, {
       label: `duration entry ${i + 1}`,
@@ -560,6 +556,45 @@ export class WorkoutEditorView extends ItemView {
         this.markDirty()
         this.render()
       },
+    })
+  }
+
+  private renderDurationInput(cell: HTMLElement, durationEntry: EditableDurationEntry): void {
+    const input = cell.createEl('input', {
+      cls: 'fitkit-input fitkit-duration-input',
+      attr: {
+        type: 'text',
+        inputmode: 'text',
+        placeholder: '0s',
+      },
+    })
+    input.setAttr('aria-label', 'Duration')
+    input.setAttr('data-fitkit-default-focus', 'true')
+    input.value = formatDurationInput(durationEntry.durationSeconds)
+
+    const sync = (mark: boolean): boolean => {
+      const parsed = parseDurationInput(input.value)
+      setAriaInvalid(input, parsed === null)
+      if (parsed === null) {
+        return false
+      }
+      durationEntry.durationSeconds = parsed.seconds
+      if (mark) {
+        this.markDirty()
+      }
+      return true
+    }
+
+    input.addEventListener('input', () => void sync(true))
+    input.addEventListener('blur', () => {
+      const parsed = parseDurationInput(input.value)
+      setAriaInvalid(input, false)
+      if (parsed === null) {
+        input.value = formatDurationInput(durationEntry.durationSeconds)
+        return
+      }
+      durationEntry.durationSeconds = parsed.seconds
+      input.value = parsed.display
     })
   }
 
@@ -694,7 +729,7 @@ export class WorkoutEditorView extends ItemView {
     if (!timer || !timer.inputEl) {
       return
     }
-    timer.inputEl.value = String(this.liveSeconds(timer))
+    timer.inputEl.value = formatDurationInput(this.liveSeconds(timer))
   }
 
   private liveSeconds(timer: ActiveTimer): number {
@@ -829,7 +864,8 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     const selector = `.fitkit-cell[data-label="${label}"] input.fitkit-input`
-    const input = row.querySelector(selector)
+    const preferredInput = row.querySelector(`${selector}[data-fitkit-default-focus="true"]`)
+    const input = preferredInput ?? row.querySelector(selector)
     if (input instanceof HTMLInputElement) {
       input.focus()
       input.select()
@@ -1132,7 +1168,7 @@ export class WorkoutEditorView extends ItemView {
       this.model.exercises.push(card)
       this.markDirty()
       this.render()
-      const focusLabel = kind === 'strength' ? 'Weight' : 'Duration (s)'
+      const focusLabel = kind === 'strength' ? 'Weight' : 'Duration'
       this.focusRowCell(exerciseIndex, 0, focusLabel)
     }).open()
   }
@@ -1307,6 +1343,14 @@ function parseNumberInput(raw: string): number | undefined {
     return undefined
   }
   return n
+}
+
+function setAriaInvalid(element: HTMLElement, invalid: boolean): void {
+  if (invalid) {
+    element.setAttr('aria-invalid', 'true')
+  } else {
+    element.toggleAttribute('aria-invalid', false)
+  }
 }
 
 function hasRows(card: ExerciseCard): boolean {

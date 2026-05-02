@@ -711,7 +711,30 @@ describe('WorkoutEditorView duration timer', () => {
     expect(view.activeTimer).toBeNull()
   })
 
-  it('renderDurationRow shows the live counter, disables the input, and adds the timing class', () => {
+  it('renderDurationRow displays stored seconds in one formatted duration text input', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 90 }],
+    }
+    const view = createTimerView(ex)
+
+    const wrap = new TestElement('div')
+    view.renderDurationRow(wrap as unknown as HTMLElement, ex, 0, 0)
+
+    const durationCell = wrap
+      .findAllByClass('fitkit-cell')
+      .find((c) => c.dataset.label === 'Duration')
+    const input = durationCell?.findByClass('fitkit-duration-input')
+    expect(input?.attributes.get('aria-label')).toBe('Duration')
+    expect(input?.attributes.get('type')).toBe('text')
+    expect(input?.attributes.get('placeholder')).toBe('0s')
+    expect(input?.attributes.get('data-fitkit-default-focus')).toBe('true')
+    expect((input as unknown as { value?: string } | undefined)?.value).toBe('1m30s')
+  })
+
+  it('renderDurationRow parses duration text into seconds and normalizes on blur', () => {
     const ex: TimerExerciseCard = {
       name: 'Plank',
       kind: 'duration',
@@ -719,8 +742,86 @@ describe('WorkoutEditorView duration timer', () => {
       durationEntries: [{}],
     }
     const view = createTimerView(ex)
+    const wrap = new TestElement('div')
+    view.renderDurationRow(wrap as unknown as HTMLElement, ex, 0, 0)
+    const durationCell = wrap
+      .findAllByClass('fitkit-cell')
+      .find((c) => c.dataset.label === 'Duration')
+    const input = durationCell?.findByClass('fitkit-duration-input')
+
+    ;(input as unknown as { value: string }).value = '5:30'
+    input?.listenersFor('input')[0]?.({})
+
+    expect(ex.durationEntries[0]?.durationSeconds).toBe(330)
+    expect(input?.attributes.has('aria-invalid')).toBe(false)
+    expect(view.markDirty).toHaveBeenCalled()
+
+    input?.listenersFor('blur')[0]?.({})
+
+    expect((input as unknown as { value?: string } | undefined)?.value).toBe('5m30s')
+  })
+
+  it('renderDurationRow accepts unit text and normalizes missing seconds on blur', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{}],
+    }
+    const view = createTimerView(ex)
+    const wrap = new TestElement('div')
+    view.renderDurationRow(wrap as unknown as HTMLElement, ex, 0, 0)
+    const durationCell = wrap
+      .findAllByClass('fitkit-cell')
+      .find((c) => c.dataset.label === 'Duration')
+    const input = durationCell?.findByClass('fitkit-duration-input')
+
+    ;(input as unknown as { value: string }).value = '5m'
+    input?.listenersFor('input')[0]?.({})
+    input?.listenersFor('blur')[0]?.({})
+
+    expect(ex.durationEntries[0]?.durationSeconds).toBe(300)
+    expect((input as unknown as { value?: string } | undefined)?.value).toBe('5m')
+  })
+
+  it('renderDurationRow preserves stored seconds while duration text is invalid', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 90 }],
+    }
+    const view = createTimerView(ex)
+    const wrap = new TestElement('div')
+    view.renderDurationRow(wrap as unknown as HTMLElement, ex, 0, 0)
+    const durationCell = wrap
+      .findAllByClass('fitkit-cell')
+      .find((c) => c.dataset.label === 'Duration')
+    const input = durationCell?.findByClass('fitkit-duration-input')
+    view.markDirty.mockClear()
+    ;(input as unknown as { value: string }).value = 'soon'
+    input?.listenersFor('input')[0]?.({})
+
+    expect(ex.durationEntries[0]?.durationSeconds).toBe(90)
+    expect(input?.attributes.get('aria-invalid')).toBe('true')
+    expect(view.markDirty).not.toHaveBeenCalled()
+
+    input?.listenersFor('blur')[0]?.({})
+
+    expect(input?.attributes.has('aria-invalid')).toBe(false)
+    expect((input as unknown as { value?: string } | undefined)?.value).toBe('1m30s')
+  })
+
+  it('renderDurationRow shows the live counter, disables the input, and adds the timing class', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 59 }],
+    }
+    const view = createTimerView(ex)
     view.startCardTimer(ex)
-    vi.setSystemTime(new Date('2026-04-28T00:00:07Z'))
+    vi.setSystemTime(new Date('2026-04-28T00:00:02Z'))
 
     const wrap = new TestElement('div')
     view.renderDurationRow(wrap as unknown as HTMLElement, ex, 0, 0)
@@ -730,9 +831,9 @@ describe('WorkoutEditorView duration timer', () => {
     expect(row?.dataset.fitkitTimerRow).toBe('0:0')
     const durationCell = row
       ?.findAllByClass('fitkit-cell')
-      .find((c) => c.dataset.label === 'Duration (s)')
+      .find((c) => c.dataset.label === 'Duration')
     const input = durationCell?.children[0]
     expect(input?.attributes.has('disabled')).toBe(true)
-    expect((input as unknown as { value?: string } | undefined)?.value).toBe('7')
+    expect((input as unknown as { value?: string } | undefined)?.value).toBe('1m1s')
   })
 })

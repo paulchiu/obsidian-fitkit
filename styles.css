@@ -286,6 +286,14 @@ body.is-mobile .fitkit-editor-root {
   resize: vertical;
 }
 
+.fitkit-input[aria-invalid='true'] {
+  border-color: var(--text-error);
+}
+
+.fitkit-duration-input {
+  font-variant-numeric: tabular-nums;
+}
+
 .fitkit-set-area {
   display: grid;
   gap: 6px;

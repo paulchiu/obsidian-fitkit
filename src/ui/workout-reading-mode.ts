@@ -1,5 +1,6 @@
 import { TFile, type MarkdownPostProcessorContext } from 'obsidian'
 
+import { formatDurationInput } from '../domain/duration-input'
 import { parseWorkoutNote } from '../domain/workout-note-model'
 import type { DurationEntry, ExerciseEntry, StrengthSet } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
@@ -49,27 +50,7 @@ export function formatReps(value: number | undefined): string {
 }
 
 export function formatDurationSeconds(value: number | undefined): string {
-  if (value === undefined || !Number.isFinite(value)) {
-    return '-'
-  }
-  const rounded = Math.max(0, Math.round(value))
-  if (rounded < 60) {
-    return `${rounded}s`
-  }
-  const hours = Math.floor(rounded / 3600)
-  const minutes = Math.floor((rounded % 3600) / 60)
-  const seconds = rounded % 60
-  const parts: string[] = []
-  if (hours > 0) {
-    parts.push(`${hours}h`)
-  }
-  if (minutes > 0 || hours > 0) {
-    parts.push(`${minutes}m`)
-  }
-  if (seconds > 0 || parts.length === 0) {
-    parts.push(`${seconds}s`)
-  }
-  return parts.join(' ')
+  return formatDurationInput(value) || '-'
 }
 
 function isWorkoutContext(plugin: FitKitPlugin, ctx: MarkdownPostProcessorContext): boolean {
