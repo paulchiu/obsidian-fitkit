@@ -23,15 +23,16 @@ The stored workout note format should remain `[duration:: seconds]`. The editor 
 - Change the workout editor duration input from raw seconds to one smart text field.
 - Display durations in compact unit notation:
   - `<60s`: `45s`.
-  - `>=60s` and `<1h`: `1m0s`, `5m30s`.
-  - `>=1h`: `1h2m3s`.
-- Accept plain seconds, unit text such as `5m`, and clock text such as `5:30`, then normalise through the stored seconds value.
+  - `>=60s` and `<1h`: `1m`, `5m30s`.
+  - `>=1h`: `1h`, `1h2m3s`.
+  - Maximum display unit: `y`.
+- Accept plain seconds, unit text such as `5m` or `1y2d`, and clock text such as `5:30`, then normalise through the stored seconds value.
 - Show invalid duration text as invalid without corrupting the stored duration value.
 
 ## Implementation
 
 1. Create `src/domain/duration-input.ts` with `formatDurationInput` and `parseDurationInput`.
-2. Add unit tests for compact formatting, unit parsing, and clock parsing.
+2. Add unit tests for compact formatting, boundary cases, unit parsing, and clock parsing.
 3. Update `WorkoutEditorView` duration rows:
    - Header and aria label become `Duration`.
    - Normal editing uses one text input.

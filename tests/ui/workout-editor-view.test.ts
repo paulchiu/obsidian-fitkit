@@ -781,7 +781,7 @@ describe('WorkoutEditorView duration timer', () => {
     input?.listenersFor('blur')[0]?.({})
 
     expect(ex.durationEntries[0]?.durationSeconds).toBe(300)
-    expect((input as unknown as { value?: string } | undefined)?.value).toBe('5m0s')
+    expect((input as unknown as { value?: string } | undefined)?.value).toBe('5m')
   })
 
   it('renderDurationRow preserves stored seconds while duration text is invalid', () => {

@@ -174,7 +174,7 @@ describe('workout reading mode rendering', () => {
 
     expect(root.findByClass('fitkit-reading-preview')).not.toBeNull()
     expect(root.allText()).toContain('Duration')
-    expect(root.allText()).toContain('1m 35s')
+    expect(root.allText()).toContain('1m35s')
   })
 
   it('does not render when the source rows cannot be safely hidden', () => {
@@ -224,8 +224,11 @@ describe('workout reading mode rendering', () => {
 
   it('formats durations across minute and hour boundaries', () => {
     expect(formatDurationSeconds(undefined)).toBe('-')
+    expect(formatDurationSeconds(1)).toBe('1s')
     expect(formatDurationSeconds(45)).toBe('45s')
-    expect(formatDurationSeconds(65)).toBe('1m 5s')
-    expect(formatDurationSeconds(3660)).toBe('1h 1m')
+    expect(formatDurationSeconds(60)).toBe('1m')
+    expect(formatDurationSeconds(65)).toBe('1m5s')
+    expect(formatDurationSeconds(3600)).toBe('1h')
+    expect(formatDurationSeconds(3660)).toBe('1h1m')
   })
 })
