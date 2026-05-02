@@ -1,35 +1,40 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  durationPartsFromSeconds,
-  formatDurationInput,
-  secondsFromDurationParts,
-} from '../../src/domain/duration-input'
+import { formatDurationInput, parseDurationInput } from '../../src/domain/duration-input'
 
 describe('duration input helpers', () => {
   it.each([
     [undefined, ''],
     [0, '0s'],
     [45, '45s'],
-    [60, '1:00'],
-    [90, '1:30'],
-    [3600, '1:00:00'],
-    [3723, '1:02:03'],
+    [60, '1m0s'],
+    [90, '1m30s'],
+    [3600, '1h0m0s'],
+    [3723, '1h2m3s'],
   ] as const)('formats %s seconds as %s', (seconds, expected) => {
     expect(formatDurationInput(seconds)).toBe(expected)
   })
 
   it.each([
-    [undefined, { hours: 0, minutes: 0, seconds: 0 }],
-    [45, { hours: 0, minutes: 0, seconds: 45 }],
-    [90, { hours: 0, minutes: 1, seconds: 30 }],
-    [3723, { hours: 1, minutes: 2, seconds: 3 }],
-  ] as const)('splits %s seconds into parts', (seconds, expected) => {
-    expect(durationPartsFromSeconds(seconds)).toEqual(expected)
+    ['', { seconds: undefined, display: '' }],
+    ['60', { seconds: 60, display: '1m0s' }],
+    ['5m', { seconds: 300, display: '5m0s' }],
+    ['5:30', { seconds: 330, display: '5m30s' }],
+    ['1:02:03', { seconds: 3723, display: '1h2m3s' }],
+    ['1h 2m 3s', { seconds: 3723, display: '1h2m3s' }],
+    ['90s', { seconds: 90, display: '1m30s' }],
+  ] as const)('parses %s', (raw, expected) => {
+    expect(parseDurationInput(raw)).toEqual(expected)
   })
 
-  it('combines structured duration parts into seconds', () => {
-    expect(secondsFromDurationParts({ hours: 1, minutes: 2, seconds: 3 })).toBe(3723)
-    expect(secondsFromDurationParts({ hours: 0, minutes: 90, seconds: 0 })).toBe(5400)
+  it.each(['five', '5:99', '1:75:00', '1m2m', '1x', '5:'])(
+    'rejects invalid duration input %s',
+    (raw) => {
+      expect(parseDurationInput(raw)).toBeNull()
+    },
+  )
+
+  it('normalizes overlarge unit values through stored seconds', () => {
+    expect(parseDurationInput('90m')).toEqual({ seconds: 5400, display: '1h30m0s' })
   })
 })

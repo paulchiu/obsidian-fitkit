@@ -1,7 +1,6 @@
-export interface DurationParts {
-  hours: number
-  minutes: number
-  seconds: number
+export interface ParsedDurationInput {
+  seconds: number | undefined
+  display: string
 }
 
 export function formatDurationInput(seconds: number | undefined): string {
@@ -15,32 +14,101 @@ export function formatDurationInput(seconds: number | undefined): string {
   const hours = Math.floor(totalMinutes / 60)
 
   if (hours > 0) {
-    return `${hours}:${pad2(minutesPart)}:${pad2(secondsPart)}`
+    return `${hours}h${minutesPart}m${secondsPart}s`
   }
   if (totalMinutes > 0) {
-    return `${totalMinutes}:${pad2(secondsPart)}`
+    return `${totalMinutes}m${secondsPart}s`
   }
   return `${wholeSeconds}s`
 }
 
-export function durationPartsFromSeconds(seconds: number | undefined): DurationParts {
-  if (seconds === undefined || !Number.isFinite(seconds)) {
-    return { hours: 0, minutes: 0, seconds: 0 }
+export function parseDurationInput(raw: string): ParsedDurationInput | null {
+  const trimmed = raw.trim().toLowerCase()
+  if (trimmed.length === 0) {
+    return { seconds: undefined, display: '' }
   }
-  const wholeSeconds = Math.max(0, Math.round(seconds))
-  return {
-    hours: Math.floor(wholeSeconds / 3600),
-    minutes: Math.floor((wholeSeconds % 3600) / 60),
-    seconds: wholeSeconds % 60,
+
+  const compact = trimmed.replace(/\s+/g, '')
+  let seconds: number | null = null
+  if (compact.includes(':')) {
+    seconds = parseClockDuration(compact)
+  } else if (/[hms]/u.test(compact)) {
+    seconds = parseUnitDuration(compact)
+  } else if (/^\d+$/u.test(compact)) {
+    seconds = Number.parseInt(compact, 10)
   }
+
+  if (seconds === null || !Number.isFinite(seconds)) {
+    return null
+  }
+  return { seconds, display: formatDurationInput(seconds) }
 }
 
-export function secondsFromDurationParts(parts: DurationParts): number {
-  return (
-    Math.max(0, parts.hours) * 3600 + Math.max(0, parts.minutes) * 60 + Math.max(0, parts.seconds)
-  )
+function parseClockDuration(value: string): number | null {
+  const parts = value.split(':')
+  if (parts.length !== 2 && parts.length !== 3) {
+    return null
+  }
+  if (!parts.every((part) => /^\d+$/u.test(part))) {
+    return null
+  }
+
+  const numbers = parts.map((part) => Number.parseInt(part, 10))
+  if (numbers.some((part) => !Number.isFinite(part))) {
+    return null
+  }
+
+  if (numbers.length === 2) {
+    const [minutes, seconds] = numbers
+    if (seconds === undefined || seconds >= 60) {
+      return null
+    }
+    return (minutes ?? 0) * 60 + seconds
+  }
+
+  const [hours, minutes, seconds] = numbers
+  if (minutes === undefined || seconds === undefined || minutes >= 60 || seconds >= 60) {
+    return null
+  }
+  return (hours ?? 0) * 3600 + minutes * 60 + seconds
 }
 
-function pad2(value: number): string {
-  return value.toString().padStart(2, '0')
+function parseUnitDuration(value: string): number | null {
+  const matches = value.matchAll(/(\d+)([hms])/gu)
+  let consumedUntil = 0
+  let hours = 0
+  let minutes = 0
+  let seconds = 0
+  const seen = new Set<string>()
+
+  for (const match of matches) {
+    const token = match[0]
+    const amountRaw = match[1]
+    const unit = match[2]
+    if (match.index !== consumedUntil || amountRaw === undefined || unit === undefined) {
+      return null
+    }
+    if (seen.has(unit)) {
+      return null
+    }
+    seen.add(unit)
+    consumedUntil += token.length
+
+    const amount = Number.parseInt(amountRaw, 10)
+    if (!Number.isFinite(amount)) {
+      return null
+    }
+    if (unit === 'h') {
+      hours = amount
+    } else if (unit === 'm') {
+      minutes = amount
+    } else {
+      seconds = amount
+    }
+  }
+
+  if (consumedUntil !== value.length || seen.size === 0) {
+    return null
+  }
+  return hours * 3600 + minutes * 60 + seconds
 }

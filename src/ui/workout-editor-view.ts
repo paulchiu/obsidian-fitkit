@@ -2,11 +2,7 @@ import type { WorkspaceLeaf } from 'obsidian'
 import { ItemView, Menu, Notice, TFile, normalizePath, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
-import {
-  durationPartsFromSeconds,
-  formatDurationInput,
-  secondsFromDurationParts,
-} from '../domain/duration-input'
+import { formatDurationInput, parseDurationInput } from '../domain/duration-input'
 import { formatExerciseHistoryBadges, type ExerciseHistoryByName } from '../domain/exercise-history'
 import {
   createRegistry,
@@ -534,14 +530,14 @@ export class WorkoutEditorView extends ItemView {
     const durationCell = this.createCell(row, 'Duration')
     if (isTiming && this.activeTimer) {
       const durationInput = durationCell.createEl('input', {
-        cls: 'fitkit-input',
+        cls: 'fitkit-input fitkit-duration-input',
         attr: { type: 'text', 'aria-label': 'Duration' },
       })
       durationInput.value = formatDurationInput(this.liveSeconds(this.activeTimer))
       durationInput.toggleAttribute('disabled', true)
       this.activeTimer.inputEl = durationInput
     } else {
-      this.renderDurationPartInputs(durationCell, durationEntry)
+      this.renderDurationInput(durationCell, durationEntry)
     }
 
     this.renderRowActions(container, body, {
@@ -563,79 +559,43 @@ export class WorkoutEditorView extends ItemView {
     })
   }
 
-  private renderDurationPartInputs(cell: HTMLElement, durationEntry: EditableDurationEntry): void {
-    const group = cell.createDiv({
-      cls: 'fitkit-duration-parts',
-      attr: { role: 'group', 'aria-label': 'Duration' },
+  private renderDurationInput(cell: HTMLElement, durationEntry: EditableDurationEntry): void {
+    const input = cell.createEl('input', {
+      cls: 'fitkit-input fitkit-duration-input',
+      attr: {
+        type: 'text',
+        inputmode: 'text',
+        placeholder: '0s',
+      },
     })
-    const hoursInput = this.createDurationPartInput(group, 'Hours', 'h')
-    const minutesInput = this.createDurationPartInput(group, 'Minutes', 'm', true)
-    const secondsInput = this.createDurationPartInput(group, 'Seconds', 's')
-    const inputs = { hours: hoursInput, minutes: minutesInput, seconds: secondsInput }
-    setDurationPartInputValues(inputs, durationEntry.durationSeconds)
+    input.setAttr('aria-label', 'Duration')
+    input.setAttr('data-fitkit-default-focus', 'true')
+    input.value = formatDurationInput(durationEntry.durationSeconds)
 
     const sync = (mark: boolean): boolean => {
-      const hours = parseDurationPartInput(hoursInput.value)
-      const minutes = parseDurationPartInput(minutesInput.value)
-      const seconds = parseDurationPartInput(secondsInput.value)
-      const invalid = hours === null || minutes === null || seconds === null
-      group.toggleAttribute('aria-invalid', invalid)
-      hoursInput.toggleAttribute('aria-invalid', hours === null)
-      minutesInput.toggleAttribute('aria-invalid', minutes === null)
-      secondsInput.toggleAttribute('aria-invalid', seconds === null)
-      if (hours === null || minutes === null || seconds === null) {
+      const parsed = parseDurationInput(input.value)
+      setAriaInvalid(input, parsed === null)
+      if (parsed === null) {
         return false
       }
-      const hasValue = [hoursInput, minutesInput, secondsInput].some(
-        (input) => input.value.trim().length > 0,
-      )
-      durationEntry.durationSeconds = hasValue
-        ? secondsFromDurationParts({ hours, minutes, seconds })
-        : undefined
+      durationEntry.durationSeconds = parsed.seconds
       if (mark) {
         this.markDirty()
       }
       return true
     }
 
-    const normalize = (): void => {
-      void sync(false)
-      setDurationPartInputValues(inputs, durationEntry.durationSeconds)
-      group.toggleAttribute('aria-invalid', false)
-      for (const input of [hoursInput, minutesInput, secondsInput]) {
-        input.toggleAttribute('aria-invalid', false)
+    input.addEventListener('input', () => void sync(true))
+    input.addEventListener('blur', () => {
+      const parsed = parseDurationInput(input.value)
+      setAriaInvalid(input, false)
+      if (parsed === null) {
+        input.value = formatDurationInput(durationEntry.durationSeconds)
+        return
       }
-    }
-
-    for (const input of [hoursInput, minutesInput, secondsInput]) {
-      input.addEventListener('input', () => void sync(true))
-      input.addEventListener('blur', normalize)
-    }
-  }
-
-  private createDurationPartInput(
-    group: HTMLElement,
-    label: string,
-    suffix: string,
-    defaultFocus = false,
-  ): HTMLInputElement {
-    const field = group.createDiv({ cls: 'fitkit-duration-part' })
-    const input = field.createEl('input', {
-      cls: 'fitkit-input fitkit-duration-part-input',
-      attr: {
-        type: 'number',
-        min: '0',
-        step: '1',
-        inputmode: 'numeric',
-        placeholder: suffix,
-      },
+      durationEntry.durationSeconds = parsed.seconds
+      input.value = parsed.display
     })
-    input.setAttr('aria-label', label)
-    if (defaultFocus) {
-      input.setAttr('data-fitkit-default-focus', 'true')
-    }
-    field.createSpan({ cls: 'fitkit-duration-part-label', text: suffix })
-    return input
   }
 
   private renderRowActions(
@@ -1385,26 +1345,12 @@ function parseNumberInput(raw: string): number | undefined {
   return n
 }
 
-function parseDurationPartInput(raw: string): number | null {
-  const trimmed = raw.trim()
-  if (trimmed.length === 0) {
-    return 0
+function setAriaInvalid(element: HTMLElement, invalid: boolean): void {
+  if (invalid) {
+    element.setAttr('aria-invalid', 'true')
+  } else {
+    element.toggleAttribute('aria-invalid', false)
   }
-  if (!/^\d+$/.test(trimmed)) {
-    return null
-  }
-  const value = Number.parseInt(trimmed, 10)
-  return Number.isFinite(value) ? value : null
-}
-
-function setDurationPartInputValues(
-  inputs: Record<'hours' | 'minutes' | 'seconds', HTMLInputElement>,
-  seconds: number | undefined,
-): void {
-  const parts = durationPartsFromSeconds(seconds)
-  inputs.hours.value = parts.hours > 0 ? String(parts.hours) : ''
-  inputs.minutes.value = parts.minutes > 0 || parts.hours > 0 ? String(parts.minutes) : ''
-  inputs.seconds.value = parts.seconds > 0 || seconds !== undefined ? String(parts.seconds) : ''
 }
 
 function hasRows(card: ExerciseCard): boolean {

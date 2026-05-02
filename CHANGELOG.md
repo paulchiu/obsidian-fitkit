@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Workout notes now render their FitKit rows as compact read-only tables in Obsidian reading mode, while keeping the raw Dataview inline-field source unchanged.
 - New `Auto-open workout editor` setting. Turn it off to keep workout notes in normal Markdown views by default and open the editor only via command.
-- Workout editor duration fields now display compact time values while regular data entry uses structured hour, minute, and second inputs that still store workout files as seconds.
+- Workout editor duration fields now display compact time values in one text field, accept entries such as `5m` and `5:30`, and still store workout files as seconds.
 
 ### Changed
 
