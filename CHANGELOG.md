@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Workout editor: Add bottom clearance on mobile so the Add exercise button is not covered by Obsidian's floating toolbar.
+
 ### Removed
 
 ## [0.10.0] - 2026-04-29
