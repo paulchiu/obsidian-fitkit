@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - Workout editor: Add bottom clearance on mobile so the Add exercise button is not covered by Obsidian's floating toolbar.
+- Workout editor set note popup buttons remain reachable above the iOS keyboard.
 
 ### Removed
 

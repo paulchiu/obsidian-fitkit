@@ -19,6 +19,7 @@ export class SetNoteModal extends Modal {
   onOpen(): void {
     const { contentEl } = this
     contentEl.empty()
+    this.modalEl.addClass('fitkit-set-note-modal-shell')
     contentEl.addClass('fitkit-set-note-modal')
     contentEl.createEl('h2', { text: this.options.title })
 
@@ -34,7 +35,7 @@ export class SetNoteModal extends Modal {
     })
     textarea.value = this.options.initial
 
-    const actions = contentEl.createDiv({ cls: 'fitkit-confirm-actions' })
+    const actions = contentEl.createDiv({ cls: 'fitkit-confirm-actions fitkit-set-note-actions' })
     const cancel = actions.createEl('button', { cls: 'fitkit-btn', text: 'Cancel' })
     cancel.addEventListener('click', () => this.close())
     const save = actions.createEl('button', {
@@ -51,6 +52,7 @@ export class SetNoteModal extends Modal {
   }
 
   onClose(): void {
+    this.modalEl.removeClass('fitkit-set-note-modal-shell')
     this.contentEl.empty()
     this.settled = true
   }
