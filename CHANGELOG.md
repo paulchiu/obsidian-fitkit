@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.11.0] - 2026-05-02
+
+### Added
+
 - Workout notes now render their FitKit rows as compact read-only tables in Obsidian reading mode, while keeping the raw Dataview inline-field source unchanged.
 - New `Auto-open workout editor` setting. Turn it off to keep workout notes in normal Markdown views by default and open the editor only via command.
 
