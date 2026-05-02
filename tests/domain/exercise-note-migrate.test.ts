@@ -192,10 +192,78 @@ metric: e1rm
 ---`)
   })
 
+  it('repairs invalid kind frontmatter from the registry', () => {
+    const source = `---
+type: exercise
+kind: cardio
+---
+
+## Progress chart
+
+\`\`\`fitkit-chart
+\`\`\`
+
+## Notes
+`
+    const result = migrate(source)
+
+    expect(result.status).toBe('updated')
+    expect(result.unknownKind).toBe(false)
+    expect(result.markdown).toContain(`type: exercise
+kind: strength
+metric: e1rm
+---`)
+    expect(result.markdown).toContain(buildRecentSessionsBlock('Squat', 'strength', 'Fitness'))
+  })
+
+  it('repairs stale valid kind frontmatter from the registry', () => {
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
+---
+
+## Progress chart
+
+\`\`\`fitkit-chart
+\`\`\`
+
+## Recent sessions
+
+${buildRecentSessionsBlock('Plank', 'strength', 'Fitness')}
+
+## Notes
+
+${buildNotesBlock('Plank', 'Fitness')}
+`
+    const result = migrate(source, { name: 'Plank' })
+
+    expect(result.status).toBe('updated')
+    expect(result.unknownKind).toBe(false)
+    expect(result.markdown).toContain(`type: exercise
+kind: duration
+metric: e1rm
+---`)
+    expect(result.markdown).toContain(buildRecentSessionsBlock('Plank', 'duration', 'Fitness'))
+    expect(result.markdown).not.toContain('WHERE L.exercise = link("Plank") AND L.set')
+  })
+
   it('leaves an existing metric key unchanged', () => {
     const source = completeStrengthNote().replace('metric: e1rm', 'metric: weight')
 
     expect(migrate(source).markdown).toBe(source)
+  })
+
+  it('repairs invalid strength metric frontmatter to the default', () => {
+    const source = completeStrengthNote().replace('metric: e1rm', 'metric: pace')
+
+    const result = migrate(source)
+
+    expect(result.status).toBe('updated')
+    expect(result.markdown).toContain(`type: exercise
+kind: strength
+metric: e1rm
+---`)
   })
 
   it('does not add metric frontmatter for duration exercise notes', () => {
