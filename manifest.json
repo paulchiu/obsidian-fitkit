@@ -1,7 +1,7 @@
 {
   "id": "fitkit",
   "name": "FitKit",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "minAppVersion": "0.15.0",
   "description": "Track workouts as plain-markdown notes. Edit structured set, rep, weight, and duration data in a custom view, import from rough journals, and auto-generate a Dataview-rendered dashboard with PBs.",
   "author": "Paul Chiu",
