@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Removed
 
+## [0.12.0] - 2026-05-02
+
+### Added
+
+### Changed
+
+### Fixed
+
+### Removed
+
 ## [0.11.0] - 2026-05-02
 
 ### Added
