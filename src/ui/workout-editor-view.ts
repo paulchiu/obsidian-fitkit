@@ -50,6 +50,14 @@ interface ActiveTimer {
   inputEl: HTMLInputElement | null
 }
 
+interface ActiveRestTimer {
+  card: ExerciseCard
+  set: EditableStrengthSet
+  startedAtMs: number
+  intervalId: number
+  labelEl: HTMLElement | null
+}
+
 export const VIEW_TYPE_FITKIT_WORKOUT_EDITOR = 'fitkit-workout-editor'
 
 interface EditableStrengthSet {
@@ -94,6 +102,7 @@ export class WorkoutEditorView extends ItemView {
   private autoSaveRequeued = false
   private dragSession: DragSession | null = null
   private activeTimer: ActiveTimer | null = null
+  private activeRestTimer: ActiveRestTimer | null = null
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -116,6 +125,15 @@ export class WorkoutEditorView extends ItemView {
 
   get currentFile(): TFile | null {
     return this.session?.file ?? null
+  }
+
+  refreshSettingsDrivenUi(): void {
+    if (!this.isRestTimerEnabled()) {
+      this.clearRestTimer()
+    }
+    if (this.model && this.session) {
+      this.render()
+    }
   }
 
   async onOpen(): Promise<void> {
@@ -147,6 +165,7 @@ export class WorkoutEditorView extends ItemView {
 
   async onClose(): Promise<void> {
     this.stopTimer({ write: true })
+    this.clearRestTimer()
     if (this.autoSaveTimer !== null) {
       activeWindow.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null
@@ -169,6 +188,7 @@ export class WorkoutEditorView extends ItemView {
 
   async loadFile(file: TFile): Promise<void> {
     this.stopTimer({ write: true })
+    this.clearRestTimer()
     if (this.autoSaveTimer !== null) {
       activeWindow.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null
@@ -208,6 +228,7 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     this.abortTimer()
+    this.clearRestTimer()
     if (this.autoSaveTimer !== null) {
       activeWindow.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null
@@ -375,11 +396,19 @@ export class WorkoutEditorView extends ItemView {
 
   private renderStrengthTable(card: HTMLElement, ex: ExerciseCard, exerciseIndex: number): void {
     const wrap = card.createDiv({ cls: 'fitkit-set-area' })
+    const showRestTimer = this.isRestTimerEnabled()
 
-    const header = wrap.createDiv({ cls: 'fitkit-set-row fitkit-set-head' })
+    const header = wrap.createDiv({
+      cls: showRestTimer
+        ? 'fitkit-set-row fitkit-set-row-with-rest fitkit-set-head'
+        : 'fitkit-set-row fitkit-set-head',
+    })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Set' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Weight' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Reps' })
+    if (showRestTimer) {
+      header.createSpan({ cls: 'fitkit-set-label', text: 'Rest' })
+    }
 
     for (let i = 0; i < ex.strengthSets.length; i++) {
       this.renderStrengthRow(wrap, ex, i)
@@ -420,7 +449,10 @@ export class WorkoutEditorView extends ItemView {
     }
     const container = wrap.createDiv({ cls: 'fitkit-row' })
     const body = container.createDiv({ cls: 'fitkit-row-body' })
-    const row = body.createDiv({ cls: 'fitkit-set-row' })
+    const showRestTimer = this.isRestTimerEnabled()
+    const row = body.createDiv({
+      cls: showRestTimer ? 'fitkit-set-row fitkit-set-row-with-rest' : 'fitkit-set-row',
+    })
 
     const setInput = this.createInputCell(row, 'Set', { type: 'number', inputmode: 'numeric' })
     setInput.value = set.set !== undefined ? String(set.set) : ''
@@ -447,10 +479,17 @@ export class WorkoutEditorView extends ItemView {
       this.markDirty()
     })
 
+    if (showRestTimer) {
+      this.renderRestTimerButton(row, ex, set, i)
+    }
+
     this.renderRowActions(container, body, {
       label: `set ${i + 1}`,
       currentNote: set.note,
       onDelete: () => {
+        if (this.activeRestTimer?.set === set) {
+          this.clearRestTimer()
+        }
         ex.strengthSets.splice(i, 1)
         this.markDirty()
         this.render()
@@ -460,6 +499,43 @@ export class WorkoutEditorView extends ItemView {
         this.markDirty()
         this.render()
       },
+    })
+  }
+
+  private renderRestTimerButton(
+    row: HTMLElement,
+    card: ExerciseCard,
+    set: EditableStrengthSet,
+    index: number,
+  ): void {
+    if (!this.isRestTimerEnabled()) {
+      return
+    }
+    const timer = this.activeRestTimer?.set === set ? this.activeRestTimer : null
+    const cell = this.createCell(row, 'Rest', 'fitkit-rest-timer-cell')
+    const button = cell.createEl('button', {
+      cls: 'fitkit-btn fitkit-btn-muted fitkit-rest-timer-button',
+      attr: {
+        type: 'button',
+        'aria-label': timer
+          ? `Stop rest timer for set ${index + 1}`
+          : `Start rest timer for set ${index + 1}`,
+      },
+    })
+    setIcon(button, timer ? 'square' : 'timer')
+    const label = button.createSpan({
+      cls: 'fitkit-rest-timer-label',
+      text: timer ? `Stop ${formatDurationInput(this.liveRestSeconds(timer))}` : 'Rest',
+    })
+    if (timer) {
+      timer.labelEl = label
+    }
+    button.addEventListener('click', () => {
+      if (this.activeRestTimer?.set === set) {
+        this.stopRestTimer()
+      } else {
+        this.startRestTimer(card, set)
+      }
     })
   }
 
@@ -679,6 +755,7 @@ export class WorkoutEditorView extends ItemView {
   }
 
   private startCardTimer(card: ExerciseCard): void {
+    this.clearRestTimer()
     if (this.activeTimer && this.activeTimer.card !== card) {
       this.stopTimer({ write: true })
     }
@@ -734,6 +811,61 @@ export class WorkoutEditorView extends ItemView {
 
   private liveSeconds(timer: ActiveTimer): number {
     return timer.accumulator + Math.max(0, Math.floor((Date.now() - timer.startedAtMs) / 1000))
+  }
+
+  private startRestTimer(card: ExerciseCard, set: EditableStrengthSet): void {
+    if (!this.isRestTimerEnabled()) {
+      return
+    }
+    if (this.activeRestTimer?.set === set) {
+      return
+    }
+    this.clearRestTimer()
+    if (this.activeTimer) {
+      this.stopTimer({ write: true })
+    }
+    const intervalId = activeWindow.setInterval(() => this.tickRestTimer(), 1000)
+    this.activeRestTimer = {
+      card,
+      set,
+      startedAtMs: Date.now(),
+      intervalId,
+      labelEl: null,
+    }
+    this.render()
+  }
+
+  private stopRestTimer(): void {
+    if (!this.activeRestTimer) {
+      return
+    }
+    this.clearRestTimer()
+    this.render()
+  }
+
+  private clearRestTimer(): void {
+    const timer = this.activeRestTimer
+    if (!timer) {
+      return
+    }
+    activeWindow.clearInterval(timer.intervalId)
+    this.activeRestTimer = null
+  }
+
+  private tickRestTimer(): void {
+    const timer = this.activeRestTimer
+    if (!timer?.labelEl) {
+      return
+    }
+    timer.labelEl.setText(`Stop ${formatDurationInput(this.liveRestSeconds(timer))}`)
+  }
+
+  private liveRestSeconds(timer: ActiveRestTimer): number {
+    return Math.max(0, Math.floor((Date.now() - timer.startedAtMs) / 1000))
+  }
+
+  private isRestTimerEnabled(): boolean {
+    return this.plugin.settings.strengthRestTimerEnabled !== false
   }
 
   private async switchKind(index: number, nextKind: ExerciseKind): Promise<void> {
@@ -823,6 +955,9 @@ export class WorkoutEditorView extends ItemView {
     if (this.activeTimer?.card === ex) {
       this.abortTimer()
     }
+    if (this.activeRestTimer?.card === ex) {
+      this.clearRestTimer()
+    }
     const previousKind = ex.kind
     ex.kind = nextKind
     ex.strengthSets = []
@@ -899,6 +1034,9 @@ export class WorkoutEditorView extends ItemView {
     const ex = this.model.exercises[index]
     if (ex && this.activeTimer?.card === ex) {
       this.abortTimer()
+    }
+    if (ex && this.activeRestTimer?.card === ex) {
+      this.clearRestTimer()
     }
     this.model.exercises.splice(index, 1)
     this.markDirty()

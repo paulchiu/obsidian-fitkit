@@ -20,6 +20,7 @@ function settingsWithRegistry(
     journalFolder: '',
     autoCreateMissingExercises: false,
     autoOpenWorkoutEditor: true,
+    strengthRestTimerEnabled: true,
     autoUpdateDashboard: true,
     autosaveDebounceMs: 600,
     chartSessionsWindow: 30,

@@ -177,6 +177,15 @@ export default class FitKitPlugin extends Plugin {
     })
   }
 
+  refreshWorkoutEditorViews(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR)) {
+      const view = leaf.view
+      if (view instanceof WorkoutEditorView) {
+        view.refreshSettingsDrivenUi()
+      }
+    }
+  }
+
   private async openWorkoutEditor(file: TFile): Promise<void> {
     /** iterateRootLeaves walks main-area leaves only; detach any others so a drawer leaf stranded by an earlier version is cleaned up. */
     let mainAreaLeaf: WorkspaceLeaf | null = null

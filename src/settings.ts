@@ -15,6 +15,7 @@ export interface FitKitSettings {
   journalFolder: string
   autoCreateMissingExercises: boolean
   autoOpenWorkoutEditor: boolean
+  strengthRestTimerEnabled: boolean
   autoUpdateDashboard: boolean
   autosaveDebounceMs: number
   chartSessionsWindow: number
@@ -28,6 +29,7 @@ export const DEFAULT_SETTINGS: FitKitSettings = {
   journalFolder: '',
   autoCreateMissingExercises: false,
   autoOpenWorkoutEditor: true,
+  strengthRestTimerEnabled: true,
   autoUpdateDashboard: true,
   autosaveDebounceMs: 600,
   chartSessionsWindow: 30,
@@ -118,6 +120,18 @@ export class FitKitSettingTab extends PluginSettingTab {
         toggle.setValue(settings.autoOpenWorkoutEditor).onChange(async (value) => {
           settings.autoOpenWorkoutEditor = value
           await this.plugin.saveSettings()
+        }),
+      )
+
+    new Setting(containerEl)
+      // eslint-disable-next-line obsidianmd/ui/sentence-case -- "Rest" means workout recovery here, not the REST API acronym.
+      .setName('Rest timer')
+      .setDesc('Show a view-only timer beside strength set rows in the workout editor.')
+      .addToggle((toggle) =>
+        toggle.setValue(settings.strengthRestTimerEnabled).onChange(async (value) => {
+          settings.strengthRestTimerEnabled = value
+          await this.plugin.saveSettings()
+          this.plugin.refreshWorkoutEditorViews()
         }),
       )
 
