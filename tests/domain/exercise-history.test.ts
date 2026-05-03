@@ -176,11 +176,11 @@ describe('exercise history aggregation', () => {
 
     expect(formatExerciseHistoryBadges(history.get('Plank'), 'duration')).toEqual([
       {
-        text: 'PB 270s',
+        text: 'PB 4m30s',
         title: 'Longest session total duration',
       },
       {
-        text: 'Last max: 240s (2026-04-22)',
+        text: 'Last max: 4m (2026-04-22)',
         title: 'Latest prior session total duration',
       },
     ])

@@ -1,4 +1,5 @@
 import type { ExerciseKind } from './workout-note-model'
+import { formatDurationInput } from './duration-input'
 import { pickHeaviestSet } from './epley'
 import type { FitKitIndex, IndexEntry, LastSessionMax, WeightSet } from './types'
 
@@ -85,13 +86,13 @@ export function formatExerciseHistoryBadges(
     return [
       history?.personalBestSeconds !== undefined
         ? {
-            text: `PB ${formatSeconds(history.personalBestSeconds)}`,
+            text: `PB ${formatDurationInput(history.personalBestSeconds)}`,
             title: 'Longest session total duration',
           }
         : null,
       history?.lastSessionMaxSeconds !== undefined
         ? {
-            text: `Last max: ${formatSeconds(history.lastSessionMaxSeconds.value)} (${history.lastSessionMaxSeconds.date})`,
+            text: `Last max: ${formatDurationInput(history.lastSessionMaxSeconds.value)} (${history.lastSessionMaxSeconds.date})`,
             title: 'Latest prior session total duration',
           }
         : null,
@@ -246,10 +247,6 @@ function isLaterSession<T>(candidate: SessionMetric<T>, current: SessionMetric<T
 
 function formatWeightSet(set: WeightSet): string {
   return `${formatNumber(set.weight)} kg x ${formatNumber(set.reps)}`
-}
-
-function formatSeconds(seconds: number): string {
-  return `${formatNumber(seconds)}s`
 }
 
 function formatNumber(value: number): string {

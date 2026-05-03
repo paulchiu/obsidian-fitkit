@@ -375,7 +375,7 @@ describe('WorkoutEditorView row actions', () => {
           },
         },
       },
-      texts: ['PB 270s', 'Last max: 240s (2026-04-20)'],
+      texts: ['PB 4m30s', 'Last max: 4m (2026-04-20)'],
     },
   ])('renders $kind PB and Last badges when history exists', ({ kind, history, texts }) => {
     const view = createExerciseCardRenderView()
