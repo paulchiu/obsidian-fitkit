@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Workout editor strength rows now include a view-only rest timer, so you can time rest between sets without changing the workout note.
+
 ### Changed
 
 ### Fixed

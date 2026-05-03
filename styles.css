@@ -360,6 +360,19 @@ body.is-mobile .fitkit-editor-root {
   gap: 6px;
 }
 
+.fitkit-rest-timer-button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 72px;
+  justify-content: center;
+}
+
+.fitkit-rest-timer-label {
+  font-variant-numeric: tabular-nums;
+}
+
 .fitkit-row--timing {
   background: var(--background-modifier-active-hover);
 }
