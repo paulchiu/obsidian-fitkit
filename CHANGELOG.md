@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [0.12.2] - 2026-05-03
+
+### Added
+
+### Changed
+
+### Fixed
+
 - Workout editor duration history badges now use compact duration text instead of raw seconds.
 
 ### Removed
