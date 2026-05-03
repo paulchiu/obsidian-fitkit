@@ -315,6 +315,10 @@ body.is-mobile .fitkit-editor-root {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.fitkit-set-row-with-rest {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(72px, auto);
+}
+
 .fitkit-cell {
   min-width: 0;
 }
@@ -361,10 +365,10 @@ body.is-mobile .fitkit-editor-root {
 }
 
 .fitkit-rest-timer-button {
-  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  width: 100%;
   min-width: 72px;
   justify-content: center;
 }

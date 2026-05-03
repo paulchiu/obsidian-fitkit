@@ -127,6 +127,15 @@ export class WorkoutEditorView extends ItemView {
     return this.session?.file ?? null
   }
 
+  refreshSettingsDrivenUi(): void {
+    if (!this.isRestTimerEnabled()) {
+      this.clearRestTimer()
+    }
+    if (this.model && this.session) {
+      this.render()
+    }
+  }
+
   async onOpen(): Promise<void> {
     this.contentEl.addClass('fitkit-editor-root')
     this.resizeObserver = new ResizeObserver(() => this.updateNarrowState())
@@ -387,11 +396,19 @@ export class WorkoutEditorView extends ItemView {
 
   private renderStrengthTable(card: HTMLElement, ex: ExerciseCard, exerciseIndex: number): void {
     const wrap = card.createDiv({ cls: 'fitkit-set-area' })
+    const showRestTimer = this.isRestTimerEnabled()
 
-    const header = wrap.createDiv({ cls: 'fitkit-set-row fitkit-set-head' })
+    const header = wrap.createDiv({
+      cls: showRestTimer
+        ? 'fitkit-set-row fitkit-set-row-with-rest fitkit-set-head'
+        : 'fitkit-set-row fitkit-set-head',
+    })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Set' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Weight' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Reps' })
+    if (showRestTimer) {
+      header.createSpan({ cls: 'fitkit-set-label', text: 'Rest' })
+    }
 
     for (let i = 0; i < ex.strengthSets.length; i++) {
       this.renderStrengthRow(wrap, ex, i)
@@ -432,7 +449,10 @@ export class WorkoutEditorView extends ItemView {
     }
     const container = wrap.createDiv({ cls: 'fitkit-row' })
     const body = container.createDiv({ cls: 'fitkit-row-body' })
-    const row = body.createDiv({ cls: 'fitkit-set-row' })
+    const showRestTimer = this.isRestTimerEnabled()
+    const row = body.createDiv({
+      cls: showRestTimer ? 'fitkit-set-row fitkit-set-row-with-rest' : 'fitkit-set-row',
+    })
 
     const setInput = this.createInputCell(row, 'Set', { type: 'number', inputmode: 'numeric' })
     setInput.value = set.set !== undefined ? String(set.set) : ''
@@ -459,7 +479,9 @@ export class WorkoutEditorView extends ItemView {
       this.markDirty()
     })
 
-    this.renderRestTimerButton(body, ex, set, i)
+    if (showRestTimer) {
+      this.renderRestTimerButton(row, ex, set, i)
+    }
 
     this.renderRowActions(container, body, {
       label: `set ${i + 1}`,
@@ -481,13 +503,17 @@ export class WorkoutEditorView extends ItemView {
   }
 
   private renderRestTimerButton(
-    body: HTMLElement,
+    row: HTMLElement,
     card: ExerciseCard,
     set: EditableStrengthSet,
     index: number,
   ): void {
+    if (!this.isRestTimerEnabled()) {
+      return
+    }
     const timer = this.activeRestTimer?.set === set ? this.activeRestTimer : null
-    const button = body.createEl('button', {
+    const cell = this.createCell(row, 'Rest', 'fitkit-rest-timer-cell')
+    const button = cell.createEl('button', {
       cls: 'fitkit-btn fitkit-btn-muted fitkit-rest-timer-button',
       attr: {
         type: 'button',
@@ -788,6 +814,9 @@ export class WorkoutEditorView extends ItemView {
   }
 
   private startRestTimer(card: ExerciseCard, set: EditableStrengthSet): void {
+    if (!this.isRestTimerEnabled()) {
+      return
+    }
     if (this.activeRestTimer?.set === set) {
       return
     }
@@ -833,6 +862,10 @@ export class WorkoutEditorView extends ItemView {
 
   private liveRestSeconds(timer: ActiveRestTimer): number {
     return Math.max(0, Math.floor((Date.now() - timer.startedAtMs) / 1000))
+  }
+
+  private isRestTimerEnabled(): boolean {
+    return this.plugin.settings.strengthRestTimerEnabled !== false
   }
 
   private async switchKind(index: number, nextKind: ExerciseKind): Promise<void> {

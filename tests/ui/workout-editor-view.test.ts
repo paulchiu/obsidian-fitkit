@@ -271,6 +271,7 @@ interface CardMenuView {
 }
 
 interface ExerciseCardRenderView {
+  plugin: { settings: { strengthRestTimerEnabled: boolean } }
   model: unknown
   exerciseHistory: unknown
   renderExerciseCard(list: HTMLElement, index: number): void
@@ -279,8 +280,11 @@ interface ExerciseCardRenderView {
 const createCardMenuView = (): CardMenuView =>
   Object.create(WorkoutEditorView.prototype) as CardMenuView
 
-const createExerciseCardRenderView = (): ExerciseCardRenderView =>
-  Object.create(WorkoutEditorView.prototype) as ExerciseCardRenderView
+const createExerciseCardRenderView = (): ExerciseCardRenderView => {
+  const view = Object.create(WorkoutEditorView.prototype) as ExerciseCardRenderView
+  view.plugin = { settings: { strengthRestTimerEnabled: true } }
+  return view
+}
 
 describe('WorkoutEditorView row actions', () => {
   afterEach(() => {
@@ -469,6 +473,8 @@ interface TimerView {
 }
 
 interface RestTimerView {
+  plugin: { settings: { strengthRestTimerEnabled: boolean } }
+  session: unknown
   model: { exercises: RestTimerExerciseCard[] }
   exerciseHistory: unknown
   activeTimer: unknown
@@ -477,6 +483,8 @@ interface RestTimerView {
   render: ReturnType<typeof vi.fn>
   markDirty: ReturnType<typeof vi.fn>
   focusRowCell: ReturnType<typeof vi.fn>
+  refreshSettingsDrivenUi(): void
+  renderStrengthTable(card: HTMLElement, ex: RestTimerExerciseCard, exerciseIndex: number): void
   renderStrengthRow(wrap: HTMLElement, ex: RestTimerExerciseCard, i: number): void
   startRestTimer(
     card: RestTimerExerciseCard,
@@ -494,6 +502,7 @@ interface RestTimerView {
 describe('WorkoutEditorView rest timer', () => {
   const createRestTimerView = (ex: RestTimerExerciseCard): RestTimerView => {
     const view = Object.create(WorkoutEditorView.prototype) as RestTimerView
+    view.plugin = { settings: { strengthRestTimerEnabled: true } }
     view.model = { exercises: [ex] }
     view.exerciseHistory = null
     view.activeTimer = null
@@ -534,6 +543,68 @@ describe('WorkoutEditorView rest timer', () => {
     expect(button?.attributes.get('aria-label')).toBe('Start rest timer for set 1')
     expect(button?.attributes.get('data-icon')).toBe('timer')
     expect(label?.textContent).toBe('Rest')
+  })
+
+  it('adds a Rest column header only when the strength rest timer is enabled', () => {
+    const ex: RestTimerExerciseCard = {
+      name: 'Squat',
+      kind: 'strength',
+      strengthSets: [{ set: 1, weight: 80, reps: 5 }],
+      durationEntries: [],
+    }
+    const view = createRestTimerView(ex)
+    const card = new TestElement('div')
+
+    view.renderStrengthTable(card as unknown as HTMLElement, ex, 0)
+
+    expect(card.findByClass('fitkit-set-head')?.children.map((child) => child.textContent)).toEqual(
+      ['Set', 'Weight', 'Reps', 'Rest'],
+    )
+
+    view.plugin.settings.strengthRestTimerEnabled = false
+    const disabledCard = new TestElement('div')
+    view.renderStrengthTable(disabledCard as unknown as HTMLElement, ex, 0)
+
+    expect(
+      disabledCard.findByClass('fitkit-set-head')?.children.map((child) => child.textContent),
+    ).toEqual(['Set', 'Weight', 'Reps'])
+    expect(disabledCard.findByClass('fitkit-rest-timer-button')).toBeNull()
+  })
+
+  it('clears and rerenders the active rest timer when the setting is disabled', () => {
+    const set = { set: 1, weight: 80, reps: 5 }
+    const ex: RestTimerExerciseCard = {
+      name: 'Squat',
+      kind: 'strength',
+      strengthSets: [set],
+      durationEntries: [],
+    }
+    const view = createRestTimerView(ex)
+    view.session = { file: { path: 'Workouts/A.md' } }
+
+    view.startRestTimer(ex, set)
+    view.plugin.settings.strengthRestTimerEnabled = false
+    view.refreshSettingsDrivenUi()
+
+    expect(view.activeRestTimer).toBeNull()
+    expect(view.render).toHaveBeenCalled()
+  })
+
+  it('does not start the rest timer when the setting is disabled', () => {
+    const set = { set: 1, weight: 80, reps: 5 }
+    const ex: RestTimerExerciseCard = {
+      name: 'Squat',
+      kind: 'strength',
+      strengthSets: [set],
+      durationEntries: [],
+    }
+    const view = createRestTimerView(ex)
+    view.plugin.settings.strengthRestTimerEnabled = false
+
+    view.startRestTimer(ex, set)
+
+    expect(view.activeRestTimer).toBeNull()
+    expect(view.render).not.toHaveBeenCalled()
   })
 
   it('starts without dirtying or mutating the strength set', () => {
