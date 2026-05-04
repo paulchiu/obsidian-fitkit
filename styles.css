@@ -315,10 +315,6 @@ body.is-mobile .fitkit-editor-root {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.fitkit-set-row-with-rest {
-  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(72px, auto);
-}
-
 .fitkit-cell {
   min-width: 0;
 }
@@ -368,13 +364,26 @@ body.is-mobile .fitkit-editor-root {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  width: 100%;
-  min-width: 72px;
+  min-width: 104px;
   justify-content: center;
 }
 
-.fitkit-rest-timer-label {
+.fitkit-rest-timer-label,
+.fitkit-rest-timer-last {
   font-variant-numeric: tabular-nums;
+}
+
+.fitkit-rest-timer-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fitkit-rest-timer-last {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
 }
 
 .fitkit-row--timing {
@@ -436,6 +445,7 @@ body.is-mobile .fitkit-editor-root {
 
 .fitkit-footer {
   display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
   border-top: 1px solid var(--background-modifier-border);
