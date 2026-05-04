@@ -204,6 +204,11 @@ class TestElement {
     return next
   }
 
+  empty(): void {
+    this.children.splice(0, this.children.length)
+    this.textContent = ''
+  }
+
   getBoundingClientRect(): DOMRect {
     return {
       bottom: 20,
@@ -451,6 +456,15 @@ interface RestTimerExerciseCard {
   durationEntries: { durationSeconds?: number; set?: number; note?: string }[]
 }
 
+interface RestTimerWorkoutModel {
+  isFitKitWorkout: boolean
+  date: string
+  name: string
+  sourcePath: string
+  exercises: RestTimerExerciseCard[]
+  preserveBlocks: unknown[]
+}
+
 interface TimerView {
   model: { exercises: TimerExerciseCard[] }
   exerciseHistory: unknown
@@ -475,42 +489,75 @@ interface TimerView {
 interface RestTimerView {
   plugin: { settings: { strengthRestTimerEnabled: boolean } }
   session: unknown
-  model: { exercises: RestTimerExerciseCard[] }
+  model: RestTimerWorkoutModel
   exerciseHistory: unknown
   activeTimer: unknown
   activeRestTimer: unknown
+  lastRestSeconds: number | null
   contentEl: TestElement
   render: ReturnType<typeof vi.fn>
   markDirty: ReturnType<typeof vi.fn>
   focusRowCell: ReturnType<typeof vi.fn>
   refreshSettingsDrivenUi(): void
+  renderFooterRestTimer(footer: HTMLElement): void
   renderStrengthTable(card: HTMLElement, ex: RestTimerExerciseCard, exerciseIndex: number): void
-  renderStrengthRow(wrap: HTMLElement, ex: RestTimerExerciseCard, i: number): void
-  startRestTimer(
-    card: RestTimerExerciseCard,
-    set: RestTimerExerciseCard['strengthSets'][number],
-  ): void
+  startRestTimer(): void
   stopRestTimer(): void
   tickRestTimer(): void
-  liveRestSeconds(timer: { startedAtMs: number }): number
-  removeExercise(index: number): void
-  applyKindSwitch(index: number, nextKind: 'strength' | 'duration', clearedRows: boolean): void
   loadFile(file: unknown): Promise<void>
   onClose(): Promise<void>
 }
 
+interface RestTimerRenderView {
+  plugin: { settings: { strengthRestTimerEnabled: boolean } }
+  session: { file: { basename: string; path: string } }
+  model: RestTimerWorkoutModel
+  exerciseHistory: unknown
+  activeTimer: unknown
+  activeRestTimer: unknown
+  lastRestSeconds: number | null
+  contentEl: TestElement
+  render(): void
+}
+
 describe('WorkoutEditorView rest timer', () => {
+  const createRestTimerModel = (exercises: RestTimerExerciseCard[]): RestTimerWorkoutModel => ({
+    isFitKitWorkout: true,
+    date: '2026-05-03',
+    name: 'Leg day',
+    sourcePath: 'Workouts/A.md',
+    exercises,
+    preserveBlocks: [],
+  })
+
   const createRestTimerView = (ex: RestTimerExerciseCard): RestTimerView => {
     const view = Object.create(WorkoutEditorView.prototype) as RestTimerView
     view.plugin = { settings: { strengthRestTimerEnabled: true } }
-    view.model = { exercises: [ex] }
+    view.model = createRestTimerModel([ex])
     view.exerciseHistory = null
     view.activeTimer = null
     view.activeRestTimer = null
+    view.lastRestSeconds = null
     view.contentEl = new TestElement('div')
     view.render = vi.fn()
     view.markDirty = vi.fn()
     view.focusRowCell = vi.fn()
+    return view
+  }
+
+  const createRestTimerRenderView = (
+    exercises: RestTimerExerciseCard[],
+    strengthRestTimerEnabled = true,
+  ): RestTimerRenderView => {
+    const view = Object.create(WorkoutEditorView.prototype) as RestTimerRenderView
+    view.plugin = { settings: { strengthRestTimerEnabled } }
+    view.session = { file: { basename: 'A', path: 'Workouts/A.md' } }
+    view.model = createRestTimerModel(exercises)
+    view.exerciseHistory = null
+    view.activeTimer = null
+    view.activeRestTimer = null
+    view.lastRestSeconds = null
+    view.contentEl = new TestElement('div')
     return view
   }
 
@@ -526,26 +573,7 @@ describe('WorkoutEditorView rest timer', () => {
     obsidianMock.menus = []
   })
 
-  it('renders a view-only rest timer button on strength rows', () => {
-    const ex: RestTimerExerciseCard = {
-      name: 'Squat',
-      kind: 'strength',
-      strengthSets: [{ set: 1, weight: 80, reps: 5 }],
-      durationEntries: [],
-    }
-    const view = createRestTimerView(ex)
-    const wrap = new TestElement('div')
-
-    view.renderStrengthRow(wrap as unknown as HTMLElement, ex, 0)
-
-    const button = wrap.findByClass('fitkit-rest-timer-button')
-    const label = button?.findByClass('fitkit-rest-timer-label')
-    expect(button?.attributes.get('aria-label')).toBe('Start rest timer for set 1')
-    expect(button?.attributes.get('data-icon')).toBe('timer')
-    expect(label?.textContent).toBe('Rest')
-  })
-
-  it('adds a Rest column header only when the strength rest timer is enabled', () => {
+  it('keeps strength rows to Set, Weight, and Reps regardless of the setting', () => {
     const ex: RestTimerExerciseCard = {
       name: 'Squat',
       kind: 'strength',
@@ -558,8 +586,9 @@ describe('WorkoutEditorView rest timer', () => {
     view.renderStrengthTable(card as unknown as HTMLElement, ex, 0)
 
     expect(card.findByClass('fitkit-set-head')?.children.map((child) => child.textContent)).toEqual(
-      ['Set', 'Weight', 'Reps', 'Rest'],
+      ['Set', 'Weight', 'Reps'],
     )
+    expect(card.findByClass('fitkit-rest-timer-button')).toBeNull()
 
     view.plugin.settings.strengthRestTimerEnabled = false
     const disabledCard = new TestElement('div')
@@ -571,43 +600,49 @@ describe('WorkoutEditorView rest timer', () => {
     expect(disabledCard.findByClass('fitkit-rest-timer-button')).toBeNull()
   })
 
-  it('clears and rerenders the active rest timer when the setting is disabled', () => {
-    const set = { set: 1, weight: 80, reps: 5 }
+  it('renders the footer rest button only when enabled', () => {
     const ex: RestTimerExerciseCard = {
       name: 'Squat',
       kind: 'strength',
-      strengthSets: [set],
+      strengthSets: [{ set: 1, weight: 80, reps: 5 }],
       durationEntries: [],
     }
-    const view = createRestTimerView(ex)
-    view.session = { file: { path: 'Workouts/A.md' } }
+    const enabledView = createRestTimerRenderView([ex])
 
-    view.startRestTimer(ex, set)
-    view.plugin.settings.strengthRestTimerEnabled = false
-    view.refreshSettingsDrivenUi()
+    enabledView.render()
 
-    expect(view.activeRestTimer).toBeNull()
-    expect(view.render).toHaveBeenCalled()
+    const footer = enabledView.contentEl.findByClass('fitkit-footer')
+    const buttons = footer?.children.filter((child) => child.tagName === 'button') ?? []
+    const restButton = footer?.findByClass('fitkit-rest-timer-button')
+    expect(buttons.map((button) => button.textContent)).toEqual(['Add exercise'])
+    expect(restButton?.attributes.get('aria-label')).toBe('Start rest timer')
+    expect(restButton?.attributes.get('data-icon')).toBe('timer')
+    expect(restButton?.findByClass('fitkit-rest-timer-label')?.textContent).toBe('Start rest')
+
+    const disabledView = createRestTimerRenderView([ex], false)
+    disabledView.render()
+
+    const disabledFooter = disabledView.contentEl.findByClass('fitkit-footer')
+    expect(disabledFooter?.findByClass('fitkit-rest-timer-button')).toBeNull()
   })
 
   it('does not start the rest timer when the setting is disabled', () => {
-    const set = { set: 1, weight: 80, reps: 5 }
     const ex: RestTimerExerciseCard = {
       name: 'Squat',
       kind: 'strength',
-      strengthSets: [set],
+      strengthSets: [{ set: 1, weight: 80, reps: 5 }],
       durationEntries: [],
     }
     const view = createRestTimerView(ex)
     view.plugin.settings.strengthRestTimerEnabled = false
 
-    view.startRestTimer(ex, set)
+    view.startRestTimer()
 
     expect(view.activeRestTimer).toBeNull()
     expect(view.render).not.toHaveBeenCalled()
   })
 
-  it('starts without dirtying or mutating the strength set', () => {
+  it('starts without dirtying or mutating the workout model', () => {
     const set = { set: 1, weight: 80, reps: 5 }
     const ex: RestTimerExerciseCard = {
       name: 'Squat',
@@ -617,15 +652,16 @@ describe('WorkoutEditorView rest timer', () => {
     }
     const view = createRestTimerView(ex)
 
-    view.startRestTimer(ex, set)
+    view.startRestTimer()
 
-    expect(view.activeRestTimer).toMatchObject({ card: ex, set })
+    expect(view.activeRestTimer).toMatchObject({ startedAtMs: Date.now() })
     expect(set).toEqual({ set: 1, weight: 80, reps: 5 })
+    expect(view.lastRestSeconds).toBeNull()
     expect(view.markDirty).not.toHaveBeenCalled()
     expect(view.render).toHaveBeenCalled()
   })
 
-  it('updates only the visible rest timer label while running', () => {
+  it('updates the visible footer rest timer label while running', () => {
     const set = { set: 1, weight: 80, reps: 5 }
     const ex: RestTimerExerciseCard = {
       name: 'Squat',
@@ -635,12 +671,12 @@ describe('WorkoutEditorView rest timer', () => {
     }
     const view = createRestTimerView(ex)
 
-    view.startRestTimer(ex, set)
+    view.startRestTimer()
     vi.setSystemTime(new Date('2026-05-03T00:00:03Z'))
-    const wrap = new TestElement('div')
-    view.renderStrengthRow(wrap as unknown as HTMLElement, ex, 0)
+    const footer = new TestElement('div')
+    view.renderFooterRestTimer(footer as unknown as HTMLElement)
 
-    const label = wrap.findByClass('fitkit-rest-timer-label')
+    const label = footer.findByClass('fitkit-rest-timer-label')
     expect(label?.textContent).toBe('Stop 3s')
 
     vi.setSystemTime(new Date('2026-05-03T00:00:07Z'))
@@ -651,28 +687,7 @@ describe('WorkoutEditorView rest timer', () => {
     expect(view.markDirty).not.toHaveBeenCalled()
   })
 
-  it('replaces the previous rest timer when another strength row starts', () => {
-    const first = { set: 1, weight: 80, reps: 5 }
-    const second = { set: 2, weight: 90, reps: 5 }
-    const ex: RestTimerExerciseCard = {
-      name: 'Squat',
-      kind: 'strength',
-      strengthSets: [first, second],
-      durationEntries: [],
-    }
-    const view = createRestTimerView(ex)
-
-    view.startRestTimer(ex, first)
-    expect(vi.getTimerCount()).toBe(1)
-
-    view.startRestTimer(ex, second)
-
-    expect(view.activeRestTimer).toMatchObject({ card: ex, set: second })
-    expect(vi.getTimerCount()).toBe(1)
-    expect(view.markDirty).not.toHaveBeenCalled()
-  })
-
-  it('stops without writing anything to the workout model', () => {
+  it('stopping captures the elapsed rest duration for the footer readout', () => {
     const set = { set: 1, weight: 80, reps: 5 }
     const ex: RestTimerExerciseCard = {
       name: 'Squat',
@@ -682,16 +697,21 @@ describe('WorkoutEditorView rest timer', () => {
     }
     const view = createRestTimerView(ex)
 
-    view.startRestTimer(ex, set)
+    view.startRestTimer()
     vi.setSystemTime(new Date('2026-05-03T00:00:12Z'))
     view.stopRestTimer()
+    const footer = new TestElement('div')
+    view.renderFooterRestTimer(footer as unknown as HTMLElement)
 
     expect(view.activeRestTimer).toBeNull()
+    expect(view.lastRestSeconds).toBe(12)
+    expect(footer.findByClass('fitkit-rest-timer-label')?.textContent).toBe('Start rest')
+    expect(footer.findByClass('fitkit-rest-timer-last')?.textContent).toBe('Last rest 12s')
     expect(set).toEqual({ set: 1, weight: 80, reps: 5 })
     expect(view.markDirty).not.toHaveBeenCalled()
   })
 
-  it('clears the rest timer when the active strength row is deleted', () => {
+  it('clears the last-rest readout when starting again', () => {
     const set = { set: 1, weight: 80, reps: 5 }
     const ex: RestTimerExerciseCard = {
       name: 'Squat',
@@ -700,29 +720,20 @@ describe('WorkoutEditorView rest timer', () => {
       durationEntries: [],
     }
     const view = createRestTimerView(ex)
-    ;(
-      view as unknown as {
-        confirmAndDeleteRow: (label: string, onDelete: () => void) => Promise<void>
-      }
-    ).confirmAndDeleteRow = (_label: string, onDelete: () => void) => {
-      onDelete()
-      return Promise.resolve()
-    }
 
-    view.startRestTimer(ex, set)
-    const wrap = new TestElement('div')
-    view.renderStrengthRow(wrap as unknown as HTMLElement, ex, 0)
-    const kebab = wrap.findByClass('fitkit-row-kebab')
+    view.startRestTimer()
+    vi.setSystemTime(new Date('2026-05-03T00:00:09Z'))
+    view.stopRestTimer()
+    view.startRestTimer()
+    const footer = new TestElement('div')
+    view.renderFooterRestTimer(footer as unknown as HTMLElement)
 
-    kebab?.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
-    const menu = obsidianMock.menus[obsidianMock.menus.length - 1]
-    menu?.items.find((i) => i.title === 'Delete row')?.onClick?.()
-
-    expect(view.activeRestTimer).toBeNull()
-    expect(ex.strengthSets).toHaveLength(0)
+    expect(view.lastRestSeconds).toBeNull()
+    expect(footer.findByClass('fitkit-rest-timer-label')?.textContent).toBe('Stop 0s')
+    expect(footer.findByClass('fitkit-rest-timer-last')).toBeNull()
   })
 
-  it('clears the rest timer when the active exercise is removed', () => {
+  it('clears active and last rest state when the setting is disabled', () => {
     const set = { set: 1, weight: 80, reps: 5 }
     const ex: RestTimerExerciseCard = {
       name: 'Squat',
@@ -731,34 +742,30 @@ describe('WorkoutEditorView rest timer', () => {
       durationEntries: [],
     }
     const view = createRestTimerView(ex)
+    view.session = { file: { path: 'Workouts/A.md' } }
 
-    view.startRestTimer(ex, set)
-    view.removeExercise(0)
+    view.startRestTimer()
+    vi.setSystemTime(new Date('2026-05-03T00:00:05Z'))
+    view.stopRestTimer()
+    expect(view.lastRestSeconds).toBe(5)
+
+    view.plugin.settings.strengthRestTimerEnabled = false
+    view.refreshSettingsDrivenUi()
 
     expect(view.activeRestTimer).toBeNull()
-    expect(view.model.exercises).toHaveLength(0)
-  })
+    expect(view.lastRestSeconds).toBeNull()
+    expect(view.render).toHaveBeenCalled()
 
-  it('clears the rest timer when switching the active exercise to duration', () => {
-    const set = { set: 1, weight: 80, reps: 5 }
-    const ex: RestTimerExerciseCard = {
-      name: 'Squat',
-      kind: 'strength',
-      strengthSets: [set],
-      durationEntries: [],
-    }
-    const view = createRestTimerView(ex)
-
-    view.startRestTimer(ex, set)
-    view.applyKindSwitch(0, 'duration', true)
+    view.plugin.settings.strengthRestTimerEnabled = true
+    view.startRestTimer()
+    view.plugin.settings.strengthRestTimerEnabled = false
+    view.refreshSettingsDrivenUi()
 
     expect(view.activeRestTimer).toBeNull()
-    expect(ex.kind).toBe('duration')
-    expect(ex.strengthSets).toHaveLength(0)
-    expect(ex.durationEntries).toHaveLength(1)
+    expect(view.lastRestSeconds).toBeNull()
   })
 
-  it('clears the rest timer on file load and close without changing the set', async () => {
+  it('clears active and last rest state on file load and close', async () => {
     const set = { set: 1, weight: 80, reps: 5 }
     const ex: RestTimerExerciseCard = {
       name: 'Squat',
@@ -768,19 +775,50 @@ describe('WorkoutEditorView rest timer', () => {
     }
     const view = createRestTimerView(ex)
 
-    view.startRestTimer(ex, set)
+    view.startRestTimer()
+    vi.setSystemTime(new Date('2026-05-03T00:00:04Z'))
+    view.stopRestTimer()
     await view
       .loadFile({ path: 'Workouts/B.md', extension: 'md', basename: 'B', stat: { mtime: 0 } })
       .catch(() => undefined)
 
     expect(view.activeRestTimer).toBeNull()
+    expect(view.lastRestSeconds).toBeNull()
     expect(set).toEqual({ set: 1, weight: 80, reps: 5 })
 
-    view.startRestTimer(ex, set)
+    view.startRestTimer()
     await view.onClose().catch(() => undefined)
 
     expect(view.activeRestTimer).toBeNull()
+    expect(view.lastRestSeconds).toBeNull()
     expect(set).toEqual({ set: 1, weight: 80, reps: 5 })
+  })
+
+  it('starting rest writes and clears an active duration timer', () => {
+    const durationEntry = { durationSeconds: 30 }
+    const ex: RestTimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [durationEntry],
+    }
+    const view = createRestTimerView(ex)
+    view.activeTimer = {
+      card: ex,
+      entry: durationEntry,
+      startedAtMs: Date.now(),
+      accumulator: 30,
+      intervalId: 0,
+      inputEl: null,
+    }
+
+    vi.setSystemTime(new Date('2026-05-03T00:00:08Z'))
+    view.startRestTimer()
+
+    expect(durationEntry.durationSeconds).toBe(38)
+    expect(view.activeTimer).toBeNull()
+    expect(view.activeRestTimer).toMatchObject({ startedAtMs: Date.now() })
+    expect(view.markDirty).toHaveBeenCalled()
   })
 })
 
