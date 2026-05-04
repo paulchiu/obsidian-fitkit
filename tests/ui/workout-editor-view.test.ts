@@ -481,7 +481,7 @@ interface TimerView {
     exerciseIndex: number,
   ): void
   startCardTimer(card: TimerExerciseCard): void
-  stopTimer(opts: { write: boolean }): void
+  stopTimer(opts: { write: boolean; render?: boolean }): void
   abortTimer(): void
   liveSeconds(timer: { accumulator: number; startedAtMs: number }): number
 }
@@ -505,6 +505,7 @@ interface RestTimerView {
   stopRestTimer(): void
   tickRestTimer(): void
   loadFile(file: unknown): Promise<void>
+  reloadFromDisk(): Promise<void>
   onClose(): Promise<void>
 }
 
@@ -573,7 +574,7 @@ describe('WorkoutEditorView rest timer', () => {
     obsidianMock.menus = []
   })
 
-  it('keeps strength rows to Set, Weight, and Reps regardless of the setting', () => {
+  it('keeps strength rows to Set, Weight, and Reps without per-row rest controls', () => {
     const ex: RestTimerExerciseCard = {
       name: 'Squat',
       kind: 'strength',
@@ -589,15 +590,11 @@ describe('WorkoutEditorView rest timer', () => {
       ['Set', 'Weight', 'Reps'],
     )
     expect(card.findByClass('fitkit-rest-timer-button')).toBeNull()
-
-    view.plugin.settings.strengthRestTimerEnabled = false
-    const disabledCard = new TestElement('div')
-    view.renderStrengthTable(disabledCard as unknown as HTMLElement, ex, 0)
-
     expect(
-      disabledCard.findByClass('fitkit-set-head')?.children.map((child) => child.textContent),
-    ).toEqual(['Set', 'Weight', 'Reps'])
-    expect(disabledCard.findByClass('fitkit-rest-timer-button')).toBeNull()
+      card
+        .findAllByClass('fitkit-set-row')
+        .some((row) => row.classes.has('fitkit-set-row-with-rest')),
+    ).toBe(false)
   })
 
   it('renders the footer rest button only when enabled', () => {
@@ -794,6 +791,49 @@ describe('WorkoutEditorView rest timer', () => {
     expect(set).toEqual({ set: 1, weight: 80, reps: 5 })
   })
 
+  it('preserves the last-rest readout while aborting active rest on reload', async () => {
+    const set = { set: 1, weight: 80, reps: 5 }
+    const ex: RestTimerExerciseCard = {
+      name: 'Squat',
+      kind: 'strength',
+      strengthSets: [set],
+      durationEntries: [],
+    }
+    const view = createRestTimerView(ex)
+    view.session = {
+      file: { path: 'Workouts/A.md' },
+      load: vi.fn().mockResolvedValue({
+        model: {
+          date: '2026-05-03',
+          name: 'Leg day',
+          sourcePath: 'Workouts/A.md',
+          exercises: [
+            {
+              exerciseName: 'Squat',
+              kind: 'strength',
+              strengthSets: [{ set: 1, weight: 90, reps: 3 }],
+              durationEntries: [],
+            },
+          ],
+          preserveBlocks: [],
+        },
+        isWorkout: true,
+      }),
+    }
+    view.lastRestSeconds = 12
+    view.activeRestTimer = {
+      startedAtMs: Date.now(),
+      intervalId: activeWindow.setInterval(() => undefined, 1000),
+      labelEl: null,
+    }
+
+    await view.reloadFromDisk()
+
+    expect(view.activeRestTimer).toBeNull()
+    expect(view.lastRestSeconds).toBe(12)
+    expect(view.model.exercises[0]?.strengthSets[0]?.weight).toBe(90)
+  })
+
   it('starting rest writes and clears an active duration timer', () => {
     const durationEntry = { durationSeconds: 30 }
     const ex: RestTimerExerciseCard = {
@@ -819,6 +859,7 @@ describe('WorkoutEditorView rest timer', () => {
     expect(view.activeTimer).toBeNull()
     expect(view.activeRestTimer).toMatchObject({ startedAtMs: Date.now() })
     expect(view.markDirty).toHaveBeenCalled()
+    expect(view.render).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -967,11 +1008,13 @@ describe('WorkoutEditorView duration timer', () => {
     const view = createTimerView(ex)
 
     view.startCardTimer(ex)
+    view.render.mockClear()
     vi.setSystemTime(new Date('2026-04-28T00:00:05Z'))
     view.abortTimer()
 
     expect(ex.durationEntries[0]?.durationSeconds).toBe(10)
     expect(view.activeTimer).toBeNull()
+    expect(view.render).toHaveBeenCalledTimes(1)
   })
 
   it('clicking Add duration entry while a timer is running writes back and appends', () => {

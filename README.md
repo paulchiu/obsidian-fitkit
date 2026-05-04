@@ -56,6 +56,10 @@ Per-row actions:
   past 80 px to delete (vertical scrolling wins if the gesture starts mostly
   vertical).
 
+When the rest timer is enabled (Settings -> Rest timer), the editor footer
+shows a Start rest button next to Add exercise; tapping it counts up live, and
+stopping leaves the last rest duration visible until the next start.
+
 When you switch an exercise's kind via the gear menu, FitKit asks whether to
 apply the change just to this workout or also persist it back to the exercise
 registry so future workouts default to the new kind. Renaming to a registered
@@ -109,17 +113,18 @@ Relevant commands:
 
 Values are stored by Obsidian plugin settings.
 
-| Setting                         | Default      | Description                                                                                                     |
-| ------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------- |
-| `fitnessRoot`                   | `Fitness`    | Folder under the vault root where workouts, exercises, and the dashboard live.                                  |
-| `journalFolder`                 | empty string | Optional folder where rough journal notes live, used by the import command.                                     |
-| `autoCreateMissingExercises`    | `false`      | When the importer or editor sees an unknown exercise, also create a stub note under `<fitnessRoot>/Exercises/`. |
-| `autoOpenWorkoutEditor`         | `true`       | When opening a workout note, automatically switch it into the FitKit editor instead of staying in Markdown.     |
-| `autoUpdateDashboard`           | `true`       | When a workout note is saved, refresh the index entry and regenerate the dashboard.                             |
-| `autosaveDebounceMs`            | `600`        | How long to wait after the last edit before persisting changes in the workout editor view.                      |
-| `exerciseRegistry`              | `[]`         | Stored exercise registry entries used for canonical exercise names and aliases.                                 |
-| `hiddenDashboardSectionsByPath` | `{}`         | Stored hidden dashboard sections by dashboard path, used when regenerating the dashboard.                       |
-| `schemaVersion`                 | `1`          | Stored settings schema version.                                                                                 |
+| Setting                         | Default      | Description                                                                                                       |
+| ------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `fitnessRoot`                   | `Fitness`    | Folder under the vault root where workouts, exercises, and the dashboard live.                                    |
+| `journalFolder`                 | empty string | Optional folder where rough journal notes live, used by the import command.                                       |
+| `autoCreateMissingExercises`    | `false`      | When the importer or editor sees an unknown exercise, also create a stub note under `<fitnessRoot>/Exercises/`.   |
+| `autoOpenWorkoutEditor`         | `true`       | When opening a workout note, automatically switch it into the FitKit editor instead of staying in Markdown.       |
+| `strengthRestTimerEnabled`      | `true`       | Show a rest timer in the workout editor footer; the footer keeps the last rest duration after you stop the timer. |
+| `autoUpdateDashboard`           | `true`       | When a workout note is saved, refresh the index entry and regenerate the dashboard.                               |
+| `autosaveDebounceMs`            | `600`        | How long to wait after the last edit before persisting changes in the workout editor view.                        |
+| `exerciseRegistry`              | `[]`         | Stored exercise registry entries used for canonical exercise names and aliases.                                   |
+| `hiddenDashboardSectionsByPath` | `{}`         | Stored hidden dashboard sections by dashboard path, used when regenerating the dashboard.                         |
+| `schemaVersion`                 | `1`          | Stored settings schema version.                                                                                   |
 
 The settings tab also shows derived paths for workouts, exercises, and the
 dashboard, and provides `Bootstrap from vault` to scan the exercises folder into

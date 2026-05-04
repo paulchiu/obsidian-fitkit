@@ -227,7 +227,7 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     this.abortTimer()
-    this.clearRestTimerState()
+    this.clearRestTimer()
     if (this.autoSaveTimer !== null) {
       activeWindow.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null
@@ -765,7 +765,7 @@ export class WorkoutEditorView extends ItemView {
     this.render()
   }
 
-  private stopTimer(opts: { write: boolean }): void {
+  private stopTimer(opts: { write: boolean; render?: boolean }): void {
     const timer = this.activeTimer
     if (!timer) {
       return
@@ -776,7 +776,9 @@ export class WorkoutEditorView extends ItemView {
       this.markDirty()
     }
     this.activeTimer = null
-    this.render()
+    if (opts.render !== false) {
+      this.render()
+    }
   }
 
   private abortTimer(): void {
@@ -802,10 +804,9 @@ export class WorkoutEditorView extends ItemView {
     if (this.activeRestTimer) {
       return
     }
-    this.clearRestTimer()
     this.lastRestSeconds = null
     if (this.activeTimer) {
-      this.stopTimer({ write: true })
+      this.stopTimer({ write: true, render: false })
     }
     const intervalId = activeWindow.setInterval(() => this.tickRestTimer(), 1000)
     this.activeRestTimer = {

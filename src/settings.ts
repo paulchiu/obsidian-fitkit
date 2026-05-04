@@ -126,7 +126,10 @@ export class FitKitSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       // eslint-disable-next-line obsidianmd/ui/sentence-case -- "Rest" means workout recovery here, not the REST API acronym.
       .setName('Rest timer')
-      .setDesc('Show a view-only timer beside strength set rows in the workout editor.')
+      .setDesc(
+        // eslint-disable-next-line obsidianmd/ui/sentence-case -- "rest" means workout recovery here, not the REST API acronym.
+        'Show a rest timer in the workout editor footer that remembers your last rest after stopping.',
+      )
       .addToggle((toggle) =>
         toggle.setValue(settings.strengthRestTimerEnabled).onChange(async (value) => {
           settings.strengthRestTimerEnabled = value
