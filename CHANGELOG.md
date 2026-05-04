@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+### Fixed
+
+### Removed
+
+## [0.13.1] - 2026-05-04
+
+### Added
+
+### Changed
+
 - Workout editor rest timer now lives in the footer and keeps showing the last rest duration after you stop it.
 
 ### Fixed
