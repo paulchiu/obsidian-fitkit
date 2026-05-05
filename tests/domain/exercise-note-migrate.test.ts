@@ -183,6 +183,33 @@ kind: duration
     expect(result.markdown).toContain(buildRecentSessionsBlock('Mystery', 'duration', 'Fitness'))
   })
 
+  it('ignores strength field words in duration exercise names when inferring missing kind', () => {
+    const source = completeDurationNote('Set Hold').replace('kind: duration\n', '')
+    const result = migrate(source, { name: 'Set Hold', registry: createRegistry([]) })
+
+    expect(result.status).toBe('unknown')
+    expect(result.unknownKind).toBe(true)
+    expect(result.markdown).toContain(`type: exercise
+kind: duration
+---`)
+    expect(result.markdown).not.toContain('metric:')
+    expect(result.markdown).toContain(buildRecentSessionsBlock('Set Hold', 'duration', 'Fitness'))
+  })
+
+  it('ignores strength field words in duration exercise names when repairing invalid kind', () => {
+    const source = completeDurationNote('Reps Hold').replace('kind: duration', 'kind: cardio')
+    const result = migrate(source, { name: 'Reps Hold', registry: createRegistry([]) })
+
+    expect(result.status).toBe('unknown')
+    expect(result.unknownKind).toBe(true)
+    expect(result.markdown).toContain(`type: exercise
+kind: duration
+---`)
+    expect(result.markdown).not.toContain('kind: cardio')
+    expect(result.markdown).not.toContain('metric:')
+    expect(result.markdown).toContain(buildRecentSessionsBlock('Reps Hold', 'duration', 'Fitness'))
+  })
+
   it('preserves valid explicit duration kind without a registry match', () => {
     const source = completeDurationNote('Mystery')
     const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })

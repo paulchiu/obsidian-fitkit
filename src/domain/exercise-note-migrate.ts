@@ -253,10 +253,45 @@ function inferExerciseKindFromContent(source: string): ExerciseKind | null {
 }
 
 function hasDataviewFields(source: string, fields: ReadonlyArray<string>): boolean {
+  const searchable = source
+    .split('\n')
+    .map(stripDataviewQuotedText)
+    .map(stripDataviewLinkText)
+    .map(stripDataviewAliases)
+    .join('\n')
   return fields.some((field) => {
     const pattern = new RegExp(`\\b(?:[A-Za-z]+\\.)?${field}\\b`, 'i')
-    return pattern.test(source)
+    return pattern.test(searchable)
   })
+}
+
+function stripDataviewQuotedText(line: string): string {
+  let quote: '"' | "'" | null = null
+  let result = ''
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index] ?? ''
+    if (quote !== null) {
+      if (char === quote) {
+        quote = null
+      }
+      continue
+    }
+    if (char === '"' || char === "'") {
+      quote = char
+      result += ' '
+      continue
+    }
+    result += char
+  }
+  return result
+}
+
+function stripDataviewAliases(line: string): string {
+  return line.replace(/\bas\s+[^,]+(?=,|$)/gi, '')
+}
+
+function stripDataviewLinkText(line: string): string {
+  return line.replace(/\[\[[^\]]+\]\]/g, ' ')
 }
 
 function frontmatterKind(lines: ReadonlyArray<string>): ExerciseKind | null {
