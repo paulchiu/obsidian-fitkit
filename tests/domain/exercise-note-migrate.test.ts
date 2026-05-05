@@ -45,6 +45,31 @@ ${notes}
 `
 }
 
+function completeDurationNote(
+  name = 'Mystery',
+  recent = buildRecentSessionsBlock(name, 'duration', 'Fitness'),
+  notes = buildNotesBlock(name, 'Fitness'),
+): string {
+  return `---
+type: exercise
+kind: duration
+---
+
+## Progress chart
+
+\`\`\`fitkit-chart
+\`\`\`
+
+## Recent sessions
+
+${recent}
+
+## Notes
+
+${notes}
+`
+}
+
 function withLineEnding(markdown: string, lineEnding: '\n' | '\r\n'): string {
   return lineEnding === '\n' ? markdown : markdown.replace(/\n/g, '\r\n')
 }
@@ -114,7 +139,7 @@ type: workout
     expect(result.changed).toBe(false)
   })
 
-  it('omits kind, metric, and Recent sessions when the registry has no kind', () => {
+  it('defaults missing no-registry kind to strength and marks the note for validation', () => {
     const source = `Loose exercise note.
 `
     const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
@@ -123,12 +148,35 @@ type: workout
     expect(result.unknownKind).toBe(true)
     expect(result.markdown).toContain(`---
 type: exercise
+kind: strength
+metric: e1rm
 ---`)
-    expect(result.markdown).not.toContain('kind:')
-    expect(result.markdown).not.toContain('metric:')
-    expect(result.markdown).not.toContain('## Recent sessions')
+    expect(result.markdown).toContain(buildRecentSessionsBlock('Mystery', 'strength', 'Fitness'))
     expect(result.markdown).toContain('## Progress chart')
     expect(result.markdown).toContain('## Notes')
+  })
+
+  it('infers invalid no-registry kind from an existing duration Recent sessions block', () => {
+    const source = completeDurationNote('Mystery').replace('kind: duration', 'kind: cardio')
+    const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
+
+    expect(result.status).toBe('unknown')
+    expect(result.unknownKind).toBe(true)
+    expect(result.markdown).toContain(`type: exercise
+kind: duration
+---`)
+    expect(result.markdown).not.toContain('kind: cardio')
+    expect(result.markdown).not.toContain('metric:')
+    expect(result.markdown).toContain(buildRecentSessionsBlock('Mystery', 'duration', 'Fitness'))
+  })
+
+  it('preserves valid explicit duration kind without a registry match', () => {
+    const source = completeDurationNote('Mystery')
+    const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
+
+    expect(result.markdown).toBe(source)
+    expect(result.status).toBe('already')
+    expect(result.unknownKind).toBe(false)
   })
 
   it('adds missing type to existing frontmatter', () => {

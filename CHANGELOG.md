@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- `Sync and repair exercise notes` now fills missing no-registry exercise `kind:` frontmatter by inferring from existing Recent sessions or defaulting to strength, and tells you how many notes need validation.
+
 ### Removed
 
 ## [0.13.1] - 2026-05-04

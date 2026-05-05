@@ -120,9 +120,10 @@ function repairFrontmatter(
     }
   }
   if (bounds.status === 'missing') {
+    const fallbackKind = registryKind ?? inferExerciseKindFromContent(source) ?? 'strength'
     return {
-      markdown: `${frontmatterBlock(registryKind)}${source}`,
-      kind: registryKind,
+      markdown: `${frontmatterBlock(fallbackKind)}${source}`,
+      kind: fallbackKind,
       unknownKind: registryKind === null,
       skippedStatus: null,
     }
@@ -163,6 +164,20 @@ function repairFrontmatter(
     }
     effectiveKind = registryKind
   } else if (kindLineIndex < 0 || effectiveKind === null) {
+    const fallbackKind = inferExerciseKindFromContent(source) ?? 'strength'
+    if (kindLineIndex < 0) {
+      const typeIndex = findFrontmatterKeyLine(nextFrontmatterLines, 'type')
+      nextFrontmatterLines = insertLines(nextFrontmatterLines, typeIndex + 1, [
+        `kind: ${fallbackKind}`,
+      ])
+    } else {
+      nextFrontmatterLines = replaceLine(
+        nextFrontmatterLines,
+        kindLineIndex,
+        `kind: ${fallbackKind}`,
+      )
+    }
+    effectiveKind = fallbackKind
     unknownKind = true
   }
 
@@ -201,11 +216,47 @@ function frontmatterBlock(kind: ExerciseKind | null): string {
   if (kind) {
     lines.push(`kind: ${kind}`)
     if (kind === 'strength') {
-      lines.push('metric: e1rm')
+      lines.push(`metric: ${DEFAULT_EXERCISE_METRIC}`)
     }
   }
   lines.push('---', '')
   return `${lines.join('\n')}\n`
+}
+
+function inferExerciseKindFromContent(source: string): ExerciseKind | null {
+  const document = splitMarkdown(source)
+  const headingIndex = findHeadingIndex(document.lines, isRecentSessionsHeading)
+  if (headingIndex < 0) {
+    return null
+  }
+
+  const sectionEnd = findNextH2HeadingIndex(document.lines, headingIndex + 1)
+  const block = findDataviewBlockInRange(
+    document.lines,
+    headingIndex + 1,
+    sectionEnd >= 0 ? sectionEnd : document.lines.length,
+  )
+  if (!block) {
+    return null
+  }
+
+  const body = document.lines.slice(block.start, block.end + 1).join('\n')
+  const hasDurationFields = hasDataviewFields(body, ['duration'])
+  const hasStrengthFields = hasDataviewFields(body, ['set', 'weight', 'reps'])
+  if (hasDurationFields && !hasStrengthFields) {
+    return 'duration'
+  }
+  if (hasStrengthFields && !hasDurationFields) {
+    return 'strength'
+  }
+  return null
+}
+
+function hasDataviewFields(source: string, fields: ReadonlyArray<string>): boolean {
+  return fields.some((field) => {
+    const pattern = new RegExp(`\\b(?:[A-Za-z]+\\.)?${field}\\b`, 'i')
+    return pattern.test(source)
+  })
 }
 
 function frontmatterKind(lines: ReadonlyArray<string>): ExerciseKind | null {
