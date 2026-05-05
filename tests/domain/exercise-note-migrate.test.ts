@@ -170,6 +170,19 @@ kind: duration
     expect(result.markdown).toContain(buildRecentSessionsBlock('Mystery', 'duration', 'Fitness'))
   })
 
+  it('infers missing no-registry kind from an existing duration Recent sessions block', () => {
+    const source = completeDurationNote('Mystery').replace('kind: duration\n', '')
+    const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
+
+    expect(result.status).toBe('unknown')
+    expect(result.unknownKind).toBe(true)
+    expect(result.markdown).toContain(`type: exercise
+kind: duration
+---`)
+    expect(result.markdown).not.toContain('metric:')
+    expect(result.markdown).toContain(buildRecentSessionsBlock('Mystery', 'duration', 'Fitness'))
+  })
+
   it('preserves valid explicit duration kind without a registry match', () => {
     const source = completeDurationNote('Mystery')
     const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
