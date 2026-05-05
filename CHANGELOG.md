@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Removed
 
+## [0.14.0] - 2026-05-05
+
+### Added
+
+### Changed
+
+### Fixed
+
+### Removed
+
 - Removed the free-text journal import commands, parser, and importer settings surface.
 
 ## [0.13.1] - 2026-05-04
