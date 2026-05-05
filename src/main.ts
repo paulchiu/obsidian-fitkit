@@ -8,7 +8,6 @@ import { DEFAULT_SETTINGS, FitKitSettingTab, type FitKitSettings } from './setti
 import { dashboardPath, exercisesFolder, workoutFilename, workoutsFolder } from './settings-paths'
 import { CreateMissingExercisesModal } from './ui/create-missing-exercises-modal'
 import { renderExerciseChartBlock } from './ui/exercise-chart-block'
-import { ImportModal } from './ui/import-modal'
 import { ParseDiagnosticsModal } from './ui/parse-diagnostics-modal'
 import { renderWorkoutReadingModeSection } from './ui/workout-reading-mode'
 import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from './ui/workout-editor-view'
@@ -24,6 +23,25 @@ function formatTodayIsoDate(): string {
 
 function emptyWorkoutMarkdown(date: string): string {
   return `---\ntype: workout\ndate: ${date}\nname: \n---\n`
+}
+
+function settingsFromStored(stored: Partial<FitKitSettings> | null): FitKitSettings {
+  if (!stored) {
+    return { ...DEFAULT_SETTINGS }
+  }
+  return {
+    fitnessRoot: stored.fitnessRoot ?? DEFAULT_SETTINGS.fitnessRoot,
+    autoOpenWorkoutEditor: stored.autoOpenWorkoutEditor ?? DEFAULT_SETTINGS.autoOpenWorkoutEditor,
+    strengthRestTimerEnabled:
+      stored.strengthRestTimerEnabled ?? DEFAULT_SETTINGS.strengthRestTimerEnabled,
+    autoUpdateDashboard: stored.autoUpdateDashboard ?? DEFAULT_SETTINGS.autoUpdateDashboard,
+    autosaveDebounceMs: stored.autosaveDebounceMs ?? DEFAULT_SETTINGS.autosaveDebounceMs,
+    chartSessionsWindow: stored.chartSessionsWindow ?? DEFAULT_SETTINGS.chartSessionsWindow,
+    exerciseRegistry: stored.exerciseRegistry ?? DEFAULT_SETTINGS.exerciseRegistry,
+    hiddenDashboardSectionsByPath:
+      stored.hiddenDashboardSectionsByPath ?? DEFAULT_SETTINGS.hiddenDashboardSectionsByPath,
+    schemaVersion: DEFAULT_SETTINGS.schemaVersion,
+  }
 }
 
 export default class FitKitPlugin extends Plugin {
@@ -150,29 +168,21 @@ export default class FitKitPlugin extends Plugin {
     })
 
     this.addCommand({
-      id: 'import-journal-active-file',
-      name: 'Import workout from journal note',
+      id: 'create-missing-exercises-current-workout',
+      name: 'Create missing exercises for current workout',
       checkCallback: (checking) => {
         const file = this.app.workspace.getActiveFile()
-        if (!(file instanceof TFile) || file.extension.toLowerCase() !== 'md') {
+        if (
+          !(file instanceof TFile) ||
+          file.extension.toLowerCase() !== 'md' ||
+          !this.isWorkoutFile(file)
+        ) {
           return false
         }
         if (!checking) {
-          void this.openImporterForActiveFile(file)
+          void this.openCreateMissingExercisesForActiveFile(file)
         }
         return true
-      },
-    })
-
-    this.addCommand({
-      id: 'import-journal-paste',
-      name: 'Import workout from pasted text',
-      callback: () => {
-        new ImportModal(this, {
-          initialInput: '',
-          readOnly: false,
-          defaultFilenameDate: formatTodayIsoDate(),
-        }).open()
       },
     })
   }
@@ -285,20 +295,14 @@ export default class FitKitPlugin extends Plugin {
     return typeof type === 'string' && type.toLowerCase() === 'workout'
   }
 
-  private async openImporterForActiveFile(file: TFile): Promise<void> {
+  private async openCreateMissingExercisesForActiveFile(file: TFile): Promise<void> {
     const text = await this.app.vault.read(file)
     const parsed = parseWorkoutNote(text, file.path)
     if (parsed.isWorkout && parsed.model) {
       new CreateMissingExercisesModal(this, parsed.model).open()
       return
     }
-    const stem = file.basename
-    const defaultDate = /^\d{4}-\d{2}-\d{2}$/.test(stem) ? stem : formatTodayIsoDate()
-    new ImportModal(this, {
-      initialInput: text,
-      readOnly: false,
-      defaultFilenameDate: defaultDate,
-    }).open()
+    new Notice('Current file is not a workout note.')
   }
 
   private async syncExerciseNotes(): Promise<void> {
@@ -384,7 +388,7 @@ export default class FitKitPlugin extends Plugin {
       await this.saveSettings()
       return
     }
-    this.settings = { ...DEFAULT_SETTINGS, ...(stored ?? {}) }
+    this.settings = settingsFromStored(stored)
   }
 
   async saveSettings(): Promise<void> {

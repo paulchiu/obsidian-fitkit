@@ -17,7 +17,7 @@ describe('workout note serializer', () => {
     const output = serializeExercise({
       canonicalName: 'Squat',
       note: '',
-      rows: [{ kind: 'strength', weight: 10, reps: 10, raw: '10 x 10' }],
+      rows: [{ kind: 'strength', weight: 10, reps: 10 }],
     })
 
     expect(output).toContain('[weight:: 10]')
@@ -28,7 +28,7 @@ describe('workout note serializer', () => {
     const output = serializeExercise({
       canonicalName: 'Squat',
       note: '',
-      rows: [{ kind: 'strength', weight: 10.5, reps: 10, raw: '10.5 x 10' }],
+      rows: [{ kind: 'strength', weight: 10.5, reps: 10 }],
     })
 
     expect(output).toContain('[weight:: 10.5]')
@@ -38,7 +38,7 @@ describe('workout note serializer', () => {
     const output = serializeExercise({
       canonicalName: 'Plank',
       note: '',
-      rows: [{ kind: 'duration', seconds: 60, raw: '60s' }],
+      rows: [{ kind: 'duration', seconds: 60 }],
     })
 
     expect(output).toContain('[duration:: 60]')
@@ -49,9 +49,9 @@ describe('workout note serializer', () => {
       canonicalName: 'Bench',
       note: '',
       rows: [
-        { kind: 'strength', weight: 10, reps: 10, raw: '10 x 10' },
-        { kind: 'strength', weight: 20, reps: 8, raw: '20 x 8' },
-        { kind: 'strength', weight: 30, reps: 6, raw: '30 x 6' },
+        { kind: 'strength', weight: 10, reps: 10 },
+        { kind: 'strength', weight: 20, reps: 8 },
+        { kind: 'strength', weight: 30, reps: 6 },
       ],
     })
 
@@ -64,7 +64,7 @@ describe('workout note serializer', () => {
     const output = serializeExercise({
       canonicalName: 'Squat',
       note: 'Keep chest tall',
-      rows: [{ kind: 'strength', weight: 10, reps: 10, raw: '10 x 10' }],
+      rows: [{ kind: 'strength', weight: 10, reps: 10 }],
     })
 
     expect(output).toContain('[notes:: Keep chest tall]')

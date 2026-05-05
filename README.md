@@ -1,8 +1,7 @@
 # FitKit
 
 Track workouts as plain-markdown notes in Obsidian. Edit structured data
-without leaving the vault, import from rough journal notes, and generate a
-dashboard with PB tracking.
+without leaving the vault and generate a dashboard with PB tracking.
 
 ## Status
 
@@ -70,18 +69,6 @@ Relevant commands:
 - `Open today's workout`
 - `Open workout editor for current file`
 
-### Journal import
-
-Use the importer for rough journal text, either from the active note or pasted
-text. FitKit parses the supported grammar, lets you map unknown exercises, then
-writes the workout note and can update the index and dashboard after a successful
-import.
-
-Relevant commands:
-
-- `Import workout from journal note`
-- `Import workout from pasted text`
-
 ### Dashboard
 
 FitKit builds a local workout index and regenerates
@@ -98,33 +85,30 @@ Relevant commands:
 
 ## Commands
 
-| Command                                        | Description                                                                                                  |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `Rebuild index`                                | Scan workout notes and cache the latest index plus parse diagnostics.                                        |
-| `Rebuild dashboard`                            | Rebuild the index, then regenerate the dashboard note.                                                       |
-| `Restore hidden sections in current dashboard` | Clear hidden-section state for the dashboard and regenerate it.                                              |
-| `Show parse diagnostics`                       | Open diagnostics from the last index build, or report that none exist.                                       |
-| `Open today's workout`                         | Create today's workout note if needed, then open it in the workout editor.                                   |
-| `Open workout editor for current file`         | Open the active Markdown file in the workout editor.                                                         |
-| `Import workout from journal note`             | Import the active Markdown file as a journal note, or create missing exercises for an existing workout note. |
-| `Import workout from pasted text`              | Open the importer with an empty editable text area.                                                          |
+| Command                                        | Description                                                                                |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `Rebuild index`                                | Scan workout notes and cache the latest index plus parse diagnostics.                      |
+| `Rebuild dashboard`                            | Rebuild the index, then regenerate the dashboard note.                                     |
+| `Restore hidden sections in current dashboard` | Clear hidden-section state for the dashboard and regenerate it.                            |
+| `Show parse diagnostics`                       | Open diagnostics from the last index build, or report that none exist.                     |
+| `Open today's workout`                         | Create today's workout note if needed, then open it in the workout editor.                 |
+| `Open workout editor for current file`         | Open the active Markdown file in the workout editor.                                       |
+| `Create missing exercises for current workout` | Review the active workout note and create missing registry entries or exercise note files. |
 
 ## Settings
 
 Values are stored by Obsidian plugin settings.
 
-| Setting                         | Default      | Description                                                                                                       |
-| ------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------- |
-| `fitnessRoot`                   | `Fitness`    | Folder under the vault root where workouts, exercises, and the dashboard live.                                    |
-| `journalFolder`                 | empty string | Optional folder where rough journal notes live, used by the import command.                                       |
-| `autoCreateMissingExercises`    | `false`      | When the importer or editor sees an unknown exercise, also create a stub note under `<fitnessRoot>/Exercises/`.   |
-| `autoOpenWorkoutEditor`         | `true`       | When opening a workout note, automatically switch it into the FitKit editor instead of staying in Markdown.       |
-| `strengthRestTimerEnabled`      | `true`       | Show a rest timer in the workout editor footer; the footer keeps the last rest duration after you stop the timer. |
-| `autoUpdateDashboard`           | `true`       | When a workout note is saved, refresh the index entry and regenerate the dashboard.                               |
-| `autosaveDebounceMs`            | `600`        | How long to wait after the last edit before persisting changes in the workout editor view.                        |
-| `exerciseRegistry`              | `[]`         | Stored exercise registry entries used for canonical exercise names and aliases.                                   |
-| `hiddenDashboardSectionsByPath` | `{}`         | Stored hidden dashboard sections by dashboard path, used when regenerating the dashboard.                         |
-| `schemaVersion`                 | `1`          | Stored settings schema version.                                                                                   |
+| Setting                         | Default   | Description                                                                                                       |
+| ------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------- |
+| `fitnessRoot`                   | `Fitness` | Folder under the vault root where workouts, exercises, and the dashboard live.                                    |
+| `autoOpenWorkoutEditor`         | `true`    | When opening a workout note, automatically switch it into the FitKit editor instead of staying in Markdown.       |
+| `strengthRestTimerEnabled`      | `true`    | Show a rest timer in the workout editor footer; the footer keeps the last rest duration after you stop the timer. |
+| `autoUpdateDashboard`           | `true`    | When a workout note is saved, refresh the index entry and regenerate the dashboard.                               |
+| `autosaveDebounceMs`            | `600`     | How long to wait after the last edit before persisting changes in the workout editor view.                        |
+| `exerciseRegistry`              | `[]`      | Stored exercise registry entries used for canonical exercise names and aliases.                                   |
+| `hiddenDashboardSectionsByPath` | `{}`      | Stored hidden dashboard sections by dashboard path, used when regenerating the dashboard.                         |
+| `schemaVersion`                 | `1`       | Stored settings schema version.                                                                                   |
 
 The settings tab also shows derived paths for workouts, exercises, and the
 dashboard, and provides `Bootstrap from vault` to scan the exercises folder into

@@ -17,8 +17,6 @@ function settingsWithRegistry(
 ): FitKitSettings {
   return {
     fitnessRoot: 'Fitness',
-    journalFolder: '',
-    autoCreateMissingExercises: false,
     autoOpenWorkoutEditor: true,
     strengthRestTimerEnabled: true,
     autoUpdateDashboard: true,

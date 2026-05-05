@@ -85,8 +85,6 @@ const emptyIndex: FitKitIndex = {
 function createSettings(overrides: Partial<FitKitSettings> = {}): FitKitSettings {
   return {
     fitnessRoot: 'Fitness',
-    journalFolder: '',
-    autoCreateMissingExercises: false,
     autoOpenWorkoutEditor: true,
     strengthRestTimerEnabled: true,
     autoUpdateDashboard: true,
