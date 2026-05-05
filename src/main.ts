@@ -316,7 +316,7 @@ export default class FitKitPlugin extends Plugin {
     let already = 0
     let skipped = 0
     let skippedMalformedFrontmatter = 0
-    let unknown = 0
+    let needsValidation = 0
     let failed = 0
     let customisedRecentSessions = 0
     let customisedNotesSections = 0
@@ -350,8 +350,9 @@ export default class FitKitPlugin extends Plugin {
         }
 
         if (result.status === 'unknown') {
-          unknown += 1
-        } else if (result.changed) {
+          needsValidation += 1
+        }
+        if (result.changed) {
           updated += 1
         } else {
           already += 1
@@ -377,7 +378,13 @@ export default class FitKitPlugin extends Plugin {
     ].filter((warning): warning is string => warning !== null)
     const customisedSummary =
       customisedWarnings.length > 0 ? ` ${customisedWarnings.join(', ')} left alone.` : ''
-    const summary = `Synced ${files.length} exercise note${files.length === 1 ? '' : 's'}; ${updated} updated, ${already} already current, ${skipped} skipped (non-exercise type), ${skippedMalformedFrontmatter} skipped (malformed frontmatter), ${unknown} unknown (no registry kind), ${failed} failed${failedHint}.${customisedSummary}`
+    const validationSummary =
+      needsValidation > 0
+        ? ` (${needsValidation} ${
+            needsValidation === 1 ? 'needs' : 'need'
+          } validation: kind inferred/defaulted without registry, review kind and metric)`
+        : ''
+    const summary = `Synced ${files.length} exercise note${files.length === 1 ? '' : 's'}; ${updated} updated${validationSummary}, ${already} already current, ${skipped} skipped (non-exercise type), ${skippedMalformedFrontmatter} skipped (malformed frontmatter), ${failed} failed${failedHint}.${customisedSummary}`
     new Notice(summary)
   }
 

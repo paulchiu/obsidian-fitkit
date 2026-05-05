@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const noticeMessages = vi.hoisted(() => [] as string[])
+
 vi.mock('obsidian', () => {
   class App {}
   class Plugin {
@@ -70,7 +72,9 @@ vi.mock('obsidian', () => {
   }
 
   class Notice {
-    constructor(readonly message: string) {}
+    constructor(readonly message: string) {
+      noticeMessages.push(message)
+    }
   }
 
   class PluginSettingTab {
@@ -153,8 +157,15 @@ interface MockWorkspace {
   on: (event: string, cb: (...args: unknown[]) => void) => unknown
 }
 
+interface MockVault {
+  getMarkdownFiles: () => TFile[]
+  read: (file: TFile) => Promise<string>
+  process: (file: TFile, callback: (live: string) => string) => Promise<void>
+}
+
 interface MockApp {
   workspace: MockWorkspace
+  vault: MockVault
   metadataCache: {
     getFileCache: (file: TFile) => { frontmatter?: { type?: unknown } } | null
   }
@@ -166,6 +177,7 @@ interface TestPlugin {
   maybeRouteWorkoutFile(file: TFile): Promise<void>
   sweepLeavesForWorkout(): void
   openWorkoutEditor(file: TFile): Promise<void>
+  syncExerciseNotes(): Promise<void>
 }
 
 const makeEditorView = (
@@ -232,7 +244,10 @@ const makeLeafShowingFile = (file: TFile): MockLeaf => {
   return leaf
 }
 
-const makeApp = (overrides: Partial<MockWorkspace> = {}): MockApp => ({
+const makeApp = (
+  overrides: Partial<MockWorkspace> = {},
+  vaultOverrides: Partial<MockVault> = {},
+): MockApp => ({
   workspace: {
     rootSplit: {},
     getActiveViewOfType: vi.fn(() => null),
@@ -243,6 +258,12 @@ const makeApp = (overrides: Partial<MockWorkspace> = {}): MockApp => ({
     getLeaf: vi.fn(() => makeLeafShowingFile(makeWorkoutFile())),
     on: vi.fn(),
     ...overrides,
+  },
+  vault: {
+    getMarkdownFiles: vi.fn(() => []),
+    read: vi.fn(async () => ''),
+    process: vi.fn(async () => undefined),
+    ...vaultOverrides,
   },
   metadataCache: {
     getFileCache: vi.fn(() => null),
@@ -340,6 +361,54 @@ describe('FitKitPlugin file-open routing (no editor open)', () => {
 
     expect(leaf.setViewState).not.toHaveBeenCalled()
     expect(app.workspace.getActiveViewOfType).not.toHaveBeenCalled()
+  })
+})
+
+describe('FitKitPlugin syncExerciseNotes', () => {
+  beforeEach(() => {
+    noticeMessages.length = 0
+  })
+
+  it('repairs no-registry missing kind and reports validation guidance', async () => {
+    const file = makeWorkoutFile('Fitness/Exercises/Mystery.md')
+    const contents = new Map<string, string>([
+      [
+        file.path,
+        `---
+type: exercise
+---
+
+## Notes
+`,
+      ],
+    ])
+    const app = makeApp(
+      {},
+      {
+        getMarkdownFiles: vi.fn(() => [file]),
+        read: vi.fn(async (target: TFile) => contents.get(target.path) ?? ''),
+        process: vi.fn(async (target: TFile, callback: (live: string) => string) => {
+          contents.set(target.path, callback(contents.get(target.path) ?? ''))
+        }),
+      },
+    )
+    const plugin = createPlugin(app, {
+      ...DEFAULT_SETTINGS,
+      exerciseRegistry: [],
+      fitnessRoot: 'Fitness',
+    })
+
+    await plugin.syncExerciseNotes()
+
+    expect(contents.get(file.path)).toContain(`type: exercise
+kind: strength
+metric: e1rm
+---`)
+    expect(contents.get(file.path)).toContain('## Recent sessions')
+    expect(noticeMessages).toHaveLength(1)
+    expect(noticeMessages[0]).toContain('1 updated (1 needs validation')
+    expect(noticeMessages[0]).toContain('0 already current')
+    expect(noticeMessages[0]).toContain('kind inferred/defaulted without registry')
   })
 })
 
