@@ -12,8 +12,6 @@ export { dashboardPath, exercisesFolder, workoutFilename, workoutsFolder } from 
 
 export interface FitKitSettings {
   fitnessRoot: string
-  journalFolder: string
-  autoCreateMissingExercises: boolean
   autoOpenWorkoutEditor: boolean
   strengthRestTimerEnabled: boolean
   autoUpdateDashboard: boolean
@@ -26,8 +24,6 @@ export interface FitKitSettings {
 
 export const DEFAULT_SETTINGS: FitKitSettings = {
   fitnessRoot: 'Fitness',
-  journalFolder: '',
-  autoCreateMissingExercises: false,
   autoOpenWorkoutEditor: true,
   strengthRestTimerEnabled: true,
   autoUpdateDashboard: true,
@@ -67,16 +63,6 @@ export class FitKitSettingTab extends PluginSettingTab {
         }),
       )
 
-    new Setting(containerEl)
-      .setName('Journal folder')
-      .setDesc('Optional. Folder where rough journal notes live (used by the import command).')
-      .addText((text) =>
-        text.setValue(settings.journalFolder).onChange(async (value) => {
-          settings.journalFolder = normalizePath(value)
-          await this.plugin.saveSettings()
-        }),
-      )
-
     containerEl.createEl('div', {
       text: 'Derived paths:',
       cls: 'setting-item-name',
@@ -98,18 +84,6 @@ export class FitKitSettingTab extends PluginSettingTab {
     refreshDerivedPaths()
 
     new Setting(containerEl).setName('Behavior').setHeading()
-
-    new Setting(containerEl)
-      .setName('Auto-create missing exercises')
-      .setDesc(
-        'When the importer or editor sees an unknown exercise, also create a stub note under <fitnessRoot>/Exercises/.',
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(settings.autoCreateMissingExercises).onChange(async (value) => {
-          settings.autoCreateMissingExercises = value
-          await this.plugin.saveSettings()
-        }),
-      )
 
     new Setting(containerEl)
       .setName('Auto-open workout editor')

@@ -1,14 +1,21 @@
-/**
- * Serializer for the canonical workout note format used by POC9/POC10.
- */
+export type CanonicalStrengthRow = {
+  kind: 'strength'
+  weight: number
+  reps: number
+}
 
-import type { ExerciseRow } from './journal-grammar'
+export type CanonicalDurationRow = {
+  kind: 'duration'
+  seconds: number
+}
+
+export type CanonicalExerciseRow = CanonicalStrengthRow | CanonicalDurationRow
 
 export type CanonicalExercise = {
   /** Canonical (resolved) exercise name. */
   canonicalName: string
   note: string
-  rows: ExerciseRow[]
+  rows: CanonicalExerciseRow[]
 }
 
 export type CanonicalWorkout = {

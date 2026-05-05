@@ -5,9 +5,6 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import type { ExerciseRegistryEntry } from '../../src/domain/exercise-registry'
-import { createRegistry, resolve as resolveExercise } from '../../src/domain/exercise-registry'
-import { parseJournal } from '../../src/domain/journal-grammar'
 import type { WorkoutNoteModel } from '../../src/domain/workout-note-model'
 import {
   parseWorkoutNote,
@@ -151,31 +148,33 @@ describe('workout note model', () => {
     expect(result.model).toBeNull()
   })
 
-  it('serializes parsed journal input into canonical workout markdown', () => {
-    const parsed = parseJournal(fixture('journals/sample-strength.md'))
-    const entries: ExerciseRegistryEntry[] = parsed.exercises.map((exercise) => ({
-      name: exercise.rawName,
-      kind: 'strength',
-      aliases: [],
-    }))
-    const registry = createRegistry(entries)
+  it('parses canonical workout markdown from an explicit workout fixture', () => {
     const workout: CanonicalWorkout = {
-      name: parsed.name,
+      name: 'Sample strength',
       date: '2026-04-24',
-      exercises: parsed.exercises.map((exercise) => {
-        const resolution = resolveExercise(registry, exercise.rawName)
-        if (resolution.kind !== 'match') {
-          throw new Error(`${exercise.rawName} did not resolve`)
-        }
-        return {
-          canonicalName: resolution.entry.name,
-          note: exercise.note,
-          rows: exercise.rows,
-        }
-      }),
+      exercises: [
+        {
+          canonicalName: 'Squat',
+          note: 'Keep chest tall',
+          rows: [
+            { kind: 'strength', weight: 50, reps: 5 },
+            { kind: 'strength', weight: 55, reps: 5 },
+          ],
+        },
+        {
+          canonicalName: 'Bench',
+          note: '',
+          rows: [{ kind: 'strength', weight: 40, reps: 8 }],
+        },
+        {
+          canonicalName: 'Plank',
+          note: '',
+          rows: [{ kind: 'duration', seconds: 60 }],
+        },
+      ],
     }
 
-    const result = parseWorkoutNote(serializeWorkout(workout), 'imported.md')
+    const result = parseWorkoutNote(serializeWorkout(workout), 'canonical.md')
 
     expect(result.isWorkout).toBe(true)
     expect(result.model?.exercises).toHaveLength(3)
