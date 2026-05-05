@@ -376,11 +376,11 @@ export default class FitKitPlugin extends Plugin {
       customisedWarnings.length > 0 ? ` ${customisedWarnings.join(', ')} left alone.` : ''
     const validationSummary =
       needsValidation > 0
-        ? `, ${needsValidation} ${
+        ? ` (${needsValidation} ${
             needsValidation === 1 ? 'needs' : 'need'
-          } validation (kind inferred/defaulted without registry; review kind and metric)`
+          } validation: kind inferred/defaulted without registry, review kind and metric)`
         : ''
-    const summary = `Synced ${files.length} exercise note${files.length === 1 ? '' : 's'}; ${updated} updated, ${already} already current${validationSummary}, ${skipped} skipped (non-exercise type), ${skippedMalformedFrontmatter} skipped (malformed frontmatter), ${failed} failed${failedHint}.${customisedSummary}`
+    const summary = `Synced ${files.length} exercise note${files.length === 1 ? '' : 's'}; ${updated} updated${validationSummary}, ${already} already current, ${skipped} skipped (non-exercise type), ${skippedMalformedFrontmatter} skipped (malformed frontmatter), ${failed} failed${failedHint}.${customisedSummary}`
     new Notice(summary)
   }
 
