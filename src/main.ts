@@ -172,7 +172,11 @@ export default class FitKitPlugin extends Plugin {
       name: 'Create missing exercises for current workout',
       checkCallback: (checking) => {
         const file = this.app.workspace.getActiveFile()
-        if (!(file instanceof TFile) || file.extension.toLowerCase() !== 'md') {
+        if (
+          !(file instanceof TFile) ||
+          file.extension.toLowerCase() !== 'md' ||
+          !this.isWorkoutFile(file)
+        ) {
           return false
         }
         if (!checking) {

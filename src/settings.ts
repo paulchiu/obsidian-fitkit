@@ -165,7 +165,7 @@ export class FitKitSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName('Registry').setHeading()
 
     containerEl.createEl('div', {
-      text: 'Curate canonical exercise names, kinds, and aliases. The registry is consulted whenever you add, rename, or import an exercise. Filenames in your exercises folder also count at runtime, even if they are not listed here; use the bootstrap action below to materialise them.',
+      text: 'Curate canonical exercise names, kinds, and aliases. The registry is consulted whenever you add or rename an exercise. Filenames in your exercises folder also count at runtime, even if they are not listed here; use the bootstrap action below to materialise them.',
       cls: 'setting-item-description',
     })
 
