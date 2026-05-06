@@ -9,11 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Exercise charts now plot completed reps for bodyweight strength exercises when no positive-weight sets exist.
+
 ### Changed
 
 ### Fixed
 
 - Exercise charts now treat strength rows with reps and no weight as bodyweight sets, and e1rm charts fall back to plotting reps when an exercise only has bodyweight data.
+- Bodyweight personal bests now render as `N reps` instead of `0 kg x N` in editor badges and dashboard PB rows.
 
 ### Removed
 
