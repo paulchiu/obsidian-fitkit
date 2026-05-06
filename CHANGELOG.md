@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.14.2] - 2026-05-06
+
+### Added
+
 - Exercise charts now plot completed reps for bodyweight strength exercises when no positive-weight sets exist.
 
 ### Changed
