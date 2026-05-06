@@ -121,8 +121,10 @@ describe('index helpers', () => {
     ).toEqual({ weight: 0, reps: 12, set: 2 })
   })
 
-  it('returns null when heaviest-set candidates are all empty', () => {
-    expect(pickHeaviestSet([{ set: 1 }, { set: 2, weight: 0 }, { set: 3, reps: 0 }])).toBeNull()
+  it('returns null when heaviest-set candidates have no completed reps', () => {
+    expect(
+      pickHeaviestSet([{ set: 1 }, { set: 2, weight: 0 }, { set: 3, weight: 10, reps: 0 }]),
+    ).toBeNull()
   })
 
   it('breaks zero-weight heaviest-set ties by lower set number', () => {

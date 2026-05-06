@@ -11,6 +11,7 @@ export function epleyE1rm(weight: number, reps: number): number {
  * - Tier B: max e1RM among sets with reps >= 1 and weight > 0
  * - Tier C: heaviest set, or most reps when all weights are 0
  * - Blank weight with completed reps is treated as bodyweight, weight 0.
+ * - Non-finite or negative weights are ignored.
  * - Sets with reps 0 or blank reps are ignored.
  * Returns null if no sets are eligible.
  */

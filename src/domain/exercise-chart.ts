@@ -33,6 +33,7 @@ export function buildExerciseChartSeries(
   let seriesMetric: ChartSeriesMetric = kind === 'duration' ? 'duration' : metric
   let ordered = collectPoints(index, matchKeys, kind, seriesMetric)
 
+  /** Reps fallback only fires with no weighted points; mixed-history bodyweight days are skipped. */
   if (kind === 'strength' && metric === 'e1rm' && ordered.length === 0) {
     const repsPoints = collectPoints(index, matchKeys, kind, 'reps')
     if (repsPoints.length > 0) {

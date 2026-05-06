@@ -246,7 +246,15 @@ function isLaterSession<T>(candidate: SessionMetric<T>, current: SessionMetric<T
 }
 
 function formatWeightSet(set: WeightSet): string {
+  if (set.weight === 0) {
+    return formatReps(set.reps)
+  }
   return `${formatNumber(set.weight)} kg x ${formatNumber(set.reps)}`
+}
+
+function formatReps(reps: number): string {
+  const formatted = formatNumber(reps)
+  return `${formatted} rep${formatted === '1' ? '' : 's'}`
 }
 
 function formatNumber(value: number): string {
