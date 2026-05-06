@@ -252,11 +252,22 @@ function validBestSet(set: BestSet | undefined): set is BestSet {
 }
 
 function formatDashboardSet(set: StrengthPbSet, metric: ExerciseMetric): string {
-  const topSet = `${set.weight} kg x ${set.reps}`
+  const topSet = formatStrengthSet(set)
   if (metric === 'weight') {
     return topSet
   }
   return `${topSet} (e1rm ${(set.e1rm ?? 0).toFixed(1)})`
+}
+
+function formatStrengthSet(set: StrengthPbSet): string {
+  if (set.weight === 0) {
+    return formatReps(set.reps)
+  }
+  return `${set.weight} kg x ${set.reps}`
+}
+
+function formatReps(reps: number): string {
+  return `${reps} rep${reps === 1 ? '' : 's'}`
 }
 
 function buildExerciseMetricMap(

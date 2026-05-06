@@ -150,6 +150,42 @@ describe('exercise history aggregation', () => {
     expect(formatExerciseHistoryBadges(history.get('Curl'), 'strength')).toEqual([])
   })
 
+  it('renders bodyweight-only strength history as reps', () => {
+    const history = buildExerciseHistoryMap(
+      fitKitIndex([
+        entry('Fitness/Workouts/2026-04-20.md', '2026-04-20', [
+          {
+            exerciseName: 'Pull-up',
+            kind: 'strength',
+            maxWeightSet: { weight: 0, reps: 20 },
+          },
+        ]),
+        entry('Fitness/Workouts/2026-04-22.md', '2026-04-22', [
+          {
+            exerciseName: 'Pull-up',
+            kind: 'strength',
+            maxWeightSet: { weight: 0, reps: 12 },
+          },
+        ]),
+      ]),
+      {
+        sourcePath: 'Fitness/Workouts/2026-04-24.md',
+        date: '2026-04-24',
+      },
+    )
+
+    expect(formatExerciseHistoryBadges(history.get('Pull-up'), 'strength')).toEqual([
+      {
+        text: 'PB 20 reps',
+        title: 'Heaviest weight lifted (not 1RM)',
+      },
+      {
+        text: 'Last max: 12 reps (2026-04-22)',
+        title: 'Heaviest weight in latest prior session',
+      },
+    ])
+  })
+
   it('uses session total duration for duration PB and Last', () => {
     const history = buildExerciseHistoryMap(
       fitKitIndex([

@@ -186,7 +186,7 @@ describe('dashboard composer', () => {
     expect(markdown).not.toContain('e1rm')
   })
 
-  it('renders zero-weight PBs for bodyweight exercises in weight metric mode', () => {
+  it('renders bodyweight PBs as reps in weight metric mode', () => {
     const markdown = composeDashboard(
       {
         ...emptyIndex,
@@ -213,10 +213,11 @@ describe('dashboard composer', () => {
       new Map([['Push-up', 'weight'] as const]),
     )
 
-    expect(markdown).toContain('- **[[#Push-up|Push-up]]:** 0 kg x 12')
+    expect(markdown).toContain('- **[[#Push-up|Push-up]]:** 12 reps')
+    expect(markdown).not.toContain('0 kg x 12')
   })
 
-  it('ranks zero-weight PBs by reps in weight metric mode', () => {
+  it('ranks bodyweight PBs by reps in weight metric mode', () => {
     const markdown = composeDashboard(
       {
         ...emptyIndex,
@@ -257,8 +258,8 @@ describe('dashboard composer', () => {
       new Map([['Push-up', 'weight'] as const]),
     )
 
-    expect(markdown).toContain('- **[[#Push-up|Push-up]]:** 0 kg x 12')
-    expect(markdown).not.toContain('- **[[#Push-up|Push-up]]:** 0 kg x 8')
+    expect(markdown).toContain('- **[[#Push-up|Push-up]]:** 12 reps')
+    expect(markdown).not.toContain('- **[[#Push-up|Push-up]]:** 8 reps')
   })
 
   it('links each PB row to its dashboard section', () => {

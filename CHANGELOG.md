@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Exercise charts now treat strength rows with reps and no weight as bodyweight sets, and e1rm charts fall back to plotting reps when an exercise only has bodyweight data.
+
 ### Removed
 
 ## [0.14.1] - 2026-05-05

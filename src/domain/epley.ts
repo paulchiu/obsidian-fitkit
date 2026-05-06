@@ -10,13 +10,15 @@ export function epleyE1rm(weight: number, reps: number): number {
  * - Tier A: max e1RM among sets with reps in [1,12] and weight > 0
  * - Tier B: max e1RM among sets with reps >= 1 and weight > 0
  * - Tier C: heaviest set, or most reps when all weights are 0
- * - Sets with reps 0 or blank weight/reps are ignored.
+ * - Blank weight with completed reps is treated as bodyweight, weight 0.
+ * - Non-finite or negative weights are ignored.
+ * - Sets with reps 0 or blank reps are ignored.
  * Returns null if no sets are eligible.
  */
 export function pickBestSet(
   sets: ReadonlyArray<{ weight?: number; reps?: number }>,
 ): BestSet | null {
-  const eligibleSets = sets.filter(isBestSetCandidate)
+  const eligibleSets = sets.map(toBestSetCandidate).filter((set) => set !== null)
   if (eligibleSets.length === 0) {
     return null
   }
@@ -63,11 +65,15 @@ export function pickHeaviestSet(
   return toWeightSet(picked)
 }
 
-function isBestSetCandidate(set: { weight?: number; reps?: number }): set is {
+function toBestSetCandidate(set: { weight?: number; reps?: number }): {
   weight: number
   reps: number
-} {
-  return set.weight !== undefined && set.reps !== undefined && set.reps !== 0
+} | null {
+  const candidate = normalizeCompletedSet(set)
+  if (!candidate) {
+    return null
+  }
+  return { weight: candidate.weight, reps: candidate.reps }
 }
 
 interface WeightSetCandidate extends WeightSet {
@@ -79,22 +85,27 @@ function toHeaviestSetCandidate(
   set: { weight?: number; reps?: number; set?: number },
   index: number,
 ): WeightSetCandidate | null {
-  if (
-    set.weight === undefined ||
-    set.reps === undefined ||
-    !Number.isFinite(set.weight) ||
-    !Number.isFinite(set.reps) ||
-    set.weight < 0 ||
-    set.reps <= 0
-  ) {
+  const candidate = normalizeCompletedSet(set)
+  if (!candidate) {
     return null
   }
   return {
-    weight: set.weight,
-    reps: set.reps,
+    weight: candidate.weight,
+    reps: candidate.reps,
     set: set.set,
     setNumber: set.set ?? index + 1,
   }
+}
+
+function normalizeCompletedSet(set: { weight?: number; reps?: number }): WeightSet | null {
+  if (set.reps === undefined || !Number.isFinite(set.reps) || set.reps <= 0) {
+    return null
+  }
+  const weight = set.weight ?? 0
+  if (!Number.isFinite(weight) || weight < 0) {
+    return null
+  }
+  return { weight, reps: set.reps }
 }
 
 function toWeightSet(candidate: WeightSetCandidate): WeightSet {
