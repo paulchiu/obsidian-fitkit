@@ -141,6 +141,25 @@ describe('workout note model', () => {
     expect(serialized).not.toContain('[set:: 3] [reps:: 0]')
   })
 
+  it('parses bodyweight strength rows with reps and no weight', () => {
+    const model = expectWorkoutModel(
+      [
+        '---',
+        'type: workout',
+        'date: 2026-04-27',
+        'name: Bodyweight day',
+        '---',
+        '',
+        '## [[Body Weight Pull-ups]]',
+        '',
+        '- [exercise:: [[Body Weight Pull-ups]]] [set:: 1] [reps:: 20]',
+      ].join('\n'),
+      'bodyweight.md',
+    )
+
+    expect(model.exercises[0]?.strengthSets).toEqual([{ set: 1, reps: 20 }])
+  })
+
   it('reports non-workout markdown without a model', () => {
     const result = parseWorkoutNote('hello world', 'x')
 

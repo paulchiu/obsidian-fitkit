@@ -3,7 +3,7 @@ import { DEFAULT_EXERCISE_METRIC, type ExerciseMetric } from './exercise-metric'
 import { normalize, resolve, type ExerciseKind, type ExerciseRegistry } from './exercise-registry'
 import type { FitKitIndex } from './types'
 
-export type ChartSeriesMetric = ExerciseMetric | 'duration'
+export type ChartSeriesMetric = ExerciseMetric | 'duration' | 'reps'
 
 export interface ChartPoint {
   date: string
@@ -15,7 +15,7 @@ export interface ChartSeries {
   exerciseName: string
   kind: ExerciseKind
   metric: ChartSeriesMetric
-  unit: 'kg' | 's'
+  unit: 'kg' | 's' | 'reps'
   points: ChartPoint[]
   windowRequested: number
   totalDates: number
@@ -30,8 +30,39 @@ export function buildExerciseChartSeries(
   metric: ExerciseMetric = DEFAULT_EXERCISE_METRIC,
 ): ChartSeries {
   const matchKeys = buildMatchKeys(registry, exerciseName)
-  const buckets = new Map<string, ChartPoint>()
+  let seriesMetric: ChartSeriesMetric = kind === 'duration' ? 'duration' : metric
+  let ordered = collectPoints(index, matchKeys, kind, seriesMetric)
 
+  if (kind === 'strength' && metric === 'e1rm' && ordered.length === 0) {
+    const repsPoints = collectPoints(index, matchKeys, kind, 'reps')
+    if (repsPoints.length > 0) {
+      seriesMetric = 'reps'
+      ordered = repsPoints
+    }
+  }
+
+  const totalDates = ordered.length
+  const safeWindow = Math.max(1, Math.floor(window))
+  const sliced = ordered.length > safeWindow ? ordered.slice(ordered.length - safeWindow) : ordered
+
+  return {
+    exerciseName,
+    kind,
+    metric: seriesMetric,
+    unit: unitForMetric(seriesMetric),
+    points: sliced,
+    windowRequested: safeWindow,
+    totalDates,
+  }
+}
+
+function collectPoints(
+  index: FitKitIndex,
+  matchKeys: ReadonlySet<string>,
+  kind: ExerciseKind,
+  metric: ChartSeriesMetric,
+): ChartPoint[] {
+  const buckets = new Map<string, ChartPoint>()
   for (const entry of index.entries) {
     for (const row of entry.exercises) {
       if (row.kind !== kind) {
@@ -56,20 +87,17 @@ export function buildExerciseChartSeries(
     }
   }
 
-  const ordered = [...buckets.values()].sort((left, right) => compareByDate(left, right))
-  const totalDates = ordered.length
-  const safeWindow = Math.max(1, Math.floor(window))
-  const sliced = ordered.length > safeWindow ? ordered.slice(ordered.length - safeWindow) : ordered
+  return [...buckets.values()].sort((left, right) => compareByDate(left, right))
+}
 
-  return {
-    exerciseName,
-    kind,
-    metric: kind === 'duration' ? 'duration' : metric,
-    unit: kind === 'duration' ? 's' : 'kg',
-    points: sliced,
-    windowRequested: safeWindow,
-    totalDates,
+function unitForMetric(metric: ChartSeriesMetric): ChartSeries['unit'] {
+  if (metric === 'duration') {
+    return 's'
   }
+  if (metric === 'reps') {
+    return 'reps'
+  }
+  return 'kg'
 }
 
 function buildMatchKeys(registry: ExerciseRegistry, exerciseName: string): Set<string> {
@@ -97,7 +125,7 @@ function buildMatchKeys(registry: ExerciseRegistry, exerciseName: string): Set<s
 function pickMetric(
   row: FitKitIndex['entries'][number]['exercises'][number],
   kind: ExerciseKind,
-  metric: ExerciseMetric,
+  metric: ChartSeriesMetric,
 ): number | null {
   if (kind === 'duration') {
     const value = row.totalDurationSeconds
@@ -105,6 +133,19 @@ function pickMetric(
       return null
     }
     return value
+  }
+  if (metric === 'reps') {
+    const set = row.bestSet ?? row.maxWeightSet
+    if (
+      !set ||
+      !Number.isFinite(set.weight) ||
+      !Number.isFinite(set.reps) ||
+      set.weight !== 0 ||
+      set.reps <= 0
+    ) {
+      return null
+    }
+    return set.reps
   }
   if (metric === 'weight') {
     const set = row.maxWeightSet
