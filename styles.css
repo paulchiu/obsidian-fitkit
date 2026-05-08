@@ -561,13 +561,20 @@ body.is-mobile .fitkit-editor-root {
   overflow-wrap: anywhere;
 }
 
+.fitkit-import-cell-label {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .fitkit-import-table,
   .fitkit-import-table tbody,
   .fitkit-import-table tr,
-  .fitkit-import-table th,
   .fitkit-import-table td {
     display: block;
+  }
+
+  .fitkit-import-table thead {
+    display: none;
   }
 
   .fitkit-import-table tr {
@@ -575,10 +582,22 @@ body.is-mobile .fitkit-editor-root {
     border-bottom: 1px solid var(--background-modifier-border);
   }
 
-  .fitkit-import-table th,
   .fitkit-import-table td {
+    display: grid;
+    grid-template-columns: minmax(88px, 34%) minmax(0, 1fr);
+    gap: 8px;
     padding: 4px 0;
     border-bottom: 0;
+  }
+
+  .fitkit-import-cell-label {
+    display: block;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .fitkit-import-table td > :not(.fitkit-import-cell-label) {
+    grid-column: 2;
   }
 }
 

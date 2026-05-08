@@ -476,6 +476,11 @@ interface PersistUnknownExerciseView {
 }
 
 describe('WorkoutEditorView unknown exercise persistence', () => {
+  const resetEnsureParentFolderMock = (): void => {
+    vaultUtilsMock.ensureParentFolder.mockClear()
+    vaultUtilsMock.ensureParentFolder.mockResolvedValue(undefined)
+  }
+
   const createPersistUnknownExerciseView = (
     options: {
       existingNote?: boolean
@@ -510,11 +515,11 @@ describe('WorkoutEditorView unknown exercise persistence', () => {
 
   beforeEach(() => {
     obsidianMock.notices = []
-    vaultUtilsMock.ensureParentFolder.mockResolvedValue(undefined)
+    resetEnsureParentFolderMock()
   })
 
   afterEach(() => {
-    vaultUtilsMock.ensureParentFolder.mockReset()
+    resetEnsureParentFolderMock()
   })
 
   it('notices when note creation reuses an existing exercise note without a tombstone', async () => {
