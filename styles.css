@@ -253,6 +253,22 @@ body.is-mobile .fitkit-editor-root {
   padding: 0;
   width: var(--fitkit-card-control-size, 32px);
   height: var(--fitkit-card-control-size, 32px);
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+  box-sizing: border-box;
+}
+
+.fitkit-gear-button:hover,
+.fitkit-gear-button:focus-visible {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.fitkit-gear-button svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.25;
 }
 
 .fitkit-field-row {

@@ -74,26 +74,25 @@ Relevant commands:
 FitKit builds a local workout index and regenerates
 `<fitnessRoot>/Fitness Dashboard.md` with a PB summary and per-exercise
 Dataview queries. Hidden dashboard sections are preserved until you explicitly
-restore them.
+restore them from Settings.
 
-Relevant commands:
+Settings maintenance actions:
 
-- `Rebuild index`
-- `Rebuild dashboard`
-- `Restore hidden sections in current dashboard`
-- `Show parse diagnostics`
+- Rebuild index
+- Rebuild dashboard
+- Restore hidden dashboard sections
+- Show parse diagnostics
+- Show exercise registry diagnostics
+- Sync and repair exercise notes
 
 ## Commands
 
-| Command                                        | Description                                                                                |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `Rebuild index`                                | Scan workout notes and cache the latest index plus parse diagnostics.                      |
-| `Rebuild dashboard`                            | Rebuild the index, then regenerate the dashboard note.                                     |
-| `Restore hidden sections in current dashboard` | Clear hidden-section state for the dashboard and regenerate it.                            |
-| `Show parse diagnostics`                       | Open diagnostics from the last index build, or report that none exist.                     |
-| `Open today's workout`                         | Create today's workout note if needed, then open it in the workout editor.                 |
-| `Open workout editor for current file`         | Open the active Markdown file in the workout editor.                                       |
-| `Create missing exercises for current workout` | Review the active workout note and create missing registry entries or exercise note files. |
+The command palette is reserved for daily workout entry.
+
+| Command                                | Description                                                                |
+| -------------------------------------- | -------------------------------------------------------------------------- |
+| `Open today's workout`                 | Create today's workout note if needed, then open it in the workout editor. |
+| `Open workout editor for current file` | Open the active Markdown file in the workout editor.                       |
 
 ## Settings
 
@@ -106,13 +105,21 @@ Values are stored by Obsidian plugin settings.
 | `strengthRestTimerEnabled`      | `true`    | Show a rest timer in the workout editor footer; the footer keeps the last rest duration after you stop the timer. |
 | `autoUpdateDashboard`           | `true`    | When a workout note is saved, refresh the index entry and regenerate the dashboard.                               |
 | `autosaveDebounceMs`            | `600`     | How long to wait after the last edit before persisting changes in the workout editor view.                        |
+| `chartSessionsWindow`           | `30`      | Default number of recent workout dates to plot in exercise progression charts.                                    |
 | `exerciseRegistry`              | `[]`      | Stored exercise registry entries used for canonical exercise names and aliases.                                   |
+| `deletedExercises`              | `[]`      | Normalized exercise-name tombstones for deleted exercise notes that should stay ignored.                          |
 | `hiddenDashboardSectionsByPath` | `{}`      | Stored hidden dashboard sections by dashboard path, used when regenerating the dashboard.                         |
 | `schemaVersion`                 | `1`       | Stored settings schema version.                                                                                   |
 
 The settings tab also shows derived paths for workouts, exercises, and the
-dashboard, and provides `Bootstrap from vault` to scan the exercises folder into
-the registry while preserving existing aliases.
+dashboard. Its setup and maintenance section replaces the old maintenance
+commands with buttons for rebuilding generated data, restoring dashboard
+sections, viewing diagnostics, and syncing exercise notes.
+
+The registry section lets you add, edit, delete, and import exercise entries
+while preserving existing aliases. Exercise import scans workout notes,
+creates missing exercise notes when selected, and keeps deleted exercise names
+ignored until you restore them.
 
 ## Workout note format
 
@@ -140,7 +147,6 @@ Duration exercises use `[duration:: 60]` (seconds).
 ## Limitations
 
 - Merge conflict UI (FitKit detects conflicts on autosave and surfaces a notice; manual resolution still happens in the underlying Markdown).
-- No settings-tab editor for the exercise registry beyond the bootstrap action; flip a kind via the gear menu's "Update registry too" choice, or edit `data.json` by hand.
 - SQL/WASM analytics
 - Custom fenced source format
 - Repeat-last-workout shortcut

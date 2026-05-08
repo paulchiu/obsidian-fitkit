@@ -304,7 +304,7 @@ metric: e1rm
     expect(result.markdown).toContain(buildRecentSessionsBlock('Squat', 'strength', 'Fitness'))
   })
 
-  it('repairs stale valid kind frontmatter from the registry', () => {
+  it('preserves stale valid kind frontmatter and warns when the registry differs', () => {
     const source = `---
 type: exercise
 kind: strength
@@ -326,14 +326,20 @@ ${buildNotesBlock('Plank', 'Fitness')}
 `
     const result = migrate(source, { name: 'Plank' })
 
-    expect(result.status).toBe('updated')
+    expect(result.status).toBe('already')
     expect(result.unknownKind).toBe(false)
+    expect(result.changed).toBe(false)
+    expect(result.warnings).toContainEqual({
+      kind: 'registry-kind-conflict',
+      noteKind: 'strength',
+      registryKind: 'duration',
+    })
     expect(result.markdown).toContain(`type: exercise
-kind: duration
+kind: strength
 metric: e1rm
 ---`)
-    expect(result.markdown).toContain(buildRecentSessionsBlock('Plank', 'duration', 'Fitness'))
-    expect(result.markdown).not.toContain('WHERE L.exercise = link("Plank") AND L.set')
+    expect(result.markdown).toContain(buildRecentSessionsBlock('Plank', 'strength', 'Fitness'))
+    expect(result.markdown).toContain('WHERE L.exercise = link("Plank") AND L.set')
   })
 
   it('leaves an existing metric key unchanged', () => {

@@ -1,11 +1,19 @@
 import { Modal, type App } from 'obsidian'
 
-import type { IndexDiagnostic } from '../domain/types'
+interface DiagnosticsModalItem {
+  path?: string
+  name?: string
+  warnings: readonly string[]
+}
 
 export class ParseDiagnosticsModal extends Modal {
-  private readonly diagnostics: IndexDiagnostic[]
+  private readonly diagnostics: readonly DiagnosticsModalItem[]
 
-  constructor(app: App, diagnostics: IndexDiagnostic[]) {
+  constructor(
+    app: App,
+    diagnostics: readonly DiagnosticsModalItem[],
+    private title = 'Parse diagnostics',
+  ) {
     super(app)
     this.diagnostics = diagnostics
   }
@@ -13,10 +21,10 @@ export class ParseDiagnosticsModal extends Modal {
   onOpen(): void {
     const { contentEl } = this
     contentEl.empty()
-    contentEl.createEl('h2', { text: 'Parse diagnostics' })
+    contentEl.createEl('h2', { text: this.title })
 
     for (const diagnostic of this.diagnostics) {
-      contentEl.createEl('h3', { text: diagnostic.path })
+      contentEl.createEl('h3', { text: diagnostic.path ?? diagnostic.name ?? 'Registry' })
       const list = contentEl.createEl('ul')
       for (const warning of diagnostic.warnings) {
         list.createEl('li', { text: warning })

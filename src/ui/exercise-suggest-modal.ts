@@ -68,7 +68,7 @@ export class ExerciseSuggestModal extends SuggestModal<ExerciseChoice> {
     if (item.type === 'new') {
       el.createDiv({
         cls: 'fitkit-suggest-note',
-        text: 'Creates a card only; no exercise note file is created.',
+        text: 'You will choose whether to create an exercise note.',
       })
     }
   }

@@ -1,19 +1,89 @@
 import type { App } from 'obsidian'
 
-import { bootstrapFromStems, mergeRegistries } from '../domain/exercise-registry'
+import { normalize } from '../domain/exercise-registry'
 import type { ExerciseRegistryEntry } from '../domain/exercise-registry'
 import type { FitKitSettings } from '../settings'
-import { exercisesFolder } from '../settings-paths'
+import { readExerciseCatalog, type ExerciseCatalogSnapshot } from './exercise-catalog'
+
+export interface ExerciseRegistrySnapshotDiagnostic {
+  kind: 'catalog' | 'registry-kind-conflict'
+  path?: string
+  name?: string
+  warnings: string[]
+}
+
+export interface ExerciseRegistrySnapshot {
+  entries: ExerciseRegistryEntry[]
+  diagnostics: ExerciseRegistrySnapshotDiagnostic[]
+  catalog: ExerciseCatalogSnapshot
+}
 
 export function exerciseRegistryWithVaultNotes(
   app: App,
   settings: FitKitSettings,
 ): ExerciseRegistryEntry[] {
-  const folder = exercisesFolder(settings)
-  const stems = app.vault
-    .getMarkdownFiles()
-    .filter((file) => file.path.startsWith(`${folder}/`))
-    .map((file) => file.basename)
-  const fresh = bootstrapFromStems(stems)
-  return mergeRegistries(settings.exerciseRegistry, fresh.entries)
+  return buildExerciseRegistrySnapshot(app, settings).entries
+}
+
+export function buildExerciseRegistrySnapshot(
+  app: App,
+  settings: FitKitSettings,
+): ExerciseRegistrySnapshot {
+  const catalog = readExerciseCatalog(app, settings)
+  const diagnostics: ExerciseRegistrySnapshotDiagnostic[] = catalog.diagnostics.map(
+    (diagnostic) => ({
+      kind: 'catalog',
+      path: diagnostic.path,
+      warnings: [...diagnostic.warnings],
+    }),
+  )
+  const savedByKey = new Map<string, ExerciseRegistryEntry>()
+  for (const entry of settings.exerciseRegistry) {
+    savedByKey.set(normalize(entry.name), entry)
+  }
+  const deletedKeys = new Set((settings.deletedExercises ?? []).map((name) => normalize(name)))
+  const entriesByKey = new Map<string, ExerciseRegistryEntry>()
+
+  for (const note of catalog.entries) {
+    const key = normalize(note.name)
+    const saved = savedByKey.get(key)
+    if (deletedKeys.has(key) && !saved) {
+      continue
+    }
+
+    if (saved && saved.kind !== note.kind) {
+      diagnostics.push({
+        kind: 'registry-kind-conflict',
+        name: note.name,
+        path: note.path,
+        warnings: [
+          `Saved registry kind '${saved.kind}' differs from note kind '${note.kind}'; using note kind.`,
+        ],
+      })
+    }
+
+    entriesByKey.set(key, {
+      name: note.name,
+      kind: note.kind,
+      aliases: saved ? [...saved.aliases] : [],
+    })
+  }
+
+  for (const entry of settings.exerciseRegistry) {
+    const key = normalize(entry.name)
+    if (entriesByKey.has(key)) {
+      continue
+    }
+    entriesByKey.set(key, {
+      name: entry.name,
+      kind: entry.kind,
+      aliases: [...entry.aliases],
+    })
+  }
+
+  const entries = [...entriesByKey.values()].sort((left, right) =>
+    left.name.localeCompare(right.name),
+  )
+
+  return { entries, diagnostics, catalog }
 }
