@@ -558,6 +558,28 @@ body.is-mobile .fitkit-editor-root {
   text-align: left;
   border-bottom: 1px solid var(--background-modifier-border);
   vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .fitkit-import-table,
+  .fitkit-import-table tbody,
+  .fitkit-import-table tr,
+  .fitkit-import-table th,
+  .fitkit-import-table td {
+    display: block;
+  }
+
+  .fitkit-import-table tr {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--background-modifier-border);
+  }
+
+  .fitkit-import-table th,
+  .fitkit-import-table td {
+    padding: 4px 0;
+    border-bottom: 0;
+  }
 }
 
 .fitkit-import-select {

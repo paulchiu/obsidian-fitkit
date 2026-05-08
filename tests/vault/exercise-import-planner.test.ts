@@ -5,6 +5,7 @@ import type { FitKitSettings } from '../../src/settings'
 import {
   applyExerciseImportPlan,
   buildExerciseImportPlan,
+  ExerciseImportApplyError,
 } from '../../src/vault/exercise-import-planner'
 
 vi.mock('obsidian', () => ({
@@ -180,6 +181,7 @@ describe('exercise import planner', () => {
 
     expect(result).toEqual({
       notesCreated: 1,
+      notePathsCreated: ['Fitness/Exercises/New lift.md'],
       registryEntriesCreated: 2,
       tombstonesRemoved: 1,
       settingsChanged: true,
@@ -220,12 +222,58 @@ describe('exercise import planner', () => {
       deleted.createNoNoteEntry = true
     }
 
-    await expect(applyExerciseImportPlan(app, config, rows)).rejects.toThrow(
-      'Failed to create Fitness/Exercises/New lift.md',
-    )
+    await expect(applyExerciseImportPlan(app, config, rows)).rejects.toMatchObject({
+      name: 'ExerciseImportApplyError',
+      message: 'Failed to create Fitness/Exercises/New lift.md',
+      partialResult: {
+        notesCreated: 0,
+        notePathsCreated: [],
+        settingsChanged: false,
+      },
+    })
 
     expect([...state.createdFiles.keys()]).toEqual([])
     expect(config.exerciseRegistry).toEqual([])
     expect(config.deletedExercises).toEqual(['Deleted lift'])
+  })
+
+  it('reports note files already created when a later create fails', async () => {
+    const config = settings()
+    const { app, state } = mockApp(
+      [
+        workout(
+          'Fitness/Workouts/2026-05-08.md',
+          workoutNote(`## [[First lift]]
+
+- [exercise:: [[First lift]]] [set:: 1] [weight:: 20] [reps:: 10]
+
+## [[Second lift]]
+
+- [exercise:: [[Second lift]]] [set:: 1] [weight:: 25] [reps:: 8]`),
+        ),
+      ],
+      ['Fitness/Exercises/Second lift.md'],
+    )
+    const plan = await buildExerciseImportPlan(app, config)
+
+    try {
+      await applyExerciseImportPlan(app, config, plan.rows)
+      throw new Error('Expected applyExerciseImportPlan to fail')
+    } catch (error) {
+      expect(error).toBeInstanceOf(ExerciseImportApplyError)
+      if (!(error instanceof ExerciseImportApplyError)) {
+        throw error
+      }
+      expect(error.message).toBe('Failed to create Fitness/Exercises/Second lift.md')
+      expect(error.partialResult).toEqual({
+        notesCreated: 1,
+        notePathsCreated: ['Fitness/Exercises/First lift.md'],
+        settingsChanged: false,
+      })
+    }
+
+    expect([...state.createdFiles.keys()]).toEqual(['Fitness/Exercises/First lift.md'])
+    expect(config.exerciseRegistry).toEqual([])
+    expect(config.deletedExercises).toEqual([])
   })
 })

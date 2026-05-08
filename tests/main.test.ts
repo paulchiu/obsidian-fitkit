@@ -133,7 +133,7 @@ vi.mock('obsidian', () => {
   }
 })
 
-import { MarkdownView, TFile } from 'obsidian'
+import { MarkdownView, Modal, TFile } from 'obsidian'
 
 import FitKitPlugin from '../src/main'
 import { DEFAULT_SETTINGS, type FitKitSettings } from '../src/settings'
@@ -184,6 +184,7 @@ interface TestPlugin {
   maybeRouteWorkoutFile(file: TFile): Promise<void>
   sweepLeavesForWorkout(): void
   openWorkoutEditor(file: TFile): Promise<void>
+  showExerciseRegistryDiagnostics(): void
   syncExerciseNotes(): Promise<void>
 }
 
@@ -326,6 +327,62 @@ describe('FitKitPlugin settings loading', () => {
       { name: 'Squat', kind: 'strength', aliases: ['back squat'] },
     ])
     expect(plugin.settings.deletedExercises).toEqual([])
+  })
+})
+
+describe('FitKitPlugin exercise registry diagnostics', () => {
+  beforeEach(() => {
+    noticeMessages.length = 0
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('shows a notice when the exercise registry has no diagnostics', () => {
+    const app = makeApp()
+    const plugin = createPlugin(app)
+    const openSpy = vi.spyOn(Modal.prototype, 'open')
+
+    plugin.showExerciseRegistryDiagnostics()
+
+    expect(openSpy).not.toHaveBeenCalled()
+    expect(noticeMessages).toEqual(['No exercise registry diagnostics.'])
+  })
+
+  it('opens exercise registry diagnostics when catalog notes need validation', () => {
+    const file = makeWorkoutFile('Fitness/Exercises/Mystery.md')
+    const app = makeApp(
+      {},
+      {
+        getMarkdownFiles: vi.fn(() => [file]),
+      },
+    )
+    app.metadataCache.getFileCache = vi.fn((target: TFile) =>
+      target.path === file.path ? { frontmatter: { type: 'exercise' } } : null,
+    )
+    const plugin = createPlugin(app, { ...DEFAULT_SETTINGS, fitnessRoot: 'Fitness' })
+    const openedModals: unknown[] = []
+    vi.spyOn(Modal.prototype, 'open').mockImplementation(function (this: unknown) {
+      openedModals.push(this)
+    })
+
+    plugin.showExerciseRegistryDiagnostics()
+
+    expect(noticeMessages).toEqual([])
+    expect(openedModals).toHaveLength(1)
+    const modal = openedModals[0] as {
+      title: string
+      diagnostics: Array<{ path?: string; warnings: string[] }>
+    }
+    expect(modal.title).toBe('Exercise registry diagnostics')
+    expect(modal.diagnostics).toEqual([
+      {
+        kind: 'catalog',
+        path: 'Fitness/Exercises/Mystery.md',
+        warnings: ['Exercise note is missing a valid kind.'],
+      },
+    ])
   })
 })
 

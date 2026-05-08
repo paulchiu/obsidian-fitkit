@@ -24,7 +24,7 @@ export class ParseDiagnosticsModal extends Modal {
     contentEl.createEl('h2', { text: this.title })
 
     for (const diagnostic of this.diagnostics) {
-      contentEl.createEl('h3', { text: diagnostic.path ?? diagnostic.name ?? 'Registry' })
+      contentEl.createEl('h3', { text: diagnostic.path ?? diagnostic.name ?? 'General diagnostic' })
       const list = contentEl.createEl('ul')
       for (const warning of diagnostic.warnings) {
         list.createEl('li', { text: warning })

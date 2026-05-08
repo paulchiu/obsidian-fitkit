@@ -14,11 +14,16 @@ interface MockMenuState {
 }
 
 const obsidianMock = vi.hoisted(
-  (): { menus: MockMenuState[]; platform: { isMobile: boolean } } => ({
+  (): { menus: MockMenuState[]; notices: string[]; platform: { isMobile: boolean } } => ({
     menus: [],
+    notices: [],
     platform: { isMobile: false },
   }),
 )
+
+const vaultUtilsMock = vi.hoisted(() => ({
+  ensureParentFolder: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+}))
 
 vi.mock('obsidian', () => {
   class Modal {
@@ -112,7 +117,9 @@ vi.mock('obsidian', () => {
   }
 
   class Notice {
-    constructor(readonly message: string) {}
+    constructor(readonly message: string) {
+      obsidianMock.notices.push(message)
+    }
   }
 
   class TFile {}
@@ -131,6 +138,10 @@ vi.mock('obsidian', () => {
     }),
   }
 })
+
+vi.mock('../../src/vault/vault-utils', () => ({
+  ensureParentFolder: vaultUtilsMock.ensureParentFolder,
+}))
 
 import { WorkoutEditorView } from '../../src/ui/workout-editor-view'
 
@@ -439,6 +450,120 @@ describe('WorkoutEditorView row actions', () => {
     view.renderExerciseCard(list as unknown as HTMLElement, 0)
 
     expect(list.findByClass('fitkit-card-history')).toBeNull()
+  })
+})
+
+interface PersistUnknownExerciseView {
+  app: {
+    vault: {
+      getAbstractFileByPath: ReturnType<typeof vi.fn>
+      create: ReturnType<typeof vi.fn>
+    }
+  }
+  plugin: {
+    settings: {
+      fitnessRoot: string
+      exerciseRegistry: { name: string; kind: 'strength' | 'duration'; aliases: string[] }[]
+      deletedExercises?: string[]
+    }
+    saveSettings: ReturnType<typeof vi.fn>
+  }
+  persistUnknownExercise(
+    name: string,
+    kind: 'strength' | 'duration',
+    createNote: boolean,
+  ): Promise<void>
+}
+
+describe('WorkoutEditorView unknown exercise persistence', () => {
+  const createPersistUnknownExerciseView = (
+    options: {
+      existingNote?: boolean
+      deletedExercises?: string[]
+      createRejects?: Error
+    } = {},
+  ): PersistUnknownExerciseView => {
+    const view = Object.create(WorkoutEditorView.prototype) as PersistUnknownExerciseView
+    view.app = {
+      vault: {
+        getAbstractFileByPath: vi.fn((path: string) =>
+          options.existingNote && path === 'Fitness/Exercises/Squat.md' ? { path } : null,
+        ),
+        create: vi.fn((_path: string, _contents: string) => {
+          if (options.createRejects) {
+            return Promise.reject(options.createRejects)
+          }
+          return Promise.resolve({ path: _path })
+        }),
+      },
+    }
+    view.plugin = {
+      settings: {
+        fitnessRoot: 'Fitness',
+        exerciseRegistry: [],
+        deletedExercises: options.deletedExercises,
+      },
+      saveSettings: vi.fn(() => Promise.resolve()),
+    }
+    return view
+  }
+
+  beforeEach(() => {
+    obsidianMock.notices = []
+    vaultUtilsMock.ensureParentFolder.mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    vaultUtilsMock.ensureParentFolder.mockReset()
+  })
+
+  it('notices when note creation reuses an existing exercise note without a tombstone', async () => {
+    const view = createPersistUnknownExerciseView({ existingNote: true })
+
+    await view.persistUnknownExercise('Squat', 'strength', true)
+
+    expect(view.app.vault.create).not.toHaveBeenCalled()
+    expect(view.plugin.saveSettings).not.toHaveBeenCalled()
+    expect(obsidianMock.notices).toEqual(["Using existing exercise note for 'Squat'."])
+  })
+
+  it('notices and clears the tombstone when note creation restores an existing exercise note', async () => {
+    const view = createPersistUnknownExerciseView({
+      existingNote: true,
+      deletedExercises: ['squat', 'bench'],
+    })
+
+    await view.persistUnknownExercise('Squat', 'strength', true)
+
+    expect(view.app.vault.create).not.toHaveBeenCalled()
+    expect(view.plugin.settings.deletedExercises).toEqual(['bench'])
+    expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
+    expect(obsidianMock.notices).toEqual(["Restored 'Squat' using the existing exercise note."])
+  })
+
+  it('notices and does not save settings when parent folder creation fails', async () => {
+    vaultUtilsMock.ensureParentFolder.mockRejectedValue(new Error('no folder'))
+    const view = createPersistUnknownExerciseView()
+
+    await view.persistUnknownExercise('Squat', 'strength', true)
+
+    expect(view.app.vault.create).not.toHaveBeenCalled()
+    expect(view.plugin.saveSettings).not.toHaveBeenCalled()
+    expect(obsidianMock.notices).toEqual(["Could not create exercise note for 'Squat': no folder."])
+  })
+
+  it('notices and does not save settings when vault.create fails', async () => {
+    const view = createPersistUnknownExerciseView({ createRejects: new Error('read only') })
+
+    await view.persistUnknownExercise('Squat', 'strength', true)
+
+    expect(vaultUtilsMock.ensureParentFolder).toHaveBeenCalledWith(
+      view.app,
+      'Fitness/Exercises/Squat.md',
+    )
+    expect(view.app.vault.create).toHaveBeenCalledTimes(1)
+    expect(view.plugin.saveSettings).not.toHaveBeenCalled()
+    expect(obsidianMock.notices).toEqual(["Could not create exercise note for 'Squat': read only."])
   })
 })
 

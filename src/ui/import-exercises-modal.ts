@@ -1,7 +1,9 @@
 import { Modal, Notice } from 'obsidian'
 
+import { formatErrorMessage } from '../domain/error'
 import type FitKitPlugin from '../main'
 import {
+  ExerciseImportApplyError,
   applyExerciseImportPlan,
   buildExerciseImportPlan,
   type ExerciseImportPlanRow,
@@ -221,6 +223,15 @@ export class ImportExercisesModal extends Modal {
       this.options.onApplied?.()
       this.close()
     } catch (error) {
+      if (
+        error instanceof ExerciseImportApplyError &&
+        error.partialResult.notePathsCreated.length
+      ) {
+        new Notice(
+          `Could not apply exercise import: ${formatErrorMessage(error.originalError)}. Created before failure: ${error.partialResult.notePathsCreated.join(', ')}.`,
+        )
+        return
+      }
       new Notice(`Could not apply exercise import: ${formatErrorMessage(error)}.`)
     }
   }
@@ -235,8 +246,4 @@ export class ImportExercisesModal extends Modal {
     const close = actions.createEl('button', { text: 'Close', cls: 'fitkit-btn' })
     close.addEventListener('click', () => this.close())
   }
-}
-
-function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }

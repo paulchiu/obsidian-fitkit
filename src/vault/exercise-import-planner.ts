@@ -39,9 +39,32 @@ export interface ExerciseImportPlan {
 
 export interface ExerciseImportApplyResult {
   notesCreated: number
+  notePathsCreated: string[]
   registryEntriesCreated: number
   tombstonesRemoved: number
   settingsChanged: boolean
+}
+
+export interface ExerciseImportApplyFailureResult {
+  notesCreated: number
+  notePathsCreated: string[]
+  settingsChanged: false
+}
+
+export class ExerciseImportApplyError extends Error {
+  readonly partialResult: ExerciseImportApplyFailureResult
+  readonly originalError: unknown
+
+  constructor(
+    message: string,
+    partialResult: ExerciseImportApplyFailureResult,
+    originalError: unknown,
+  ) {
+    super(message)
+    this.name = 'ExerciseImportApplyError'
+    this.partialResult = partialResult
+    this.originalError = originalError
+  }
 }
 
 export async function buildExerciseImportPlan(
@@ -97,6 +120,7 @@ export async function applyExerciseImportPlan(
   let notesCreated = 0
   let tombstonesRemoved = 0
   let settingsChanged = false
+  const notePathsCreated: string[] = []
   let deletedExercises = [...(settings.deletedExercises ?? [])]
   const removedTombstones = new Set<string>()
   const folder = exercisesFolder(settings)
@@ -135,9 +159,22 @@ export async function applyExerciseImportPlan(
     if (app.vault.getAbstractFileByPath(path)) {
       continue
     }
-    await ensureParentFolder(app, path)
-    await app.vault.create(path, composeExerciseNote(row.name, row.kind, workouts))
+    try {
+      await ensureParentFolder(app, path)
+      await app.vault.create(path, composeExerciseNote(row.name, row.kind, workouts))
+    } catch (error) {
+      throw new ExerciseImportApplyError(
+        error instanceof Error ? error.message : `Failed to create ${path}`,
+        {
+          notesCreated,
+          notePathsCreated: [...notePathsCreated],
+          settingsChanged: false,
+        },
+        error,
+      )
+    }
     notesCreated += 1
+    notePathsCreated.push(path)
   }
 
   if (settingsChanged) {
@@ -147,6 +184,7 @@ export async function applyExerciseImportPlan(
 
   return {
     notesCreated,
+    notePathsCreated,
     registryEntriesCreated,
     tombstonesRemoved,
     settingsChanged,

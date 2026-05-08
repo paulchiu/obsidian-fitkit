@@ -1,5 +1,6 @@
 import { App, Notice, PluginSettingTab, Setting, TFile, normalizePath } from 'obsidian'
 
+import { formatErrorMessage } from './domain/error'
 import type { ExerciseRegistryEntry } from './domain/exercise-registry'
 import { createRegistry, normalize, removeEntry } from './domain/exercise-registry'
 import type FitKitPlugin from './main'
@@ -87,10 +88,6 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
       stored.hiddenDashboardSectionsByPath ?? DEFAULT_SETTINGS.hiddenDashboardSectionsByPath,
     schemaVersion: DEFAULT_SETTINGS.schemaVersion,
   }
-}
-
-function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }
 
 const CHART_WINDOW_MIN = 5

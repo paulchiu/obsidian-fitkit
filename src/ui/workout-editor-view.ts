@@ -3,6 +3,7 @@ import { ItemView, Menu, Modal, Notice, TFile, normalizePath, setIcon } from 'ob
 
 import { reorderArray } from '../domain/array-utils'
 import { formatDurationInput, parseDurationInput } from '../domain/duration-input'
+import { formatErrorMessage } from '../domain/error'
 import { formatExerciseHistoryBadges, type ExerciseHistoryByName } from '../domain/exercise-history'
 import {
   createRegistry,
@@ -1351,8 +1352,12 @@ export class WorkoutEditorView extends ItemView {
           return
         }
         new Notice(`Created exercise note for '${name}'.`)
-      } else if (hadTombstone) {
-        new Notice(`Restored '${name}' using the existing exercise note.`)
+      } else {
+        new Notice(
+          hadTombstone
+            ? `Restored '${name}' using the existing exercise note.`
+            : `Using existing exercise note for '${name}'.`,
+        )
       }
     } else {
       const registry = createRegistry(this.plugin.settings.exerciseRegistry)
@@ -1599,10 +1604,6 @@ function parseNumberInput(raw: string): number | undefined {
     return undefined
   }
   return n
-}
-
-function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }
 
 function setAriaInvalid(element: HTMLElement, invalid: boolean): void {

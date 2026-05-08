@@ -1,5 +1,6 @@
 import { MarkdownView, Notice, Plugin, TFile, type WorkspaceLeaf, normalizePath } from 'obsidian'
 
+import { formatErrorMessage } from './domain/error'
 import { createRegistry } from './domain/exercise-registry'
 import { migrateExerciseNote } from './domain/exercise-note-migrate'
 import type { FitKitIndex, IndexDiagnostic } from './domain/types'
@@ -27,10 +28,6 @@ function formatTodayIsoDate(): string {
 
 function emptyWorkoutMarkdown(date: string): string {
   return `---\ntype: workout\ndate: ${date}\nname: \n---\n`
-}
-
-function formatErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }
 
 export default class FitKitPlugin extends Plugin {
@@ -129,10 +126,8 @@ export default class FitKitPlugin extends Plugin {
       delete this.settings.hiddenDashboardSectionsByPath[path]
       await this.saveSettings()
     }
-    if (!this.cachedIndex) {
-      this.cachedIndex = await rebuildIndex(this.app, this.settings)
-      this.lastDiagnostics = this.cachedIndex.diagnostics
-    }
+    this.cachedIndex = await rebuildIndex(this.app, this.settings)
+    this.lastDiagnostics = this.cachedIndex.diagnostics
     const result = await regenerateDashboard(this.app, this.settings, this.cachedIndex)
     new Notice(`Restored hidden sections; ${result.sectionCount} section(s) now in dashboard.`)
   }
