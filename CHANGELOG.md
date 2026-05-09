@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+### Fixed
+
+### Removed
+
+## [0.15.2] - 2026-05-09
+
+### Added
+
+### Changed
+
 - README now explains installation, first-run workout tracking, Dataview expectations, and key feature screenshots.
 
 ### Fixed
