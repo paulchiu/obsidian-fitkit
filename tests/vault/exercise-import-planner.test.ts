@@ -195,6 +195,48 @@ describe('exercise import planner', () => {
     expect(config.deletedExercises).toEqual([])
   })
 
+  it('creates an exercise note for a selected no-note registry entry', async () => {
+    const config = settings()
+    config.exerciseRegistry = [{ name: 'Foam roll thigh', kind: 'duration', aliases: [] }]
+    const { app, state } = mockApp([
+      workout(
+        'Fitness/Workouts/2026-05-07.md',
+        workoutNote(`## [[Foam roll thigh]]
+
+- [exercise:: [[Foam roll thigh]]] [duration:: 273]`),
+      ),
+    ])
+    const plan = await buildExerciseImportPlan(app, config)
+    const foamRoll = plan.rows.find((row) => row.name === 'Foam roll thigh')
+
+    expect(foamRoll).toMatchObject({
+      status: 'known',
+      registryName: 'Foam roll thigh',
+      noteExists: false,
+      createNote: false,
+    })
+    expect(foamRoll).toBeDefined()
+    if (foamRoll) {
+      foamRoll.createNote = true
+    }
+
+    const result = await applyExerciseImportPlan(app, config, plan.rows)
+
+    expect(result).toEqual({
+      notesCreated: 1,
+      notePathsCreated: ['Fitness/Exercises/Foam roll thigh.md'],
+      registryEntriesCreated: 0,
+      tombstonesRemoved: 0,
+      settingsChanged: false,
+    })
+    expect(state.createdFiles.get('Fitness/Exercises/Foam roll thigh.md')).toContain(
+      'kind: duration',
+    )
+    expect(config.exerciseRegistry).toEqual([
+      { name: 'Foam roll thigh', kind: 'duration', aliases: [] },
+    ])
+  })
+
   it('does not mutate settings when applying selected rows fails', async () => {
     const config = settings()
     config.deletedExercises = ['Deleted lift']

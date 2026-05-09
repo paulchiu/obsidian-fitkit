@@ -170,7 +170,7 @@ export class ImportExercisesModal extends Modal {
       actionCell.createSpan({ text: label, cls: 'fitkit-import-cell-label' })
     }
 
-    if (row.status === 'known') {
+    if (row.status === 'known' && row.noteExists) {
       actionCell.createSpan({ text: 'No action' })
       return
     }
