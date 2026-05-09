@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const noticeMessages = vi.hoisted(() => [] as string[])
+const registeredCommandIds = vi.hoisted(() => [] as string[])
 
 vi.mock('obsidian', () => {
   class App {}
@@ -10,8 +11,12 @@ vi.mock('obsidian', () => {
       this.app = app
     }
     registerEvent(): void {}
+    registerMarkdownCodeBlockProcessor(): void {}
+    registerMarkdownPostProcessor(): void {}
     registerView(): void {}
-    addCommand(): void {}
+    addCommand(command: { id: string }): void {
+      registeredCommandIds.push(command.id)
+    }
     addSettingTab(): void {}
     async loadData(): Promise<unknown> {
       return null
@@ -128,7 +133,7 @@ vi.mock('obsidian', () => {
   }
 })
 
-import { MarkdownView, TFile } from 'obsidian'
+import { MarkdownView, Modal, TFile } from 'obsidian'
 
 import FitKitPlugin from '../src/main'
 import { DEFAULT_SETTINGS, type FitKitSettings } from '../src/settings'
@@ -148,6 +153,7 @@ interface MockLeaf {
 
 interface MockWorkspace {
   rootSplit: unknown
+  getActiveFile: () => TFile | null
   getActiveViewOfType: (ctor: unknown) => unknown
   getLeavesOfType: (type: string) => MockLeaf[]
   iterateRootLeaves: (cb: (leaf: MockLeaf) => void) => void
@@ -174,9 +180,11 @@ interface MockApp {
 interface TestPlugin {
   app: MockApp
   settings: FitKitSettings
+  loadSettings(): Promise<void>
   maybeRouteWorkoutFile(file: TFile): Promise<void>
   sweepLeavesForWorkout(): void
   openWorkoutEditor(file: TFile): Promise<void>
+  showExerciseRegistryDiagnostics(): void
   syncExerciseNotes(): Promise<void>
 }
 
@@ -250,6 +258,7 @@ const makeApp = (
 ): MockApp => ({
   workspace: {
     rootSplit: {},
+    getActiveFile: vi.fn(() => null),
     getActiveViewOfType: vi.fn(() => null),
     getLeavesOfType: vi.fn(() => []),
     iterateRootLeaves: vi.fn(),
@@ -268,6 +277,113 @@ const makeApp = (
   metadataCache: {
     getFileCache: vi.fn(() => null),
   },
+})
+
+describe('FitKitPlugin command registration', () => {
+  beforeEach(() => {
+    registeredCommandIds.length = 0
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('keeps daily commands in the palette and prunes settings maintenance actions', async () => {
+    const app = makeApp()
+    const plugin = new (FitKitPlugin as unknown as { new (app: MockApp): FitKitPlugin })(app)
+
+    await plugin.onload()
+
+    expect(registeredCommandIds).toHaveLength(2)
+    expect(registeredCommandIds).toEqual(
+      expect.arrayContaining(['open-todays-workout', 'open-workout-editor']),
+    )
+    expect(registeredCommandIds).not.toContain('rebuild-index')
+    expect(registeredCommandIds).not.toContain('rebuild-dashboard')
+    expect(registeredCommandIds).not.toContain('restore-hidden-sections')
+    expect(registeredCommandIds).not.toContain('show-parse-diagnostics')
+    expect(registeredCommandIds).not.toContain('sync-exercise-notes')
+  })
+})
+
+describe('FitKitPlugin settings loading', () => {
+  it('keeps stored settings when schemaVersion is omitted', async () => {
+    const app = makeApp()
+    const plugin = new (FitKitPlugin as unknown as { new (app: MockApp): FitKitPlugin })(app)
+    const stored = {
+      fitnessRoot: 'Area/Fitness',
+      exerciseRegistry: [{ name: 'Squat', kind: 'strength' as const, aliases: ['back squat'] }],
+      hiddenDashboardSectionsByPath: { 'Fitness/Fitness Dashboard.md': ['exercise:Squat'] },
+    }
+    const loadData = vi.spyOn(plugin, 'loadData').mockResolvedValue(stored)
+    const saveData = vi.spyOn(plugin, 'saveData').mockResolvedValue(undefined)
+
+    await plugin.loadSettings()
+
+    expect(loadData).toHaveBeenCalledTimes(1)
+    expect(saveData).not.toHaveBeenCalled()
+    expect(plugin.settings.fitnessRoot).toBe('Area/Fitness')
+    expect(plugin.settings.exerciseRegistry).toEqual([
+      { name: 'Squat', kind: 'strength', aliases: ['back squat'] },
+    ])
+    expect(plugin.settings.deletedExercises).toEqual([])
+  })
+})
+
+describe('FitKitPlugin exercise registry diagnostics', () => {
+  beforeEach(() => {
+    noticeMessages.length = 0
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('shows a notice when the exercise registry has no diagnostics', () => {
+    const app = makeApp()
+    const plugin = createPlugin(app)
+    const openSpy = vi.spyOn(Modal.prototype, 'open')
+
+    plugin.showExerciseRegistryDiagnostics()
+
+    expect(openSpy).not.toHaveBeenCalled()
+    expect(noticeMessages).toEqual(['No exercise registry diagnostics.'])
+  })
+
+  it('opens exercise registry diagnostics when catalog notes need validation', () => {
+    const file = makeWorkoutFile('Fitness/Exercises/Mystery.md')
+    const app = makeApp(
+      {},
+      {
+        getMarkdownFiles: vi.fn(() => [file]),
+      },
+    )
+    app.metadataCache.getFileCache = vi.fn((target: TFile) =>
+      target.path === file.path ? { frontmatter: { type: 'exercise' } } : null,
+    )
+    const plugin = createPlugin(app, { ...DEFAULT_SETTINGS, fitnessRoot: 'Fitness' })
+    const openedModals: unknown[] = []
+    vi.spyOn(Modal.prototype, 'open').mockImplementation(function (this: unknown) {
+      openedModals.push(this)
+    })
+
+    plugin.showExerciseRegistryDiagnostics()
+
+    expect(noticeMessages).toEqual([])
+    expect(openedModals).toHaveLength(1)
+    const modal = openedModals[0] as {
+      title: string
+      diagnostics: Array<{ path?: string; warnings: string[] }>
+    }
+    expect(modal.title).toBe('Exercise registry diagnostics')
+    expect(modal.diagnostics).toEqual([
+      {
+        kind: 'catalog',
+        path: 'Fitness/Exercises/Mystery.md',
+        warnings: ['Exercise note is missing a valid kind.'],
+      },
+    ])
+  })
 })
 
 describe('FitKitPlugin file-open routing (no editor open)', () => {
@@ -409,6 +525,49 @@ metric: e1rm
     expect(noticeMessages[0]).toContain('1 updated (1 needs validation')
     expect(noticeMessages[0]).toContain('0 already current')
     expect(noticeMessages[0]).toContain('kind inferred/defaulted without registry')
+  })
+
+  it('preserves valid note kind when the saved registry kind differs and reports conflict', async () => {
+    const file = makeWorkoutFile('Fitness/Exercises/Squat.md')
+    const contents = new Map<string, string>([
+      [
+        file.path,
+        `---
+type: exercise
+kind: duration
+---
+
+## Notes
+`,
+      ],
+    ])
+    const app = makeApp(
+      {},
+      {
+        getMarkdownFiles: vi.fn(() => [file]),
+        read: vi.fn(async (target: TFile) => contents.get(target.path) ?? ''),
+        process: vi.fn(async (target: TFile, callback: (live: string) => string) => {
+          contents.set(target.path, callback(contents.get(target.path) ?? ''))
+        }),
+      },
+    )
+    app.metadataCache.getFileCache = vi.fn(() => ({
+      frontmatter: { type: 'exercise', kind: 'duration' },
+    }))
+    const plugin = createPlugin(app, {
+      ...DEFAULT_SETTINGS,
+      exerciseRegistry: [{ name: 'Squat', kind: 'strength', aliases: [] }],
+      fitnessRoot: 'Fitness',
+    })
+
+    await plugin.syncExerciseNotes()
+
+    expect(contents.get(file.path)).toContain(`type: exercise
+kind: duration
+---`)
+    expect(contents.get(file.path)).not.toContain('kind: strength')
+    expect(noticeMessages).toHaveLength(1)
+    expect(noticeMessages[0]).toContain('1 registry kind conflict preserved')
   })
 })
 

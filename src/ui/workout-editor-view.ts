@@ -1,12 +1,14 @@
-import type { WorkspaceLeaf } from 'obsidian'
-import { ItemView, Menu, Notice, TFile, normalizePath, setIcon } from 'obsidian'
+import type { App, WorkspaceLeaf } from 'obsidian'
+import { ItemView, Menu, Modal, Notice, TFile, normalizePath, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
 import { formatDurationInput, parseDurationInput } from '../domain/duration-input'
+import { formatErrorMessage } from '../domain/error'
 import { formatExerciseHistoryBadges, type ExerciseHistoryByName } from '../domain/exercise-history'
 import {
   createRegistry,
   kindForName,
+  normalize,
   upsertEntry,
   type ExerciseRegistryEntry,
 } from '../domain/exercise-registry'
@@ -22,9 +24,11 @@ import {
 } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
 import { exercisesFolder, workoutsFolder } from '../settings-paths'
+import { composeExerciseNote } from '../vault/exercise-note'
 import { exerciseHistoryFromVault } from '../vault/exercise-history-vault'
 import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
 import { FileSession } from '../vault/file-session'
+import { ensureParentFolder } from '../vault/vault-utils'
 import { ConfirmModal } from './confirm-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
 import { KindSwitchChoiceModal, type KindSwitchChoice } from './kind-switch-choice-modal'
@@ -1274,25 +1278,110 @@ export class WorkoutEditorView extends ItemView {
     const names = await this.collectExerciseSuggestions()
     const registry = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
     new ExerciseSuggestModal(this.app, names, (name) => {
-      const trimmed = name.trim()
-      if (!trimmed || !this.model) {
-        return
-      }
-      const exerciseIndex = this.model.exercises.length
-      const kind: ExerciseKind = kindForName(registry, trimmed) ?? 'strength'
-      const card: ExerciseCard = {
-        name: trimmed,
-        kind,
-        strengthSets: [],
-        durationEntries: [],
-      }
-      seedEmptyRow(card)
-      this.model.exercises.push(card)
-      this.markDirty()
-      this.render()
-      const focusLabel = kind === 'strength' ? 'Weight' : 'Duration'
-      this.focusRowCell(exerciseIndex, 0, focusLabel)
+      void this.addExerciseFromSuggestion(name, registry)
     }).open()
+  }
+
+  private async addExerciseFromSuggestion(
+    name: string,
+    registry: ReturnType<typeof createRegistry>,
+  ): Promise<void> {
+    const trimmed = name.trim()
+    if (!trimmed || !this.model) {
+      return
+    }
+    const exerciseIndex = this.model.exercises.length
+    const registryKind = kindForName(registry, trimmed)
+    const kind: ExerciseKind = registryKind ?? 'strength'
+    const card: ExerciseCard = {
+      name: trimmed,
+      kind,
+      strengthSets: [],
+      durationEntries: [],
+    }
+    seedEmptyRow(card)
+    this.model.exercises.push(card)
+    this.markDirty()
+    this.render()
+    const focusLabel = kind === 'strength' ? 'Weight' : 'Duration'
+    this.focusRowCell(exerciseIndex, 0, focusLabel)
+
+    if (registryKind === null) {
+      const wasDeleted = (this.plugin.settings.deletedExercises ?? []).some(
+        (deletedName) => normalize(deletedName) === normalize(trimmed),
+      )
+      const createNote = await this.promptForUnknownExercise(trimmed, wasDeleted)
+      if (createNote !== null) {
+        await this.persistUnknownExercise(trimmed, kind, createNote)
+      }
+    }
+  }
+
+  private async promptForUnknownExercise(
+    name: string,
+    wasDeleted: boolean,
+  ): Promise<boolean | null> {
+    return new Promise((resolve) => {
+      new UnknownExerciseModal(this.app, name, wasDeleted, resolve).open()
+    })
+  }
+
+  private async persistUnknownExercise(
+    name: string,
+    kind: ExerciseKind,
+    createNote: boolean,
+  ): Promise<void> {
+    let settingsChanged = false
+    const deletedKey = normalize(name)
+    const previousDeleted = this.plugin.settings.deletedExercises ?? []
+    const hadTombstone = previousDeleted.some(
+      (deletedName) => normalize(deletedName) === deletedKey,
+    )
+
+    if (createNote) {
+      const path = normalizePath(`${exercisesFolder(this.plugin.settings)}/${name}.md`)
+      if (!this.app.vault.getAbstractFileByPath(path)) {
+        try {
+          await ensureParentFolder(this.app, path)
+          await this.app.vault.create(
+            path,
+            composeExerciseNote(name, kind, workoutsFolder(this.plugin.settings)),
+          )
+        } catch (error) {
+          new Notice(`Could not create exercise note for '${name}': ${formatErrorMessage(error)}.`)
+          return
+        }
+        new Notice(`Created exercise note for '${name}'.`)
+      } else {
+        new Notice(
+          hadTombstone
+            ? `Restored '${name}' using the existing exercise note.`
+            : `Using existing exercise note for '${name}'.`,
+        )
+      }
+    } else {
+      const registry = createRegistry(this.plugin.settings.exerciseRegistry)
+      if (kindForName(registry, name) === null) {
+        this.plugin.settings.exerciseRegistry = upsertEntry(registry, {
+          name,
+          kind,
+          aliases: [],
+        }).entries
+        settingsChanged = true
+        new Notice(`Added '${name}' as a no-note registry entry.`)
+      }
+    }
+
+    if (hadTombstone) {
+      this.plugin.settings.deletedExercises = previousDeleted.filter(
+        (deletedName) => normalize(deletedName) !== deletedKey,
+      )
+      settingsChanged = true
+    }
+
+    if (settingsChanged) {
+      await this.plugin.saveSettings()
+    }
   }
 
   private async openRenameExerciseModal(index: number): Promise<void> {
@@ -1452,6 +1541,56 @@ export class WorkoutEditorView extends ItemView {
         this.scheduleAutoSave()
       }
     }
+  }
+}
+
+class UnknownExerciseModal extends Modal {
+  private choice: boolean | null = null
+
+  constructor(
+    app: App,
+    private name: string,
+    private wasDeleted: boolean,
+    private onChoice: (createNote: boolean | null) => void,
+  ) {
+    super(app)
+  }
+
+  onOpen(): void {
+    const { contentEl } = this
+    contentEl.empty()
+    contentEl.createEl('h2', { text: 'Add exercise' })
+    contentEl.createEl('p', {
+      text: this.wasDeleted
+        ? `"${this.name}" was previously deleted and ignored. Add it again?`
+        : `"${this.name}" is not in your exercise registry yet.`,
+      cls: 'fitkit-import-muted',
+    })
+
+    const checkboxRow = contentEl.createEl('label', { cls: 'fitkit-import-checkbox-row' })
+    const checkbox = checkboxRow.createEl('input', { attr: { type: 'checkbox' } })
+    checkbox.checked = true
+    checkboxRow.createSpan({ text: 'Create exercise note' })
+
+    const actions = contentEl.createDiv({ cls: 'fitkit-import-actions' })
+    const cancel = actions.createEl('button', { cls: 'fitkit-btn', text: 'Skip' })
+    cancel.addEventListener('click', () => {
+      this.choice = null
+      this.close()
+    })
+    const add = actions.createEl('button', {
+      cls: 'fitkit-btn fitkit-btn-primary',
+      text: 'Add exercise',
+    })
+    add.addEventListener('click', () => {
+      this.choice = checkbox.checked
+      this.close()
+    })
+  }
+
+  onClose(): void {
+    this.contentEl.empty()
+    this.onChoice(this.choice)
   }
 }
 

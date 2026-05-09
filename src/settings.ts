@@ -1,12 +1,13 @@
 import { App, Notice, PluginSettingTab, Setting, TFile, normalizePath } from 'obsidian'
 
+import { formatErrorMessage } from './domain/error'
 import type { ExerciseRegistryEntry } from './domain/exercise-registry'
 import { createRegistry, normalize, removeEntry } from './domain/exercise-registry'
 import type FitKitPlugin from './main'
 import { DeleteRegistryEntryModal } from './ui/delete-registry-entry-modal'
 import { ExerciseRegistryEntryModal } from './ui/exercise-registry-entry-modal'
+import { ImportExercisesModal } from './ui/import-exercises-modal'
 import { dashboardPath, exercisesFolder, workoutsFolder } from './settings-paths'
-import { exerciseRegistryWithVaultNotes } from './vault/exercise-registry-vault'
 
 export { dashboardPath, exercisesFolder, workoutFilename, workoutsFolder } from './settings-paths'
 
@@ -18,6 +19,7 @@ export interface FitKitSettings {
   autosaveDebounceMs: number
   chartSessionsWindow: number
   exerciseRegistry: ExerciseRegistryEntry[]
+  deletedExercises?: string[]
   hiddenDashboardSectionsByPath: Record<string, string[]>
   schemaVersion: 1
 }
@@ -30,8 +32,62 @@ export const DEFAULT_SETTINGS: FitKitSettings = {
   autosaveDebounceMs: 600,
   chartSessionsWindow: 30,
   exerciseRegistry: [],
+  deletedExercises: [],
   hiddenDashboardSectionsByPath: {},
   schemaVersion: 1,
+}
+
+export function normalizeDeletedExerciseTombstones(
+  deletedExercises: readonly string[] = [],
+): string[] {
+  const tombstones: string[] = []
+  const seen = new Set<string>()
+  for (const name of deletedExercises) {
+    const key = normalize(name)
+    if (key.length === 0 || seen.has(key)) {
+      continue
+    }
+    seen.add(key)
+    tombstones.push(key)
+  }
+  return tombstones
+}
+
+export function addDeletedExerciseTombstone(
+  deletedExercises: readonly string[] | undefined,
+  name: string,
+): string[] {
+  return normalizeDeletedExerciseTombstones([...(deletedExercises ?? []), name])
+}
+
+export function removeDeletedExerciseTombstone(
+  deletedExercises: readonly string[] | undefined,
+  name: string,
+): string[] {
+  const targetKey = normalize(name)
+  return normalizeDeletedExerciseTombstones(deletedExercises).filter((key) => key !== targetKey)
+}
+
+export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitKitSettings {
+  if (!stored) {
+    return { ...DEFAULT_SETTINGS }
+  }
+  return {
+    fitnessRoot: stored.fitnessRoot ?? DEFAULT_SETTINGS.fitnessRoot,
+    autoOpenWorkoutEditor: stored.autoOpenWorkoutEditor ?? DEFAULT_SETTINGS.autoOpenWorkoutEditor,
+    strengthRestTimerEnabled:
+      stored.strengthRestTimerEnabled ?? DEFAULT_SETTINGS.strengthRestTimerEnabled,
+    autoUpdateDashboard: stored.autoUpdateDashboard ?? DEFAULT_SETTINGS.autoUpdateDashboard,
+    autosaveDebounceMs: stored.autosaveDebounceMs ?? DEFAULT_SETTINGS.autosaveDebounceMs,
+    chartSessionsWindow: stored.chartSessionsWindow ?? DEFAULT_SETTINGS.chartSessionsWindow,
+    exerciseRegistry: stored.exerciseRegistry ?? DEFAULT_SETTINGS.exerciseRegistry,
+    deletedExercises: normalizeDeletedExerciseTombstones(
+      stored.deletedExercises ?? DEFAULT_SETTINGS.deletedExercises,
+    ),
+    hiddenDashboardSectionsByPath:
+      stored.hiddenDashboardSectionsByPath ?? DEFAULT_SETTINGS.hiddenDashboardSectionsByPath,
+    schemaVersion: DEFAULT_SETTINGS.schemaVersion,
+  }
 }
 
 const CHART_WINDOW_MIN = 5
@@ -162,10 +218,61 @@ export class FitKitSettingTab extends PluginSettingTab {
         })
       })
 
+    new Setting(containerEl).setName('Setup and maintenance').setHeading()
+
+    containerEl.createEl('div', {
+      text: 'Use these actions when setting up the plugin, repairing generated exercise notes, or refreshing dashboard data.',
+      cls: 'setting-item-description',
+    })
+
+    new Setting(containerEl)
+      .setName('Rebuild index')
+      .setDesc('Scan workout notes and cache the latest index plus parse diagnostics.')
+      .addButton((button) =>
+        button.setButtonText('Rebuild').onClick(() => this.plugin.rebuildWorkoutIndex()),
+      )
+
+    new Setting(containerEl)
+      .setName('Rebuild dashboard')
+      .setDesc('Rebuild the workout index, then regenerate the dashboard note.')
+      .addButton((button) =>
+        button.setButtonText('Rebuild').onClick(() => this.plugin.rebuildDashboard()),
+      )
+
+    new Setting(containerEl)
+      .setName('Restore hidden dashboard sections')
+      .setDesc('Clear hidden-section state for the dashboard and regenerate it.')
+      .addButton((button) =>
+        button.setButtonText('Restore').onClick(() => this.plugin.restoreHiddenDashboardSections()),
+      )
+
+    new Setting(containerEl)
+      .setName('Show parse diagnostics')
+      .setDesc('Open diagnostics from the last index build, or report that none exist.')
+      .addButton((button) =>
+        button.setButtonText('Show').onClick(() => this.plugin.showParseDiagnostics()),
+      )
+
+    new Setting(containerEl)
+      .setName('Show exercise registry diagnostics')
+      .setDesc('Open exercise catalog and registry diagnostics from the current vault state.')
+      .addButton((button) =>
+        button.setButtonText('Show').onClick(() => this.plugin.showExerciseRegistryDiagnostics()),
+      )
+
+    new Setting(containerEl)
+      .setName('Sync and repair exercise notes')
+      .setDesc(
+        'Repair exercise note frontmatter, chart blocks, recent sessions, and note headings.',
+      )
+      .addButton((button) =>
+        button.setButtonText('Sync').onClick(() => this.plugin.syncExerciseNotes()),
+      )
+
     new Setting(containerEl).setName('Registry').setHeading()
 
     containerEl.createEl('div', {
-      text: 'Curate canonical exercise names, kinds, and aliases. The registry is consulted whenever you add or rename an exercise. Filenames in your exercises folder also count at runtime, even if they are not listed here; use the bootstrap action below to materialise them.',
+      text: 'Curate no-note exercise entries and aliases. Exercise notes in your exercises folder count at runtime even when they are not listed here; use import exercises to create missing notes or no-note entries from workout history.',
       cls: 'setting-item-description',
     })
 
@@ -185,18 +292,14 @@ export class FitKitSettingTab extends PluginSettingTab {
           renderRegistrySection()
         }).open()
       })
-      const bootstrapBtn = actions.createEl('button', {
+      const importBtn = actions.createEl('button', {
         cls: 'fitkit-btn',
-        text: 'Bootstrap from vault',
+        text: 'Import exercises',
       })
-      bootstrapBtn.addEventListener('click', () => {
-        void (async () => {
-          const merged = exerciseRegistryWithVaultNotes(this.plugin.app, settings)
-          settings.exerciseRegistry = merged
-          await this.plugin.saveSettings()
-          new Notice(`Registry now has ${merged.length} entries.`)
-          renderRegistrySection()
-        })()
+      importBtn.addEventListener('click', () => {
+        new ImportExercisesModal(this.plugin, {
+          onApplied: renderRegistrySection,
+        }).open()
       })
 
       const search = registrySection.createEl('input', {
@@ -221,7 +324,7 @@ export class FitKitSettingTab extends PluginSettingTab {
           .slice()
           .sort((left, right) => left.name.localeCompare(right.name))
         if (entries.length === 0) {
-          empty.setText('No entries yet. Add one or bootstrap from your exercises folder.')
+          empty.setText('No registry overlays yet. Add one or import from workouts.')
           return
         }
 
@@ -324,9 +427,6 @@ export class FitKitSettingTab extends PluginSettingTab {
       rerender()
       return
     }
-    const next = removeEntry(fresh, target.name)
-    this.plugin.settings.exerciseRegistry = next.entries
-    await this.plugin.saveSettings()
 
     if (alsoDeleteFile) {
       const notePath = normalizePath(`${exercisesFolder(this.plugin.settings)}/${target.name}.md`)
@@ -334,18 +434,34 @@ export class FitKitSettingTab extends PluginSettingTab {
       if (file instanceof TFile) {
         try {
           await this.plugin.app.fileManager.trashFile(file)
-          new Notice(`Removed entry '${target.name}' and trashed note file.`)
         } catch (error) {
-          console.error('FitKit: failed to trash exercise note file', error)
           new Notice(
-            `Removed entry '${target.name}', but failed to trash the note file. See console for details.`,
+            `Could not delete '${target.name}' because the note file could not be trashed: ${formatErrorMessage(error)}.`,
           )
+          rerender()
+          return
         }
-      } else {
-        new Notice(`Removed entry '${target.name}'. Note file was already missing.`)
       }
+      const next = removeEntry(fresh, target.name)
+      this.plugin.settings.exerciseRegistry = next.entries
+      this.plugin.settings.deletedExercises = addDeletedExerciseTombstone(
+        this.plugin.settings.deletedExercises,
+        target.name,
+      )
+      await this.plugin.saveSettings()
+      new Notice(
+        file instanceof TFile
+          ? `Deleted '${target.name}' and recorded it as ignored.`
+          : `Removed '${target.name}' and recorded the already-missing note as ignored.`,
+      )
+      rerender()
+      return
     }
 
+    const next = removeEntry(fresh, target.name)
+    this.plugin.settings.exerciseRegistry = next.entries
+    await this.plugin.saveSettings()
+    new Notice(`Removed registry overlay for '${target.name}'.`)
     rerender()
   }
 }

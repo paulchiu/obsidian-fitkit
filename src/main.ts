@@ -1,17 +1,22 @@
 import { MarkdownView, Notice, Plugin, TFile, type WorkspaceLeaf, normalizePath } from 'obsidian'
 
+import { formatErrorMessage } from './domain/error'
 import { createRegistry } from './domain/exercise-registry'
 import { migrateExerciseNote } from './domain/exercise-note-migrate'
 import type { FitKitIndex, IndexDiagnostic } from './domain/types'
-import { parseWorkoutNote } from './domain/workout-note-model'
-import { DEFAULT_SETTINGS, FitKitSettingTab, type FitKitSettings } from './settings'
+import {
+  DEFAULT_SETTINGS,
+  FitKitSettingTab,
+  settingsFromStored,
+  type FitKitSettings,
+} from './settings'
 import { dashboardPath, exercisesFolder, workoutFilename, workoutsFolder } from './settings-paths'
-import { CreateMissingExercisesModal } from './ui/create-missing-exercises-modal'
 import { renderExerciseChartBlock } from './ui/exercise-chart-block'
 import { ParseDiagnosticsModal } from './ui/parse-diagnostics-modal'
 import { renderWorkoutReadingModeSection } from './ui/workout-reading-mode'
 import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from './ui/workout-editor-view'
 import { regenerateDashboard } from './vault/dashboard'
+import { buildExerciseRegistrySnapshot } from './vault/exercise-registry-vault'
 import { rebuildIndex } from './vault/index'
 
 function formatTodayIsoDate(): string {
@@ -25,25 +30,6 @@ function emptyWorkoutMarkdown(date: string): string {
   return `---\ntype: workout\ndate: ${date}\nname: \n---\n`
 }
 
-function settingsFromStored(stored: Partial<FitKitSettings> | null): FitKitSettings {
-  if (!stored) {
-    return { ...DEFAULT_SETTINGS }
-  }
-  return {
-    fitnessRoot: stored.fitnessRoot ?? DEFAULT_SETTINGS.fitnessRoot,
-    autoOpenWorkoutEditor: stored.autoOpenWorkoutEditor ?? DEFAULT_SETTINGS.autoOpenWorkoutEditor,
-    strengthRestTimerEnabled:
-      stored.strengthRestTimerEnabled ?? DEFAULT_SETTINGS.strengthRestTimerEnabled,
-    autoUpdateDashboard: stored.autoUpdateDashboard ?? DEFAULT_SETTINGS.autoUpdateDashboard,
-    autosaveDebounceMs: stored.autosaveDebounceMs ?? DEFAULT_SETTINGS.autosaveDebounceMs,
-    chartSessionsWindow: stored.chartSessionsWindow ?? DEFAULT_SETTINGS.chartSessionsWindow,
-    exerciseRegistry: stored.exerciseRegistry ?? DEFAULT_SETTINGS.exerciseRegistry,
-    hiddenDashboardSectionsByPath:
-      stored.hiddenDashboardSectionsByPath ?? DEFAULT_SETTINGS.hiddenDashboardSectionsByPath,
-    schemaVersion: DEFAULT_SETTINGS.schemaVersion,
-  }
-}
-
 export default class FitKitPlugin extends Plugin {
   settings!: FitKitSettings
   cachedIndex: FitKitIndex | null = null
@@ -52,66 +38,6 @@ export default class FitKitPlugin extends Plugin {
   async onload(): Promise<void> {
     await this.loadSettings()
     this.addSettingTab(new FitKitSettingTab(this.app, this))
-
-    this.addCommand({
-      id: 'rebuild-index',
-      name: 'Rebuild index',
-      callback: async () => {
-        this.cachedIndex = await rebuildIndex(this.app, this.settings)
-        this.lastDiagnostics = this.cachedIndex.diagnostics
-        new Notice(
-          `Indexed ${this.cachedIndex.entries.length} workout(s)${
-            this.lastDiagnostics.length ? `, ${this.lastDiagnostics.length} diagnostic(s)` : ''
-          }.`,
-        )
-      },
-    })
-
-    this.addCommand({
-      id: 'rebuild-dashboard',
-      name: 'Rebuild dashboard',
-      callback: async () => {
-        this.cachedIndex = await rebuildIndex(this.app, this.settings)
-        this.lastDiagnostics = this.cachedIndex.diagnostics
-        const result = await regenerateDashboard(this.app, this.settings, this.cachedIndex)
-        new Notice(`Dashboard rebuilt: ${result.sectionCount} section(s) at ${result.path}.`)
-      },
-    })
-
-    this.addCommand({
-      id: 'restore-hidden-sections',
-      name: 'Restore hidden sections in current dashboard',
-      callback: async () => {
-        const path = normalizePath(dashboardPath(this.settings))
-        if (this.settings.hiddenDashboardSectionsByPath[path]) {
-          delete this.settings.hiddenDashboardSectionsByPath[path]
-          await this.saveSettings()
-        }
-        if (!this.cachedIndex) {
-          this.cachedIndex = await rebuildIndex(this.app, this.settings)
-        }
-        const result = await regenerateDashboard(this.app, this.settings, this.cachedIndex)
-        new Notice(`Restored hidden sections; ${result.sectionCount} section(s) now in dashboard.`)
-      },
-    })
-
-    this.addCommand({
-      id: 'show-parse-diagnostics',
-      name: 'Show parse diagnostics',
-      callback: () => {
-        if (this.lastDiagnostics.length === 0) {
-          new Notice('No diagnostics from the last index build.')
-          return
-        }
-        new ParseDiagnosticsModal(this.app, this.lastDiagnostics).open()
-      },
-    })
-
-    this.addCommand({
-      id: 'sync-exercise-notes',
-      name: 'Sync and repair exercise notes',
-      callback: () => void this.syncExerciseNotes(),
-    })
 
     this.registerMarkdownCodeBlockProcessor('fitkit-chart', (source, el, ctx) =>
       renderExerciseChartBlock(this, source, el, ctx),
@@ -166,25 +92,6 @@ export default class FitKitPlugin extends Plugin {
         return true
       },
     })
-
-    this.addCommand({
-      id: 'create-missing-exercises-current-workout',
-      name: 'Create missing exercises for current workout',
-      checkCallback: (checking) => {
-        const file = this.app.workspace.getActiveFile()
-        if (
-          !(file instanceof TFile) ||
-          file.extension.toLowerCase() !== 'md' ||
-          !this.isWorkoutFile(file)
-        ) {
-          return false
-        }
-        if (!checking) {
-          void this.openCreateMissingExercisesForActiveFile(file)
-        }
-        return true
-      },
-    })
   }
 
   refreshWorkoutEditorViews(): void {
@@ -194,6 +101,52 @@ export default class FitKitPlugin extends Plugin {
         view.refreshSettingsDrivenUi()
       }
     }
+  }
+
+  async rebuildWorkoutIndex(): Promise<void> {
+    this.cachedIndex = await rebuildIndex(this.app, this.settings)
+    this.lastDiagnostics = this.cachedIndex.diagnostics
+    new Notice(
+      `Indexed ${this.cachedIndex.entries.length} workout(s)${
+        this.lastDiagnostics.length ? `, ${this.lastDiagnostics.length} diagnostic(s)` : ''
+      }.`,
+    )
+  }
+
+  async rebuildDashboard(): Promise<void> {
+    this.cachedIndex = await rebuildIndex(this.app, this.settings)
+    this.lastDiagnostics = this.cachedIndex.diagnostics
+    const result = await regenerateDashboard(this.app, this.settings, this.cachedIndex)
+    new Notice(`Dashboard rebuilt: ${result.sectionCount} section(s) at ${result.path}.`)
+  }
+
+  async restoreHiddenDashboardSections(): Promise<void> {
+    const path = normalizePath(dashboardPath(this.settings))
+    if (this.settings.hiddenDashboardSectionsByPath[path]) {
+      delete this.settings.hiddenDashboardSectionsByPath[path]
+      await this.saveSettings()
+    }
+    this.cachedIndex = await rebuildIndex(this.app, this.settings)
+    this.lastDiagnostics = this.cachedIndex.diagnostics
+    const result = await regenerateDashboard(this.app, this.settings, this.cachedIndex)
+    new Notice(`Restored hidden sections; ${result.sectionCount} section(s) now in dashboard.`)
+  }
+
+  showParseDiagnostics(): void {
+    if (this.lastDiagnostics.length === 0) {
+      new Notice('No diagnostics from the last index build.')
+      return
+    }
+    new ParseDiagnosticsModal(this.app, this.lastDiagnostics).open()
+  }
+
+  showExerciseRegistryDiagnostics(): void {
+    const diagnostics = buildExerciseRegistrySnapshot(this.app, this.settings).diagnostics
+    if (diagnostics.length === 0) {
+      new Notice('No exercise registry diagnostics.')
+      return
+    }
+    new ParseDiagnosticsModal(this.app, diagnostics, 'Exercise registry diagnostics').open()
   }
 
   private async openWorkoutEditor(file: TFile): Promise<void> {
@@ -295,22 +248,19 @@ export default class FitKitPlugin extends Plugin {
     return typeof type === 'string' && type.toLowerCase() === 'workout'
   }
 
-  private async openCreateMissingExercisesForActiveFile(file: TFile): Promise<void> {
-    const text = await this.app.vault.read(file)
-    const parsed = parseWorkoutNote(text, file.path)
-    if (parsed.isWorkout && parsed.model) {
-      new CreateMissingExercisesModal(this, parsed.model).open()
-      return
-    }
-    new Notice('Current file is not a workout note.')
-  }
-
-  private async syncExerciseNotes(): Promise<void> {
+  async syncExerciseNotes(): Promise<void> {
     const folder = exercisesFolder(this.settings)
     const files = this.app.vault
       .getMarkdownFiles()
       .filter((file) => file.path.startsWith(`${folder}/`))
+    const snapshot = buildExerciseRegistrySnapshot(this.app, this.settings)
     const registry = createRegistry(this.settings.exerciseRegistry)
+    const conflictPaths = new Set<string>()
+    for (const diagnostic of snapshot.diagnostics) {
+      if (diagnostic.kind === 'registry-kind-conflict' && diagnostic.path) {
+        conflictPaths.add(diagnostic.path)
+      }
+    }
 
     let updated = 0
     let already = 0
@@ -318,17 +268,18 @@ export default class FitKitPlugin extends Plugin {
     let skippedMalformedFrontmatter = 0
     let needsValidation = 0
     let failed = 0
+    const failedPaths: string[] = []
     let customisedRecentSessions = 0
     let customisedNotesSections = 0
     for (const file of files) {
       try {
-        const snapshot = await this.app.vault.read(file)
+        const source = await this.app.vault.read(file)
         const input = {
           name: file.basename,
           registry,
           fitnessRoot: this.settings.fitnessRoot,
         }
-        const result = migrateExerciseNote(snapshot, input)
+        const result = migrateExerciseNote(source, input)
         if (result.status === 'skipped-non-exercise-type') {
           skipped += 1
           continue
@@ -344,6 +295,9 @@ export default class FitKitPlugin extends Plugin {
         if (result.warnings.some((warning) => warning.kind === 'custom-notes-section')) {
           customisedNotesSections += 1
         }
+        if (result.warnings.some((warning) => warning.kind === 'registry-kind-conflict')) {
+          conflictPaths.add(file.path)
+        }
 
         if (result.changed) {
           await this.app.vault.process(file, (live) => migrateExerciseNote(live, input).markdown)
@@ -358,12 +312,12 @@ export default class FitKitPlugin extends Plugin {
           already += 1
         }
       } catch (error) {
-        console.error(`FitKit: failed to sync exercise note '${file.path}'`, error)
         failed += 1
+        failedPaths.push(`${file.path}: ${formatErrorMessage(error)}`)
       }
     }
 
-    const failedHint = failed > 0 ? ' (see console)' : ''
+    const failedHint = failedPaths[0] ? ` (first failure: ${failedPaths[0]})` : ''
     const customisedWarnings = [
       customisedRecentSessions > 0
         ? `${customisedRecentSessions} customised recent sessions block${
@@ -384,13 +338,23 @@ export default class FitKitPlugin extends Plugin {
             needsValidation === 1 ? 'needs' : 'need'
           } validation: kind inferred/defaulted without registry, review kind and metric)`
         : ''
-    const summary = `Synced ${files.length} exercise note${files.length === 1 ? '' : 's'}; ${updated} updated${validationSummary}, ${already} already current, ${skipped} skipped (non-exercise type), ${skippedMalformedFrontmatter} skipped (malformed frontmatter), ${failed} failed${failedHint}.${customisedSummary}`
+    const conflictSummary =
+      conflictPaths.size > 0
+        ? `, ${conflictPaths.size} registry kind conflict${
+            conflictPaths.size === 1 ? '' : 's'
+          } preserved`
+        : ''
+    const summary = `Synced ${files.length} exercise note${files.length === 1 ? '' : 's'}; ${updated} updated${validationSummary}, ${already} already current, ${skipped} skipped (non-exercise type), ${skippedMalformedFrontmatter} skipped (malformed frontmatter), ${failed} failed${failedHint}${conflictSummary}.${customisedSummary}`
     new Notice(summary)
   }
 
   async loadSettings(): Promise<void> {
     const stored = (await this.loadData()) as Partial<FitKitSettings> | null
-    if (stored && stored.schemaVersion !== DEFAULT_SETTINGS.schemaVersion) {
+    if (
+      stored &&
+      stored.schemaVersion !== undefined &&
+      stored.schemaVersion !== DEFAULT_SETTINGS.schemaVersion
+    ) {
       this.settings = { ...DEFAULT_SETTINGS }
       await this.saveSettings()
       return

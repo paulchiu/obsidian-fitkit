@@ -26,12 +26,16 @@ export class DeleteRegistryEntryModal extends Modal {
     const { contentEl } = this
     contentEl.empty()
     contentEl.addClass('fitkit-kind-confirm-modal')
-    contentEl.createEl('h2', { text: 'Delete entry?' })
+    contentEl.createEl('h2', { text: 'Delete exercise?' })
     contentEl.createEl('p', {
-      text: `Delete '${this.options.entryName}' from the registry? Existing workouts that reference it will resolve as Unknown until you re-add the entry.`,
+      text: `Remove the registry overlay for '${this.options.entryName}'? Existing workout history is not rewritten.`,
     })
 
     if (this.options.notePath) {
+      contentEl.createEl('p', {
+        text: 'The exercise note will stay in your vault unless you choose to delete it too.',
+        cls: 'fitkit-import-muted',
+      })
       const row = contentEl.createDiv({ cls: 'fitkit-import-checkbox-row' })
       const checkbox = row.createEl('input', { type: 'checkbox' })
       checkbox.id = 'fitkit-delete-also-file'
@@ -40,12 +44,12 @@ export class DeleteRegistryEntryModal extends Modal {
         this.alsoDeleteFile = checkbox.checked
       })
       const label = row.createEl('label', {
-        text: `Also delete the note file '${this.options.notePath}' (sent to your configured trash).`,
+        text: `Also delete the exercise note '${this.options.notePath}' and ignore this exercise until restored.`,
       })
       label.setAttr('for', 'fitkit-delete-also-file')
     } else {
       contentEl.createEl('p', {
-        text: 'No matching note file exists in your exercises folder; only the registry entry will be removed.',
+        text: 'No matching exercise note exists in your exercises folder. Only the registry overlay will be removed.',
         cls: 'fitkit-import-muted',
       })
     }

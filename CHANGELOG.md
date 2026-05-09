@@ -20,8 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Exercise charts now plot completed reps for bodyweight strength exercises when no positive-weight sets exist.
+- Settings now includes setup and maintenance actions for rebuilding the index, rebuilding the dashboard, restoring hidden dashboard sections, showing parse diagnostics, showing exercise registry diagnostics, and syncing exercise notes.
+- Exercise catalog onboarding now treats vault exercise notes as the source of truth for registry and import repair flows.
+- Settings now includes an Import exercises action that scans workout history, creates missing exercise notes or no-note registry entries, and respects deleted-exercise tombstones.
+- Added `deletedExercises` settings tombstones so deleted exercise notes stay ignored until explicitly restored.
 
 ### Changed
+
+- Maintenance actions now live in Settings so the command palette stays focused on daily workout entry.
+- Catalog and import onboarding surfaces have clearer button and icon polish.
+- The old Bootstrap from vault registry action was replaced by catalog-backed runtime entries and the Import exercises review flow.
 
 ### Fixed
 
@@ -29,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Bodyweight personal bests now render as `N reps` instead of `0 kg x N` in editor badges and dashboard PB rows.
 
 ### Removed
+
+- Removed rebuild, dashboard restore, parse diagnostics, create-missing-exercises, and exercise-note sync maintenance commands from the command palette.
 
 ## [0.14.1] - 2026-05-05
 

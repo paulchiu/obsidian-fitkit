@@ -28,9 +28,14 @@ type SkippedExerciseNoteMigrationStatus = Extract<
   'skipped-non-exercise-type' | 'skipped-malformed-frontmatter'
 >
 
-export interface ExerciseNoteMigrationWarning {
-  kind: 'custom-recent-sessions' | 'custom-notes-section'
-}
+export type ExerciseNoteMigrationWarning =
+  | { kind: 'custom-recent-sessions' }
+  | { kind: 'custom-notes-section' }
+  | {
+      kind: 'registry-kind-conflict'
+      noteKind: ExerciseKind
+      registryKind: ExerciseKind
+    }
 
 export interface ExerciseNoteMigrationResult {
   markdown: string
@@ -44,6 +49,7 @@ interface FrontmatterRepairResult {
   markdown: string
   kind: ExerciseKind | null
   unknownKind: boolean
+  warnings: ExerciseNoteMigrationWarning[]
   skippedStatus: SkippedExerciseNoteMigrationStatus | null
 }
 
@@ -101,7 +107,7 @@ export function migrateExerciseNote(
     changed: markdown !== source,
     status: frontmatter.unknownKind ? 'unknown' : markdown === source ? 'already' : 'updated',
     unknownKind: frontmatter.unknownKind,
-    warnings: [...recent.warnings, ...notes.warnings],
+    warnings: [...frontmatter.warnings, ...recent.warnings, ...notes.warnings],
   }
 }
 
@@ -116,6 +122,7 @@ function repairFrontmatter(
       markdown: source,
       kind: null,
       unknownKind: false,
+      warnings: [],
       skippedStatus: 'skipped-malformed-frontmatter',
     }
   }
@@ -125,6 +132,7 @@ function repairFrontmatter(
       markdown: `${frontmatterBlock(fallbackKind)}${source}`,
       kind: fallbackKind,
       unknownKind: registryKind === null,
+      warnings: [],
       skippedStatus: null,
     }
   }
@@ -137,11 +145,13 @@ function repairFrontmatter(
       markdown: source,
       kind: null,
       unknownKind: false,
+      warnings: [],
       skippedStatus: 'skipped-non-exercise-type',
     }
   }
 
   let nextFrontmatterLines = frontmatterLines
+  const warnings: ExerciseNoteMigrationWarning[] = []
   if (typeLineIndex < 0) {
     nextFrontmatterLines = ['type: exercise', ...nextFrontmatterLines]
   }
@@ -149,13 +159,21 @@ function repairFrontmatter(
   let kindLineIndex = findFrontmatterKeyLine(nextFrontmatterLines, 'kind')
   let effectiveKind = frontmatterKind(nextFrontmatterLines)
   let unknownKind = false
-  if (registryKind) {
+  if (effectiveKind) {
+    if (registryKind && registryKind !== effectiveKind) {
+      warnings.push({
+        kind: 'registry-kind-conflict',
+        noteKind: effectiveKind,
+        registryKind,
+      })
+    }
+  } else if (registryKind) {
     if (kindLineIndex < 0) {
       const typeIndex = findFrontmatterKeyLine(nextFrontmatterLines, 'type')
       nextFrontmatterLines = insertLines(nextFrontmatterLines, typeIndex + 1, [
         `kind: ${registryKind}`,
       ])
-    } else if (effectiveKind !== registryKind) {
+    } else {
       nextFrontmatterLines = replaceLine(
         nextFrontmatterLines,
         kindLineIndex,
@@ -207,6 +225,7 @@ function repairFrontmatter(
     markdown,
     kind: effectiveKind,
     unknownKind,
+    warnings,
     skippedStatus: null,
   }
 }
