@@ -16,9 +16,9 @@ FitKit writes the notes and generated blocks. The [Dataview plugin](https://gith
 
 Install Dataview first from Obsidian's community plugins. FitKit needs Dataview to render the dashboard and recent-session views.
 
-To install FitKit with BRAT:
+To install FitKit with the [BRAT community plugin](https://github.com/TfTHacker/obsidian42-brat):
 
-1. Install the BRAT community plugin.
+1. Install BRAT.
 2. Add `https://github.com/paulchiu/obsidian-fitkit` as a beta plugin.
 3. Enable FitKit from Obsidian's community plugins list.
 
@@ -39,7 +39,7 @@ Then copy `main.js`, `manifest.json`, and `styles.css` into `<vault>/.obsidian/p
 
 ## Getting started
 
-<!-- Screenshot slot: FitKit settings showing the default paths and setup actions. -->
+![FitKit settings showing the default paths and setup actions](docs/images/settings.png)
 
 Open FitKit settings after enabling the plugin. The default root is `Fitness`, which gives you:
 
@@ -51,7 +51,7 @@ The defaults are enough to start. Change `Fitness root` only if you want those f
 
 Run `Open today's workout` from the command palette. FitKit creates today's workout note if it does not exist and opens the structured workout editor.
 
-<!-- Screenshot slot: Workout editor with a strength exercise, rows, and rest timer. -->
+![Workout editor with a strength exercise, rows, and rest timer](docs/images/workout-editor.png)
 
 Add an exercise, then enter the sets, reps, weight, or duration you want to track. If the exercise is new, FitKit asks whether to create an exercise note for it. Leave `Create exercise note` enabled for exercises you want to revisit, chart, and annotate later.
 
@@ -74,8 +74,9 @@ Duration exercises use `[duration:: 60]`, stored as seconds.
 
 ## Dashboard and exercise notes
 
-<!-- Screenshot slot: Generated dashboard with PBs and Dataview history tables. -->
-<!-- Screenshot slot: Exercise note with a progression chart and Recent sessions. -->
+![Generated dashboard with PBs and Dataview history tables](docs/images/dashboard.png)
+
+![Exercise note with a progression chart and Recent sessions](docs/images/exercise-note.png)
 
 Use `Rebuild dashboard` in FitKit settings once you have a few workouts. FitKit scans the workout notes, updates its local index, and regenerates `Fitness/Fitness Dashboard.md` with PBs and per-exercise Dataview queries.
 
