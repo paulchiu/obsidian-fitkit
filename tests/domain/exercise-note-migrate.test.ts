@@ -46,6 +46,13 @@ ${notes}
 `
 }
 
+function completeStrengthNoteFor(name: string, unit = 'kg'): string {
+  return completeStrengthNote(
+    buildRecentSessionsBlock(name, 'strength', 'Fitness'),
+    buildNotesBlock(name, 'Fitness'),
+  ).replace('unit: kg', `unit: ${unit}`)
+}
+
 function completeDurationNote(
   name = 'Mystery',
   recent = buildRecentSessionsBlock(name, 'duration', 'Fitness'),
@@ -390,6 +397,59 @@ metric: e1rm
 unit: lbs
 ---`)
     expect(result.markdown).not.toContain('unit: kg')
+    expect(second.markdown).toBe(result.markdown)
+  })
+
+  it('preserves valid strength unit frontmatter without a registry match and stays idempotent', () => {
+    const source = completeStrengthNoteFor('Plank Press', 'lbs')
+    const emptyRegistry = createRegistry([])
+
+    const result = migrate(source, { name: 'Plank Press', registry: emptyRegistry })
+    const second = migrate(result.markdown, { name: 'Plank Press', registry: emptyRegistry })
+
+    expect(result.status).toBe('already')
+    expect(result.markdown).toContain(`type: exercise
+kind: strength
+metric: e1rm
+unit: lbs
+---`)
+    expect(result.markdown).not.toContain('unit: kg')
+    expect(second.status).toBe('already')
+    expect(second.markdown).toBe(result.markdown)
+  })
+
+  it('repairs invalid strength unit frontmatter to kg without a registry match and stays idempotent', () => {
+    const source = completeStrengthNoteFor('Plank Press', 'stone')
+    const emptyRegistry = createRegistry([])
+
+    const result = migrate(source, { name: 'Plank Press', registry: emptyRegistry })
+    const second = migrate(result.markdown, { name: 'Plank Press', registry: emptyRegistry })
+
+    expect(result.status).toBe('updated')
+    expect(result.markdown).toContain(`type: exercise
+kind: strength
+metric: e1rm
+unit: kg
+---`)
+    expect(result.markdown).not.toContain('unit: stone')
+    expect(second.status).toBe('already')
+    expect(second.markdown).toBe(result.markdown)
+  })
+
+  it('adds missing strength unit as kg without a registry match and stays idempotent', () => {
+    const source = completeStrengthNoteFor('Plank Press').replace('unit: kg\n', '')
+    const emptyRegistry = createRegistry([])
+
+    const result = migrate(source, { name: 'Plank Press', registry: emptyRegistry })
+    const second = migrate(result.markdown, { name: 'Plank Press', registry: emptyRegistry })
+
+    expect(result.status).toBe('updated')
+    expect(result.markdown).toContain(`type: exercise
+kind: strength
+metric: e1rm
+unit: kg
+---`)
+    expect(second.status).toBe('already')
     expect(second.markdown).toBe(result.markdown)
   })
 

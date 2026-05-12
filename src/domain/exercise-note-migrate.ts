@@ -10,7 +10,7 @@ import {
   type ExerciseMetric,
 } from './exercise-metric'
 import { buildNotesBlock, buildRecentSessionsBlock } from './exercise-note-template'
-import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from './weight-unit'
+import { DEFAULT_WEIGHT_UNIT, parseWeightUnit, type WeightUnit } from './weight-unit'
 
 const FENCE_OPEN = /^(`{3,})([^`]*)$/
 const LIMIT_MIN = 5
@@ -122,7 +122,7 @@ function repairFrontmatter(
   options: ExerciseNoteMigrationOptions,
 ): FrontmatterRepairResult {
   const registryKind = kindForName(options.registry, options.name)
-  const registryUnit = unitForName(options.registry, options.name) ?? DEFAULT_WEIGHT_UNIT
+  const registryUnit = unitForName(options.registry, options.name)
   const bounds = findFrontmatterBounds(source)
   if (bounds.status === 'malformed') {
     return {
@@ -136,7 +136,7 @@ function repairFrontmatter(
   if (bounds.status === 'missing') {
     const fallbackKind = registryKind ?? inferExerciseKindFromContent(source) ?? 'strength'
     return {
-      markdown: `${frontmatterBlock(fallbackKind, registryUnit)}${source}`,
+      markdown: `${frontmatterBlock(fallbackKind, registryUnit ?? DEFAULT_WEIGHT_UNIT)}${source}`,
       kind: fallbackKind,
       unknownKind: registryKind === null,
       warnings: [],
@@ -343,17 +343,26 @@ function frontmatterMetric(line: string): ExerciseMetric | null {
 
 function setStrengthUnitFromRegistry(
   lines: ReadonlyArray<string>,
-  registryUnit: WeightUnit,
+  registryUnit: WeightUnit | null,
 ): string[] {
   const unitLineIndex = findFrontmatterKeyLine(lines, 'unit')
   if (unitLineIndex < 0) {
     const metricLineIndex = findFrontmatterKeyLine(lines, 'metric')
     const kindLineIndex = findFrontmatterKeyLine(lines, 'kind')
     const insertionIndex = metricLineIndex >= 0 ? metricLineIndex + 1 : kindLineIndex + 1
-    return insertLines(lines, insertionIndex, [`unit: ${registryUnit}`])
+    return insertLines(lines, insertionIndex, [`unit: ${registryUnit ?? DEFAULT_WEIGHT_UNIT}`])
   }
 
-  return replaceLine(lines, unitLineIndex, `unit: ${registryUnit}`)
+  if (registryUnit) {
+    return replaceLine(lines, unitLineIndex, `unit: ${registryUnit}`)
+  }
+
+  const existingUnit = parseWeightUnit(scalarValue(lines[unitLineIndex] ?? ''))
+  if (existingUnit) {
+    return [...lines]
+  }
+
+  return replaceLine(lines, unitLineIndex, `unit: ${DEFAULT_WEIGHT_UNIT}`)
 }
 
 function repairRecentSessions(
