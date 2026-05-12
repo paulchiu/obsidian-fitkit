@@ -49,6 +49,68 @@ describe('dashboard composer', () => {
     ).toMatch(/^# FitKit Dashboard/)
   })
 
+  it('renders a recent workouts section above PBs when there are no sessions', () => {
+    const markdown = composeDashboard(
+      emptyIndex,
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+    )
+
+    expect(markdown.indexOf('## Recent workouts')).toBeGreaterThan(-1)
+    expect(markdown.indexOf('## Recent workouts')).toBeLessThan(markdown.indexOf('## PBs'))
+    expect(markdown).toContain('_No workouts yet._')
+  })
+
+  it('lists the most recent workouts by date with linked names', () => {
+    const entries = Array.from({ length: 12 }, (_, i) => {
+      const day = String(i + 1).padStart(2, '0')
+      return {
+        path: `Fitness/Workouts/2026-04-${day}.md`,
+        mtime: i,
+        date: `2026-04-${day}`,
+        name: `Day ${i + 1}`,
+        exercises: [],
+      }
+    })
+
+    const markdown = composeDashboard(
+      { schemaVersion: 1, builtAt: 0, entries, diagnostics: [] },
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+    )
+
+    expect(markdown).toContain('- 2026-04-12: [[Fitness/Workouts/2026-04-12|Day 12]]')
+    expect(markdown).toContain('- 2026-04-03: [[Fitness/Workouts/2026-04-03|Day 3]]')
+    expect(markdown).not.toContain('Day 2]]')
+    expect(markdown).not.toContain('Day 1]]')
+  })
+
+  it('falls back to the workout filename when no name is set', () => {
+    const markdown = composeDashboard(
+      {
+        schemaVersion: 1,
+        builtAt: 0,
+        entries: [
+          {
+            path: 'Fitness/Workouts/2026-04-24.md',
+            mtime: 1,
+            date: '2026-04-24',
+            name: '',
+            exercises: [],
+          },
+        ],
+        diagnostics: [],
+      },
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+    )
+
+    expect(markdown).toContain('- 2026-04-24: [[Fitness/Workouts/2026-04-24|2026-04-24]]')
+  })
+
   it('renders PBs and an exercise section for strength entries', () => {
     const markdown = composeDashboard(
       mixedIndex,

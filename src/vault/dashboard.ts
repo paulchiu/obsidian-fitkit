@@ -11,7 +11,7 @@ import {
   resolve,
   type ExerciseRegistry,
 } from '../domain/exercise-registry'
-import type { BestSet, ExerciseIndexRow, FitKitIndex, WeightSet } from '../domain/types'
+import type { BestSet, ExerciseIndexRow, FitKitIndex, IndexEntry, WeightSet } from '../domain/types'
 import type { FitKitSettings } from '../settings'
 import { dashboardPath, exercisesFolder, normalizeFolder, workoutsFolder } from '../settings-paths'
 import { exerciseRegistryWithVaultNotes } from './exercise-registry-vault'
@@ -85,6 +85,19 @@ function composeDashboardFromAggregates(
   lines.push(
     `_Generated ${new Date(index.builtAt).toISOString()}; ${index.entries.length} sessions, ${exercises.length} exercises._`,
   )
+  lines.push('')
+  lines.push('## Recent workouts')
+  lines.push('')
+
+  const recent = recentWorkouts(index)
+  if (recent.length === 0) {
+    lines.push('_No workouts yet._')
+  } else {
+    for (const entry of recent) {
+      lines.push(formatRecentWorkout(entry, workoutsFolderPath))
+    }
+  }
+
   lines.push('')
   lines.push('## PBs')
   lines.push('')
@@ -344,4 +357,24 @@ function readFrontmatterField(
 ): unknown {
   const record: Record<string, unknown> | null = frontmatter ?? null
   return record === null ? undefined : record[key]
+}
+
+function recentWorkouts(index: FitKitIndex): IndexEntry[] {
+  return [...index.entries]
+    .sort((left, right) => {
+      if (left.date !== right.date) {
+        return right.date.localeCompare(left.date)
+      }
+      if (left.mtime !== right.mtime) {
+        return right.mtime - left.mtime
+      }
+      return right.path.localeCompare(left.path)
+    })
+    .slice(0, 10)
+}
+
+function formatRecentWorkout(entry: IndexEntry, workoutsFolderPath: string): string {
+  const basename = entry.path.slice(entry.path.lastIndexOf('/') + 1).replace(/\.md$/i, '')
+  const label = entry.name.trim() || basename
+  return `- ${entry.date}: [[${workoutsFolderPath}/${basename}|${label}]]`
 }

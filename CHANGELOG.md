@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Dashboard now opens with a "Recent workouts" section listing the last 10 workout dates and names linked to their notes. Existing dashboards are updated when rebuilt.
+
 ### Changed
 
 ### Fixed
