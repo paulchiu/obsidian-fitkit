@@ -21,6 +21,7 @@ import type FitKitPlugin from '../main'
 import { exercisesFolder } from '../settings-paths'
 import { rebuildIndex } from '../vault/index'
 import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
+import { DEFAULT_WEIGHT_UNIT, parseWeightUnit, type WeightUnit } from '../domain/weight-unit'
 import { renderExerciseChartSvg } from './exercise-chart-svg'
 
 type KindFrontmatterResult =
@@ -118,6 +119,10 @@ async function renderInternal(
 
   const metric = resolveExerciseChartMetric(parsed, exerciseFrontmatter, kind, notes)
 
+  const weightUnit =
+    kind === 'strength'
+      ? resolveExerciseWeightUnit(exerciseFrontmatter, registry, exerciseName)
+      : null
   if (!plugin.cachedIndex) {
     plugin.cachedIndex = await rebuildIndex(plugin.app, plugin.settings)
     plugin.lastDiagnostics = plugin.cachedIndex.diagnostics
@@ -130,6 +135,7 @@ async function renderInternal(
     kind,
     window,
     metric,
+    weightUnit,
   )
   renderExerciseChartSvg(el, series, { notes })
 }
@@ -190,6 +196,19 @@ function kindFromFrontmatter(
     return { kind: lowered }
   }
   return { kind: null, reason: 'invalid', raw }
+}
+
+function resolveExerciseWeightUnit(
+  frontmatter: CachedMetadata['frontmatter'] | undefined,
+  registry: ReturnType<typeof createRegistry>,
+  exerciseName: string,
+): WeightUnit {
+  const frontmatterUnit = parseWeightUnit(readFrontmatterField(frontmatter, 'unit'))
+  if (frontmatterUnit) {
+    return frontmatterUnit
+  }
+  const resolved = resolve(registry, exerciseName)
+  return resolved.kind === 'match' ? resolved.entry.unit : DEFAULT_WEIGHT_UNIT
 }
 
 function readFrontmatterField(

@@ -1,5 +1,6 @@
 import type { ExerciseKind } from '../domain/exercise-registry'
 import { buildNotesBlock, buildRecentSessionsBlock } from '../domain/exercise-note-template'
+import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
 
 /**
  * Pure: build the seeded markdown body for a freshly-created exercise note.
@@ -14,6 +15,7 @@ export function composeExerciseNote(
   exerciseName: string,
   kind: ExerciseKind,
   workoutsFolderPath: string,
+  unit: WeightUnit = DEFAULT_WEIGHT_UNIT,
 ): string {
   const lines: string[] = []
   lines.push('---')
@@ -21,6 +23,7 @@ export function composeExerciseNote(
   lines.push(`kind: ${kind}`)
   if (kind === 'strength') {
     lines.push('metric: e1rm')
+    lines.push(`unit: ${unit}`)
   }
   lines.push('---')
   lines.push('')

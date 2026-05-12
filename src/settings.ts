@@ -3,6 +3,7 @@ import { App, Notice, PluginSettingTab, Setting, TFile, normalizePath } from 'ob
 import { formatErrorMessage } from './domain/error'
 import type { ExerciseRegistryEntry } from './domain/exercise-registry'
 import { createRegistry, normalize, removeEntry } from './domain/exercise-registry'
+import { DEFAULT_WEIGHT_UNIT, parseWeightUnit } from './domain/weight-unit'
 import type FitKitPlugin from './main'
 import { DeleteRegistryEntryModal } from './ui/delete-registry-entry-modal'
 import { ExerciseRegistryEntryModal } from './ui/exercise-registry-entry-modal'
@@ -80,7 +81,9 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
     autoUpdateDashboard: stored.autoUpdateDashboard ?? DEFAULT_SETTINGS.autoUpdateDashboard,
     autosaveDebounceMs: stored.autosaveDebounceMs ?? DEFAULT_SETTINGS.autosaveDebounceMs,
     chartSessionsWindow: stored.chartSessionsWindow ?? DEFAULT_SETTINGS.chartSessionsWindow,
-    exerciseRegistry: stored.exerciseRegistry ?? DEFAULT_SETTINGS.exerciseRegistry,
+    exerciseRegistry: normalizeStoredExerciseRegistry(
+      stored.exerciseRegistry ?? DEFAULT_SETTINGS.exerciseRegistry,
+    ),
     deletedExercises: normalizeDeletedExerciseTombstones(
       stored.deletedExercises ?? DEFAULT_SETTINGS.deletedExercises,
     ),
@@ -88,6 +91,17 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
       stored.hiddenDashboardSectionsByPath ?? DEFAULT_SETTINGS.hiddenDashboardSectionsByPath,
     schemaVersion: DEFAULT_SETTINGS.schemaVersion,
   }
+}
+
+function normalizeStoredExerciseRegistry(
+  entries: readonly ExerciseRegistryEntry[] = [],
+): ExerciseRegistryEntry[] {
+  return entries.map((entry) => ({
+    name: entry.name,
+    kind: entry.kind,
+    unit: parseWeightUnit(entry.unit) ?? DEFAULT_WEIGHT_UNIT,
+    aliases: [...entry.aliases],
+  }))
 }
 
 const CHART_WINDOW_MIN = 5
@@ -347,6 +361,7 @@ export class FitKitSettingTab extends PluginSettingTab {
         const head = table.createEl('tr')
         head.createEl('th', { text: 'Name' })
         head.createEl('th', { text: 'Kind' })
+        head.createEl('th', { text: 'Unit' })
         head.createEl('th', { text: 'Aliases' })
         head.createEl('th', { text: '' })
 
@@ -369,6 +384,7 @@ export class FitKitSettingTab extends PluginSettingTab {
     const tr = table.createEl('tr')
     tr.createEl('td', { text: entry.name })
     tr.createEl('td', { text: entry.kind })
+    tr.createEl('td', { text: entry.unit })
 
     const aliasCell = tr.createEl('td')
     if (entry.aliases.length === 0) {

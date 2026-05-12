@@ -50,19 +50,30 @@ describe('settings migration', () => {
   it('defaults deleted exercise tombstones without dropping stored data', () => {
     const migrated = settingsFromStored({
       fitnessRoot: 'Area/Fitness',
-      exerciseRegistry: [{ name: 'Squat', kind: 'strength', aliases: ['back squat'] }],
+      exerciseRegistry: [{ name: 'Squat', kind: 'strength', unit: 'kg', aliases: ['back squat'] }],
       hiddenDashboardSectionsByPath: { 'Fitness/Fitness Dashboard.md': ['exercise:Squat'] },
       schemaVersion: 1,
     })
 
     expect(migrated.fitnessRoot).toBe('Area/Fitness')
     expect(migrated.exerciseRegistry).toEqual([
-      { name: 'Squat', kind: 'strength', aliases: ['back squat'] },
+      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: ['back squat'] },
     ])
     expect(migrated.hiddenDashboardSectionsByPath).toEqual({
       'Fitness/Fitness Dashboard.md': ['exercise:Squat'],
     })
     expect(migrated.deletedExercises).toEqual([])
+  })
+
+  it('defaults legacy registry entries without a unit to kg', () => {
+    const migrated = settingsFromStored({
+      exerciseRegistry: [{ name: 'Squat', kind: 'strength', aliases: [] }],
+      schemaVersion: 1,
+    } as unknown as Partial<FitKitSettings>)
+
+    expect(migrated.exerciseRegistry).toEqual([
+      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: [] },
+    ])
   })
 
   it('preserves stored deleted exercise tombstones', () => {
@@ -122,7 +133,7 @@ describe('registry deletion tombstones', () => {
     const file = new TFile()
     const settings: FitKitSettings = {
       ...DEFAULT_SETTINGS,
-      exerciseRegistry: [{ name: 'Squat', kind: 'strength', aliases: [] }],
+      exerciseRegistry: [{ name: 'Squat', kind: 'strength', unit: 'kg', aliases: [] }],
       deletedExercises: [],
     }
     const { harness, saveSettings, trashFile, rerender } = createDeleteHarness(settings, file)
@@ -141,7 +152,7 @@ describe('registry deletion tombstones', () => {
   it('records a tombstone when deleting the note and it is already missing', async () => {
     const settings: FitKitSettings = {
       ...DEFAULT_SETTINGS,
-      exerciseRegistry: [{ name: 'Squat', kind: 'strength', aliases: [] }],
+      exerciseRegistry: [{ name: 'Squat', kind: 'strength', unit: 'kg', aliases: [] }],
       deletedExercises: [],
     }
     const { harness, trashFile, rerender } = createDeleteHarness(settings, null)
@@ -157,7 +168,7 @@ describe('registry deletion tombstones', () => {
   it('does not tombstone when only removing the registry overlay', async () => {
     const settings: FitKitSettings = {
       ...DEFAULT_SETTINGS,
-      exerciseRegistry: [{ name: 'Squat', kind: 'strength', aliases: [] }],
+      exerciseRegistry: [{ name: 'Squat', kind: 'strength', unit: 'kg', aliases: [] }],
       deletedExercises: [],
     }
     const { harness, getAbstractFileByPath, trashFile, rerender } = createDeleteHarness(
@@ -176,7 +187,7 @@ describe('registry deletion tombstones', () => {
   it('keeps the overlay and tombstones unchanged when trashing the note fails', async () => {
     const settings: FitKitSettings = {
       ...DEFAULT_SETTINGS,
-      exerciseRegistry: [{ name: 'Squat', kind: 'strength', aliases: [] }],
+      exerciseRegistry: [{ name: 'Squat', kind: 'strength', unit: 'kg', aliases: [] }],
       deletedExercises: [],
     }
     const trashFile = vi.fn(async () => {
@@ -190,7 +201,9 @@ describe('registry deletion tombstones', () => {
 
     await harness.deleteRegistryEntry('Squat', true, rerender)
 
-    expect(settings.exerciseRegistry).toEqual([{ name: 'Squat', kind: 'strength', aliases: [] }])
+    expect(settings.exerciseRegistry).toEqual([
+      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: [] },
+    ])
     expect(settings.deletedExercises).toEqual([])
     expect(saveSettings).not.toHaveBeenCalled()
     expect(rerender).toHaveBeenCalledTimes(1)

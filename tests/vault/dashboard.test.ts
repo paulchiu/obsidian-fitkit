@@ -151,7 +151,7 @@ describe('dashboard composer', () => {
     )
 
     expect(markdown).toContain('50 kg x 20')
-    expect(markdown).toContain('e1rm 73.3')
+    expect(markdown).toContain('e1rm 73.3 kg')
     expect(markdown).toContain('total 120s across 1 session')
     expect(markdown).toContain('duration + "s" as Duration')
   })
@@ -198,7 +198,7 @@ describe('dashboard composer', () => {
       new Set(),
     )
 
-    expect(markdown).toContain('- **[[#Bench Press|Bench Press]]:** 90 kg x 10 (e1rm 120.0)')
+    expect(markdown).toContain('- **[[#Bench Press|Bench Press]]:** 90 kg x 10 (e1rm 120.0 kg)')
   })
 
   it('honors weight metric by ranking the heaviest set and omitting e1rm', () => {
@@ -246,6 +246,38 @@ describe('dashboard composer', () => {
 
     expect(markdown).toContain('- **[[#Bench Press|Bench Press]]:** 105 kg x 3')
     expect(markdown).not.toContain('e1rm')
+  })
+
+  it('renders strength PBs with the configured lbs unit', () => {
+    const markdown = composeDashboard(
+      {
+        ...emptyIndex,
+        entries: [
+          {
+            path: 'Fitness/Workouts/2026-04-24.md',
+            mtime: 1,
+            date: '2026-04-24',
+            name: 'Workout',
+            exercises: [
+              {
+                exerciseName: 'Bench Press',
+                kind: 'strength',
+                bestSet: { weight: 200, reps: 5, e1rm: 233.3 },
+                maxWeightSet: { weight: 200, reps: 5 },
+                totalSets: 1,
+              },
+            ],
+          },
+        ],
+      },
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+      new Map([['Bench Press', 'e1rm'] as const]),
+      new Map([['Bench Press', 'lbs'] as const]),
+    )
+
+    expect(markdown).toContain('- **[[#Bench Press|Bench Press]]:** 200 lbs x 5 (e1rm 233.3 lbs)')
   })
 
   it('renders bodyweight PBs as reps in weight metric mode', () => {

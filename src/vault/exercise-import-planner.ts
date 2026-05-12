@@ -9,6 +9,7 @@ import {
   upsertEntry,
   type ExerciseKind,
 } from '../domain/exercise-registry'
+import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
 import type { ExerciseEntry, WorkoutNoteModel } from '../domain/workout-note-model'
 import { parseWorkoutNote } from '../domain/workout-note-model'
 import type { FitKitSettings } from '../settings'
@@ -22,6 +23,7 @@ export type ExerciseImportRowStatus = 'known' | 'missing' | 'ignored'
 export interface ExerciseImportPlanRow {
   name: string
   kind: ExerciseKind
+  unit: WeightUnit
   status: ExerciseImportRowStatus
   registryName: string | null
   notePath: string | null
@@ -82,6 +84,7 @@ export async function buildExerciseImportPlan(
     const key = normalize(candidate.name)
     const match = resolve(registry, candidate.name)
     const matchedKind = match.kind === 'match' ? match.entry.kind : null
+    const matchedUnit = match.kind === 'match' ? match.entry.unit : null
     const registryName = match.kind === 'match' ? match.entry.name : null
     const note = noteByKey.get(key)
     const tombstoned = deletedKeys.has(key)
@@ -91,9 +94,11 @@ export async function buildExerciseImportPlan(
         ? 'known'
         : 'missing'
     const kind = matchedKind ?? note?.kind ?? candidate.kind
+    const unit = matchedUnit ?? note?.unit ?? DEFAULT_WEIGHT_UNIT
     rows.push({
       name: candidate.name,
       kind,
+      unit,
       status,
       registryName,
       notePath: note?.path ?? null,
@@ -145,6 +150,7 @@ export async function applyExerciseImportPlan(
       registry = upsertEntry(registry, {
         name: row.name,
         kind: row.kind,
+        unit: row.unit,
         aliases: [],
       })
       registryEntriesCreated += 1
@@ -161,7 +167,7 @@ export async function applyExerciseImportPlan(
     }
     try {
       await ensureParentFolder(app, path)
-      await app.vault.create(path, composeExerciseNote(row.name, row.kind, workouts))
+      await app.vault.create(path, composeExerciseNote(row.name, row.kind, workouts, row.unit))
     } catch (error) {
       throw new ExerciseImportApplyError(
         error instanceof Error ? error.message : `Failed to create ${path}`,

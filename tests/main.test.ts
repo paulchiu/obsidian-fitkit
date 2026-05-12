@@ -312,7 +312,9 @@ describe('FitKitPlugin settings loading', () => {
     const plugin = new (FitKitPlugin as unknown as { new (app: MockApp): FitKitPlugin })(app)
     const stored = {
       fitnessRoot: 'Area/Fitness',
-      exerciseRegistry: [{ name: 'Squat', kind: 'strength' as const, aliases: ['back squat'] }],
+      exerciseRegistry: [
+        { name: 'Squat', kind: 'strength' as const, unit: 'kg' as const, aliases: ['back squat'] },
+      ],
       hiddenDashboardSectionsByPath: { 'Fitness/Fitness Dashboard.md': ['exercise:Squat'] },
     }
     const loadData = vi.spyOn(plugin, 'loadData').mockResolvedValue(stored)
@@ -324,7 +326,7 @@ describe('FitKitPlugin settings loading', () => {
     expect(saveData).not.toHaveBeenCalled()
     expect(plugin.settings.fitnessRoot).toBe('Area/Fitness')
     expect(plugin.settings.exerciseRegistry).toEqual([
-      { name: 'Squat', kind: 'strength', aliases: ['back squat'] },
+      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: ['back squat'] },
     ])
     expect(plugin.settings.deletedExercises).toEqual([])
   })
@@ -519,6 +521,7 @@ type: exercise
     expect(contents.get(file.path)).toContain(`type: exercise
 kind: strength
 metric: e1rm
+unit: kg
 ---`)
     expect(contents.get(file.path)).toContain('## Recent sessions')
     expect(noticeMessages).toHaveLength(1)
@@ -556,7 +559,7 @@ kind: duration
     }))
     const plugin = createPlugin(app, {
       ...DEFAULT_SETTINGS,
-      exerciseRegistry: [{ name: 'Squat', kind: 'strength', aliases: [] }],
+      exerciseRegistry: [{ name: 'Squat', kind: 'strength', unit: 'kg', aliases: [] }],
       fitnessRoot: 'Fitness',
     })
 

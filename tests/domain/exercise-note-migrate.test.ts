@@ -5,8 +5,8 @@ import { migrateExerciseNote } from '../../src/domain/exercise-note-migrate'
 import { buildNotesBlock, buildRecentSessionsBlock } from '../../src/domain/exercise-note-template'
 
 const registry = createRegistry([
-  { name: 'Squat', kind: 'strength', aliases: [] },
-  { name: 'Plank', kind: 'duration', aliases: [] },
+  { name: 'Squat', kind: 'strength', unit: 'kg', aliases: [] },
+  { name: 'Plank', kind: 'duration', unit: 'kg', aliases: [] },
 ])
 
 function migrate(
@@ -28,6 +28,7 @@ function completeStrengthNote(
 type: exercise
 kind: strength
 metric: e1rm
+unit: kg
 ---
 
 ## Progress chart
@@ -115,6 +116,7 @@ Keep this.
 type: exercise
 kind: strength
 metric: e1rm
+unit: kg
 ---`)
     expect(result.markdown.indexOf('## Progress chart')).toBeLessThan(
       result.markdown.indexOf('## Recent sessions'),
@@ -150,6 +152,7 @@ type: workout
 type: exercise
 kind: strength
 metric: e1rm
+unit: kg
 ---`)
     expect(result.markdown).toContain(buildRecentSessionsBlock('Mystery', 'strength', 'Fitness'))
     expect(result.markdown).toContain('## Progress chart')
@@ -256,6 +259,7 @@ type: exercise
     expect(result.markdown).toContain(`type: exercise
 kind: strength
 metric: e1rm
+unit: kg
 ---`)
   })
 
@@ -277,6 +281,7 @@ kind: strength
     expect(result.markdown).toContain(`type: exercise
 kind: strength
 metric: e1rm
+unit: kg
 ---`)
   })
 
@@ -300,6 +305,7 @@ kind: cardio
     expect(result.markdown).toContain(`type: exercise
 kind: strength
 metric: e1rm
+unit: kg
 ---`)
     expect(result.markdown).toContain(buildRecentSessionsBlock('Squat', 'strength', 'Fitness'))
   })
@@ -309,6 +315,7 @@ metric: e1rm
 type: exercise
 kind: strength
 metric: e1rm
+unit: kg
 ---
 
 ## Progress chart
@@ -337,6 +344,7 @@ ${buildNotesBlock('Plank', 'Fitness')}
     expect(result.markdown).toContain(`type: exercise
 kind: strength
 metric: e1rm
+unit: kg
 ---`)
     expect(result.markdown).toContain(buildRecentSessionsBlock('Plank', 'strength', 'Fitness'))
     expect(result.markdown).toContain('WHERE L.exercise = link("Plank") AND L.set')
@@ -348,6 +356,37 @@ metric: e1rm
     expect(migrate(source).markdown).toBe(source)
   })
 
+  it('adds missing strength unit from the registry and stays idempotent', () => {
+    const source = completeStrengthNote().replace('unit: kg\n', '')
+    const lbsRegistry = createRegistry([
+      { name: 'Squat', kind: 'strength', unit: 'lbs', aliases: [] },
+    ])
+
+    const result = migrate(source, { registry: lbsRegistry })
+    const second = migrate(result.markdown, { registry: lbsRegistry })
+
+    expect(result.status).toBe('updated')
+    expect(result.markdown).toContain(`type: exercise
+kind: strength
+metric: e1rm
+unit: lbs
+---`)
+    expect(second.markdown).toBe(result.markdown)
+  })
+
+  it('repairs invalid strength unit frontmatter to kg', () => {
+    const source = completeStrengthNote().replace('unit: kg', 'unit: stone')
+
+    const result = migrate(source)
+
+    expect(result.status).toBe('updated')
+    expect(result.markdown).toContain(`type: exercise
+kind: strength
+metric: e1rm
+unit: kg
+---`)
+  })
+
   it('repairs invalid strength metric frontmatter to the default', () => {
     const source = completeStrengthNote().replace('metric: e1rm', 'metric: pace')
 
@@ -357,6 +396,7 @@ metric: e1rm
     expect(result.markdown).toContain(`type: exercise
 kind: strength
 metric: e1rm
+unit: kg
 ---`)
   })
 
@@ -590,6 +630,7 @@ something
 type: exercise
 kind: strength
 metric: e1rm
+unit: kg
 ---
 
 ## Progress chart
@@ -654,6 +695,7 @@ ${buildRecentSessionsBlock('Squat', 'strength', 'Fitness')}
 type: exercise
 kind: strength
 metric: e1rm
+unit: kg
 ---
 
 ## Progress chart
@@ -906,6 +948,7 @@ ${buildRecentSessionsBlock('Plank', 'duration', 'Fitness')}
       'type: exercise',
       'kind: strength',
       'metric: e1rm',
+      'unit: kg',
     ])
     expect(result.markdown.replace(/\r\n/g, '')).not.toContain('\n')
     expect(result.markdown.startsWith('---\r\ntype: exercise')).toBe(true)
@@ -969,6 +1012,7 @@ Existing notes.
       'type: exercise',
       'kind: strength',
       'metric: e1rm',
+      'unit: kg',
     ])
     expect(result.markdown).toContain('## Progress chart')
     const second = migrate(result.markdown)

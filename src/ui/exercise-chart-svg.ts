@@ -238,10 +238,7 @@ export function chartYAxisTitle(series: ChartSeries): string | null {
 
 export function formatChartValue(value: number, series: ChartSeries): string {
   if (series.metric === 'e1rm') {
-    return value.toFixed(1)
-  }
-  if (series.unit === 'kg') {
-    return `${formatNumber(value)}kg`
+    return `${value.toFixed(1)}${series.unit}`
   }
   if (series.unit === 'reps') {
     const formatted = formatNumber(value)

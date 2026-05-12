@@ -1,10 +1,16 @@
-import { kindForName, type ExerciseKind, type ExerciseRegistry } from './exercise-registry'
+import {
+  kindForName,
+  unitForName,
+  type ExerciseKind,
+  type ExerciseRegistry,
+} from './exercise-registry'
 import {
   DEFAULT_EXERCISE_METRIC,
   parseExerciseMetric,
   type ExerciseMetric,
 } from './exercise-metric'
 import { buildNotesBlock, buildRecentSessionsBlock } from './exercise-note-template'
+import { DEFAULT_WEIGHT_UNIT, parseWeightUnit, type WeightUnit } from './weight-unit'
 
 const FENCE_OPEN = /^(`{3,})([^`]*)$/
 const LIMIT_MIN = 5
@@ -116,6 +122,7 @@ function repairFrontmatter(
   options: ExerciseNoteMigrationOptions,
 ): FrontmatterRepairResult {
   const registryKind = kindForName(options.registry, options.name)
+  const registryUnit = unitForName(options.registry, options.name) ?? DEFAULT_WEIGHT_UNIT
   const bounds = findFrontmatterBounds(source)
   if (bounds.status === 'malformed') {
     return {
@@ -129,7 +136,7 @@ function repairFrontmatter(
   if (bounds.status === 'missing') {
     const fallbackKind = registryKind ?? inferExerciseKindFromContent(source) ?? 'strength'
     return {
-      markdown: `${frontmatterBlock(fallbackKind)}${source}`,
+      markdown: `${frontmatterBlock(fallbackKind, registryUnit)}${source}`,
       kind: fallbackKind,
       unknownKind: registryKind === null,
       warnings: [],
@@ -213,6 +220,7 @@ function repairFrontmatter(
         `metric: ${DEFAULT_EXERCISE_METRIC}`,
       )
     }
+    nextFrontmatterLines = repairStrengthUnit(nextFrontmatterLines, registryUnit)
   }
 
   const markdown = [
@@ -230,12 +238,16 @@ function repairFrontmatter(
   }
 }
 
-function frontmatterBlock(kind: ExerciseKind | null): string {
+function frontmatterBlock(
+  kind: ExerciseKind | null,
+  unit: WeightUnit = DEFAULT_WEIGHT_UNIT,
+): string {
   const lines = ['---', 'type: exercise']
   if (kind) {
     lines.push(`kind: ${kind}`)
     if (kind === 'strength') {
       lines.push(`metric: ${DEFAULT_EXERCISE_METRIC}`)
+      lines.push(`unit: ${unit}`)
     }
   }
   lines.push('---', '')
@@ -327,6 +339,26 @@ function frontmatterKind(lines: ReadonlyArray<string>): ExerciseKind | null {
 
 function frontmatterMetric(line: string): ExerciseMetric | null {
   return parseExerciseMetric(scalarValue(line))
+}
+
+function frontmatterUnit(line: string): WeightUnit | null {
+  return parseWeightUnit(scalarValue(line))
+}
+
+function repairStrengthUnit(lines: ReadonlyArray<string>, missingUnit: WeightUnit): string[] {
+  const unitLineIndex = findFrontmatterKeyLine(lines, 'unit')
+  if (unitLineIndex < 0) {
+    const metricLineIndex = findFrontmatterKeyLine(lines, 'metric')
+    const kindLineIndex = findFrontmatterKeyLine(lines, 'kind')
+    const insertionIndex = metricLineIndex >= 0 ? metricLineIndex + 1 : kindLineIndex + 1
+    return insertLines(lines, insertionIndex, [`unit: ${missingUnit}`])
+  }
+
+  if (frontmatterUnit(lines[unitLineIndex] ?? '') === null) {
+    return replaceLine(lines, unitLineIndex, `unit: ${DEFAULT_WEIGHT_UNIT}`)
+  }
+
+  return [...lines]
 }
 
 function repairRecentSessions(

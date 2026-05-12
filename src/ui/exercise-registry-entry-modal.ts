@@ -13,6 +13,7 @@ import {
   upsertEntry,
   validateEntryDraft,
 } from '../domain/exercise-registry'
+import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
 import type FitKitPlugin from '../main'
 
 export type RegistryEntryModalMode =
@@ -22,9 +23,11 @@ export type RegistryEntryModalMode =
 export class ExerciseRegistryEntryModal extends Modal {
   private name: string
   private exerciseKind: ExerciseKind
+  private weightUnit: WeightUnit
   private aliasesText: string
   private nameInput!: HTMLInputElement
   private kindSelect!: HTMLSelectElement
+  private unitSelect!: HTMLSelectElement
   private aliasesTextarea!: HTMLTextAreaElement
   private saveButton!: HTMLButtonElement
   private nameError!: HTMLDivElement
@@ -39,10 +42,12 @@ export class ExerciseRegistryEntryModal extends Modal {
     if (mode.kind === 'edit') {
       this.name = mode.original.name
       this.exerciseKind = mode.original.kind
+      this.weightUnit = mode.original.unit
       this.aliasesText = mode.original.aliases.join('\n')
     } else {
       this.name = ''
       this.exerciseKind = 'strength'
+      this.weightUnit = DEFAULT_WEIGHT_UNIT
       this.aliasesText = ''
     }
   }
@@ -78,6 +83,18 @@ export class ExerciseRegistryEntryModal extends Modal {
       this.exerciseKind = this.kindSelect.value === 'duration' ? 'duration' : 'strength'
     })
 
+    const unitField = contentEl.createDiv({ cls: 'fitkit-registry-field' })
+    unitField.createEl('label', { text: 'Unit', cls: 'fitkit-registry-field-label' })
+    this.unitSelect = unitField.createEl('select', { cls: 'fitkit-registry-select' })
+    // eslint-disable-next-line obsidianmd/ui/sentence-case -- Unit symbols use lowercase labels.
+    this.unitSelect.createEl('option', { value: 'kg', text: 'kg' })
+    // eslint-disable-next-line obsidianmd/ui/sentence-case -- Unit symbols use lowercase labels.
+    this.unitSelect.createEl('option', { value: 'lbs', text: 'lbs' })
+    this.unitSelect.value = this.weightUnit
+    this.unitSelect.addEventListener('change', () => {
+      this.weightUnit = this.unitSelect.value === 'lbs' ? 'lbs' : 'kg'
+    })
+
     const aliasField = contentEl.createDiv({ cls: 'fitkit-registry-field' })
     aliasField.createEl('label', {
       text: 'Aliases (one per line)',
@@ -109,10 +126,11 @@ export class ExerciseRegistryEntryModal extends Modal {
     this.contentEl.empty()
   }
 
-  private buildDraft(): { name: string; kind: ExerciseKind; aliases: string[] } {
+  private buildDraft(): { name: string; kind: ExerciseKind; unit: WeightUnit; aliases: string[] } {
     return sanitizeEntryDraft({
       name: this.name,
       kind: this.exerciseKind,
+      unit: this.weightUnit,
       aliases: this.aliasesText.split('\n'),
     })
   }
