@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [0.16.1] - 2026-05-12
+
+### Added
+
+### Changed
+
+### Fixed
+
 - Sync and repair exercise notes now overwrites strength unit: frontmatter to match the registry, so changing a unit in settings reflects in charts and the dashboard after the next sync.
 - Sync and repair exercise notes now preserves valid note-backed strength `unit:` frontmatter when the exercise has no registry entry, instead of resetting it to kg.
 - Sync and repair exercise notes now preserves valid note-backed strength `unit:` frontmatter when a duration registry entry conflicts with the note kind, instead of resetting it to kg.
