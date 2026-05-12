@@ -1,20 +1,19 @@
 # FitKit
 
-FitKit tracks workouts as plain Markdown notes in Obsidian. The structured editor handles sets, reps, weight, duration, and rest timing. FitKit also keeps exercise notes, progression charts, and a generated dashboard up to date while leaving the underlying data readable in your vault.
+FitKit is a workout tracker that lives inside Obsidian. Your sets, reps, weight, and rest timing are stored as plain Markdown in your vault, edited through a fast structured form, and rolled up into a dashboard and per-exercise progression charts.
 
-The 'kit' is a small set of tools kept together:
+## Why FitKit
 
-- Workout notes in `Fitness/Workouts`.
-- Exercise notes in `Fitness/Exercises`.
-- A generated `Fitness/Fitness Dashboard.md`.
-- A workout editor for daily data entry.
-- Exercise charts, recent-session tables, and PB summaries.
+- **Your data stays as Markdown.** Every workout is a normal note with Dataview inline fields. No SQLite blob, no proprietary export, no cloud account. If you uninstall FitKit tomorrow, your training history is still plain text in your vault.
+- **The editor is built for the gym.** Tap to add a set, type the weight, hit the rest timer. You are not editing Markdown between sets, you are using a form that writes Markdown for you.
+- **PBs and progression are automatic.** Once you have logged a few workouts, FitKit generates a dashboard with personal bests and a Dataview-powered history per exercise. Exercise notes get a progression chart and a recent-sessions table without you wiring anything up.
+- **It is just an Obsidian plugin.** It works with the rest of your vault: link exercises to your training notes, embed charts in a daily note, query workouts with your own Dataview queries.
 
-FitKit writes the notes and generated blocks. The [Dataview plugin](https://github.com/blacksmithgu/obsidian-dataview) renders the history tables in the dashboard and exercise notes. Without Dataview, your workout data is still stored as Markdown, but those generated history sections show as raw `dataview` code blocks.
+If you want a workout tracker that is yours, that you can read and edit in any text editor, and that does not silo your training history behind an app, FitKit is built for that.
 
 ## Install
 
-Install Dataview first from Obsidian's community plugins. FitKit needs Dataview to render the dashboard and recent-session views.
+FitKit needs the [Dataview plugin](https://github.com/blacksmithgu/obsidian-dataview) to render history tables and recent-session views. Install Dataview first from Obsidian's community plugins.
 
 To install FitKit with the [BRAT community plugin](https://github.com/TfTHacker/obsidian42-brat):
 
@@ -28,49 +27,53 @@ To install manually from a release:
 2. Put them in `<vault>/.obsidian/plugins/fitkit/`, creating the folder if needed.
 3. Reload Obsidian, then enable FitKit from the community plugins list.
 
-To install manually from source:
+## Log your first workout
 
-```bash
-npm install
-npm run build
-```
+The defaults are designed so you can log a workout the moment FitKit is enabled. No setup is required.
 
-Then copy `main.js`, `manifest.json`, and `styles.css` into `<vault>/.obsidian/plugins/fitkit/` and reload Obsidian.
+1. **Open the command palette** and run `Open today's workout`. FitKit creates today's note under `Fitness/Workouts/` and opens it in the structured workout editor.
 
-## Getting started
+   ![Workout editor with a strength exercise, rows, and rest timer](docs/images/workout-editor.png)
+
+2. **Add an exercise.** Type the name (for example, `Squat`). If it is a new exercise, FitKit asks whether to create an exercise note for it. Say yes for anything you want to chart and revisit later.
+
+3. **Log your sets.** Enter weight and reps for each set, or a duration in seconds for time-based exercises. Tap the rest timer between sets if you want it.
+
+4. **That is it.** The editor autosaves the note as you go. The underlying Markdown looks like this:
+
+   ```markdown
+   ---
+   type: workout
+   date: 2026-05-12
+   name: Squat Day
+   ---
+
+   ## [[Squat]]
+
+   - [exercise:: [[Squat]]] [set:: 1] [weight:: 50] [reps:: 5]
+   - [exercise:: [[Squat]]] [set:: 2] [weight:: 55] [reps:: 5]
+   ```
+
+After a few sessions, run `Rebuild dashboard` from FitKit settings to generate `Fitness/Fitness Dashboard.md` with your PBs and per-exercise history. Exercise notes pick up a progression chart and a `Recent sessions` table automatically.
+
+## Settings and defaults
 
 ![FitKit settings showing the default paths and setup actions](docs/images/settings.png)
 
-Open FitKit settings after enabling the plugin. The default root is `Fitness`, which gives you:
+The default root is `Fitness`, which gives you:
 
-- `Fitness/Workouts` for workout notes.
-- `Fitness/Exercises` for exercise notes.
+- `Fitness/Workouts/` for workout notes.
+- `Fitness/Exercises/` for exercise notes.
 - `Fitness/Fitness Dashboard.md` for the generated dashboard.
 
-The defaults are enough to start. Change `Fitness root` only if you want those files somewhere else in your vault.
+Change `Fitness root` only if you want those files somewhere else in your vault.
 
-Run `Open today's workout` from the command palette. FitKit creates today's workout note if it does not exist and opens the structured workout editor.
+Other settings worth knowing:
 
-![Workout editor with a strength exercise, rows, and rest timer](docs/images/workout-editor.png)
-
-Add an exercise, then enter the sets, reps, weight, or duration you want to track. If the exercise is new, FitKit asks whether to create an exercise note for it. Leave `Create exercise note` enabled for exercises you want to revisit, chart, and annotate later.
-
-The editor autosaves back to the Markdown note. A basic strength workout is stored like this:
-
-```markdown
----
-type: workout
-date: 2026-05-09
-name: Squat Day
----
-
-## [[Squat]]
-
-- [exercise:: [[Squat]]] [set:: 1] [weight:: 50] [reps:: 5]
-- [exercise:: [[Squat]]] [set:: 2] [weight:: 55] [reps:: 5]
-```
-
-Duration exercises use `[duration:: 60]`, stored as seconds.
+- `Auto-open workout editor`: open workout notes in the FitKit editor by default.
+- `Rest timer`: show the workout editor rest timer.
+- `Auto-update dashboard on save`: refresh dashboard data after workout saves.
+- `Chart sessions`: default number of recent sessions to plot in exercise charts.
 
 ## Dashboard and exercise notes
 
@@ -78,7 +81,7 @@ Duration exercises use `[duration:: 60]`, stored as seconds.
 
 ![Exercise note with a progression chart and Recent sessions](docs/images/exercise-note.png)
 
-Use `Rebuild dashboard` in FitKit settings once you have a few workouts. FitKit scans the workout notes, updates its local index, and regenerates `Fitness/Fitness Dashboard.md` with PBs and per-exercise Dataview queries.
+`Rebuild dashboard` scans your workout notes, updates the local index, and regenerates the dashboard with PBs and per-exercise Dataview queries.
 
 Exercise notes are normal Markdown files with `type: exercise` frontmatter. FitKit can seed them with:
 
@@ -86,7 +89,7 @@ Exercise notes are normal Markdown files with `type: exercise` frontmatter. FitK
 - A Dataview-powered `Recent sessions` section.
 - A `Notes` section for your own training notes.
 
-Use `Sync and repair exercise notes` if you already have exercise notes and want FitKit to add or refresh the generated sections. Use `Import exercises` when you have workout history and want FitKit to create missing exercise notes or no-note registry entries from the names it finds.
+Use `Sync and repair exercise notes` if you already have exercise notes and want FitKit to add or refresh the generated sections. Use `Import exercises` when you have workout history and want FitKit to create missing exercise notes or registry entries from the names it finds.
 
 ## Commands
 
@@ -97,17 +100,9 @@ The command palette is reserved for daily workout entry.
 | `Open today's workout`                 | Create today's workout note if needed, then open it in the workout editor. |
 | `Open workout editor for current file` | Open the active Markdown file in the workout editor.                       |
 
-## Settings and maintenance
+## Maintenance actions
 
-The settings tab keeps the everyday setup in one place:
-
-- `Fitness root`: where workouts, exercises, and the dashboard live.
-- `Auto-open workout editor`: open workout notes in the FitKit editor by default.
-- `Rest timer`: show the workout editor rest timer.
-- `Auto-update dashboard on save`: refresh dashboard data after workout saves.
-- `Chart sessions`: default number of recent sessions to plot in exercise charts.
-
-The maintenance actions cover generated data and diagnostics:
+The settings tab has maintenance actions for generated data and diagnostics:
 
 - `Rebuild index`: rescan workout notes into the local index.
 - `Rebuild dashboard`: regenerate `Fitness/Fitness Dashboard.md` from the index.
@@ -128,7 +123,7 @@ Dataview inline fields are the canonical workout format:
 [exercise:: [[Name]]] [duration:: S]
 ```
 
-Fenced code blocks are reporting surfaces, not the source of truth.
+Durations are stored as seconds. Fenced code blocks are reporting surfaces, not the source of truth.
 
 ## Limitations
 
