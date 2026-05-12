@@ -122,7 +122,7 @@ function repairFrontmatter(
   options: ExerciseNoteMigrationOptions,
 ): FrontmatterRepairResult {
   const registryKind = kindForName(options.registry, options.name)
-  const registryUnit = unitForName(options.registry, options.name) ?? DEFAULT_WEIGHT_UNIT
+  const registryUnit = strengthUnitForName(options.registry, options.name)
   const bounds = findFrontmatterBounds(source)
   if (bounds.status === 'malformed') {
     return {
@@ -136,7 +136,7 @@ function repairFrontmatter(
   if (bounds.status === 'missing') {
     const fallbackKind = registryKind ?? inferExerciseKindFromContent(source) ?? 'strength'
     return {
-      markdown: `${frontmatterBlock(fallbackKind, registryUnit)}${source}`,
+      markdown: `${frontmatterBlock(fallbackKind, registryUnit ?? DEFAULT_WEIGHT_UNIT)}${source}`,
       kind: fallbackKind,
       unknownKind: registryKind === null,
       warnings: [],
@@ -220,7 +220,7 @@ function repairFrontmatter(
         `metric: ${DEFAULT_EXERCISE_METRIC}`,
       )
     }
-    nextFrontmatterLines = repairStrengthUnit(nextFrontmatterLines, registryUnit)
+    nextFrontmatterLines = setStrengthUnitFromRegistry(nextFrontmatterLines, registryUnit)
   }
 
   const markdown = [
@@ -236,6 +236,13 @@ function repairFrontmatter(
     warnings,
     skippedStatus: null,
   }
+}
+
+function strengthUnitForName(registry: ExerciseRegistry, name: string): WeightUnit | null {
+  if (kindForName(registry, name) !== 'strength') {
+    return null
+  }
+  return unitForName(registry, name)
 }
 
 function frontmatterBlock(
@@ -341,24 +348,28 @@ function frontmatterMetric(line: string): ExerciseMetric | null {
   return parseExerciseMetric(scalarValue(line))
 }
 
-function frontmatterUnit(line: string): WeightUnit | null {
-  return parseWeightUnit(scalarValue(line))
-}
-
-function repairStrengthUnit(lines: ReadonlyArray<string>, missingUnit: WeightUnit): string[] {
+function setStrengthUnitFromRegistry(
+  lines: ReadonlyArray<string>,
+  registryUnit: WeightUnit | null,
+): string[] {
   const unitLineIndex = findFrontmatterKeyLine(lines, 'unit')
   if (unitLineIndex < 0) {
     const metricLineIndex = findFrontmatterKeyLine(lines, 'metric')
     const kindLineIndex = findFrontmatterKeyLine(lines, 'kind')
     const insertionIndex = metricLineIndex >= 0 ? metricLineIndex + 1 : kindLineIndex + 1
-    return insertLines(lines, insertionIndex, [`unit: ${missingUnit}`])
+    return insertLines(lines, insertionIndex, [`unit: ${registryUnit ?? DEFAULT_WEIGHT_UNIT}`])
   }
 
-  if (frontmatterUnit(lines[unitLineIndex] ?? '') === null) {
-    return replaceLine(lines, unitLineIndex, `unit: ${missingUnit}`)
+  if (registryUnit) {
+    return replaceLine(lines, unitLineIndex, `unit: ${registryUnit}`)
   }
 
-  return [...lines]
+  const existingUnit = parseWeightUnit(scalarValue(lines[unitLineIndex] ?? ''))
+  if (existingUnit) {
+    return [...lines]
+  }
+
+  return replaceLine(lines, unitLineIndex, `unit: ${DEFAULT_WEIGHT_UNIT}`)
 }
 
 function repairRecentSessions(

@@ -401,9 +401,9 @@ function readExerciseNoteUnits(app: App, settings: FitKitSettings): Map<string, 
       continue
     }
 
-    const rawUnit = readFrontmatterField(frontmatter, 'unit')
-    if (rawUnit !== undefined && rawUnit !== null) {
-      units.set(normalize(file.basename), parseWeightUnit(rawUnit) ?? DEFAULT_WEIGHT_UNIT)
+    const unit = parseWeightUnit(readFrontmatterField(frontmatter, 'unit'))
+    if (unit) {
+      units.set(normalize(file.basename), unit)
     }
   }
 
