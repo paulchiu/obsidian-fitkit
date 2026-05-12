@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Sync and repair exercise notes now overwrites strength unit: frontmatter to match the registry, so changing a unit in settings reflects in charts and the dashboard after the next sync.
+- Dashboard PB lines now fall back to the registry unit when an exercise note has an invalid unit: value, instead of silently using kg.
+
 ### Removed
 
 ## [0.16.0] - 2026-05-12

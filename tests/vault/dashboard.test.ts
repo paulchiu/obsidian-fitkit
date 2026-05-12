@@ -1,7 +1,9 @@
+import type { App, TFile } from 'obsidian'
 import { describe, expect, it } from 'vitest'
 
 import type { FitKitIndex } from '../../src/domain/types'
-import { composeDashboard } from '../../src/vault/dashboard'
+import type { FitKitSettings } from '../../src/settings'
+import { composeDashboard, regenerateDashboard } from '../../src/vault/dashboard'
 
 const emptyIndex: FitKitIndex = {
   schemaVersion: 1,
@@ -40,6 +42,66 @@ const mixedIndex: FitKitIndex = {
     },
   ],
   diagnostics: [],
+}
+
+type MockMarkdownFile = {
+  path: string
+  basename: string
+  frontmatter?: Record<string, unknown>
+}
+
+function mockDashboardApp(markdownFiles: MockMarkdownFile[]): {
+  app: App
+  dashboardMarkdown: () => string
+} {
+  const frontmatterByPath = new Map(
+    markdownFiles.map((file) => [file.path, file.frontmatter] as const),
+  )
+  const dashboardFile = {
+    path: 'Fitness/Fitness Dashboard.md',
+    basename: 'Fitness Dashboard',
+  }
+  let dashboardMarkdown = ''
+
+  return {
+    app: {
+      vault: {
+        getMarkdownFiles: () => markdownFiles as unknown as TFile[],
+        getAbstractFileByPath: () => null,
+        process: async (_file: TFile, callback: (current: string) => string): Promise<string> => {
+          dashboardMarkdown = callback(dashboardMarkdown)
+          return dashboardMarkdown
+        },
+        create: async (_path: string, markdown: string): Promise<TFile> => {
+          dashboardMarkdown = markdown
+          return dashboardFile
+        },
+      },
+      metadataCache: {
+        getFileCache: (file: TFile) => ({
+          frontmatter: frontmatterByPath.get(file.path),
+        }),
+      },
+    } as unknown as App,
+    dashboardMarkdown: () => dashboardMarkdown,
+  }
+}
+
+function settingsWithRegistry(
+  exerciseRegistry: FitKitSettings['exerciseRegistry'],
+): FitKitSettings {
+  return {
+    fitnessRoot: 'Fitness',
+    autoOpenWorkoutEditor: true,
+    strengthRestTimerEnabled: true,
+    autoUpdateDashboard: true,
+    autosaveDebounceMs: 600,
+    chartSessionsWindow: 30,
+    exerciseRegistry,
+    deletedExercises: [],
+    hiddenDashboardSectionsByPath: {},
+    schemaVersion: 1,
+  }
 }
 
 describe('dashboard composer', () => {
@@ -278,6 +340,46 @@ describe('dashboard composer', () => {
     )
 
     expect(markdown).toContain('- **[[#Bench Press|Bench Press]]:** 200lbs x 5 (e1rm 233.3lbs)')
+  })
+
+  it('falls back to the registry unit when exercise note unit frontmatter is invalid', async () => {
+    const { app, dashboardMarkdown } = mockDashboardApp([
+      {
+        path: 'Fitness/Exercises/Bench Press.md',
+        basename: 'Bench Press',
+        frontmatter: { type: 'exercise', kind: 'strength', unit: 'stone' },
+      },
+    ])
+
+    await regenerateDashboard(
+      app,
+      settingsWithRegistry([{ name: 'Bench Press', kind: 'strength', unit: 'lbs', aliases: [] }]),
+      {
+        ...emptyIndex,
+        entries: [
+          {
+            path: 'Fitness/Workouts/2026-04-24.md',
+            mtime: 1,
+            date: '2026-04-24',
+            name: 'Workout',
+            exercises: [
+              {
+                exerciseName: 'Bench Press',
+                kind: 'strength',
+                bestSet: { weight: 200, reps: 5, e1rm: 233.3 },
+                maxWeightSet: { weight: 200, reps: 5 },
+                totalSets: 1,
+              },
+            ],
+          },
+        ],
+      },
+    )
+
+    expect(dashboardMarkdown()).toContain(
+      '- **[[#Bench Press|Bench Press]]:** 200lbs x 5 (e1rm 233.3lbs)',
+    )
+    expect(dashboardMarkdown()).not.toContain('200kg x 5')
   })
 
   it('renders bodyweight PBs as reps in weight metric mode', () => {

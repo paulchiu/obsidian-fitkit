@@ -10,7 +10,7 @@ import {
   type ExerciseMetric,
 } from './exercise-metric'
 import { buildNotesBlock, buildRecentSessionsBlock } from './exercise-note-template'
-import { DEFAULT_WEIGHT_UNIT, parseWeightUnit, type WeightUnit } from './weight-unit'
+import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from './weight-unit'
 
 const FENCE_OPEN = /^(`{3,})([^`]*)$/
 const LIMIT_MIN = 5
@@ -220,7 +220,7 @@ function repairFrontmatter(
         `metric: ${DEFAULT_EXERCISE_METRIC}`,
       )
     }
-    nextFrontmatterLines = repairStrengthUnit(nextFrontmatterLines, registryUnit)
+    nextFrontmatterLines = setStrengthUnitFromRegistry(nextFrontmatterLines, registryUnit)
   }
 
   const markdown = [
@@ -341,24 +341,19 @@ function frontmatterMetric(line: string): ExerciseMetric | null {
   return parseExerciseMetric(scalarValue(line))
 }
 
-function frontmatterUnit(line: string): WeightUnit | null {
-  return parseWeightUnit(scalarValue(line))
-}
-
-function repairStrengthUnit(lines: ReadonlyArray<string>, missingUnit: WeightUnit): string[] {
+function setStrengthUnitFromRegistry(
+  lines: ReadonlyArray<string>,
+  registryUnit: WeightUnit,
+): string[] {
   const unitLineIndex = findFrontmatterKeyLine(lines, 'unit')
   if (unitLineIndex < 0) {
     const metricLineIndex = findFrontmatterKeyLine(lines, 'metric')
     const kindLineIndex = findFrontmatterKeyLine(lines, 'kind')
     const insertionIndex = metricLineIndex >= 0 ? metricLineIndex + 1 : kindLineIndex + 1
-    return insertLines(lines, insertionIndex, [`unit: ${missingUnit}`])
+    return insertLines(lines, insertionIndex, [`unit: ${registryUnit}`])
   }
 
-  if (frontmatterUnit(lines[unitLineIndex] ?? '') === null) {
-    return replaceLine(lines, unitLineIndex, `unit: ${missingUnit}`)
-  }
-
-  return [...lines]
+  return replaceLine(lines, unitLineIndex, `unit: ${registryUnit}`)
 }
 
 function repairRecentSessions(

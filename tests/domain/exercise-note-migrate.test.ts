@@ -374,6 +374,25 @@ unit: lbs
     expect(second.markdown).toBe(result.markdown)
   })
 
+  it('overwrites valid strength unit frontmatter from the registry and stays idempotent', () => {
+    const source = completeStrengthNote()
+    const lbsRegistry = createRegistry([
+      { name: 'Squat', kind: 'strength', unit: 'lbs', aliases: [] },
+    ])
+
+    const result = migrate(source, { registry: lbsRegistry })
+    const second = migrate(result.markdown, { registry: lbsRegistry })
+
+    expect(result.status).toBe('updated')
+    expect(result.markdown).toContain(`type: exercise
+kind: strength
+metric: e1rm
+unit: lbs
+---`)
+    expect(result.markdown).not.toContain('unit: kg')
+    expect(second.markdown).toBe(result.markdown)
+  })
+
   it('repairs invalid strength unit frontmatter to kg', () => {
     const source = completeStrengthNote().replace('unit: kg', 'unit: stone')
 
