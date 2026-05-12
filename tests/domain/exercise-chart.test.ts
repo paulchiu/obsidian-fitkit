@@ -5,6 +5,7 @@ import {
   niceRange,
   pickXTickIndices,
 } from '../../src/domain/exercise-chart'
+import type { ChartSeries } from '../../src/domain/exercise-chart'
 import { createRegistry } from '../../src/domain/exercise-registry'
 import type { ExerciseIndexRow, FitKitIndex, IndexEntry } from '../../src/domain/types'
 import {
@@ -37,11 +38,13 @@ describe('buildExerciseChartSeries', () => {
     {
       name: 'Bench Press',
       kind: 'strength',
+      unit: 'kg',
       aliases: ['Bench', 'BB Bench'],
     },
     {
       name: 'Plank',
       kind: 'duration',
+      unit: 'kg',
       aliases: ['Front Plank'],
     },
   ])
@@ -263,7 +266,7 @@ describe('buildExerciseChartSeries', () => {
     expect(series.points[0]?.value).toBeCloseTo(133.3333333333)
   })
 
-  it('formats e1rm chart axis values and tooltips without kg', () => {
+  it('formats e1rm chart axis values and tooltips with the active unit', () => {
     const series = buildExerciseChartSeries(
       fitKitIndex([
         entry('w/2026-04-01.md', '2026-04-01', [
@@ -285,9 +288,67 @@ describe('buildExerciseChartSeries', () => {
       throw new Error('Expected chart point')
     }
 
-    expect(chartYAxisTitle(series)).toBe('e1rm')
-    expect(formatChartValue(point.value, series)).toBe('114.0')
-    expect(formatChartTooltip(point.date, point.value, series)).toBe('2026-04-01: e1rm 114.0')
+    expect(chartYAxisTitle(series)).toBe('e1rm (kg)')
+    expect(formatChartValue(point.value, series)).toBe('114.0kg')
+    expect(formatChartTooltip(point.date, point.value, series)).toBe('2026-04-01: e1rm 114.0kg')
+  })
+
+  it('uses the registry weight unit for weight and e1rm series', () => {
+    const lbsRegistry = createRegistry([
+      { name: 'Bench Press', kind: 'strength', unit: 'lbs', aliases: [] },
+    ])
+    const series = buildExerciseChartSeries(
+      fitKitIndex([
+        entry('w/2026-04-01.md', '2026-04-01', [
+          {
+            exerciseName: 'Bench Press',
+            kind: 'strength',
+            bestSet: { weight: 200, reps: 5, e1rm: 0 },
+            maxWeightSet: { weight: 200, reps: 5 },
+          },
+        ]),
+      ]),
+      lbsRegistry,
+      'Bench Press',
+      'strength',
+      30,
+      'e1rm',
+    )
+
+    expect(series.unit).toBe('lbs')
+    expect(formatChartValue(series.points[0]?.value ?? 0, series)).toBe('233.3lbs')
+  })
+
+  it('formats weight and e1rm chart values with kg and lbs suffixes', () => {
+    const baseSeries = {
+      exerciseName: 'Bench Press',
+      kind: 'strength',
+      points: [],
+      windowRequested: 30,
+      totalDates: 0,
+    } satisfies Omit<ChartSeries, 'metric' | 'unit'>
+
+    expect(formatChartValue(80, { ...baseSeries, metric: 'weight', unit: 'kg' })).toBe('80kg')
+    expect(formatChartValue(200, { ...baseSeries, metric: 'weight', unit: 'lbs' })).toBe('200lbs')
+    expect(formatChartValue(114.5, { ...baseSeries, metric: 'e1rm', unit: 'kg' })).toBe('114.5kg')
+    expect(formatChartValue(233.3, { ...baseSeries, metric: 'e1rm', unit: 'lbs' })).toBe('233.3lbs')
+  })
+
+  it('labels weight chart axes with the active unit', () => {
+    const series = buildExerciseChartSeries(
+      fitKitIndex([
+        entry('w/2026-04-01.md', '2026-04-01', [
+          { exerciseName: 'Bench Press', kind: 'strength', maxWeightSet: { weight: 200, reps: 5 } },
+        ]),
+      ]),
+      createRegistry([{ name: 'Bench Press', kind: 'strength', unit: 'lbs', aliases: [] }]),
+      'Bench Press',
+      'strength',
+      30,
+      'weight',
+    )
+
+    expect(chartYAxisTitle(series)).toBe('weight (lbs)')
   })
 
   it('breaks same-date same-value ties on lexicographic workoutPath', () => {

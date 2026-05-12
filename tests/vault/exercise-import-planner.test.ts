@@ -188,16 +188,19 @@ describe('exercise import planner', () => {
     })
     expect([...state.createdFiles.keys()]).toEqual(['Fitness/Exercises/New lift.md'])
     expect(state.createdFiles.get('Fitness/Exercises/New lift.md')).toContain('kind: strength')
+    expect(state.createdFiles.get('Fitness/Exercises/New lift.md')).toContain('unit: kg')
     expect(config.exerciseRegistry).toEqual([
-      { name: 'Deleted lift', kind: 'strength', aliases: [] },
-      { name: 'No note', kind: 'duration', aliases: [] },
+      { name: 'Deleted lift', kind: 'strength', unit: 'kg', aliases: [] },
+      { name: 'No note', kind: 'duration', unit: 'kg', aliases: [] },
     ])
     expect(config.deletedExercises).toEqual([])
   })
 
   it('creates an exercise note for a selected no-note registry entry', async () => {
     const config = settings()
-    config.exerciseRegistry = [{ name: 'Foam roll thigh', kind: 'duration', aliases: [] }]
+    config.exerciseRegistry = [
+      { name: 'Foam roll thigh', kind: 'duration', unit: 'kg', aliases: [] },
+    ]
     const { app, state } = mockApp([
       workout(
         'Fitness/Workouts/2026-05-07.md',
@@ -233,7 +236,7 @@ describe('exercise import planner', () => {
       'kind: duration',
     )
     expect(config.exerciseRegistry).toEqual([
-      { name: 'Foam roll thigh', kind: 'duration', aliases: [] },
+      { name: 'Foam roll thigh', kind: 'duration', unit: 'kg', aliases: [] },
     ])
   })
 

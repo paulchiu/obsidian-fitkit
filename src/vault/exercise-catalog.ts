@@ -1,6 +1,7 @@
 import type { App, CachedMetadata, TFile } from 'obsidian'
 
 import type { ExerciseKind } from '../domain/exercise-registry'
+import { DEFAULT_WEIGHT_UNIT, parseWeightUnit, type WeightUnit } from '../domain/weight-unit'
 import type { FitKitSettings } from '../settings'
 import { exercisesFolder, normalizeFolder } from '../settings-paths'
 
@@ -8,6 +9,7 @@ export interface ExerciseCatalogEntry {
   name: string
   path: string
   kind: ExerciseKind
+  unit: WeightUnit
 }
 
 export interface ExerciseCatalogDiagnostic {
@@ -48,6 +50,7 @@ export function readExerciseCatalog(app: App, settings: FitKitSettings): Exercis
       name: file.basename,
       path: file.path,
       kind,
+      unit: unitFromFrontmatter(frontmatter, kind),
     })
   }
 
@@ -75,6 +78,15 @@ function parseExerciseKind(value: unknown): ExerciseKind | null {
     return normalized
   }
   return null
+}
+
+function unitFromFrontmatter(
+  frontmatter: CachedMetadata['frontmatter'] | undefined,
+  kind: ExerciseKind,
+): WeightUnit {
+  return kind === 'strength'
+    ? (parseWeightUnit(readFrontmatterField(frontmatter, 'unit')) ?? DEFAULT_WEIGHT_UNIT)
+    : DEFAULT_WEIGHT_UNIT
 }
 
 function readFrontmatterField(

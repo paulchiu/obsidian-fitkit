@@ -57,7 +57,7 @@ describe('exercise registry vault merge', () => {
       {
         path: 'Fitness/Exercises/Squat.md',
         basename: 'Squat',
-        frontmatter: { type: 'exercise', kind: 'strength' },
+        frontmatter: { type: 'exercise', kind: 'strength', unit: 'lbs' },
       },
       {
         path: 'Fitness/Exercises/Plank.md',
@@ -85,6 +85,7 @@ describe('exercise registry vault merge', () => {
 
     expect(merged.map((entry) => entry.name)).toEqual(['Plank', 'Squat'])
     expect(merged.map((entry) => entry.kind)).toEqual(['duration', 'strength'])
+    expect(merged.map((entry) => entry.unit)).toEqual(['kg', 'lbs'])
   })
 
   it('preserves existing saved registry entries and aliases when a vault note also exists', () => {
@@ -97,19 +98,25 @@ describe('exercise registry vault merge', () => {
     ])
     const merged = exerciseRegistryWithVaultNotes(
       app,
-      settingsWithRegistry([{ name: 'Squat', kind: 'strength', aliases: ['back squat'] }]),
+      settingsWithRegistry([
+        { name: 'Squat', kind: 'strength', unit: 'kg', aliases: ['back squat'] },
+      ]),
     )
 
-    expect(merged).toEqual([{ name: 'Squat', kind: 'strength', aliases: ['back squat'] }])
+    expect(merged).toEqual([
+      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: ['back squat'] },
+    ])
   })
 
   it('keeps no-note registry entries', () => {
     const snapshot = buildExerciseRegistrySnapshot(
       mockApp([]),
-      settingsWithRegistry([{ name: 'Air bike', kind: 'duration', aliases: ['bike'] }]),
+      settingsWithRegistry([{ name: 'Air bike', kind: 'duration', unit: 'kg', aliases: ['bike'] }]),
     )
 
-    expect(snapshot.entries).toEqual([{ name: 'Air bike', kind: 'duration', aliases: ['bike'] }])
+    expect(snapshot.entries).toEqual([
+      { name: 'Air bike', kind: 'duration', unit: 'kg', aliases: ['bike'] },
+    ])
     expect(snapshot.diagnostics).toEqual([])
   })
 
@@ -122,11 +129,13 @@ describe('exercise registry vault merge', () => {
           frontmatter: { type: 'exercise', kind: 'duration' },
         },
       ]),
-      settingsWithRegistry([{ name: 'Plank', kind: 'strength', aliases: ['front plank'] }]),
+      settingsWithRegistry([
+        { name: 'Plank', kind: 'strength', unit: 'kg', aliases: ['front plank'] },
+      ]),
     )
 
     expect(snapshot.entries).toEqual([
-      { name: 'Plank', kind: 'duration', aliases: ['front plank'] },
+      { name: 'Plank', kind: 'duration', unit: 'kg', aliases: ['front plank'] },
     ])
     expect(snapshot.diagnostics).toEqual([
       {
@@ -157,11 +166,13 @@ describe('exercise registry vault merge', () => {
     const snapshot = buildExerciseRegistrySnapshot(
       app,
       settingsWithRegistry(
-        [{ name: 'Restored', kind: 'strength', aliases: ['again'] }],
+        [{ name: 'Restored', kind: 'strength', unit: 'kg', aliases: ['again'] }],
         ['deleted', 'restored'],
       ),
     )
 
-    expect(snapshot.entries).toEqual([{ name: 'Restored', kind: 'duration', aliases: ['again'] }])
+    expect(snapshot.entries).toEqual([
+      { name: 'Restored', kind: 'duration', unit: 'kg', aliases: ['again'] },
+    ])
   })
 })

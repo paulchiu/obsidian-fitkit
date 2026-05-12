@@ -10,10 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Dashboard now opens with a "Recent workouts" section listing the last 10 workout dates and names linked to their notes. Existing dashboards are updated when rebuilt.
+- Added per-exercise strength weight units (`kg` or `lbs`) through the registry editor and exercise-note `unit:` frontmatter, with chart and dashboard labels using the selected unit without converting stored numbers.
 
 ### Changed
 
+- Exercise chart e1rm and weight axis labels now include the active `kg` or `lbs` unit, and e1rm values render with the same unit suffix as chart ticks.
+
 ### Fixed
+
+- `Sync and repair exercise notes` now backfills missing strength `unit:` frontmatter from the registry or kg, and repairs invalid unit values from the registry or kg.
 
 ### Removed
 

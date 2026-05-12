@@ -65,6 +65,7 @@ export function buildExerciseRegistrySnapshot(
     entriesByKey.set(key, {
       name: note.name,
       kind: note.kind,
+      unit: saved?.unit ?? note.unit,
       aliases: saved ? [...saved.aliases] : [],
     })
   }
@@ -77,6 +78,7 @@ export function buildExerciseRegistrySnapshot(
     entriesByKey.set(key, {
       name: entry.name,
       kind: entry.kind,
+      unit: entry.unit,
       aliases: [...entry.aliases],
     })
   }

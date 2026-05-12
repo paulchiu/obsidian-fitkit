@@ -10,6 +10,7 @@ import {
   renameEntry,
   resolve,
   sanitizeEntryDraft,
+  unitForName,
   upsertEntry,
   validateEntryDraft,
 } from '../../src/domain/exercise-registry'
@@ -17,12 +18,14 @@ import {
 const squat: ExerciseRegistryEntry = {
   name: 'Squat',
   kind: 'strength',
+  unit: 'kg',
   aliases: ['squats', 'back squat'],
 }
 
 const plank: ExerciseRegistryEntry = {
   name: 'Plank',
   kind: 'duration',
+  unit: 'kg',
   aliases: [],
 }
 
@@ -50,6 +53,7 @@ describe('exercise registry', () => {
 
     expect(registry.entries.map((entry) => entry.name)).toEqual(['Bench Press', 'Squat'])
     expect(registry.entries.every((entry) => entry.kind === 'strength')).toBe(true)
+    expect(registry.entries.every((entry) => entry.unit === 'kg')).toBe(true)
   })
 
   it('upserts entries without mutating the input registry', () => {
@@ -74,16 +78,16 @@ describe('exercise registry', () => {
 
   it('merges fresh entries without replacing existing aliases', () => {
     const existing: ExerciseRegistryEntry[] = [
-      { name: 'Squat', kind: 'strength', aliases: ['squats'] },
+      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: ['squats'] },
     ]
     const fresh: ExerciseRegistryEntry[] = [
-      { name: 'Squat', kind: 'strength', aliases: [] },
-      { name: 'Bench Press', kind: 'strength', aliases: [] },
+      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: [] },
+      { name: 'Bench Press', kind: 'strength', unit: 'kg', aliases: [] },
     ]
 
     expect(mergeRegistries(existing, fresh)).toEqual([
-      { name: 'Squat', kind: 'strength', aliases: ['squats'] },
-      { name: 'Bench Press', kind: 'strength', aliases: [] },
+      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: ['squats'] },
+      { name: 'Bench Press', kind: 'strength', unit: 'kg', aliases: [] },
     ])
   })
 
@@ -95,10 +99,18 @@ describe('exercise registry', () => {
     expect(kindForName(registry, 'plank')).toBe('duration')
   })
 
+  it('returns the unit for an exact match and aliases', () => {
+    const registry = createRegistry([{ ...squat, unit: 'lbs' }])
+
+    expect(unitForName(registry, 'Squat')).toBe('lbs')
+    expect(unitForName(registry, 'back squat')).toBe('lbs')
+  })
+
   it('returns null for unknown or ambiguous names', () => {
     const otherSquat: ExerciseRegistryEntry = {
       name: 'Front Squat',
       kind: 'strength',
+      unit: 'kg',
       aliases: ['squats'],
     }
     const registry = createRegistry([squat, otherSquat])
@@ -109,12 +121,14 @@ describe('exercise registry', () => {
 
   it('merges fresh entries case-insensitively', () => {
     const existing: ExerciseRegistryEntry[] = [
-      { name: 'squat', kind: 'strength', aliases: ['squats'] },
+      { name: 'squat', kind: 'strength', unit: 'kg', aliases: ['squats'] },
     ]
-    const fresh: ExerciseRegistryEntry[] = [{ name: 'Squat', kind: 'strength', aliases: [] }]
+    const fresh: ExerciseRegistryEntry[] = [
+      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: [] },
+    ]
 
     expect(mergeRegistries(existing, fresh)).toEqual([
-      { name: 'squat', kind: 'strength', aliases: ['squats'] },
+      { name: 'squat', kind: 'strength', unit: 'kg', aliases: ['squats'] },
     ])
   })
 })
@@ -124,6 +138,7 @@ describe('sanitizeEntryDraft', () => {
     const result = sanitizeEntryDraft({
       name: '  Squat  ',
       kind: 'strength',
+      unit: 'kg',
       aliases: ['  Back Squat  ', ' BB Squat '],
     })
 
@@ -135,6 +150,7 @@ describe('sanitizeEntryDraft', () => {
     const result = sanitizeEntryDraft({
       name: 'Squat',
       kind: 'strength',
+      unit: 'kg',
       aliases: ['Back Squat', '   ', '', 'BB Squat'],
     })
 
@@ -145,6 +161,7 @@ describe('sanitizeEntryDraft', () => {
     const result = sanitizeEntryDraft({
       name: 'Squat',
       kind: 'strength',
+      unit: 'kg',
       aliases: ['Back Squat', 'back squat', 'BACK SQUAT'],
     })
 
@@ -155,6 +172,7 @@ describe('sanitizeEntryDraft', () => {
     const result = sanitizeEntryDraft({
       name: 'Squat',
       kind: 'strength',
+      unit: 'kg',
       aliases: ['squat', '  Squat ', 'Back Squat'],
     })
 
@@ -165,6 +183,7 @@ describe('sanitizeEntryDraft', () => {
     const draft = {
       name: '  Squat  ',
       kind: 'strength' as const,
+      unit: 'kg' as const,
       aliases: ['Back Squat', 'back squat', '', 'BB Squat'],
     }
     const once = sanitizeEntryDraft(draft)
@@ -176,14 +195,15 @@ describe('sanitizeEntryDraft', () => {
 
 describe('validateEntryDraft', () => {
   const registry = createRegistry([
-    { name: 'Squat', kind: 'strength', aliases: ['Back Squat', 'BB Squat'] },
-    { name: 'Plank', kind: 'duration', aliases: [] },
+    { name: 'Squat', kind: 'strength', unit: 'kg', aliases: ['Back Squat', 'BB Squat'] },
+    { name: 'Plank', kind: 'duration', unit: 'kg', aliases: [] },
   ])
 
   it('returns [] for a valid draft', () => {
     const errors = validateEntryDraft(registry, {
       name: 'Bench Press',
       kind: 'strength',
+      unit: 'kg',
       aliases: ['Bench'],
     })
     expect(errors).toEqual([])
@@ -193,6 +213,7 @@ describe('validateEntryDraft', () => {
     const errors = validateEntryDraft(registry, {
       name: '   ',
       kind: 'strength',
+      unit: 'kg',
       aliases: [],
     })
     expect(errors).toEqual([{ field: 'name', message: 'Name cannot be empty.' }])
@@ -202,6 +223,7 @@ describe('validateEntryDraft', () => {
     const errors = validateEntryDraft(registry, {
       name: 'plank',
       kind: 'duration',
+      unit: 'kg',
       aliases: [],
     })
     expect(errors).toEqual([
@@ -213,6 +235,7 @@ describe('validateEntryDraft', () => {
     const errors = validateEntryDraft(registry, {
       name: 'back squat',
       kind: 'strength',
+      unit: 'kg',
       aliases: [],
     })
     expect(errors).toEqual([
@@ -224,6 +247,7 @@ describe('validateEntryDraft', () => {
     const errors = validateEntryDraft(registry, {
       name: 'Front Squat',
       kind: 'strength',
+      unit: 'kg',
       aliases: ['plank'],
     })
     expect(errors).toEqual([
@@ -235,6 +259,7 @@ describe('validateEntryDraft', () => {
     const errors = validateEntryDraft(registry, {
       name: 'Front Squat',
       kind: 'strength',
+      unit: 'kg',
       aliases: ['BB Squat'],
     })
     expect(errors).toEqual([
@@ -250,6 +275,7 @@ describe('validateEntryDraft', () => {
     const errors = validateEntryDraft(registry, {
       name: '!!!',
       kind: 'strength',
+      unit: 'kg',
       aliases: [],
     })
     expect(errors).toEqual([{ field: 'name', message: 'Name must contain a letter or number.' }])
@@ -258,7 +284,7 @@ describe('validateEntryDraft', () => {
   it('allows self-collision in edit mode via excludeOriginalName', () => {
     const errors = validateEntryDraft(
       registry,
-      { name: 'Squat', kind: 'strength', aliases: ['Back Squat'] },
+      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: ['Back Squat'] },
       { excludeOriginalName: 'Squat' },
     )
     expect(errors).toEqual([])
@@ -268,6 +294,7 @@ describe('validateEntryDraft', () => {
     const errors = validateEntryDraft(registry, {
       name: 'Front Squat',
       kind: 'strength',
+      unit: 'kg',
       aliases: ['front squat'],
     })
     expect(errors).toEqual([])
@@ -277,6 +304,7 @@ describe('validateEntryDraft', () => {
     const errors = validateEntryDraft(registry, {
       name: 'squat!',
       kind: 'strength',
+      unit: 'kg',
       aliases: [],
     })
     expect(errors).toHaveLength(1)
@@ -287,14 +315,15 @@ describe('validateEntryDraft', () => {
 describe('renameEntry', () => {
   const baseRegistry = (): ExerciseRegistry =>
     createRegistry([
-      { name: 'Squat', kind: 'strength', aliases: ['Back Squat'] },
-      { name: 'Plank', kind: 'duration', aliases: [] },
+      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: ['Back Squat'] },
+      { name: 'Plank', kind: 'duration', unit: 'kg', aliases: [] },
     ])
 
   it('updates kind and aliases without renaming', () => {
     const next = renameEntry(baseRegistry(), 'Plank', {
       name: 'Plank',
       kind: 'strength',
+      unit: 'kg',
       aliases: ['Forearm Plank'],
     })
     const entry = next.entries.find((row) => row.name === 'Plank')
@@ -307,6 +336,7 @@ describe('renameEntry', () => {
     const next = renameEntry(baseRegistry(), 'Squat ', {
       name: 'Squat',
       kind: 'strength',
+      unit: 'kg',
       aliases: ['Back Squat'],
     })
     const entry = next.entries.find((row) => row.name === 'Squat')
@@ -317,6 +347,7 @@ describe('renameEntry', () => {
     const next = renameEntry(baseRegistry(), 'Squat', {
       name: 'Back Squat',
       kind: 'strength',
+      unit: 'kg',
       aliases: [],
     })
     const entry = next.entries.find((row) => row.name === 'Back Squat')
@@ -328,6 +359,7 @@ describe('renameEntry', () => {
     const next = renameEntry(baseRegistry(), 'Squat', {
       name: 'Front Squat',
       kind: 'strength',
+      unit: 'kg',
       aliases: ['Squat', 'Back Squat'],
     })
     const entry = next.entries.find((row) => row.name === 'Front Squat')
@@ -338,6 +370,7 @@ describe('renameEntry', () => {
     const next = renameEntry(baseRegistry(), 'Back Squat', {
       name: 'Front Squat',
       kind: 'strength',
+      unit: 'kg',
       aliases: ['back squat ', 'Low Bar'],
     })
     const entry = next.entries.find((row) => row.name === 'Front Squat')
@@ -348,6 +381,7 @@ describe('renameEntry', () => {
     const next = renameEntry(baseRegistry(), 'Squat', {
       name: 'Front Squat',
       kind: 'strength',
+      unit: 'kg',
       aliases: ['front squat', 'Low Bar'],
     })
     const entry = next.entries.find((row) => row.name === 'Front Squat')
@@ -358,6 +392,7 @@ describe('renameEntry', () => {
     const next = renameEntry(baseRegistry(), 'Squat', {
       name: 'Back Squat',
       kind: 'strength',
+      unit: 'kg',
       aliases: [],
     })
     const result = resolve(next, 'Squat')

@@ -1,7 +1,14 @@
 import { epleyE1rm } from './epley'
 import { DEFAULT_EXERCISE_METRIC, type ExerciseMetric } from './exercise-metric'
-import { normalize, resolve, type ExerciseKind, type ExerciseRegistry } from './exercise-registry'
+import {
+  normalize,
+  resolve,
+  unitForName,
+  type ExerciseKind,
+  type ExerciseRegistry,
+} from './exercise-registry'
 import type { FitKitIndex } from './types'
+import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from './weight-unit'
 
 export type ChartSeriesMetric = ExerciseMetric | 'duration' | 'reps'
 
@@ -15,7 +22,7 @@ export interface ChartSeries {
   exerciseName: string
   kind: ExerciseKind
   metric: ChartSeriesMetric
-  unit: 'kg' | 's' | 'reps'
+  unit: WeightUnit | 's' | 'reps'
   points: ChartPoint[]
   windowRequested: number
   totalDates: number
@@ -28,8 +35,10 @@ export function buildExerciseChartSeries(
   kind: ExerciseKind,
   window: number,
   metric: ExerciseMetric = DEFAULT_EXERCISE_METRIC,
+  weightUnit: WeightUnit | null = null,
 ): ChartSeries {
   const matchKeys = buildMatchKeys(registry, exerciseName)
+  const activeWeightUnit = weightUnit ?? unitForName(registry, exerciseName) ?? DEFAULT_WEIGHT_UNIT
   let seriesMetric: ChartSeriesMetric = kind === 'duration' ? 'duration' : metric
   let ordered = collectPoints(index, matchKeys, kind, seriesMetric)
 
@@ -50,7 +59,7 @@ export function buildExerciseChartSeries(
     exerciseName,
     kind,
     metric: seriesMetric,
-    unit: unitForMetric(seriesMetric),
+    unit: unitForMetric(seriesMetric, activeWeightUnit),
     points: sliced,
     windowRequested: safeWindow,
     totalDates,
@@ -91,14 +100,14 @@ function collectPoints(
   return [...buckets.values()].sort((left, right) => compareByDate(left, right))
 }
 
-function unitForMetric(metric: ChartSeriesMetric): ChartSeries['unit'] {
+function unitForMetric(metric: ChartSeriesMetric, weightUnit: WeightUnit): ChartSeries['unit'] {
   if (metric === 'duration') {
     return 's'
   }
   if (metric === 'reps') {
     return 'reps'
   }
-  return 'kg'
+  return weightUnit
 }
 
 function buildMatchKeys(registry: ExerciseRegistry, exerciseName: string): Set<string> {

@@ -228,7 +228,10 @@ export function formatChartTooltip(date: string, value: number, series: ChartSer
 
 export function chartYAxisTitle(series: ChartSeries): string | null {
   if (series.metric === 'e1rm') {
-    return 'e1rm'
+    return `e1rm (${series.unit})`
+  }
+  if (series.metric === 'weight' && (series.unit === 'kg' || series.unit === 'lbs')) {
+    return `weight (${series.unit})`
   }
   if (series.metric === 'reps') {
     return 'reps'
@@ -238,10 +241,10 @@ export function chartYAxisTitle(series: ChartSeries): string | null {
 
 export function formatChartValue(value: number, series: ChartSeries): string {
   if (series.metric === 'e1rm') {
-    return value.toFixed(1)
+    return `${value.toFixed(1)}${series.unit}`
   }
-  if (series.unit === 'kg') {
-    return `${formatNumber(value)}kg`
+  if (series.metric === 'weight' && (series.unit === 'kg' || series.unit === 'lbs')) {
+    return `${formatNumber(value)}${series.unit}`
   }
   if (series.unit === 'reps') {
     const formatted = formatNumber(value)

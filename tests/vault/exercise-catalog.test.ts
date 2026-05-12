@@ -52,7 +52,7 @@ describe('exercise catalog', () => {
         {
           path: 'Fitness/Exercises/Squat.md',
           basename: 'Squat',
-          frontmatter: { type: ' exercise ', kind: 'strength' },
+          frontmatter: { type: ' exercise ', kind: 'strength', unit: 'LBS' },
         },
         {
           path: 'Fitness/Exercises/Workout draft.md',
@@ -74,7 +74,7 @@ describe('exercise catalog', () => {
     )
 
     expect(snapshot.entries).toEqual([
-      { name: 'Squat', path: 'Fitness/Exercises/Squat.md', kind: 'strength' },
+      { name: 'Squat', path: 'Fitness/Exercises/Squat.md', kind: 'strength', unit: 'lbs' },
     ])
     expect(snapshot.diagnostics).toEqual([])
   })
@@ -97,8 +97,8 @@ describe('exercise catalog', () => {
     )
 
     expect(snapshot.entries).toEqual([
-      { name: 'Plank', path: 'Fitness/Exercises/Plank.md', kind: 'duration' },
-      { name: 'Squat', path: 'Fitness/Exercises/Squat.md', kind: 'strength' },
+      { name: 'Plank', path: 'Fitness/Exercises/Plank.md', kind: 'duration', unit: 'kg' },
+      { name: 'Squat', path: 'Fitness/Exercises/Squat.md', kind: 'strength', unit: 'kg' },
     ])
   })
 

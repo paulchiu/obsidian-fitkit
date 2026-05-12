@@ -32,6 +32,7 @@ describe('exercise-note composer', () => {
         'type: exercise',
         'kind: strength',
         'metric: e1rm',
+        'unit: kg',
         '---',
         '',
         '## Progress chart',
@@ -60,6 +61,13 @@ describe('exercise-note composer', () => {
         '',
       ].join('\n'),
     )
+  })
+
+  it('seeds a strength exercise note with a registry-derived lbs unit', () => {
+    const markdown = composeExerciseNote('Bench', 'strength', 'Fitness/Workouts', 'lbs')
+
+    expect(markdown).toContain('unit: lbs')
+    expect(markdown).not.toContain('unit: kg')
   })
 
   it('seeds a duration exercise note with the duration query and the same Notes block', () => {

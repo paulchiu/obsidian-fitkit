@@ -12,6 +12,7 @@ import {
   upsertEntry,
   type ExerciseRegistryEntry,
 } from '../domain/exercise-registry'
+import { DEFAULT_WEIGHT_UNIT } from '../domain/weight-unit'
 import {
   parseWorkoutNote,
   serializeWorkoutNote,
@@ -913,7 +914,7 @@ export class WorkoutEditorView extends ItemView {
     const existing = current.entries.find((entry) => entry.name === trimmed)
     const nextEntry: ExerciseRegistryEntry = existing
       ? { ...existing, aliases: [...existing.aliases], kind: nextKind }
-      : { name: trimmed, kind: nextKind, aliases: [] }
+      : { name: trimmed, kind: nextKind, unit: DEFAULT_WEIGHT_UNIT, aliases: [] }
     const updated = upsertEntry(current, nextEntry)
     settings.exerciseRegistry = updated.entries
     await this.plugin.saveSettings()
@@ -1365,6 +1366,7 @@ export class WorkoutEditorView extends ItemView {
         this.plugin.settings.exerciseRegistry = upsertEntry(registry, {
           name,
           kind,
+          unit: DEFAULT_WEIGHT_UNIT,
           aliases: [],
         }).entries
         settingsChanged = true

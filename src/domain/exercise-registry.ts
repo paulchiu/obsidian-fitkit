@@ -3,11 +3,14 @@
  * NFC, lower, trim, strip edge punctuation, collapse internal whitespace.
  */
 
+import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from './weight-unit'
+
 export type ExerciseKind = 'strength' | 'duration'
 
 export type ExerciseRegistryEntry = {
   name: string
   kind: ExerciseKind
+  unit: WeightUnit
   aliases: string[]
 }
 
@@ -50,6 +53,7 @@ function cloneEntry(entry: ExerciseRegistryEntry): ExerciseRegistryEntry {
   return {
     name: entry.name,
     kind: entry.kind,
+    unit: entry.unit,
     aliases: [...entry.aliases],
   }
 }
@@ -87,6 +91,11 @@ function buildIndex(registry: ExerciseRegistry): Map<string, ExerciseRegistryEnt
 export function kindForName(registry: ExerciseRegistry, rawName: string): ExerciseKind | null {
   const result = resolve(registry, rawName)
   return result.kind === 'match' ? result.entry.kind : null
+}
+
+export function unitForName(registry: ExerciseRegistry, rawName: string): WeightUnit | null {
+  const result = resolve(registry, rawName)
+  return result.kind === 'match' ? result.entry.unit : null
 }
 
 export function resolve(registry: ExerciseRegistry, rawName: string): ResolutionResult {
@@ -151,6 +160,7 @@ export function bootstrapFromStems(
   const entries: ExerciseRegistryEntry[] = stems.map((stem) => ({
     name: stem,
     kind: durationSet.has(normalize(stem)) ? 'duration' : 'strength',
+    unit: DEFAULT_WEIGHT_UNIT,
     aliases: [],
   }))
   entries.sort((left, right) => left.name.localeCompare(right.name))
@@ -160,6 +170,7 @@ export function bootstrapFromStems(
 export type RegistryEntryDraft = {
   name: string
   kind: ExerciseKind
+  unit: WeightUnit
   aliases: string[]
 }
 
@@ -198,7 +209,7 @@ export function sanitizeEntryDraft(draft: RegistryEntryDraft): RegistryEntryDraf
     seen.add(key)
     aliases.push(trimmed)
   }
-  return { name, kind: draft.kind, aliases }
+  return { name, kind: draft.kind, unit: draft.unit, aliases }
 }
 
 /**
@@ -306,6 +317,7 @@ export function renameEntry(
   return upsertEntry(without, {
     name: next.name,
     kind: next.kind,
+    unit: next.unit,
     aliases: dedupedAliases,
   })
 }

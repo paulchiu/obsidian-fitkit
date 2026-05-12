@@ -131,7 +131,7 @@ Durations are stored as seconds. Fenced code blocks are reporting surfaces, not 
 - SQL/WASM analytics are not implemented.
 - A custom fenced source format is not implemented.
 - Repeat-last-workout is not implemented.
-- Per-exercise unit overrides and multi-unit support are not implemented.
+- Strength exercises can use a per-exercise weight unit (`kg` or `lbs`) from the exercise registry editor or `unit:` frontmatter. It defaults to kg and only changes labels, with no numeric conversion.
 
 ## Development
 

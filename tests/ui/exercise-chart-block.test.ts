@@ -185,7 +185,7 @@ describe('exercise chart block rendering', () => {
       [file],
       new Map([[file.path, { type: 'exercise' }]]),
       createSettings({
-        exerciseRegistry: [{ name: 'Plank', kind: 'duration', aliases: [] }],
+        exerciseRegistry: [{ name: 'Plank', kind: 'duration', unit: 'kg', aliases: [] }],
       }),
     )
 
@@ -199,13 +199,30 @@ describe('exercise chart block rendering', () => {
     expect(renderedNotes()).toEqual([])
   })
 
+  it('uses exercise note unit frontmatter for strength charts', async () => {
+    const file = new TFile('Fitness/Exercises/Bench Press.md')
+    const plugin = createPlugin(
+      [file],
+      new Map([[file.path, { type: 'exercise', kind: 'strength', unit: 'lbs' }]]),
+    )
+
+    await renderExerciseChartBlock(
+      plugin,
+      '',
+      new TestElement('div') as unknown as HTMLElement,
+      createContext(file.path),
+    )
+
+    expect(renderedSeries().unit).toBe('lbs')
+  })
+
   it('shows an invalid kind note when the registry resolves the exercise to duration', async () => {
     const file = new TFile('Fitness/Exercises/Plank.md')
     const plugin = createPlugin(
       [file],
       new Map([[file.path, { type: 'exercise', kind: 'cardio' }]]),
       createSettings({
-        exerciseRegistry: [{ name: 'Plank', kind: 'duration', aliases: [] }],
+        exerciseRegistry: [{ name: 'Plank', kind: 'duration', unit: 'kg', aliases: [] }],
       }),
     )
 

@@ -463,7 +463,12 @@ interface PersistUnknownExerciseView {
   plugin: {
     settings: {
       fitnessRoot: string
-      exerciseRegistry: { name: string; kind: 'strength' | 'duration'; aliases: string[] }[]
+      exerciseRegistry: {
+        name: string
+        kind: 'strength' | 'duration'
+        unit: 'kg' | 'lbs'
+        aliases: string[]
+      }[]
       deletedExercises?: string[]
     }
     saveSettings: ReturnType<typeof vi.fn>
