@@ -12,13 +12,7 @@ import {
   type ExerciseRegistry,
 } from '../domain/exercise-registry'
 import { DEFAULT_WEIGHT_UNIT, parseWeightUnit, type WeightUnit } from '../domain/weight-unit'
-import type {
-  BestSet,
-  ExerciseIndexRow,
-  FitKitIndex,
-  IndexEntry,
-  WeightSet,
-} from '../domain/types'
+import type { BestSet, ExerciseIndexRow, FitKitIndex, IndexEntry, WeightSet } from '../domain/types'
 import type { FitKitSettings } from '../settings'
 import { dashboardPath, exercisesFolder, normalizeFolder, workoutsFolder } from '../settings-paths'
 import { exerciseRegistryWithVaultNotes } from './exercise-registry-vault'
@@ -283,14 +277,14 @@ function formatDashboardSet(set: StrengthPbSet, metric: ExerciseMetric, unit: We
   if (metric === 'weight') {
     return topSet
   }
-  return `${topSet} (e1rm ${(set.e1rm ?? 0).toFixed(1)} ${unit})`
+  return `${topSet} (e1rm ${(set.e1rm ?? 0).toFixed(1)}${unit})`
 }
 
 function formatStrengthSet(set: StrengthPbSet, unit: WeightUnit): string {
   if (set.weight === 0) {
     return formatReps(set.reps)
   }
-  return `${set.weight} ${unit} x ${set.reps}`
+  return `${set.weight}${unit} x ${set.reps}`
 }
 
 function formatReps(reps: number): string {

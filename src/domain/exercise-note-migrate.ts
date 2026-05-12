@@ -355,7 +355,7 @@ function repairStrengthUnit(lines: ReadonlyArray<string>, missingUnit: WeightUni
   }
 
   if (frontmatterUnit(lines[unitLineIndex] ?? '') === null) {
-    return replaceLine(lines, unitLineIndex, `unit: ${DEFAULT_WEIGHT_UNIT}`)
+    return replaceLine(lines, unitLineIndex, `unit: ${missingUnit}`)
   }
 
   return [...lines]

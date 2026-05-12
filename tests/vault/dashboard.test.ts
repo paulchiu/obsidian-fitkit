@@ -150,8 +150,8 @@ describe('dashboard composer', () => {
       new Set(),
     )
 
-    expect(markdown).toContain('50 kg x 20')
-    expect(markdown).toContain('e1rm 73.3 kg')
+    expect(markdown).toContain('50kg x 20')
+    expect(markdown).toContain('e1rm 73.3kg')
     expect(markdown).toContain('total 120s across 1 session')
     expect(markdown).toContain('duration + "s" as Duration')
   })
@@ -198,7 +198,7 @@ describe('dashboard composer', () => {
       new Set(),
     )
 
-    expect(markdown).toContain('- **[[#Bench Press|Bench Press]]:** 90 kg x 10 (e1rm 120.0 kg)')
+    expect(markdown).toContain('- **[[#Bench Press|Bench Press]]:** 90kg x 10 (e1rm 120.0kg)')
   })
 
   it('honors weight metric by ranking the heaviest set and omitting e1rm', () => {
@@ -244,7 +244,7 @@ describe('dashboard composer', () => {
       new Map([['Bench Press', 'weight'] as const]),
     )
 
-    expect(markdown).toContain('- **[[#Bench Press|Bench Press]]:** 105 kg x 3')
+    expect(markdown).toContain('- **[[#Bench Press|Bench Press]]:** 105kg x 3')
     expect(markdown).not.toContain('e1rm')
   })
 
@@ -277,7 +277,7 @@ describe('dashboard composer', () => {
       new Map([['Bench Press', 'lbs'] as const]),
     )
 
-    expect(markdown).toContain('- **[[#Bench Press|Bench Press]]:** 200 lbs x 5 (e1rm 233.3 lbs)')
+    expect(markdown).toContain('- **[[#Bench Press|Bench Press]]:** 200lbs x 5 (e1rm 233.3lbs)')
   })
 
   it('renders bodyweight PBs as reps in weight metric mode', () => {
@@ -308,7 +308,7 @@ describe('dashboard composer', () => {
     )
 
     expect(markdown).toContain('- **[[#Push-up|Push-up]]:** 12 reps')
-    expect(markdown).not.toContain('0 kg x 12')
+    expect(markdown).not.toContain('0kg x 12')
   })
 
   it('ranks bodyweight PBs by reps in weight metric mode', () => {
@@ -364,7 +364,7 @@ describe('dashboard composer', () => {
       new Set(),
     )
 
-    expect(markdown).toContain('- **[[#Squat|Squat]]:** 50 kg x 20')
+    expect(markdown).toContain('- **[[#Squat|Squat]]:** 50kg x 20')
     expect(markdown).toContain('- **[[#Plank|Plank]]:** total 120s across 1 session')
   })
 

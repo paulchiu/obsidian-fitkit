@@ -384,7 +384,7 @@ export class FitKitSettingTab extends PluginSettingTab {
     const tr = table.createEl('tr')
     tr.createEl('td', { text: entry.name })
     tr.createEl('td', { text: entry.kind })
-    tr.createEl('td', { text: entry.unit })
+    tr.createEl('td', { text: entry.kind === 'strength' ? entry.unit : '' })
 
     const aliasCell = tr.createEl('td')
     if (entry.aliases.length === 0) {

@@ -27,6 +27,7 @@ export class ExerciseRegistryEntryModal extends Modal {
   private aliasesText: string
   private nameInput!: HTMLInputElement
   private kindSelect!: HTMLSelectElement
+  private unitField!: HTMLDivElement
   private unitSelect!: HTMLSelectElement
   private aliasesTextarea!: HTMLTextAreaElement
   private saveButton!: HTMLButtonElement
@@ -81,11 +82,12 @@ export class ExerciseRegistryEntryModal extends Modal {
     this.kindSelect.value = this.exerciseKind
     this.kindSelect.addEventListener('change', () => {
       this.exerciseKind = this.kindSelect.value === 'duration' ? 'duration' : 'strength'
+      this.refreshUnitVisibility()
     })
 
-    const unitField = contentEl.createDiv({ cls: 'fitkit-registry-field' })
-    unitField.createEl('label', { text: 'Unit', cls: 'fitkit-registry-field-label' })
-    this.unitSelect = unitField.createEl('select', { cls: 'fitkit-registry-select' })
+    this.unitField = contentEl.createDiv({ cls: 'fitkit-registry-field' })
+    this.unitField.createEl('label', { text: 'Unit', cls: 'fitkit-registry-field-label' })
+    this.unitSelect = this.unitField.createEl('select', { cls: 'fitkit-registry-select' })
     // eslint-disable-next-line obsidianmd/ui/sentence-case -- Unit symbols use lowercase labels.
     this.unitSelect.createEl('option', { value: 'kg', text: 'kg' })
     // eslint-disable-next-line obsidianmd/ui/sentence-case -- Unit symbols use lowercase labels.
@@ -94,6 +96,7 @@ export class ExerciseRegistryEntryModal extends Modal {
     this.unitSelect.addEventListener('change', () => {
       this.weightUnit = this.unitSelect.value === 'lbs' ? 'lbs' : 'kg'
     })
+    this.refreshUnitVisibility()
 
     const aliasField = contentEl.createDiv({ cls: 'fitkit-registry-field' })
     aliasField.createEl('label', {
@@ -141,6 +144,10 @@ export class ExerciseRegistryEntryModal extends Modal {
 
   private excludeOriginalName(): string | undefined {
     return this.mode.kind === 'edit' ? this.mode.original.name : undefined
+  }
+
+  private refreshUnitVisibility(): void {
+    this.unitField.hidden = this.exerciseKind === 'duration'
   }
 
   private refreshValidation(): void {

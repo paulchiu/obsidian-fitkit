@@ -14,9 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Exercise chart e1rm and weight axis labels now include the active `kg` or `lbs` unit, and e1rm values render with the same unit suffix as chart ticks.
+
 ### Fixed
 
-- `Sync and repair exercise notes` now backfills missing strength `unit:` frontmatter from the registry or kg, and repairs invalid unit values to kg.
+- `Sync and repair exercise notes` now backfills missing strength `unit:` frontmatter from the registry or kg, and repairs invalid unit values from the registry or kg.
 
 ### Removed
 

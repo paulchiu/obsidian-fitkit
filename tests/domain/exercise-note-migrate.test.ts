@@ -387,6 +387,22 @@ unit: kg
 ---`)
   })
 
+  it('repairs invalid strength unit frontmatter from the registry unit', () => {
+    const source = completeStrengthNote().replace('unit: kg', 'unit: stone')
+    const lbsRegistry = createRegistry([
+      { name: 'Squat', kind: 'strength', unit: 'lbs', aliases: [] },
+    ])
+
+    const result = migrate(source, { registry: lbsRegistry })
+
+    expect(result.status).toBe('updated')
+    expect(result.markdown).toContain(`type: exercise
+kind: strength
+metric: e1rm
+unit: lbs
+---`)
+  })
+
   it('repairs invalid strength metric frontmatter to the default', () => {
     const source = completeStrengthNote().replace('metric: e1rm', 'metric: pace')
 
