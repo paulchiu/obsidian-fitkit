@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.16.0] - 2026-05-12
+
+### Added
+
 - Dashboard now opens with a "Recent workouts" section listing the last 10 workout dates and names linked to their notes. Existing dashboards are updated when rebuilt.
 - Added per-exercise strength weight units (`kg` or `lbs`) through the registry editor and exercise-note `unit:` frontmatter, with chart and dashboard labels using the selected unit without converting stored numbers.
 
