@@ -357,6 +357,31 @@ unit: kg
     expect(result.markdown).toContain('WHERE L.exercise = link("Plank") AND L.set')
   })
 
+  it('preserves valid strength unit frontmatter when a duration registry entry conflicts', () => {
+    const source = completeStrengthNoteFor('Plank', 'lbs')
+    const durationRegistry = createRegistry([
+      { name: 'Plank', kind: 'duration', unit: 'kg', aliases: [] },
+    ])
+
+    const result = migrate(source, { name: 'Plank', registry: durationRegistry })
+    const second = migrate(result.markdown, { name: 'Plank', registry: durationRegistry })
+
+    expect(result.status).toBe('already')
+    expect(result.changed).toBe(false)
+    expect(result.markdown).toContain(`type: exercise
+kind: strength
+metric: e1rm
+unit: lbs
+---`)
+    expect(result.markdown).not.toContain('unit: kg')
+    expect(result.warnings).toContainEqual({
+      kind: 'registry-kind-conflict',
+      noteKind: 'strength',
+      registryKind: 'duration',
+    })
+    expect(second.markdown).toBe(result.markdown)
+  })
+
   it('leaves an existing metric key unchanged', () => {
     const source = completeStrengthNote().replace('metric: e1rm', 'metric: weight')
 
@@ -398,6 +423,23 @@ unit: lbs
 ---`)
     expect(result.markdown).not.toContain('unit: kg')
     expect(second.markdown).toBe(result.markdown)
+  })
+
+  it('updates strength unit frontmatter from a matching strength registry entry', () => {
+    const source = completeStrengthNoteFor('Bench', 'kg')
+    const benchRegistry = createRegistry([
+      { name: 'Bench', kind: 'strength', unit: 'lbs', aliases: [] },
+    ])
+
+    const result = migrate(source, { name: 'Bench', registry: benchRegistry })
+
+    expect(result.status).toBe('updated')
+    expect(result.markdown).toContain(`type: exercise
+kind: strength
+metric: e1rm
+unit: lbs
+---`)
+    expect(result.markdown).not.toContain('unit: kg')
   })
 
   it('preserves valid strength unit frontmatter without a registry match and stays idempotent', () => {

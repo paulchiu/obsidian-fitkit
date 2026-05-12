@@ -122,7 +122,7 @@ function repairFrontmatter(
   options: ExerciseNoteMigrationOptions,
 ): FrontmatterRepairResult {
   const registryKind = kindForName(options.registry, options.name)
-  const registryUnit = unitForName(options.registry, options.name)
+  const registryUnit = strengthUnitForName(options.registry, options.name)
   const bounds = findFrontmatterBounds(source)
   if (bounds.status === 'malformed') {
     return {
@@ -236,6 +236,13 @@ function repairFrontmatter(
     warnings,
     skippedStatus: null,
   }
+}
+
+function strengthUnitForName(registry: ExerciseRegistry, name: string): WeightUnit | null {
+  if (kindForName(registry, name) !== 'strength') {
+    return null
+  }
+  return unitForName(registry, name)
 }
 
 function frontmatterBlock(
