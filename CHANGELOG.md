@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Deleted exercises no longer appear in the add-exercise suggestion list in the workout editor.
+
 ### Removed
 
 ## [0.16.1] - 2026-05-12

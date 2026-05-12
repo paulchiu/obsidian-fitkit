@@ -12,6 +12,7 @@ import {
   upsertEntry,
   type ExerciseRegistryEntry,
 } from '../domain/exercise-registry'
+import { filterSuggestableNames } from '../domain/exercise-suggestions'
 import { DEFAULT_WEIGHT_UNIT } from '../domain/weight-unit'
 import {
   parseWorkoutNote,
@@ -1444,6 +1445,9 @@ export class WorkoutEditorView extends ItemView {
     const files = this.app.vault.getMarkdownFiles()
     const exerciseFolder = exercisesFolder(this.plugin.settings)
     const workoutFolder = workoutsFolder(this.plugin.settings)
+    const registryKeys = new Set(
+      this.plugin.settings.exerciseRegistry.map((entry) => normalize(entry.name)),
+    )
 
     for (const file of files) {
       if (isInFolder(file.path, exerciseFolder)) {
@@ -1470,7 +1474,11 @@ export class WorkoutEditorView extends ItemView {
       }
     }
 
-    return Array.from(names).sort((a, b) => a.localeCompare(b))
+    return filterSuggestableNames(
+      Array.from(names),
+      this.plugin.settings.deletedExercises ?? [],
+      registryKeys,
+    ).sort((a, b) => a.localeCompare(b))
   }
 
   private markDirty(): void {
