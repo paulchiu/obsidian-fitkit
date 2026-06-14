@@ -630,6 +630,7 @@ export class WorkoutEditorView extends ItemView {
       attr: {
         type: 'text',
         inputmode: 'text',
+        // eslint-disable-next-line obsidianmd/ui/sentence-case -- "0s" is a duration placeholder; "s" is the seconds unit symbol.
         placeholder: '0s',
       },
     })
@@ -984,12 +985,12 @@ export class WorkoutEditorView extends ItemView {
   private focusRowCell(exerciseIndex: number, rowIndex: number, label: string): void {
     const cards = this.contentEl.querySelectorAll('.fitkit-exercise-list > .fitkit-card')
     const card = cards.item(exerciseIndex)
-    if (!(card instanceof HTMLElement)) {
+    if (!card?.instanceOf(HTMLElement)) {
       return
     }
     const rows = card.querySelectorAll('.fitkit-set-area > .fitkit-row')
     const row = rows.item(rowIndex)
-    if (!(row instanceof HTMLElement)) {
+    if (!row?.instanceOf(HTMLElement)) {
       return
     }
     const selector = `.fitkit-cell[data-label="${label}"] input.fitkit-input`
