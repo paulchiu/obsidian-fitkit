@@ -24,6 +24,7 @@ export type ExerciseFilePlan =
       kind: 'open'
       path: string
       sourcePath: string
+      name: string
     }
   | {
       kind: 'create'
@@ -47,7 +48,7 @@ export function exerciseFilePathForName(
   if (trimmed.length === 0) {
     return null
   }
-  return normalizeExercisePath(`${exercisesFolderPath.replace(/\/+$/, '')}/${trimmed}.md`)
+  return normalizePath(`${exercisesFolderPath.replace(/\/+$/, '')}/${trimmed}.md`)
 }
 
 export function planExerciseFileOpen(input: ExerciseFilePlanInput): ExerciseFilePlan {
@@ -66,6 +67,7 @@ export function planExerciseFileOpen(input: ExerciseFilePlanInput): ExerciseFile
       kind: 'open',
       path,
       sourcePath: input.sourcePath,
+      name: canonicalName,
     }
   }
 
@@ -78,8 +80,4 @@ export function planExerciseFileOpen(input: ExerciseFilePlanInput): ExerciseFile
     workoutsFolderPath: input.workoutsFolderPath,
     unit: unitForName(registry, canonicalName) ?? DEFAULT_WEIGHT_UNIT,
   }
-}
-
-function normalizeExercisePath(path: string): string {
-  return normalizePath(path)
 }

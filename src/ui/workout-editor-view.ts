@@ -1157,48 +1157,43 @@ export class WorkoutEditorView extends ItemView {
       return
     }
 
+    const deletedKey = normalize(plan.name)
+    const previousDeleted = this.plugin.settings.deletedExercises ?? []
+    const hadTombstone = previousDeleted.some(
+      (deletedName) => normalize(deletedName) === deletedKey,
+    )
+    let shouldClearTombstone = false
+
     if (plan.kind === 'create') {
-      const deletedKey = normalize(plan.name)
-      const previousDeleted = this.plugin.settings.deletedExercises ?? []
-      const hadTombstone = previousDeleted.some(
-        (deletedName) => normalize(deletedName) === deletedKey,
-      )
-
-      if (!this.app.vault.getAbstractFileByPath(plan.path)) {
-        try {
-          await ensureParentFolder(this.app, plan.path)
-          await this.app.vault.create(
-            plan.path,
-            composeExerciseNote(plan.name, plan.exerciseKind, plan.workoutsFolderPath, plan.unit),
-          )
-          new Notice(`Created exercise note for '${plan.name}'.`)
-        } catch (error) {
-          new Notice(
-            `Could not create exercise note for '${plan.name}': ${formatErrorMessage(error)}.`,
-          )
-          return
-        }
-      } else {
+      try {
+        await ensureParentFolder(this.app, plan.path)
+        await this.app.vault.create(
+          plan.path,
+          composeExerciseNote(plan.name, plan.exerciseKind, plan.workoutsFolderPath, plan.unit),
+        )
+        new Notice(`Created exercise note for '${plan.name}'.`)
+        shouldClearTombstone = true
+      } catch (error) {
         new Notice(
-          hadTombstone
-            ? `Restored '${plan.name}' using the existing exercise note.`
-            : `Using existing exercise note for '${plan.name}'.`,
+          `Could not create exercise note for '${plan.name}': ${formatErrorMessage(error)}.`,
         )
-      }
-
-      if (hadTombstone) {
-        this.plugin.settings.deletedExercises = previousDeleted.filter(
-          (deletedName) => normalize(deletedName) !== deletedKey,
-        )
-        await this.plugin.saveSettings()
+        return
       }
     }
 
     try {
       this.app.workspace.setActiveLeaf(this.leaf, { focus: true })
       await this.app.workspace.openLinkText(plan.path, plan.sourcePath || plan.path, false)
+      shouldClearTombstone = true
     } catch (error) {
       new Notice(`Could not open exercise file: ${formatError(error)}`)
+    }
+
+    if (hadTombstone && shouldClearTombstone) {
+      this.plugin.settings.deletedExercises = previousDeleted.filter(
+        (deletedName) => normalize(deletedName) !== deletedKey,
+      )
+      await this.plugin.saveSettings()
     }
   }
 

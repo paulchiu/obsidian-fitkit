@@ -518,6 +518,51 @@ describe('WorkoutEditorView row actions', () => {
     expect(view.app.vault.create).not.toHaveBeenCalled()
   })
 
+  it('clears and persists a deleted exercise tombstone when opening an existing note', async () => {
+    const view = createExerciseCardRenderView()
+    const existingFile = new TFile()
+    view.plugin.settings.deletedExercises = ['squat', 'bench']
+    view.app = {
+      vault: {
+        getAbstractFileByPath: vi.fn((path: string) =>
+          path === 'Fitness/Exercises/Squat.md' ? existingFile : null,
+        ),
+        create: vi.fn(),
+      },
+      workspace: {
+        setActiveLeaf: vi.fn(),
+        openLinkText: vi.fn(() => Promise.resolve()),
+      },
+    }
+    view.leaf = { id: 'leaf' }
+    view.model = {
+      sourcePath: 'Fitness/Workouts/2026-06-15.md',
+      exercises: [
+        {
+          name: 'Squat',
+          kind: 'strength',
+          strengthSets: [],
+          durationEntries: [],
+        },
+      ],
+    }
+    view.exerciseHistory = null
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    list.findByClass('fitkit-name-button')?.listenersFor('click')[0]?.({})
+    await flushPromises()
+
+    expect(view.app.vault.create).not.toHaveBeenCalled()
+    expect(view.plugin.settings.deletedExercises).toEqual(['bench'])
+    expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
+    expect(view.app.workspace.openLinkText).toHaveBeenCalledWith(
+      'Fitness/Exercises/Squat.md',
+      'Fitness/Workouts/2026-06-15.md',
+      false,
+    )
+  })
+
   it('opens the canonical exercise note when the rendered name is an alias', async () => {
     const view = createExerciseCardRenderView()
     const existingFile = new TFile()

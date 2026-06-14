@@ -21,6 +21,7 @@ describe('exercise file plan', () => {
       kind: 'open',
       path: 'Fitness/Exercises/Squat.md',
       sourcePath: 'Fitness/Workouts/2026-06-15.md',
+      name: 'Squat',
     })
   })
 
@@ -82,6 +83,7 @@ describe('exercise file plan', () => {
       kind: 'open',
       path: 'Fitness/Exercises/Back squat.md',
       sourcePath: 'Fitness/Workouts/2026-06-15.md',
+      name: 'Back squat',
     })
   })
 
