@@ -206,15 +206,19 @@ body.is-mobile .fitkit-editor-root {
 }
 
 .fitkit-name-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
   flex: 1 1 160px;
   height: var(--fitkit-card-control-size);
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 0 8px;
   font-size: 14px;
-  line-height: var(--fitkit-card-control-size);
-  background: var(--background-primary);
-  color: var(--text-normal);
+  line-height: 1.2;
+  background: transparent;
+  color: var(--text-accent);
   font-weight: 600;
   text-align: left;
   cursor: pointer;
@@ -223,6 +227,52 @@ body.is-mobile .fitkit-editor-root {
 .fitkit-name-button:hover,
 .fitkit-name-button:focus-visible {
   background: var(--background-modifier-hover);
+  color: var(--text-accent-hover);
+}
+
+.fitkit-name-button-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fitkit-name-button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: var(--text-accent);
+}
+
+.fitkit-name-button-icon svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.25;
+}
+
+.fitkit-card-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  width: var(--fitkit-card-control-size, 32px);
+  height: var(--fitkit-card-control-size, 32px);
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+  box-sizing: border-box;
+}
+
+.fitkit-card-icon-button:hover,
+.fitkit-card-icon-button:focus-visible {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.fitkit-card-icon-button svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.25;
 }
 
 .fitkit-card-history {
@@ -248,27 +298,6 @@ body.is-mobile .fitkit-editor-root {
 
 .fitkit-gear-button {
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  width: var(--fitkit-card-control-size, 32px);
-  height: var(--fitkit-card-control-size, 32px);
-  border-color: transparent;
-  background: transparent;
-  color: var(--text-muted);
-  box-sizing: border-box;
-}
-
-.fitkit-gear-button:hover,
-.fitkit-gear-button:focus-visible {
-  color: var(--text-normal);
-  background: var(--background-modifier-hover);
-}
-
-.fitkit-gear-button svg {
-  width: 18px;
-  height: 18px;
-  stroke-width: 2.25;
 }
 
 .fitkit-field-row {

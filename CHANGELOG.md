@@ -9,7 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Exercise names in the workout editor now open existing exercise notes in one click or
+  create the note before opening it when missing.
+
 ### Changed
+
+- Renaming an exercise in the workout editor now uses a dedicated pencil button beside
+  the exercise name.
 
 ### Fixed
 

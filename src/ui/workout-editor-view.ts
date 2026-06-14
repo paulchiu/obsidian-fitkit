@@ -27,6 +27,7 @@ import {
 import type FitKitPlugin from '../main'
 import { exercisesFolder, workoutsFolder } from '../settings-paths'
 import { composeExerciseNote } from '../vault/exercise-note'
+import { exerciseFilePathForName, planExerciseFileOpen } from '../vault/exercise-file-plan'
 import { exerciseHistoryFromVault } from '../vault/exercise-history-vault'
 import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
 import { FileSession } from '../vault/file-session'
@@ -407,14 +408,26 @@ export class WorkoutEditorView extends ItemView {
 
     const nameButton = top.createEl('button', {
       cls: 'fitkit-name-button',
-      attr: { type: 'button', 'aria-label': 'Change exercise' },
+      attr: { type: 'button', 'aria-label': `Open exercise file for ${ex.name}` },
     })
-    nameButton.setText(ex.name)
-    nameButton.addEventListener('click', () => void this.openRenameExerciseModal(index))
+    nameButton.createSpan({ cls: 'fitkit-name-button-text', text: ex.name })
+    const linkIcon = nameButton.createSpan({
+      cls: 'fitkit-name-button-icon',
+      attr: { 'aria-hidden': 'true' },
+    })
+    setIcon(linkIcon, 'arrow-up-right')
+    nameButton.addEventListener('click', () => void this.openOrCreateExerciseFile(ex))
+
+    const renameBtn = top.createEl('button', {
+      cls: 'fitkit-btn fitkit-btn-muted fitkit-card-icon-button fitkit-rename-button',
+      attr: { type: 'button', 'aria-label': 'Rename exercise' },
+    })
+    setIcon(renameBtn, 'pencil')
+    renameBtn.addEventListener('click', () => void this.openRenameExerciseModal(index))
 
     const gearBtn = top.createEl('button', {
-      cls: 'fitkit-btn fitkit-btn-muted fitkit-gear-button',
-      attr: { 'aria-label': 'Exercise options' },
+      cls: 'fitkit-btn fitkit-btn-muted fitkit-card-icon-button fitkit-gear-button',
+      attr: { type: 'button', 'aria-label': 'Exercise options' },
     })
     setIcon(gearBtn, 'settings')
     gearBtn.addEventListener('click', (evt) => this.openCardMenu(evt, index))
@@ -1052,7 +1065,7 @@ export class WorkoutEditorView extends ItemView {
       item
         .setTitle('Open exercise file')
         .setIcon('file-text')
-        .onClick(() => void this.openExerciseFile(ex.name)),
+        .onClick(() => void this.openOrCreateExerciseFile(ex)),
     )
     menu.addSeparator()
     menu.addItem((item) =>
@@ -1128,23 +1141,43 @@ export class WorkoutEditorView extends ItemView {
     }
   }
 
-  private async openExerciseFile(exerciseName: string): Promise<void> {
-    const trimmed = exerciseName.trim()
-    if (trimmed.length === 0) {
-      new Notice('No exercise file found.')
+  private async openOrCreateExerciseFile(exercise: ExerciseCard): Promise<void> {
+    const path = exerciseFilePathForName(exercise.name, exercisesFolder(this.plugin.settings))
+    const file = path ? this.app.vault.getAbstractFileByPath(normalizePath(path)) : null
+    const plan = planExerciseFileOpen({
+      name: exercise.name,
+      kind: exercise.kind,
+      noteExists: file instanceof TFile,
+      registryEntries: exerciseRegistryWithVaultNotes(this.app, this.plugin.settings),
+      exercisesFolderPath: exercisesFolder(this.plugin.settings),
+      workoutsFolderPath: workoutsFolder(this.plugin.settings),
+      sourcePath: this.model?.sourcePath ?? '',
+    })
+
+    if (plan.kind === 'error') {
+      new Notice(plan.message)
       return
     }
 
-    const path = normalizePath(`${exercisesFolder(this.plugin.settings)}/${trimmed}.md`)
-    const file = this.app.vault.getAbstractFileByPath(path)
-    if (!(file instanceof TFile)) {
-      new Notice('No exercise file found.')
-      return
+    if (plan.kind === 'create') {
+      try {
+        await ensureParentFolder(this.app, plan.path)
+        await this.app.vault.create(
+          plan.path,
+          composeExerciseNote(plan.name, plan.exerciseKind, plan.workoutsFolderPath, plan.unit),
+        )
+        new Notice(`Created exercise note for '${plan.name}'.`)
+      } catch (error) {
+        new Notice(
+          `Could not create exercise note for '${plan.name}': ${formatErrorMessage(error)}.`,
+        )
+        return
+      }
     }
 
     try {
       this.app.workspace.setActiveLeaf(this.leaf, { focus: true })
-      await this.app.workspace.openLinkText(path, this.model?.sourcePath ?? file.path, false)
+      await this.app.workspace.openLinkText(plan.path, plan.sourcePath || plan.path, false)
     } catch (error) {
       new Notice(`Could not open exercise file: ${formatError(error)}`)
     }
