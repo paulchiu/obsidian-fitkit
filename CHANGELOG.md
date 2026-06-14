@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+### Fixed
+
+### Removed
+
+## [0.17.0] - 2026-06-14
+
+### Added
+
+### Changed
+
 - Duplicating a strength set in the workout editor now focuses the Reps field instead of Weight, since the duplicated weight usually carries over and only the rep count needs editing.
 
 ### Fixed
