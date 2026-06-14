@@ -31,13 +31,9 @@ export default tseslint.config(
      * obsidianmd 0.3.0's hybrid recommended config enables its typed rules (which
      * call getParserServices()) globally rather than only on TypeScript files. On
      * package.json (parsed with the JSON language) and on *.mjs/config files they
-     * crash with "rule which requires type information". Disable the typed rules
-     * everywhere; the block below re-enables the applicable ones on real TS source.
-     *
-     * 0.3.0 also newly enforces rules the 0.1.9 baseline did not. `prefer-window-timers`
-     * directly contradicts this project's popout-safety convention (AGENTS.md prefers
-     * `activeWindow.setTimeout`), and `no-unsupported-api` flags APIs newer than the
-     * declared minAppVersion. Adopting those is a separate migration, so they stay off.
+     * crash with "rule which requires type information". Turn the typed rules off
+     * everywhere; the block below re-enables them on real TypeScript source where
+     * parser services exist.
      */
     rules: {
       'obsidianmd/no-plugin-as-component': 'off',
@@ -54,7 +50,18 @@ export default tseslint.config(
     rules: {
       'obsidianmd/no-plugin-as-component': 'error',
       'obsidianmd/no-view-references-in-plugin': 'error',
-      'obsidianmd/prefer-file-manager-trash-file': 'warn',
+      'obsidianmd/no-unsupported-api': 'error',
+      'obsidianmd/prefer-file-manager-trash-file': 'error',
+      'obsidianmd/prefer-instanceof': 'error',
+      'obsidianmd/no-global-this': 'error',
+      /**
+       * Intentionally left off. `prefer-window-timers` wants bare `window.setTimeout`
+       * / `window.setInterval`, which breaks in Obsidian popout windows. This project
+       * mandates `activeWindow.setTimeout` / `activeWindow.setInterval` for popout
+       * safety (see AGENTS.md "Popout safety"), so enabling this rule would push the
+       * source in the opposite direction of the documented convention.
+       */
+      'obsidianmd/prefer-window-timers': 'off',
     },
   },
   {

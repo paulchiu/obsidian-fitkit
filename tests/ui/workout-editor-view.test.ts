@@ -700,6 +700,11 @@ describe('WorkoutEditorView rest timer', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-05-03T00:00:00Z'))
+    /**
+     * The node test environment has no `window`, so point the popout-safe
+     * `activeWindow` global the source relies on at the test realm's global.
+     */
+    // eslint-disable-next-line obsidianmd/no-global-this
     vi.stubGlobal('activeWindow', globalThis)
   })
 
@@ -1036,6 +1041,11 @@ describe('WorkoutEditorView duration timer', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-04-28T00:00:00Z'))
+    /**
+     * The node test environment has no `window`, so point the popout-safe
+     * `activeWindow` global the source relies on at the test realm's global.
+     */
+    // eslint-disable-next-line obsidianmd/no-global-this
     vi.stubGlobal('activeWindow', globalThis)
   })
 

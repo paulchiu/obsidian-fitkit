@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- Updated dev dependencies, including `eslint-plugin-obsidianmd` to 0.3.0, and adjusted the ESLint config so its newly typed rules no longer crash on non-TypeScript files.
+- Raised `minAppVersion` to 1.7.2 to match the newest Obsidian APIs the plugin already uses (`Workspace.revealLeaf` requires 1.7.2; also `FileManager.trashFile`, `Vault.createFolder`, `Vault.process`, and `Menu.showAtPosition`).
+- Updated dev dependencies, including `eslint-plugin-obsidianmd` to 0.3.0. Scoped its typed rules to real TypeScript source so they no longer crash on `package.json` and config files, re-enabled the six rules the interim fix had disabled (`no-plugin-as-component`, `no-view-references-in-plugin`, `no-unsupported-api`, `prefer-file-manager-trash-file`, `prefer-instanceof`, `no-global-this`), and fixed the violations they flagged. `prefer-window-timers` stays disabled because it conflicts with the project's `activeWindow` popout-safety convention.
 
 ### Fixed
 
