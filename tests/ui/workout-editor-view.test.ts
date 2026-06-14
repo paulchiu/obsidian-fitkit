@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ExerciseRegistryEntry } from '../../src/domain/exercise-registry'
 
 interface MockMenuItemState {
   title?: string
@@ -23,6 +24,10 @@ const obsidianMock = vi.hoisted(
 
 const vaultUtilsMock = vi.hoisted(() => ({
   ensureParentFolder: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+}))
+
+const registryVaultMock = vi.hoisted(() => ({
+  exerciseRegistryWithVaultNotes: vi.fn<() => ExerciseRegistryEntry[]>(() => []),
 }))
 
 vi.mock('obsidian', () => {
@@ -143,6 +148,11 @@ vi.mock('../../src/vault/vault-utils', () => ({
   ensureParentFolder: vaultUtilsMock.ensureParentFolder,
 }))
 
+vi.mock('../../src/vault/exercise-registry-vault', () => ({
+  exerciseRegistryWithVaultNotes: registryVaultMock.exerciseRegistryWithVaultNotes,
+}))
+
+import { TFile } from 'obsidian'
 import { WorkoutEditorView } from '../../src/ui/workout-editor-view'
 
 interface TestElementOptions {
@@ -283,13 +293,34 @@ const createRowActionView = (): RowActionView =>
 
 interface CardMenuView {
   model: unknown
+  openOrCreateExerciseFile?: ReturnType<typeof vi.fn>
   openCardMenu(evt: MouseEvent, index: number): void
 }
 
 interface ExerciseCardRenderView {
-  plugin: { settings: { strengthRestTimerEnabled: boolean } }
+  app?: {
+    vault: {
+      getAbstractFileByPath: ReturnType<typeof vi.fn>
+      create: ReturnType<typeof vi.fn>
+    }
+    workspace: {
+      setActiveLeaf: ReturnType<typeof vi.fn>
+      openLinkText: ReturnType<typeof vi.fn>
+    }
+  }
+  leaf?: unknown
+  plugin: {
+    settings: {
+      fitnessRoot: string
+      strengthRestTimerEnabled: boolean
+      exerciseRegistry: ExerciseRegistryEntry[]
+      deletedExercises?: string[]
+    }
+    saveSettings: ReturnType<typeof vi.fn>
+  }
   model: unknown
   exerciseHistory: unknown
+  openRenameExerciseModal?: ReturnType<typeof vi.fn>
   renderExerciseCard(list: HTMLElement, index: number): void
 }
 
@@ -298,9 +329,31 @@ const createCardMenuView = (): CardMenuView =>
 
 const createExerciseCardRenderView = (): ExerciseCardRenderView => {
   const view = Object.create(WorkoutEditorView.prototype) as ExerciseCardRenderView
-  view.plugin = { settings: { strengthRestTimerEnabled: true } }
+  view.plugin = {
+    settings: {
+      fitnessRoot: 'Fitness',
+      strengthRestTimerEnabled: true,
+      exerciseRegistry: [],
+      deletedExercises: [],
+    },
+    saveSettings: vi.fn(() => Promise.resolve()),
+  }
   return view
 }
+
+const flushPromises = async (): Promise<void> => {
+  await Promise.resolve()
+  await Promise.resolve()
+  await Promise.resolve()
+}
+
+beforeEach(() => {
+  obsidianMock.notices = []
+  vaultUtilsMock.ensureParentFolder.mockClear()
+  vaultUtilsMock.ensureParentFolder.mockResolvedValue(undefined)
+  registryVaultMock.exerciseRegistryWithVaultNotes.mockReset()
+  registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([])
+})
 
 describe('WorkoutEditorView row actions', () => {
   afterEach(() => {
@@ -368,6 +421,288 @@ describe('WorkoutEditorView row actions', () => {
       'Move down',
       'Remove exercise',
     ])
+  })
+
+  it('routes the card menu Open exercise file item through the shared handler', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
+    const view = createCardMenuView()
+    const exercise = {
+      name: 'Squat',
+      kind: 'strength',
+      strengthSets: [],
+      durationEntries: [],
+    }
+    view.model = { exercises: [exercise] }
+    view.openOrCreateExerciseFile = vi.fn(() => Promise.resolve())
+    const button = new TestElement('button')
+
+    view.openCardMenu({ currentTarget: button } as unknown as MouseEvent, 0)
+    obsidianMock.menus[0]?.items[0]?.onClick?.()
+
+    expect(view.openOrCreateExerciseFile).toHaveBeenCalledWith(exercise)
+  })
+
+  it('renders the exercise name as an open-file link and moves rename to the pencil', () => {
+    const view = createExerciseCardRenderView()
+    view.model = {
+      exercises: [
+        {
+          name: 'Squat',
+          kind: 'strength',
+          strengthSets: [],
+          durationEntries: [],
+        },
+      ],
+    }
+    view.exerciseHistory = null
+    view.openRenameExerciseModal = vi.fn(() => Promise.resolve())
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    const nameButton = list.findByClass('fitkit-name-button')
+    const renameButton = list.findByClass('fitkit-rename-button')
+    expect(nameButton?.attributes.get('aria-label')).toBe('Open exercise file for Squat')
+    expect(nameButton?.findByClass('fitkit-name-button-text')?.textContent).toBe('Squat')
+    expect(nameButton?.findByClass('fitkit-name-button-icon')?.attributes.get('data-icon')).toBe(
+      'arrow-up-right',
+    )
+    expect(renameButton?.attributes.get('aria-label')).toBe('Rename exercise')
+    expect(renameButton?.attributes.get('data-icon')).toBe('pencil')
+
+    renameButton?.listenersFor('click')[0]?.({})
+
+    expect(view.openRenameExerciseModal).toHaveBeenCalledWith(0)
+  })
+
+  it('opens an existing exercise note when the rendered name is clicked', async () => {
+    const view = createExerciseCardRenderView()
+    const existingFile = new TFile()
+    view.app = {
+      vault: {
+        getAbstractFileByPath: vi.fn((path: string) =>
+          path === 'Fitness/Exercises/Squat.md' ? existingFile : null,
+        ),
+        create: vi.fn(),
+      },
+      workspace: {
+        setActiveLeaf: vi.fn(),
+        openLinkText: vi.fn(() => Promise.resolve()),
+      },
+    }
+    view.leaf = { id: 'leaf' }
+    view.model = {
+      sourcePath: 'Fitness/Workouts/2026-06-15.md',
+      exercises: [
+        {
+          name: 'Squat',
+          kind: 'strength',
+          strengthSets: [],
+          durationEntries: [],
+        },
+      ],
+    }
+    view.exerciseHistory = null
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    list.findByClass('fitkit-name-button')?.listenersFor('click')[0]?.({})
+    await flushPromises()
+
+    expect(view.app.workspace.setActiveLeaf).toHaveBeenCalledWith(view.leaf, { focus: true })
+    expect(view.app.workspace.openLinkText).toHaveBeenCalledWith(
+      'Fitness/Exercises/Squat.md',
+      'Fitness/Workouts/2026-06-15.md',
+      false,
+    )
+    expect(view.app.vault.create).not.toHaveBeenCalled()
+  })
+
+  it('clears and persists a deleted exercise tombstone when opening an existing note', async () => {
+    const view = createExerciseCardRenderView()
+    const existingFile = new TFile()
+    view.plugin.settings.deletedExercises = ['squat', 'bench']
+    view.app = {
+      vault: {
+        getAbstractFileByPath: vi.fn((path: string) =>
+          path === 'Fitness/Exercises/Squat.md' ? existingFile : null,
+        ),
+        create: vi.fn(),
+      },
+      workspace: {
+        setActiveLeaf: vi.fn(),
+        openLinkText: vi.fn(() => Promise.resolve()),
+      },
+    }
+    view.leaf = { id: 'leaf' }
+    view.model = {
+      sourcePath: 'Fitness/Workouts/2026-06-15.md',
+      exercises: [
+        {
+          name: 'Squat',
+          kind: 'strength',
+          strengthSets: [],
+          durationEntries: [],
+        },
+      ],
+    }
+    view.exerciseHistory = null
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    list.findByClass('fitkit-name-button')?.listenersFor('click')[0]?.({})
+    await flushPromises()
+
+    expect(view.app.vault.create).not.toHaveBeenCalled()
+    expect(view.plugin.settings.deletedExercises).toEqual(['bench'])
+    expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
+    expect(view.app.workspace.openLinkText).toHaveBeenCalledWith(
+      'Fitness/Exercises/Squat.md',
+      'Fitness/Workouts/2026-06-15.md',
+      false,
+    )
+  })
+
+  it('opens the canonical exercise note when the rendered name is an alias', async () => {
+    const view = createExerciseCardRenderView()
+    const existingFile = new TFile()
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      { name: 'Back squat', kind: 'strength', unit: 'lbs', aliases: ['Squat'] },
+    ])
+    view.app = {
+      vault: {
+        getAbstractFileByPath: vi.fn((path: string) =>
+          path === 'Fitness/Exercises/Back squat.md' ? existingFile : null,
+        ),
+        create: vi.fn(),
+      },
+      workspace: {
+        setActiveLeaf: vi.fn(),
+        openLinkText: vi.fn(() => Promise.resolve()),
+      },
+    }
+    view.leaf = { id: 'leaf' }
+    view.model = {
+      sourcePath: 'Fitness/Workouts/2026-06-15.md',
+      exercises: [
+        {
+          name: 'Squat',
+          kind: 'strength',
+          strengthSets: [],
+          durationEntries: [],
+        },
+      ],
+    }
+    view.exerciseHistory = null
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    list.findByClass('fitkit-name-button')?.listenersFor('click')[0]?.({})
+    await flushPromises()
+
+    expect(view.app.vault.getAbstractFileByPath).toHaveBeenCalledWith(
+      'Fitness/Exercises/Back squat.md',
+    )
+    expect(view.app.vault.create).not.toHaveBeenCalled()
+    expect(view.app.workspace.openLinkText).toHaveBeenCalledWith(
+      'Fitness/Exercises/Back squat.md',
+      'Fitness/Workouts/2026-06-15.md',
+      false,
+    )
+  })
+
+  it('creates and opens a missing exercise note when the rendered name is clicked', async () => {
+    const view = createExerciseCardRenderView()
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      { name: 'Squat', kind: 'strength', unit: 'lbs', aliases: [] },
+    ])
+    view.app = {
+      vault: {
+        getAbstractFileByPath: vi.fn(() => null),
+        create: vi.fn(() => Promise.resolve({ path: 'Fitness/Exercises/Squat.md' })),
+      },
+      workspace: {
+        setActiveLeaf: vi.fn(),
+        openLinkText: vi.fn(() => Promise.resolve()),
+      },
+    }
+    view.leaf = { id: 'leaf' }
+    view.model = {
+      sourcePath: 'Fitness/Workouts/2026-06-15.md',
+      exercises: [
+        {
+          name: 'Squat',
+          kind: 'strength',
+          strengthSets: [],
+          durationEntries: [],
+        },
+      ],
+    }
+    view.exerciseHistory = null
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    list.findByClass('fitkit-name-button')?.listenersFor('click')[0]?.({})
+    await flushPromises()
+
+    expect(vaultUtilsMock.ensureParentFolder).toHaveBeenCalledWith(
+      view.app,
+      'Fitness/Exercises/Squat.md',
+    )
+    expect(view.app.vault.create).toHaveBeenCalledWith(
+      'Fitness/Exercises/Squat.md',
+      expect.stringContaining('unit: lbs'),
+    )
+    expect(obsidianMock.notices).toContain("Created exercise note for 'Squat'.")
+    expect(view.app.workspace.openLinkText).toHaveBeenCalledWith(
+      'Fitness/Exercises/Squat.md',
+      'Fitness/Workouts/2026-06-15.md',
+      false,
+    )
+  })
+
+  it('clears and persists a deleted exercise tombstone when creating from the rendered name', async () => {
+    const view = createExerciseCardRenderView()
+    view.plugin.settings.deletedExercises = ['squat', 'bench']
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      { name: 'Squat', kind: 'strength', unit: 'lbs', aliases: [] },
+    ])
+    view.app = {
+      vault: {
+        getAbstractFileByPath: vi.fn(() => null),
+        create: vi.fn(() => Promise.resolve({ path: 'Fitness/Exercises/Squat.md' })),
+      },
+      workspace: {
+        setActiveLeaf: vi.fn(),
+        openLinkText: vi.fn(() => Promise.resolve()),
+      },
+    }
+    view.leaf = { id: 'leaf' }
+    view.model = {
+      sourcePath: 'Fitness/Workouts/2026-06-15.md',
+      exercises: [
+        {
+          name: 'Squat',
+          kind: 'strength',
+          strengthSets: [],
+          durationEntries: [],
+        },
+      ],
+    }
+    view.exerciseHistory = null
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    list.findByClass('fitkit-name-button')?.listenersFor('click')[0]?.({})
+    await flushPromises()
+
+    expect(view.plugin.settings.deletedExercises).toEqual(['bench'])
+    expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
+    expect(view.app.workspace.openLinkText).toHaveBeenCalledWith(
+      'Fitness/Exercises/Squat.md',
+      'Fitness/Workouts/2026-06-15.md',
+      false,
+    )
   })
 
   it.each([
