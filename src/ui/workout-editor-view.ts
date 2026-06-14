@@ -630,6 +630,7 @@ export class WorkoutEditorView extends ItemView {
       attr: {
         type: 'text',
         inputmode: 'text',
+        // eslint-disable-next-line obsidianmd/ui/sentence-case -- "0s" is a duration placeholder; "s" is the seconds unit symbol.
         placeholder: '0s',
       },
     })

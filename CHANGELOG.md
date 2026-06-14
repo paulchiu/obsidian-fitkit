@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Updated dev dependencies, including `eslint-plugin-obsidianmd` to 0.3.0, and adjusted the ESLint config so its newly typed rules no longer crash on non-TypeScript files.
+
 ### Fixed
 
 ### Removed
