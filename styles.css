@@ -211,6 +211,7 @@ body.is-mobile .fitkit-editor-root {
   justify-content: space-between;
   gap: 6px;
   flex: 1 1 160px;
+  min-width: 0;
   height: var(--fitkit-card-control-size);
   border: 1px solid transparent;
   border-radius: 6px;
