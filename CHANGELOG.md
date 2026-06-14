@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.18.0] - 2026-06-14
+
+### Added
+
 - Exercise names in the workout editor now open existing exercise notes in one click or
   create the note before opening it when missing.
 
