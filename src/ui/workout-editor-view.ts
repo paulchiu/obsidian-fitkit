@@ -27,7 +27,7 @@ import {
 import type FitKitPlugin from '../main'
 import { exercisesFolder, workoutsFolder } from '../settings-paths'
 import { composeExerciseNote } from '../vault/exercise-note'
-import { exerciseFilePathForName, planExerciseFileOpen } from '../vault/exercise-file-plan'
+import { planExerciseFileOpen } from '../vault/exercise-file-plan'
 import { exerciseHistoryFromVault } from '../vault/exercise-history-vault'
 import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
 import { FileSession } from '../vault/file-session'
@@ -1142,12 +1142,10 @@ export class WorkoutEditorView extends ItemView {
   }
 
   private async openOrCreateExerciseFile(exercise: ExerciseCard): Promise<void> {
-    const path = exerciseFilePathForName(exercise.name, exercisesFolder(this.plugin.settings))
-    const file = path ? this.app.vault.getAbstractFileByPath(normalizePath(path)) : null
     const plan = planExerciseFileOpen({
       name: exercise.name,
       kind: exercise.kind,
-      noteExists: file instanceof TFile,
+      noteExists: (path) => this.app.vault.getAbstractFileByPath(path) instanceof TFile,
       registryEntries: exerciseRegistryWithVaultNotes(this.app, this.plugin.settings),
       exercisesFolderPath: exercisesFolder(this.plugin.settings),
       workoutsFolderPath: workoutsFolder(this.plugin.settings),
@@ -1160,18 +1158,39 @@ export class WorkoutEditorView extends ItemView {
     }
 
     if (plan.kind === 'create') {
-      try {
-        await ensureParentFolder(this.app, plan.path)
-        await this.app.vault.create(
-          plan.path,
-          composeExerciseNote(plan.name, plan.exerciseKind, plan.workoutsFolderPath, plan.unit),
-        )
-        new Notice(`Created exercise note for '${plan.name}'.`)
-      } catch (error) {
+      const deletedKey = normalize(plan.name)
+      const previousDeleted = this.plugin.settings.deletedExercises ?? []
+      const hadTombstone = previousDeleted.some(
+        (deletedName) => normalize(deletedName) === deletedKey,
+      )
+
+      if (!this.app.vault.getAbstractFileByPath(plan.path)) {
+        try {
+          await ensureParentFolder(this.app, plan.path)
+          await this.app.vault.create(
+            plan.path,
+            composeExerciseNote(plan.name, plan.exerciseKind, plan.workoutsFolderPath, plan.unit),
+          )
+          new Notice(`Created exercise note for '${plan.name}'.`)
+        } catch (error) {
+          new Notice(
+            `Could not create exercise note for '${plan.name}': ${formatErrorMessage(error)}.`,
+          )
+          return
+        }
+      } else {
         new Notice(
-          `Could not create exercise note for '${plan.name}': ${formatErrorMessage(error)}.`,
+          hadTombstone
+            ? `Restored '${plan.name}' using the existing exercise note.`
+            : `Using existing exercise note for '${plan.name}'.`,
         )
-        return
+      }
+
+      if (hadTombstone) {
+        this.plugin.settings.deletedExercises = previousDeleted.filter(
+          (deletedName) => normalize(deletedName) !== deletedKey,
+        )
+        await this.plugin.saveSettings()
       }
     }
 

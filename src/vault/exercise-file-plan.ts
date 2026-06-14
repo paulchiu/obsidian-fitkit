@@ -1,5 +1,8 @@
+import { normalizePath } from 'obsidian'
+
 import {
   createRegistry,
+  resolve,
   unitForName,
   type ExerciseKind,
   type ExerciseRegistryEntry,
@@ -9,7 +12,7 @@ import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
 export interface ExerciseFilePlanInput {
   name: string
   kind: ExerciseKind
-  noteExists: boolean
+  noteExists: (path: string) => boolean
   registryEntries: ExerciseRegistryEntry[]
   exercisesFolderPath: string
   workoutsFolderPath: string
@@ -44,17 +47,21 @@ export function exerciseFilePathForName(
   if (trimmed.length === 0) {
     return null
   }
-  return `${exercisesFolderPath.replace(/\/+$/, '')}/${trimmed}.md`
+  return normalizeExercisePath(`${exercisesFolderPath.replace(/\/+$/, '')}/${trimmed}.md`)
 }
 
 export function planExerciseFileOpen(input: ExerciseFilePlanInput): ExerciseFilePlan {
   const trimmed = input.name.trim()
-  const path = exerciseFilePathForName(trimmed, input.exercisesFolderPath)
+  const registry = createRegistry(input.registryEntries)
+  const match = resolve(registry, trimmed)
+  const canonicalEntry = match.kind === 'match' ? match.entry : null
+  const canonicalName = canonicalEntry?.name ?? trimmed
+  const path = exerciseFilePathForName(canonicalName, input.exercisesFolderPath)
   if (!path) {
     return { kind: 'error', message: 'Cannot open an exercise file without an exercise name.' }
   }
 
-  if (input.noteExists) {
+  if (input.noteExists(path)) {
     return {
       kind: 'open',
       path,
@@ -62,14 +69,17 @@ export function planExerciseFileOpen(input: ExerciseFilePlanInput): ExerciseFile
     }
   }
 
-  const registry = createRegistry(input.registryEntries)
   return {
     kind: 'create',
     path,
     sourcePath: input.sourcePath,
-    name: trimmed,
-    exerciseKind: input.kind,
+    name: canonicalName,
+    exerciseKind: canonicalEntry?.kind ?? input.kind,
     workoutsFolderPath: input.workoutsFolderPath,
-    unit: unitForName(registry, trimmed) ?? DEFAULT_WEIGHT_UNIT,
+    unit: unitForName(registry, canonicalName) ?? DEFAULT_WEIGHT_UNIT,
   }
+}
+
+function normalizeExercisePath(path: string): string {
+  return normalizePath(path)
 }

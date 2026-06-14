@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Opening or creating an exercise note from a workout card now resolves aliases to the
+  canonical exercise file, uses one normalized path for lookup, create, and open, and
+  clears restored exercise tombstones.
+
 ### Removed
 
 ## [0.17.2] - 2026-06-14
