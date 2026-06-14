@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [0.16.3] - 2026-06-14
+
+### Added
+
+### Changed
+
+### Fixed
+
 ### Security
 
 - Bump esbuild (build-time devDependency) to 0.28.1 to resolve a high-severity advisory (GHSA-gv7w-rqvm-qjhr). No runtime or user-facing change.
