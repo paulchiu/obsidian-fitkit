@@ -732,6 +732,28 @@ describe('WorkoutEditorView rest timer', () => {
     ).toBe(false)
   })
 
+  it('focuses the Reps cell after duplicating the last set, since the weight carries over', () => {
+    const ex: RestTimerExerciseCard = {
+      name: 'Squat',
+      kind: 'strength',
+      strengthSets: [{ set: 1, weight: 80, reps: 5 }],
+      durationEntries: [],
+    }
+    const view = createRestTimerView(ex)
+    const card = new TestElement('div')
+
+    view.renderStrengthTable(card as unknown as HTMLElement, ex, 0)
+    const actions = card.findByClass('fitkit-row-actions')
+    const dupBtn = actions?.children.find(
+      (c) => c.tagName === 'button' && c.textContent === 'Duplicate last set',
+    )
+    dupBtn?.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
+
+    expect(ex.strengthSets).toHaveLength(2)
+    expect(ex.strengthSets[1]).toMatchObject({ set: 2, weight: 80, reps: 5 })
+    expect(view.focusRowCell).toHaveBeenCalledWith(0, 1, 'Reps')
+  })
+
   it('renders the footer rest button only when enabled', () => {
     const ex: RestTimerExerciseCard = {
       name: 'Squat',

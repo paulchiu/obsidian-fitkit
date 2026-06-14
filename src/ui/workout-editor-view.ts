@@ -473,7 +473,8 @@ export class WorkoutEditorView extends ItemView {
       ex.strengthSets.push(copy)
       this.markDirty()
       this.render()
-      this.focusRowCell(exerciseIndex, ex.strengthSets.length - 1, 'Weight')
+      // A duplicated set copies the previous weight, so focus Reps (the value most likely to change) instead.
+      this.focusRowCell(exerciseIndex, ex.strengthSets.length - 1, 'Reps')
     })
   }
 
