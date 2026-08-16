@@ -23,11 +23,7 @@ export interface ExerciseNoteMigrationOptions {
 }
 
 export type ExerciseNoteMigrationStatus =
-  | 'already'
-  | 'updated'
-  | 'unknown'
-  | 'skipped-non-exercise-type'
-  | 'skipped-malformed-frontmatter'
+  'already' | 'updated' | 'unknown' | 'skipped-non-exercise-type' | 'skipped-malformed-frontmatter'
 
 type SkippedExerciseNoteMigrationStatus = Extract<
   ExerciseNoteMigrationStatus,
@@ -76,9 +72,7 @@ interface FencedBlock {
 }
 
 type FrontmatterBoundsResult =
-  | { status: 'found'; start: number; end: number }
-  | { status: 'missing' }
-  | { status: 'malformed' }
+  { status: 'found'; start: number; end: number } | { status: 'missing' } | { status: 'malformed' }
 
 interface SectionRepairResult {
   markdown: string

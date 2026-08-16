@@ -17,8 +17,7 @@ import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
 import type FitKitPlugin from '../main'
 
 export type RegistryEntryModalMode =
-  | { kind: 'create' }
-  | { kind: 'edit'; original: ExerciseRegistryEntry }
+  { kind: 'create' } | { kind: 'edit'; original: ExerciseRegistryEntry }
 
 export class ExerciseRegistryEntryModal extends Modal {
   private name: string
