@@ -3,6 +3,13 @@ import obsidianmd from 'eslint-plugin-obsidianmd'
 import globals from 'globals'
 import { globalIgnores } from 'eslint/config'
 
+/**
+ * `import.meta.dirname` is Node-only and this file is typed by the default
+ * project (tsconfig.json), which has no `node` types, so it resolves to an
+ * error type. Assert it once here rather than at each use site.
+ */
+const tsconfigRootDir = import.meta.dirname as string
+
 export default tseslint.config(
   {
     languageOptions: {
@@ -20,7 +27,7 @@ export default tseslint.config(
             'vitest.config.ts',
           ],
         },
-        tsconfigRootDir: import.meta.dirname,
+        tsconfigRootDir,
         extraFileExtensions: ['.json'],
       },
     },
@@ -28,7 +35,7 @@ export default tseslint.config(
   ...obsidianmd.configs.recommended,
   {
     /**
-     * obsidianmd 0.3.0's hybrid recommended config enables its typed rules (which
+     * obsidianmd's hybrid recommended config enables its typed rules (which
      * call getParserServices()) globally rather than only on TypeScript files. On
      * package.json (parsed with the JSON language) and on *.mjs/config files they
      * crash with "rule which requires type information". Turn the typed rules off
@@ -43,6 +50,41 @@ export default tseslint.config(
       'obsidianmd/prefer-instanceof': 'off',
       'obsidianmd/prefer-window-timers': 'off',
       'obsidianmd/no-global-this': 'off',
+    },
+  },
+  {
+    files: ['**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}'],
+    /**
+     * Restates obsidianmd's `no-restricted-disable` list (ESLint replaces rule
+     * options rather than merging them) so two rules can still be silenced
+     * inline where the codebase has a documented reason: `ui/sentence-case` for
+     * unit symbols like "kg" and "0s", and `no-global-this` for the test-harness
+     * `vi.stubGlobal('activeWindow', globalThis)` bootstrapping.
+     *
+     * Patterns are matched with gitignore semantics, so `obsidianmd/*` excludes
+     * the `obsidianmd/ui` segment wholesale and nothing beneath it can be
+     * re-included. The `ui` pair below reopens that segment before restricting
+     * its rules individually.
+     */
+    rules: {
+      'eslint-comments/no-restricted-disable': [
+        'error',
+        'obsidianmd/*',
+        '!obsidianmd/ui',
+        'obsidianmd/ui/*',
+        '!obsidianmd/ui/sentence-case',
+        '!obsidianmd/no-global-this',
+        'no-console',
+        'no-restricted-globals',
+        '@typescript-eslint/no-restricted-imports',
+        'no-alert',
+        '@typescript-eslint/no-deprecated',
+        '@typescript-eslint/no-explicit-any',
+        '@microsoft/sdl/no-document-write',
+        'no-eval',
+        '@microsoft/sdl/no-inner-html',
+        'obsidianmd/no-nodejs-modules',
+      ],
     },
   },
   {
@@ -77,7 +119,7 @@ export default tseslint.config(
       parserOptions: {
         projectService: false,
         project: './tsconfig.vitest.json',
-        tsconfigRootDir: import.meta.dirname,
+        tsconfigRootDir,
       },
     },
   },

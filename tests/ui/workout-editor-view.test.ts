@@ -1039,7 +1039,7 @@ describe('WorkoutEditorView rest timer', () => {
      * The node test environment has no `window`, so point the popout-safe
      * `activeWindow` global the source relies on at the test realm's global.
      */
-    // eslint-disable-next-line obsidianmd/no-global-this
+    // eslint-disable-next-line obsidianmd/no-global-this -- The test realm's global object is the only handle available for stubbing.
     vi.stubGlobal('activeWindow', globalThis)
   })
 
@@ -1380,7 +1380,7 @@ describe('WorkoutEditorView duration timer', () => {
      * The node test environment has no `window`, so point the popout-safe
      * `activeWindow` global the source relies on at the test realm's global.
      */
-    // eslint-disable-next-line obsidianmd/no-global-this
+    // eslint-disable-next-line obsidianmd/no-global-this -- The test realm's global object is the only handle available for stubbing.
     vi.stubGlobal('activeWindow', globalThis)
   })
 
