@@ -26,7 +26,7 @@
   "license": "MIT",
   "devDependencies": {
     "@emnapi/core": "1.10.0",
-    "@emnapi/runtime": "1.10.0",
+    "@emnapi/runtime": "1.11.1",
     "@eslint/js": "^9.30.1",
     "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^25.9.3",
@@ -45,6 +45,6 @@
   },
   "overrides": {
     "@emnapi/core": "1.10.0",
-    "@emnapi/runtime": "1.10.0"
+    "@emnapi/runtime": "1.11.1"
   }
 }
