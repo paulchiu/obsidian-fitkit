@@ -10,13 +10,16 @@
  * H2 and the inline exercise disagree we trust the inline and emit a warning.
  *
  * Bullet kinds:
- *  - Exercise-level note: has `[exercise::]` and optional `[notes::]` only.
+ *  - Exercise-level note: has `[exercise::]` and optional `[notes::]` /
+ *    `[next::]` only.
  *  - Strength row: has `[set::]`, optional `[weight::]`, optional `[reps::]`, optional `[notes::]`.
  *  - Duration row: has `[duration::]` (seconds), optional `[set::]`, optional `[notes::]`.
  *
  * Fenced code blocks (triple-backtick) anywhere in the body are preserved
  * verbatim at their original line index and are skipped by the parser.
  */
+
+import { formatNextPlan, parseNextPlan, type NextPlan } from './next-plan'
 
 export type ExerciseKind = 'strength' | 'duration'
 
@@ -37,6 +40,7 @@ export interface ExerciseEntry {
   exerciseName: string
   kind: ExerciseKind
   note?: string
+  next?: NextPlan
   strengthSets?: StrengthSet[]
   durationEntries?: DurationEntry[]
 }
@@ -161,6 +165,10 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
       if (note !== undefined) {
         current.note = note
       }
+      const next = parseNextPlan(fields.get('next'))
+      if (next) {
+        current.next = next
+      }
       continue
     }
 
@@ -271,8 +279,15 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
     }
     bodyLines.push(`## [[${exercise.exerciseName}]]`)
     bodyLines.push('')
-    if (exercise.note !== undefined) {
-      bodyLines.push(`- [exercise:: [[${exercise.exerciseName}]]] [notes:: ${exercise.note}]`)
+    if (exercise.note !== undefined || exercise.next !== undefined) {
+      const parts = [`[exercise:: [[${exercise.exerciseName}]]]`]
+      if (exercise.note !== undefined) {
+        parts.push(`[notes:: ${exercise.note}]`)
+      }
+      if (exercise.next !== undefined) {
+        parts.push(`[next:: ${formatNextPlan(exercise.next)}]`)
+      }
+      bodyLines.push(`- ${parts.join(' ')}`)
     }
     if (exercise.kind === 'strength') {
       for (const set of exercise.strengthSets ?? []) {
@@ -334,6 +349,7 @@ export function canonicalizeForEquality(model: WorkoutNoteModel): unknown {
       exerciseName: ex.exerciseName,
       kind: ex.kind,
       note: ex.note,
+      next: ex.next,
       strengthSets: ex.strengthSets?.map((set) => ({
         set: set.set,
         weight: set.weight,

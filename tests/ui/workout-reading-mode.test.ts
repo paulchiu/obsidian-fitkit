@@ -177,6 +177,27 @@ describe('workout reading mode rendering', () => {
     expect(root.allText()).toContain('1m35s')
   })
 
+  it('shows the next-time plan recorded on the exercise', () => {
+    const section = [
+      '## [[Squat]]',
+      '',
+      '- [exercise:: [[Squat]]] [next:: up 2.5]',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+    ].join('\n')
+    const root = createRenderedSection([
+      '[exercise:: [[Squat]]] [next:: up 2.5]',
+      '[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+    ])
+
+    renderWorkoutReadingModeSection(
+      createPlugin(),
+      root as unknown as HTMLElement,
+      createContext(section),
+    )
+
+    expect(root.findByClass('fitkit-reading-plan')?.allText()).toContain('Next time: up 2.5 kg')
+  })
+
   it('does not render when the source rows cannot be safely hidden', () => {
     const root = new TestElement('div')
 

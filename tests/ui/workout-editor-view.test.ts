@@ -1743,3 +1743,206 @@ describe('WorkoutEditorView duration timer', () => {
     expect((input as unknown as { value?: string } | undefined)?.value).toBe('1m1s')
   })
 })
+
+interface NextPlanExerciseCard {
+  name: string
+  kind: 'strength' | 'duration'
+  next?: { direction: 'up' | 'down' | 'stay'; step?: number }
+  strengthSets: Array<{ set?: number; weight?: number; reps?: number }>
+  durationEntries: Array<{ durationSeconds?: number }>
+}
+
+interface NextPlanView {
+  plugin: { settings: { fitnessRoot: string; strengthRestTimerEnabled: boolean } }
+  model: { exercises: NextPlanExerciseCard[] }
+  exerciseHistory: unknown
+  render: ReturnType<typeof vi.fn>
+  markDirty: ReturnType<typeof vi.fn>
+  focusRowCell: ReturnType<typeof vi.fn>
+  renderExerciseCard(list: HTMLElement, index: number): void
+}
+
+describe('WorkoutEditorView next-time plan', () => {
+  const createNextPlanView = (ex: NextPlanExerciseCard): NextPlanView => {
+    const view = Object.create(WorkoutEditorView.prototype) as NextPlanView
+    view.plugin = { settings: { fitnessRoot: 'Fitness', strengthRestTimerEnabled: false } }
+    view.model = { exercises: [ex] }
+    view.exerciseHistory = null
+    view.render = vi.fn()
+    view.markDirty = vi.fn()
+    view.focusRowCell = vi.fn()
+    return view
+  }
+
+  const renderCard = (ex: NextPlanExerciseCard): TestElement => {
+    const list = new TestElement('div')
+    createNextPlanView(ex).renderExerciseCard(list as unknown as HTMLElement, 0)
+    return list
+  }
+
+  it('offers down, stay, and up on strength cards', () => {
+    const list = renderCard({
+      name: 'Squat',
+      kind: 'strength',
+      strengthSets: [{ set: 1, weight: 100, reps: 5 }],
+      durationEntries: [],
+    })
+
+    const buttons = list.findAllByClass('fitkit-next-seg-button')
+    expect(buttons.map((button) => button.attributes.get('data-icon'))).toEqual([
+      'arrow-down',
+      'minus',
+      'arrow-up',
+    ])
+    expect(buttons.every((button) => button.attributes.get('aria-pressed') === 'false')).toBe(true)
+    expect(list.findByClass('fitkit-next-step')).toBeNull()
+  })
+
+  it('omits the control on duration cards', () => {
+    const list = renderCard({
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 60 }],
+    })
+
+    expect(list.findByClass('fitkit-next-row')).toBeNull()
+  })
+
+  it('marks the recorded direction and previews the resulting weight', () => {
+    const list = renderCard({
+      name: 'Squat',
+      kind: 'strength',
+      next: { direction: 'up', step: 2.5 },
+      strengthSets: [{ set: 1, weight: 100, reps: 5 }],
+      durationEntries: [],
+    })
+
+    const pressed = list
+      .findAllByClass('fitkit-next-seg-button')
+      .filter((button) => button.attributes.get('aria-pressed') === 'true')
+    expect(pressed.map((button) => button.attributes.get('data-icon'))).toEqual(['arrow-up'])
+    expect(list.findByClass('fitkit-next-target')?.textContent).toBe('→ 102.5 kg')
+  })
+
+  it('hides the step field when the plan is to stay', () => {
+    const list = renderCard({
+      name: 'Squat',
+      kind: 'strength',
+      next: { direction: 'stay' },
+      strengthSets: [{ set: 1, weight: 100, reps: 5 }],
+      durationEntries: [],
+    })
+
+    expect(list.findByClass('fitkit-next-step')).toBeNull()
+  })
+
+  it('records a direction when one is chosen', () => {
+    const ex: NextPlanExerciseCard = {
+      name: 'Squat',
+      kind: 'strength',
+      strengthSets: [{ set: 1, weight: 100, reps: 5 }],
+      durationEntries: [],
+    }
+    const view = createNextPlanView(ex)
+    const list = new TestElement('div')
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    const up = list.findAllByClass('fitkit-next-seg-button')[2]
+    up?.listenersFor('click').forEach((listener) => listener({}))
+
+    expect(ex.next).toEqual({ direction: 'up' })
+    expect(view.markDirty).toHaveBeenCalled()
+    expect(view.render).toHaveBeenCalled()
+  })
+
+  it('clears the plan when the active direction is chosen again', () => {
+    const ex: NextPlanExerciseCard = {
+      name: 'Squat',
+      kind: 'strength',
+      next: { direction: 'up', step: 2.5 },
+      strengthSets: [{ set: 1, weight: 100, reps: 5 }],
+      durationEntries: [],
+    }
+    const view = createNextPlanView(ex)
+    const list = new TestElement('div')
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    const up = list.findAllByClass('fitkit-next-seg-button')[2]
+    up?.listenersFor('click').forEach((listener) => listener({}))
+
+    expect(ex.next).toBeUndefined()
+  })
+
+  it('carries the step across a direction change', () => {
+    const ex: NextPlanExerciseCard = {
+      name: 'Squat',
+      kind: 'strength',
+      next: { direction: 'up', step: 2.5 },
+      strengthSets: [{ set: 1, weight: 100, reps: 5 }],
+      durationEntries: [],
+    }
+    const view = createNextPlanView(ex)
+    const list = new TestElement('div')
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    const down = list.findAllByClass('fitkit-next-seg-button')[0]
+    down?.listenersFor('click').forEach((listener) => listener({}))
+
+    expect(ex.next).toEqual({ direction: 'down', step: 2.5 })
+  })
+
+  it('reads the step from the field and drops it when cleared', () => {
+    const ex: NextPlanExerciseCard = {
+      name: 'Squat',
+      kind: 'strength',
+      next: { direction: 'up' },
+      strengthSets: [{ set: 1, weight: 100, reps: 5 }],
+      durationEntries: [],
+    }
+    const view = createNextPlanView(ex)
+    const list = new TestElement('div')
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    const step = list.findByClass('fitkit-next-step') as unknown as
+      (TestElement & { value: string }) | null
+    expect(step).not.toBeNull()
+
+    step!.value = '5'
+    step!.listenersFor('input').forEach((listener) => listener({}))
+    expect(ex.next).toEqual({ direction: 'up', step: 5 })
+    expect(list.findByClass('fitkit-next-target')?.textContent).toBe('→ 105 kg')
+
+    step!.value = ''
+    step!.listenersFor('input').forEach((listener) => listener({}))
+    expect(ex.next).toEqual({ direction: 'up' })
+    expect(list.findByClass('fitkit-next-target')?.textContent).toBe('')
+  })
+
+  it('shows the plan recorded last session as a badge', () => {
+    const view = createNextPlanView({
+      name: 'Squat',
+      kind: 'strength',
+      strengthSets: [],
+      durationEntries: [],
+    })
+    view.exerciseHistory = new Map([
+      [
+        'Squat',
+        {
+          strength: { lastSessionMax: { value: { weight: 100, reps: 5 }, date: '2026-08-10' } },
+          nextPlan: { value: { direction: 'up', step: 2.5 }, date: '2026-08-10' },
+        },
+      ],
+    ])
+    const list = new TestElement('div')
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    const badge = list.findByClass('fitkit-plan-badge')
+    expect(badge?.attributes.get('title')).toBe('Planned on 2026-08-10: up 2.5 kg from 100 kg')
+    expect(badge?.findAllByClass('fitkit-plan-badge-icon')[0]?.attributes.get('data-icon')).toBe(
+      'arrow-up',
+    )
+    expect(badge?.children.map((child) => child.textContent).join('')).toContain('Next: 102.5 kg')
+  })
+})

@@ -9,7 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Strength exercise cards can record how to load the exercise next session (up, stay, or
+  down) with an optional weight change, saved to the note as `[next:: up 2.5]`.
+- The workout editor shows the plan recorded last session as a badge beside PB and Last
+  max, resolved to a target weight when the plan carries a step.
+- Reading mode shows the plan recorded on an exercise, and the dashboard gains a
+  `Next session plans` section listing every exercise with an outstanding plan.
+
 ### Changed
+
+- Changing an exercise unit in the registry editor now warns that recorded weights and
+  next-time steps stay as written.
+- History badges now break same-date ties by modification time, so the most recently
+  written note wins when an exercise is logged twice in one day.
 
 ### Fixed
 

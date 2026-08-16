@@ -124,6 +124,71 @@ describe('dashboard composer', () => {
     expect(markdown).toContain('_No workouts yet._')
   })
 
+  it('omits the plans section when no exercise has a next-time plan', () => {
+    const markdown = composeDashboard(
+      mixedIndex,
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+    )
+
+    expect(markdown).not.toContain('## Next session plans')
+  })
+
+  it('lists recorded next-time plans with their unit and date', () => {
+    const index: FitKitIndex = {
+      schemaVersion: 1,
+      builtAt: 0,
+      entries: [
+        {
+          path: 'Fitness/Workouts/2026-08-03.md',
+          mtime: 1,
+          date: '2026-08-03',
+          name: 'Earlier',
+          exercises: [
+            {
+              exerciseName: 'Squat',
+              kind: 'strength',
+              maxWeightSet: { weight: 95, reps: 5 },
+              totalSets: 1,
+              next: { direction: 'down', step: 5 },
+            },
+          ],
+        },
+        {
+          path: 'Fitness/Workouts/2026-08-10.md',
+          mtime: 2,
+          date: '2026-08-10',
+          name: 'Later',
+          exercises: [
+            {
+              exerciseName: 'Squat',
+              kind: 'strength',
+              maxWeightSet: { weight: 100, reps: 5 },
+              totalSets: 1,
+              next: { direction: 'up', step: 2.5 },
+            },
+            {
+              exerciseName: 'Bench',
+              kind: 'strength',
+              maxWeightSet: { weight: 60, reps: 5 },
+              totalSets: 1,
+              next: { direction: 'stay' },
+            },
+          ],
+        },
+      ],
+      diagnostics: [],
+    }
+
+    const markdown = composeDashboard(index, 'Fitness/Workouts', 'Fitness/Exercises', new Set())
+
+    expect(markdown).toContain('## Next session plans')
+    expect(markdown).toContain('- **[[#Squat|Squat]]:** up 2.5 kg (planned 2026-08-10)')
+    expect(markdown).toContain('- **[[#Bench|Bench]]:** same weight (planned 2026-08-10)')
+    expect(markdown.indexOf('## PBs')).toBeLessThan(markdown.indexOf('## Next session plans'))
+  })
+
   it('lists the most recent workouts by date with linked names', () => {
     const entries = Array.from({ length: 12 }, (_, i) => {
       const day = String(i + 1).padStart(2, '0')

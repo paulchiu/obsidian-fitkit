@@ -1,3 +1,5 @@
+import type { NextPlan } from './next-plan'
+
 export interface BestSet {
   weight: number
   reps: number
@@ -21,6 +23,7 @@ export interface ExerciseIndexRow {
   maxWeightSet?: WeightSet
   totalSets?: number
   totalDurationSeconds?: number
+  next?: NextPlan
 }
 
 export interface IndexEntry {

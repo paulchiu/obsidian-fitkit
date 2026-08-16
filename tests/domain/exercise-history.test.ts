@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildExerciseHistoryMap,
   formatExerciseHistoryBadges,
+  formatNextPlanBadge,
   pickMaxWeightSet,
   resolveWorkoutAnchorDate,
 } from '../../src/domain/exercise-history'
@@ -220,6 +221,125 @@ describe('exercise history aggregation', () => {
         title: 'Latest prior session total duration',
       },
     ])
+  })
+
+  it('carries the most recent next-time plan forward', () => {
+    const history = buildExerciseHistoryMap(
+      fitKitIndex([
+        entry('Fitness/Workouts/2026-08-03.md', '2026-08-03', [
+          {
+            exerciseName: 'Squat',
+            kind: 'strength',
+            maxWeightSet: { weight: 95, reps: 5 },
+            next: { direction: 'down', step: 5 },
+          },
+        ]),
+        entry('Fitness/Workouts/2026-08-10.md', '2026-08-10', [
+          {
+            exerciseName: 'Squat',
+            kind: 'strength',
+            maxWeightSet: { weight: 100, reps: 5 },
+            next: { direction: 'up', step: 2.5 },
+          },
+        ]),
+      ]),
+      { sourcePath: 'Fitness/Workouts/2026-08-17.md', date: '2026-08-17' },
+    )
+
+    expect(history.get('Squat')?.nextPlan).toEqual({
+      value: { direction: 'up', step: 2.5 },
+      date: '2026-08-10',
+    })
+  })
+
+  it('keeps a plan from an older session when later sessions recorded none', () => {
+    const history = buildExerciseHistoryMap(
+      fitKitIndex([
+        entry('Fitness/Workouts/2026-05-01.md', '2026-05-01', [
+          {
+            exerciseName: 'Squat',
+            kind: 'strength',
+            maxWeightSet: { weight: 90, reps: 5 },
+            next: { direction: 'up', step: 2.5 },
+          },
+        ]),
+        entry('Fitness/Workouts/2026-08-10.md', '2026-08-10', [
+          { exerciseName: 'Squat', kind: 'strength', maxWeightSet: { weight: 100, reps: 5 } },
+        ]),
+      ]),
+      { sourcePath: 'Fitness/Workouts/2026-08-17.md', date: '2026-08-17' },
+    )
+
+    expect(history.get('Squat')?.nextPlan?.value).toEqual({ direction: 'up', step: 2.5 })
+  })
+
+  it('prefers the most recently written note when two sessions share a date', () => {
+    const early: IndexEntry = {
+      ...entry('Fitness/Workouts/2026-08-10 morning.md', '2026-08-10', [
+        {
+          exerciseName: 'Squat',
+          kind: 'strength',
+          maxWeightSet: { weight: 100, reps: 5 },
+          next: { direction: 'up', step: 2.5 },
+        },
+      ]),
+      mtime: 10,
+    }
+    const late: IndexEntry = {
+      ...entry('Fitness/Workouts/2026-08-10 evening.md', '2026-08-10', [
+        {
+          exerciseName: 'Squat',
+          kind: 'strength',
+          maxWeightSet: { weight: 80, reps: 5 },
+          next: { direction: 'down', step: 5 },
+        },
+      ]),
+      mtime: 20,
+    }
+
+    const history = buildExerciseHistoryMap(fitKitIndex([early, late]), {
+      sourcePath: 'Fitness/Workouts/2026-08-17.md',
+      date: '2026-08-17',
+    })
+
+    expect(history.get('Squat')?.nextPlan?.value).toEqual({ direction: 'down', step: 5 })
+  })
+
+  it('shows the resulting weight when the plan carries a step', () => {
+    const summary = {
+      strength: { lastSessionMax: { value: { weight: 100, reps: 5 }, date: '2026-08-10' } },
+      nextPlan: { value: { direction: 'up' as const, step: 2.5 }, date: '2026-08-10' },
+    }
+
+    expect(formatNextPlanBadge(summary, 'strength')).toEqual({
+      text: 'Next: 102.5 kg',
+      title: 'Planned on 2026-08-10: up 2.5 kg from 100 kg',
+      icon: 'arrow-up',
+    })
+  })
+
+  it('falls back to the direction when the plan carries no step', () => {
+    const badge = formatNextPlanBadge(
+      {
+        strength: { lastSessionMax: { value: { weight: 100, reps: 5 }, date: '2026-08-10' } },
+        nextPlan: { value: { direction: 'down' }, date: '2026-08-10' },
+      },
+      'strength',
+    )
+
+    expect(badge?.text).toBe('Next: down')
+    expect(badge?.icon).toBe('arrow-down')
+  })
+
+  it('has no plan badge for duration exercises or absent plans', () => {
+    expect(
+      formatNextPlanBadge(
+        { nextPlan: { value: { direction: 'up' }, date: '2026-08-10' } },
+        'duration',
+      ),
+    ).toBeNull()
+    expect(formatNextPlanBadge({}, 'strength')).toBeNull()
+    expect(formatNextPlanBadge(undefined, 'strength')).toBeNull()
   })
 
   it('keeps zero-weight strength values and ignores missing strength values', () => {

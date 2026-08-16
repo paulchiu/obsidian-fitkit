@@ -1,6 +1,7 @@
 import type { ExerciseKind } from './workout-note-model'
 import { formatDurationInput } from './duration-input'
 import { pickHeaviestSet } from './epley'
+import { formatNextPlanLabel, nextPlanTargetWeight, type NextPlan } from './next-plan'
 import type { FitKitIndex, IndexEntry, LastSessionMax, WeightSet } from './types'
 
 export interface ExerciseHistoryAnchor {
@@ -22,6 +23,8 @@ export interface DurationExerciseHistory {
 export interface ExerciseHistorySummary {
   strength?: StrengthExerciseHistory
   duration?: DurationExerciseHistory
+  /** Most recent plan the user recorded for this exercise, at any point in the past. */
+  nextPlan?: LastSessionMax<NextPlan>
 }
 
 export interface ExerciseHistoryBadge {
@@ -29,10 +32,15 @@ export interface ExerciseHistoryBadge {
   title: string
 }
 
+export interface NextPlanBadge extends ExerciseHistoryBadge {
+  icon: string
+}
+
 export type ExerciseHistoryByName = Map<string, ExerciseHistorySummary>
 
 interface SessionMetric<T> {
   date: string
+  mtime: number
   path: string
   value: T
 }
@@ -42,6 +50,7 @@ interface ExerciseHistoryDraft {
   strengthLastSessionMax?: SessionMetric<WeightSet>
   durationPersonalBestSeconds?: number
   durationLastSessionMaxSeconds?: SessionMetric<number>
+  nextPlan?: SessionMetric<NextPlan>
 }
 
 const ISO_DATE_PREFIX = /^(\d{4}-\d{2}-\d{2})/
@@ -116,6 +125,36 @@ export function formatExerciseHistoryBadges(
   ].filter((badge): badge is ExerciseHistoryBadge => badge !== null)
 }
 
+/**
+ * Badge for the plan the user recorded last time. Shows the resulting weight
+ * when the plan carries a step and the last session gives it something to
+ * apply to, since that is the number they act on at the rack; otherwise it
+ * falls back to the direction alone.
+ */
+export function formatNextPlanBadge(
+  summary: ExerciseHistorySummary | undefined,
+  kind: ExerciseKind,
+): NextPlanBadge | null {
+  const plan = summary?.nextPlan
+  if (!plan || kind !== 'strength') {
+    return null
+  }
+
+  const lastWeight = summary?.strength?.lastSessionMax?.value.weight
+  const base = lastWeight !== undefined && lastWeight > 0 ? lastWeight : null
+  const target = base === null ? null : nextPlanTargetWeight(plan.value, base)
+  const label = formatNextPlanLabel(plan.value).toLowerCase()
+  const change = plan.value.step === undefined ? label : `${label} kg`
+  const from =
+    base !== null && plan.value.direction !== 'stay' ? ` from ${formatNumber(base)} kg` : ''
+
+  return {
+    text: target !== null ? `Next: ${formatNumber(target)} kg` : `Next: ${change}`,
+    title: `Planned on ${plan.date}: ${change}${from}`,
+    icon: nextPlanIcon(plan.value),
+  }
+}
+
 export function pickMaxWeightSet(
   sets: ReadonlyArray<{ weight?: number; reps?: number }>,
 ): WeightSet | null {
@@ -145,6 +184,19 @@ function addEntryToDrafts(
     const draft = drafts.get(row.exerciseName) ?? {}
     let hasMetric = false
 
+    if (row.next) {
+      hasMetric = true
+      const candidate = {
+        date: entryDate,
+        mtime: entry.mtime,
+        path: entry.path,
+        value: row.next,
+      }
+      if (!draft.nextPlan || isLaterSession(candidate, draft.nextPlan)) {
+        draft.nextPlan = candidate
+      }
+    }
+
     if (row.kind === 'strength' && row.maxWeightSet) {
       hasMetric = true
       draft.strengthPersonalBest = draft.strengthPersonalBest
@@ -152,6 +204,7 @@ function addEntryToDrafts(
         : row.maxWeightSet
       const candidate = {
         date: entryDate,
+        mtime: entry.mtime,
         path: entry.path,
         value: row.maxWeightSet,
       }
@@ -175,6 +228,7 @@ function addEntryToDrafts(
           : row.totalDurationSeconds
       const candidate = {
         date: entryDate,
+        mtime: entry.mtime,
         path: entry.path,
         value: row.totalDurationSeconds,
       }
@@ -208,6 +262,9 @@ function finalizeDrafts(drafts: Map<string, ExerciseHistoryDraft>): ExerciseHist
           : undefined,
       }
     }
+    if (draft.nextPlan) {
+      summary.nextPlan = { value: draft.nextPlan.value, date: draft.nextPlan.date }
+    }
     if (
       draft.durationPersonalBestSeconds !== undefined ||
       draft.durationLastSessionMaxSeconds !== undefined
@@ -228,6 +285,13 @@ function finalizeDrafts(drafts: Map<string, ExerciseHistoryDraft>): ExerciseHist
   return history
 }
 
+function nextPlanIcon(plan: NextPlan): string {
+  if (plan.direction === 'up') {
+    return 'arrow-up'
+  }
+  return plan.direction === 'down' ? 'arrow-down' : 'minus'
+}
+
 function pickHeavierWeightSet(left: WeightSet, right: WeightSet): WeightSet {
   if (right.weight > left.weight) {
     return right
@@ -238,9 +302,17 @@ function pickHeavierWeightSet(left: WeightSet, right: WeightSet): WeightSet {
   return left
 }
 
+/**
+ * Later wins, and within a single day the most recently written note wins:
+ * two sessions of the same exercise on one date are ordered by mtime, with
+ * path as a stable last resort.
+ */
 function isLaterSession<T>(candidate: SessionMetric<T>, current: SessionMetric<T>): boolean {
   if (candidate.date !== current.date) {
     return candidate.date > current.date
+  }
+  if (candidate.mtime !== current.mtime) {
+    return candidate.mtime > current.mtime
   }
   return candidate.path > current.path
 }

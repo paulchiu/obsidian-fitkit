@@ -114,6 +114,7 @@ function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
         (total, entry) => total + entry.durationSeconds,
         0,
       ),
+      next: exercise.next,
     }
   }
 
@@ -124,6 +125,7 @@ function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
     bestSet: pickBestSet(strengthSets) ?? undefined,
     maxWeightSet: pickHeaviestSet(strengthSets) ?? undefined,
     totalSets: strengthSets.length,
+    next: exercise.next,
   }
 }
 
