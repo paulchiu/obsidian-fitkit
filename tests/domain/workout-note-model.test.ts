@@ -159,6 +159,68 @@ describe('workout note model', () => {
     expect(model.exercises[0]?.strengthSets).toEqual([{ set: 1, reps: 20 }])
   })
 
+  it('round-trips a next-time plan on the exercise bullet', () => {
+    const source = [
+      '---',
+      'type: workout',
+      'date: 2026-08-17',
+      'name: Plan day',
+      '---',
+      '',
+      '## [[Squat]]',
+      '',
+      '- [exercise:: [[Squat]]] [notes:: felt easy] [next:: up 2.5]',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+    ].join('\n')
+
+    const model = expectWorkoutModel(source, 'plan.md')
+    const serialized = serializeWorkoutNote(model)
+
+    expect(model.exercises[0]?.next).toEqual({ direction: 'up', step: 2.5 })
+    expect(serialized).toContain('[notes:: felt easy] [next:: up 2.5]')
+    expect(semanticEqual(model, expectWorkoutModel(serialized, 'plan.md'))).toBe(true)
+  })
+
+  it('writes the exercise bullet for a plan with no exercise note', () => {
+    const serialized = serializeWorkoutNote({
+      date: '2026-08-17',
+      name: 'Plan only',
+      sourcePath: 'plan-only.md',
+      preserveBlocks: [],
+      exercises: [
+        {
+          exerciseName: 'Squat',
+          kind: 'strength',
+          next: { direction: 'down' },
+          strengthSets: [{ set: 1, weight: 100, reps: 5 }],
+        },
+      ],
+    })
+
+    expect(serialized).toContain('- [exercise:: [[Squat]]] [next:: down]\n')
+    expect(serialized).not.toContain('[notes::]')
+  })
+
+  it('ignores an unrecognised next-time value', () => {
+    const model = expectWorkoutModel(
+      [
+        '---',
+        'type: workout',
+        'date: 2026-08-17',
+        'name: Freehand',
+        '---',
+        '',
+        '## [[Squat]]',
+        '',
+        '- [exercise:: [[Squat]]] [next:: heavier if grip holds]',
+        '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      ].join('\n'),
+      'freehand.md',
+    )
+
+    expect(model.exercises[0]?.next).toBeUndefined()
+  })
+
   it('reports non-workout markdown without a model', () => {
     const result = parseWorkoutNote('hello world', 'x')
 

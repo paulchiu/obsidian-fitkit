@@ -1,6 +1,7 @@
 import { TFile, type MarkdownPostProcessorContext } from 'obsidian'
 
 import { formatDurationInput } from '../domain/duration-input'
+import { formatNextPlanLabel } from '../domain/next-plan'
 import { parseWorkoutNote } from '../domain/workout-note-model'
 import type { DurationEntry, ExerciseEntry, StrengthSet } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
@@ -134,6 +135,15 @@ function renderExercisePreview(el: HTMLElement, exercise: ExerciseEntry): void {
 
   if (exercise.note) {
     wrap.createDiv({ cls: 'fitkit-reading-note', text: exercise.note })
+  }
+
+  if (exercise.next) {
+    wrap.createDiv({
+      cls: 'fitkit-reading-plan',
+      text: `Next time: ${formatNextPlanLabel(exercise.next).toLowerCase()}${
+        exercise.next.step === undefined ? '' : ' kg'
+      }`,
+    })
   }
 
   if (exercise.kind === 'strength') {

@@ -4,7 +4,11 @@ import { ItemView, Menu, Modal, Notice, TFile, normalizePath, setIcon } from 'ob
 import { reorderArray } from '../domain/array-utils'
 import { formatDurationInput, parseDurationInput } from '../domain/duration-input'
 import { formatErrorMessage } from '../domain/error'
-import { formatExerciseHistoryBadges, type ExerciseHistoryByName } from '../domain/exercise-history'
+import {
+  formatExerciseHistoryBadges,
+  formatNextPlanBadge,
+  type ExerciseHistoryByName,
+} from '../domain/exercise-history'
 import {
   createRegistry,
   kindForName,
@@ -13,6 +17,13 @@ import {
   type ExerciseRegistryEntry,
 } from '../domain/exercise-registry'
 import { filterSuggestableNames } from '../domain/exercise-suggestions'
+import { pickHeaviestSet } from '../domain/epley'
+import {
+  formatNumber as formatPlanNumber,
+  nextPlanTargetWeight,
+  type NextPlan,
+  type NextPlanDirection,
+} from '../domain/next-plan'
 import { DEFAULT_WEIGHT_UNIT } from '../domain/weight-unit'
 import {
   parseWorkoutNote,
@@ -82,9 +93,20 @@ interface ExerciseCard {
   name: string
   kind: ExerciseKind
   exerciseNotes?: string
+  next?: NextPlan
   strengthSets: EditableStrengthSet[]
   durationEntries: EditableDurationEntry[]
 }
+
+const NEXT_PLAN_OPTIONS: ReadonlyArray<{
+  direction: NextPlanDirection
+  icon: string
+  label: string
+}> = [
+  { direction: 'down', icon: 'arrow-down', label: 'Go down next time' },
+  { direction: 'stay', icon: 'minus', label: 'Stay at the same weight next time' },
+  { direction: 'up', icon: 'arrow-up', label: 'Go up next time' },
+]
 
 interface EditorWorkoutModel {
   isFitKitWorkout: boolean
@@ -445,9 +467,77 @@ export class WorkoutEditorView extends ItemView {
 
     if (ex.kind === 'strength') {
       this.renderStrengthTable(card, ex, index)
+      this.renderNextPlanControl(card, ex)
     } else {
       this.renderDurationTable(card, ex, index)
     }
+  }
+
+  /**
+   * Three-way toggle plus an optional step, recorded against this session and
+   * shown on the card the next time the exercise comes up. Tapping the active
+   * direction clears the plan.
+   */
+  private renderNextPlanControl(card: HTMLElement, ex: ExerciseCard): void {
+    const row = card.createDiv({ cls: 'fitkit-next-row' })
+    row.createSpan({ cls: 'fitkit-label', text: 'Next time' })
+
+    const group = row.createDiv({
+      cls: 'fitkit-next-seg',
+      attr: { role: 'group', 'aria-label': 'Plan for next session' },
+    })
+    for (const option of NEXT_PLAN_OPTIONS) {
+      const isActive = ex.next?.direction === option.direction
+      const button = group.createEl('button', {
+        cls: isActive ? 'fitkit-next-seg-button is-active' : 'fitkit-next-seg-button',
+        attr: {
+          type: 'button',
+          'aria-label': option.label,
+          'aria-pressed': isActive ? 'true' : 'false',
+        },
+      })
+      setIcon(button, option.icon)
+      button.addEventListener('click', () => {
+        ex.next = isActive ? undefined : buildNextPlan(option.direction, ex.next?.step)
+        this.markDirty()
+        this.render()
+      })
+    }
+
+    if (!ex.next || ex.next.direction === 'stay') {
+      return
+    }
+
+    const stepInput = row.createEl('input', {
+      cls: 'fitkit-input fitkit-next-step',
+      attr: {
+        type: 'text',
+        inputmode: 'decimal',
+        // eslint-disable-next-line obsidianmd/ui/sentence-case -- Unit symbols use lowercase labels.
+        placeholder: 'kg',
+        'aria-label': 'Weight change for next session',
+      },
+    })
+    stepInput.value = ex.next.step === undefined ? '' : formatPlanNumber(ex.next.step)
+
+    const target = row.createSpan({ cls: 'fitkit-next-target' })
+    const syncTarget = () => {
+      target.setText(nextPlanTargetText(ex) ?? '')
+    }
+    syncTarget()
+
+    stepInput.addEventListener('input', () => {
+      if (!ex.next) {
+        return
+      }
+      const step = Number(stepInput.value.trim())
+      ex.next =
+        Number.isFinite(step) && step > 0
+          ? { direction: ex.next.direction, step }
+          : { direction: ex.next.direction }
+      syncTarget()
+      this.markDirty()
+    })
   }
 
   private renderStrengthTable(card: HTMLElement, ex: ExerciseCard, exerciseIndex: number): void {
@@ -1108,8 +1198,10 @@ export class WorkoutEditorView extends ItemView {
   }
 
   private renderExerciseHistoryBadges(card: HTMLElement, ex: ExerciseCard): void {
-    const badges = formatExerciseHistoryBadges(this.exerciseHistory?.get(ex.name), ex.kind)
-    if (badges.length === 0) {
+    const summary = this.exerciseHistory?.get(ex.name)
+    const badges = formatExerciseHistoryBadges(summary, ex.kind)
+    const planBadge = formatNextPlanBadge(summary, ex.kind)
+    if (badges.length === 0 && !planBadge) {
       return
     }
 
@@ -1124,6 +1216,20 @@ export class WorkoutEditorView extends ItemView {
         },
       })
     }
+
+    if (!planBadge) {
+      return
+    }
+    const plan = historyRow.createSpan({
+      cls: 'fitkit-card-badge fitkit-plan-badge',
+      attr: {
+        title: planBadge.title,
+        'aria-label': `${planBadge.text}: ${planBadge.title}`,
+      },
+    })
+    const icon = plan.createSpan({ cls: 'fitkit-plan-badge-icon', attr: { 'aria-hidden': 'true' } })
+    setIcon(icon, planBadge.icon)
+    plan.createSpan({ text: planBadge.text })
   }
 
   private async loadExerciseHistory(): Promise<ExerciseHistoryByName | null> {
@@ -1721,7 +1827,27 @@ function toEditorExercise(exercise: ExerciseEntry): ExerciseCard {
   if (exercise.note !== undefined) {
     card.exerciseNotes = exercise.note
   }
+  if (exercise.next !== undefined) {
+    card.next = exercise.next
+  }
   return card
+}
+
+function buildNextPlan(direction: NextPlanDirection, step: number | undefined): NextPlan {
+  return direction === 'stay' || step === undefined ? { direction } : { direction, step }
+}
+
+/** Live preview of where the plan lands, against the heaviest set logged today. */
+function nextPlanTargetText(card: ExerciseCard): string | null {
+  if (!card.next) {
+    return null
+  }
+  const heaviest = pickHeaviestSet(card.strengthSets)
+  if (!heaviest || heaviest.weight <= 0) {
+    return null
+  }
+  const target = nextPlanTargetWeight(card.next, heaviest.weight)
+  return target === null ? null : `→ ${formatPlanNumber(target)} kg`
 }
 
 function toEditorStrengthSet(set: StrengthSet): EditableStrengthSet {
@@ -1770,6 +1896,9 @@ function toWorkoutExercise(card: ExerciseCard): ExerciseEntry {
   }
   if (card.exerciseNotes !== undefined) {
     exercise.note = card.exerciseNotes
+  }
+  if (card.next !== undefined) {
+    exercise.next = card.next
   }
   if (card.kind === 'strength') {
     exercise.strengthSets = card.strengthSets.map(toStrengthSet)

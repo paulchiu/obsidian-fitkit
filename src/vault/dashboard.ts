@@ -11,6 +11,7 @@ import {
   resolve,
   type ExerciseRegistry,
 } from '../domain/exercise-registry'
+import { formatNextPlanLabel, type NextPlan } from '../domain/next-plan'
 import { DEFAULT_WEIGHT_UNIT, parseWeightUnit, type WeightUnit } from '../domain/weight-unit'
 import type { BestSet, ExerciseIndexRow, FitKitIndex, IndexEntry, WeightSet } from '../domain/types'
 import type { FitKitSettings } from '../settings'
@@ -26,6 +27,14 @@ interface ExerciseAggregate {
   totalSets: number
   totalDurationSeconds: number
   sessionCount: number
+  nextPlan?: PlannedSession
+}
+
+interface PlannedSession {
+  value: NextPlan
+  date: string
+  mtime: number
+  path: string
 }
 
 type StrengthPbSet = WeightSet & { e1rm?: number }
@@ -110,6 +119,16 @@ function composeDashboardFromAggregates(
     lines.push(formatPb(exercise))
   }
 
+  const planned = exercises.filter((exercise) => exercise.nextPlan !== undefined)
+  if (planned.length > 0) {
+    lines.push('')
+    lines.push('## Next session plans')
+    lines.push('')
+    for (const exercise of planned) {
+      lines.push(formatNextPlanLine(exercise))
+    }
+  }
+
   for (const exercise of exercises) {
     lines.push('')
     lines.push(`## ${exercise.exerciseName}`)
@@ -156,6 +175,17 @@ function aggregateExercises(
       if (candidate && isBetterDashboardSet(candidate, aggregate.pbSet, aggregate.metric)) {
         aggregate.pbSet = candidate
       }
+      if (row.next) {
+        const planned: PlannedSession = {
+          value: row.next,
+          date: entry.date,
+          mtime: entry.mtime,
+          path: entry.path,
+        }
+        if (!aggregate.nextPlan || isMoreRecentPlan(planned, aggregate.nextPlan)) {
+          aggregate.nextPlan = planned
+        }
+      }
     }
   }
 
@@ -199,6 +229,27 @@ function formatPb(exercise: ExerciseAggregate): string {
   }
 
   return `- **${link}:** ${formatDashboardSet(exercise.pbSet, exercise.metric, exercise.unit)}`
+}
+
+function formatNextPlanLine(exercise: ExerciseAggregate): string {
+  const link = `[[#${exercise.exerciseName}|${exercise.exerciseName}]]`
+  const plan = exercise.nextPlan
+  if (!plan) {
+    return `- **${link}:** no plan`
+  }
+  const label = formatNextPlanLabel(plan.value).toLowerCase()
+  const change = plan.value.step === undefined ? label : `${label} ${exercise.unit}`
+  return `- **${link}:** ${change} (planned ${plan.date})`
+}
+
+function isMoreRecentPlan(candidate: PlannedSession, current: PlannedSession): boolean {
+  if (candidate.date !== current.date) {
+    return candidate.date > current.date
+  }
+  if (candidate.mtime !== current.mtime) {
+    return candidate.mtime > current.mtime
+  }
+  return candidate.path > current.path
 }
 
 function dataviewQuery(exercise: ExerciseAggregate, workoutsFolderPath: string): string[] {

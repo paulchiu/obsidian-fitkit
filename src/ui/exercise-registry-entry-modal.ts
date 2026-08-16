@@ -28,6 +28,7 @@ export class ExerciseRegistryEntryModal extends Modal {
   private kindSelect!: HTMLSelectElement
   private unitField!: HTMLDivElement
   private unitSelect!: HTMLSelectElement
+  private unitWarning!: HTMLDivElement
   private aliasesTextarea!: HTMLTextAreaElement
   private saveButton!: HTMLButtonElement
   private nameError!: HTMLDivElement
@@ -92,10 +93,13 @@ export class ExerciseRegistryEntryModal extends Modal {
     // eslint-disable-next-line obsidianmd/ui/sentence-case -- Unit symbols use lowercase labels.
     this.unitSelect.createEl('option', { value: 'lbs', text: 'lbs' })
     this.unitSelect.value = this.weightUnit
+    this.unitWarning = this.unitField.createDiv({ cls: 'fitkit-registry-field-warning' })
     this.unitSelect.addEventListener('change', () => {
       this.weightUnit = this.unitSelect.value === 'lbs' ? 'lbs' : 'kg'
+      this.refreshUnitWarning()
     })
     this.refreshUnitVisibility()
+    this.refreshUnitWarning()
 
     const aliasField = contentEl.createDiv({ cls: 'fitkit-registry-field' })
     aliasField.createEl('label', {
@@ -147,6 +151,19 @@ export class ExerciseRegistryEntryModal extends Modal {
 
   private refreshUnitVisibility(): void {
     this.unitField.hidden = this.exerciseKind === 'duration'
+  }
+
+  /**
+   * Weights and next-time steps are already written into workout notes as bare
+   * numbers, so switching unit reinterprets rather than converts them.
+   */
+  private refreshUnitWarning(): void {
+    const changed = this.mode.kind === 'edit' && this.weightUnit !== this.mode.original.unit
+    this.unitWarning.setText(
+      changed
+        ? 'Weights and next-time steps already recorded stay as written. Update them yourself if they need converting.'
+        : '',
+    )
   }
 
   private refreshValidation(): void {

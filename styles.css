@@ -299,6 +299,88 @@ body.is-mobile .fitkit-editor-root {
   white-space: nowrap;
 }
 
+.fitkit-plan-badge {
+  gap: 4px;
+  border-style: dashed;
+  border-color: var(--text-accent);
+  color: var(--text-accent);
+}
+
+.fitkit-plan-badge-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.fitkit-plan-badge-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.fitkit-next-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fitkit-next-seg {
+  display: inline-flex;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--background-primary);
+}
+
+.fitkit-next-seg-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  border-right: 1px solid var(--background-modifier-border);
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.fitkit-next-seg-button:last-child {
+  border-right: none;
+}
+
+.fitkit-next-seg-button:hover,
+.fitkit-next-seg-button:focus-visible {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.fitkit-next-seg-button.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.fitkit-next-seg-button svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.25;
+}
+
+.fitkit-next-step {
+  width: 84px;
+  flex: 0 0 auto;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.fitkit-next-target {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .fitkit-gear-button {
   display: inline-flex;
 }
@@ -761,6 +843,11 @@ body.is-mobile .fitkit-editor-root {
   min-height: 1em;
 }
 
+.fitkit-registry-entry-modal .fitkit-registry-field-warning {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .fitkit-chart {
   margin: 0.5rem 0;
 }
@@ -858,6 +945,13 @@ body.is-mobile .fitkit-editor-root {
   color: var(--text-muted);
   font-size: var(--font-ui-small);
   white-space: pre-wrap;
+}
+
+.fitkit-reading-plan {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  color: var(--text-accent);
+  font-size: var(--font-ui-small);
 }
 
 .fitkit-reading-table {

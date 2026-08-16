@@ -121,9 +121,12 @@ Dataview inline fields are the canonical workout format:
 ```markdown
 [exercise:: [[Name]]] [set:: N] [weight:: X] [reps:: Y]
 [exercise:: [[Name]]] [duration:: S]
+[exercise:: [[Name]]] [notes:: text] [next:: up 2.5]
 ```
 
 Durations are stored as seconds. Fenced code blocks are reporting surfaces, not the source of truth.
+
+`next::` records how you want to load the exercise next session: `up`, `down`, or `stay`, with an optional weight change (`up 2.5`). FitKit writes it from the workout editor and shows it on the exercise card the next time that exercise comes up. Values it does not recognise are left alone.
 
 ## Limitations
 

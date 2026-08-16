@@ -80,7 +80,7 @@ Official references (authoritative):
 ### Project-specific patterns
 
 - **Autosave (editor views):** debounce writes (~600ms), flush on tab close and on switching files, show an `unsaved` indicator while a write is pending, and block on mid-edit external changes (offer a reload path).
-- **Dataview inline fields** are the canonical editing surface for workout data: `[exercise:: [[Name]]] [set:: N] [weight:: X] [reps:: Y]` (strength) and `[exercise:: [[Name]]] [duration:: S]` (duration). Fenced code blocks are reporting-only.
+- **Dataview inline fields** are the canonical editing surface for workout data: `[exercise:: [[Name]]] [set:: N] [weight:: X] [reps:: Y]` (strength) and `[exercise:: [[Name]]] [duration:: S]` (duration). The exercise-level bullet carries `[notes:: text]` and `[next:: up 2.5]` (the user's plan for next session: `up`, `down`, or `stay`, with an optional step). Fenced code blocks are reporting-only.
 - **Frontmatter contracts:** `type: workout` on workout notes; `type: exercise` on exercise notes. Treat them as the discriminator between canonical docs and journal drafts.
 
 ## 6. Operation Manual
