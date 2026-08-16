@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.19.0] - 2026-08-16
+
+### Added
+
 - Strength exercise cards can record how to load the exercise next session (up, stay, or
   down) with an optional weight change, saved to the note as `[next:: up 2.5]`.
 - The workout editor shows the plan recorded last session as a badge beside PB and Last
