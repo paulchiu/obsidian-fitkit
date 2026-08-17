@@ -72,7 +72,6 @@ Other settings worth knowing:
 
 - `Auto-open workout editor`: open workout notes in the FitKit editor by default.
 - `Rest timer`: show the workout editor rest timer.
-- `Auto-update dashboard on save`: refresh dashboard data after workout saves.
 - `Chart sessions`: default number of recent sessions to plot in exercise charts.
 
 ## Dashboard and exercise notes

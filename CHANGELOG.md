@@ -13,7 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Next-session history badges no longer serve a stale plan after the workout editor
+  autosaves. The editor now refreshes the cached index entry for the note it just wrote,
+  so an edited or cleared `next::` value is reflected immediately instead of waiting for
+  a manual `Rebuild index`.
+- The next-time step field now stays on the same row as the direction buttons instead of
+  stretching to full width and wrapping onto a line of its own.
+
 ### Removed
+
+- The live target-weight preview under the Next time control. It restated what the
+  direction and step already say, and went stale when the set weight changed underneath
+  it.
+- The `Auto-update dashboard on save` setting. Nothing ever read it, so the toggle had no
+  effect; the dashboard still regenerates from the `Rebuild dashboard` maintenance
+  action.
 
 ## [0.19.0] - 2026-08-16
 

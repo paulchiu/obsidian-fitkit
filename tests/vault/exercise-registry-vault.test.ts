@@ -41,7 +41,6 @@ function settingsWithRegistry(
     fitnessRoot: 'Fitness',
     autoOpenWorkoutEditor: true,
     strengthRestTimerEnabled: true,
-    autoUpdateDashboard: true,
     autosaveDebounceMs: 600,
     chartSessionsWindow: 30,
     exerciseRegistry,
