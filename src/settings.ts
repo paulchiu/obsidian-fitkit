@@ -96,7 +96,7 @@ function normalizeStoredExerciseRegistry(
   return entries.map((entry) => ({
     name: entry.name,
     kind: entry.kind,
-    unit: parseWeightUnit(entry.unit) ?? DEFAULT_WEIGHT_UNIT,
+    unit: parseWeightUnit(entry.unit) ?? undefined,
     aliases: [...entry.aliases],
   }))
 }
@@ -367,7 +367,9 @@ export class FitKitSettingTab extends PluginSettingTab {
     const tr = table.createEl('tr')
     tr.createEl('td', { text: entry.name })
     tr.createEl('td', { text: entry.kind })
-    tr.createEl('td', { text: entry.kind === 'strength' ? entry.unit : '' })
+    tr.createEl('td', {
+      text: entry.kind === 'strength' ? (entry.unit ?? DEFAULT_WEIGHT_UNIT) : '',
+    })
 
     const aliasCell = tr.createEl('td')
     if (entry.aliases.length === 0) {

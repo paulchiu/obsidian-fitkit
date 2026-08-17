@@ -3,6 +3,7 @@ import { Modal, Notice } from 'obsidian'
 import type {
   ExerciseKind,
   ExerciseRegistryEntry,
+  RegistryEntryDraft,
   ValidationError,
 } from '../domain/exercise-registry'
 import {
@@ -23,6 +24,8 @@ export class ExerciseRegistryEntryModal extends Modal {
   private name: string
   private exerciseKind: ExerciseKind
   private weightUnit: WeightUnit
+  /** True once the user interacts with the unit dropdown; gates whether buildDraft() may record a unit at all. */
+  private unitTouched: boolean
   private aliasesText: string
   private nameInput!: HTMLInputElement
   private kindSelect!: HTMLSelectElement
@@ -43,7 +46,7 @@ export class ExerciseRegistryEntryModal extends Modal {
     if (mode.kind === 'edit') {
       this.name = mode.original.name
       this.exerciseKind = mode.original.kind
-      this.weightUnit = mode.original.unit
+      this.weightUnit = mode.original.unit ?? DEFAULT_WEIGHT_UNIT
       this.aliasesText = mode.original.aliases.join('\n')
     } else {
       this.name = ''
@@ -51,6 +54,7 @@ export class ExerciseRegistryEntryModal extends Modal {
       this.weightUnit = DEFAULT_WEIGHT_UNIT
       this.aliasesText = ''
     }
+    this.unitTouched = false
   }
 
   onOpen(): void {
@@ -96,6 +100,7 @@ export class ExerciseRegistryEntryModal extends Modal {
     this.unitWarning = this.unitField.createDiv({ cls: 'fitkit-registry-field-warning' })
     this.unitSelect.addEventListener('change', () => {
       this.weightUnit = this.unitSelect.value === 'lbs' ? 'lbs' : 'kg'
+      this.unitTouched = true
       this.refreshUnitWarning()
     })
     this.refreshUnitVisibility()
@@ -132,13 +137,29 @@ export class ExerciseRegistryEntryModal extends Modal {
     this.contentEl.empty()
   }
 
-  private buildDraft(): { name: string; kind: ExerciseKind; unit: WeightUnit; aliases: string[] } {
+  private buildDraft(): RegistryEntryDraft {
     return sanitizeEntryDraft({
       name: this.name,
       kind: this.exerciseKind,
-      unit: this.weightUnit,
+      unit: this.resolveDraftUnit(),
       aliases: this.aliasesText.split('\n'),
     })
+  }
+
+  /**
+   * Only record a unit when the user actually specified one: creating a new
+   * entry, editing one that already had an explicit unit, or having touched
+   * the unit dropdown this session. Otherwise stay unrecorded rather than
+   * synthesizing DEFAULT_WEIGHT_UNIT as if it were a deliberate choice.
+   */
+  private resolveDraftUnit(): WeightUnit | undefined {
+    if (this.mode.kind === 'create') {
+      return this.weightUnit
+    }
+    if (this.mode.original.unit !== undefined || this.unitTouched) {
+      return this.weightUnit
+    }
+    return undefined
   }
 
   private currentRegistry(): ReturnType<typeof createRegistry> {
@@ -158,7 +179,9 @@ export class ExerciseRegistryEntryModal extends Modal {
    * numbers, so switching unit reinterprets rather than converts them.
    */
   private refreshUnitWarning(): void {
-    const changed = this.mode.kind === 'edit' && this.weightUnit !== this.mode.original.unit
+    const changed =
+      this.mode.kind === 'edit' &&
+      this.weightUnit !== (this.mode.original.unit ?? DEFAULT_WEIGHT_UNIT)
     this.unitWarning.setText(
       changed
         ? 'Weights and next-time steps already recorded stay as written. Update them yourself if they need converting.'

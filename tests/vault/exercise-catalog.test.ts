@@ -96,8 +96,8 @@ describe('exercise catalog', () => {
     )
 
     expect(snapshot.entries).toEqual([
-      { name: 'Plank', path: 'Fitness/Exercises/Plank.md', kind: 'duration', unit: 'kg' },
-      { name: 'Squat', path: 'Fitness/Exercises/Squat.md', kind: 'strength', unit: 'kg' },
+      { name: 'Plank', path: 'Fitness/Exercises/Plank.md', kind: 'duration' },
+      { name: 'Squat', path: 'Fitness/Exercises/Squat.md', kind: 'strength' },
     ])
   })
 

@@ -16,13 +16,14 @@ import {
   upsertEntry,
   type ExerciseRegistryEntry,
 } from '../domain/exercise-registry'
+import type { ExerciseNoteKindUpdateResult } from '../domain/exercise-note-migrate'
+import { setExerciseNoteKind } from '../domain/exercise-note-migrate'
 import { filterSuggestableNames } from '../domain/exercise-suggestions'
 import {
   formatNumber as formatPlanNumber,
   type NextPlan,
   type NextPlanDirection,
 } from '../domain/next-plan'
-import { DEFAULT_WEIGHT_UNIT } from '../domain/weight-unit'
 import {
   parseWorkoutNote,
   serializeWorkoutNote,
@@ -35,6 +36,7 @@ import {
 } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
 import { exercisesFolder, workoutsFolder } from '../settings-paths'
+import { readExerciseCatalog } from '../vault/exercise-catalog'
 import { composeExerciseNote } from '../vault/exercise-note'
 import { planExerciseFileOpen } from '../vault/exercise-file-plan'
 import { exerciseHistoryFromVault } from '../vault/exercise-history-vault'
@@ -977,8 +979,41 @@ export class WorkoutEditorView extends ItemView {
     }
     this.applyKindSwitch(index, nextKind, hadRows)
     if (choice === 'workout-and-registry') {
-      await this.persistRegistryKind(ex.name, nextKind)
+      await this.persistKindChange(ex.name, nextKind)
     }
+  }
+
+  /**
+   * Writes the kind switch to whichever store wins on read. An exercise note
+   * always beats the registry overlay (see buildExerciseRegistrySnapshot), so
+   * the note is updated when one exists; the registry is only the fallback
+   * for no-note exercises.
+   */
+  private async persistKindChange(name: string, nextKind: ExerciseKind): Promise<void> {
+    const trimmed = name.trim()
+    if (!trimmed) {
+      return
+    }
+    const key = normalize(trimmed)
+    const catalog = readExerciseCatalog(this.app, this.plugin.settings)
+    const noteEntry = catalog.entries.find((entry) => normalize(entry.name) === key)
+    const noteFile = noteEntry ? this.app.vault.getAbstractFileByPath(noteEntry.path) : null
+    if (noteFile instanceof TFile) {
+      let result: ExerciseNoteKindUpdateResult | undefined
+      await this.app.vault.process(noteFile, (text) => {
+        result = setExerciseNoteKind(text, nextKind)
+        return result.markdown
+      })
+      if (result?.changed) {
+        new Notice(`Exercise note now records ${trimmed} as ${nextKind}.`)
+      } else {
+        new Notice(
+          `Could not update the exercise note for ${trimmed}; its frontmatter was left unchanged.`,
+        )
+      }
+      return
+    }
+    await this.persistRegistryKind(trimmed, nextKind)
   }
 
   private chooseKindSwitch(
@@ -1008,10 +1043,11 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     const current = createRegistry(settings.exerciseRegistry)
-    const existing = current.entries.find((entry) => entry.name === trimmed)
+    const trimmedKey = normalize(trimmed)
+    const existing = current.entries.find((entry) => normalize(entry.name) === trimmedKey)
     const nextEntry: ExerciseRegistryEntry = existing
       ? { ...existing, aliases: [...existing.aliases], kind: nextKind }
-      : { name: trimmed, kind: nextKind, unit: DEFAULT_WEIGHT_UNIT, aliases: [] }
+      : { name: trimmed, kind: nextKind, aliases: [] }
     const updated = upsertEntry(current, nextEntry)
     settings.exerciseRegistry = updated.entries
     await this.plugin.saveSettings()
@@ -1499,6 +1535,20 @@ export class WorkoutEditorView extends ItemView {
           new Notice(`Could not create exercise note for '${name}': ${formatErrorMessage(error)}.`)
           return
         }
+        /**
+         * A note-backed exercise still needs a registry entry so it shows up in
+         * the settings Registry table, which lists settings.exerciseRegistry
+         * directly rather than the note-merged snapshot.
+         */
+        const registry = createRegistry(this.plugin.settings.exerciseRegistry)
+        if (kindForName(registry, name) === null) {
+          this.plugin.settings.exerciseRegistry = upsertEntry(registry, {
+            name,
+            kind,
+            aliases: [],
+          }).entries
+          settingsChanged = true
+        }
         new Notice(`Created exercise note for '${name}'.`)
       } else {
         new Notice(
@@ -1513,7 +1563,6 @@ export class WorkoutEditorView extends ItemView {
         this.plugin.settings.exerciseRegistry = upsertEntry(registry, {
           name,
           kind,
-          unit: DEFAULT_WEIGHT_UNIT,
           aliases: [],
         }).entries
         settingsChanged = true

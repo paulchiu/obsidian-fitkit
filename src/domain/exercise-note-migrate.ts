@@ -111,6 +111,51 @@ export function migrateExerciseNote(
   }
 }
 
+export interface ExerciseNoteKindUpdateResult {
+  markdown: string
+  changed: boolean
+}
+
+/**
+ * Writes `kind:` directly into an exercise note's frontmatter, without the
+ * rest of migrateExerciseNote's repair pass. Used when the user explicitly
+ * switches an exercise's kind, so the note (the store that wins on read via
+ * buildExerciseRegistrySnapshot) reflects the choice immediately rather than
+ * being downgraded back on the next read.
+ */
+export function setExerciseNoteKind(
+  source: string,
+  kind: ExerciseKind,
+): ExerciseNoteKindUpdateResult {
+  const normalizedSource = normalizeMarkdownSource(source)
+  const bounds = findFrontmatterBounds(normalizedSource.markdown)
+  if (bounds.status !== 'found') {
+    return { markdown: source, changed: false }
+  }
+
+  const lines = normalizedSource.markdown.split('\n')
+  const frontmatterLines = lines.slice(bounds.start + 1, bounds.end)
+  if (frontmatterKind(frontmatterLines) === kind) {
+    return { markdown: source, changed: false }
+  }
+
+  const kindLineIndex = findFrontmatterKeyLine(frontmatterLines, 'kind')
+  const nextFrontmatterLines =
+    kindLineIndex < 0
+      ? insertLines(frontmatterLines, findFrontmatterKeyLine(frontmatterLines, 'type') + 1, [
+          `kind: ${kind}`,
+        ])
+      : replaceLine(frontmatterLines, kindLineIndex, `kind: ${kind}`)
+
+  const markdown = [
+    ...lines.slice(0, bounds.start + 1),
+    ...nextFrontmatterLines,
+    ...lines.slice(bounds.end),
+  ].join('\n')
+
+  return { markdown: restoreMarkdownSource(markdown, normalizedSource), changed: true }
+}
+
 function repairFrontmatter(
   source: string,
   options: ExerciseNoteMigrationOptions,
@@ -342,6 +387,12 @@ function frontmatterMetric(line: string): ExerciseMetric | null {
   return parseExerciseMetric(scalarValue(line))
 }
 
+/**
+ * Fills in a missing or invalid strength unit, preferring an explicit registry
+ * unit over the default. Never touches a line that already holds a valid unit:
+ * frontmatter is what the user edits, so a recorded 'kg'/'lbs' always stands,
+ * even against a differing registry unit.
+ */
 function setStrengthUnitFromRegistry(
   lines: ReadonlyArray<string>,
   registryUnit: WeightUnit | null,
@@ -354,16 +405,12 @@ function setStrengthUnitFromRegistry(
     return insertLines(lines, insertionIndex, [`unit: ${registryUnit ?? DEFAULT_WEIGHT_UNIT}`])
   }
 
-  if (registryUnit) {
-    return replaceLine(lines, unitLineIndex, `unit: ${registryUnit}`)
-  }
-
   const existingUnit = parseWeightUnit(scalarValue(lines[unitLineIndex] ?? ''))
   if (existingUnit) {
     return [...lines]
   }
 
-  return replaceLine(lines, unitLineIndex, `unit: ${DEFAULT_WEIGHT_UNIT}`)
+  return replaceLine(lines, unitLineIndex, `unit: ${registryUnit ?? DEFAULT_WEIGHT_UNIT}`)
 }
 
 function repairRecentSessions(

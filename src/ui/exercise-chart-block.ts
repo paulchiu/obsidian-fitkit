@@ -208,7 +208,9 @@ function resolveExerciseWeightUnit(
     return frontmatterUnit
   }
   const resolved = resolve(registry, exerciseName)
-  return resolved.kind === 'match' ? resolved.entry.unit : DEFAULT_WEIGHT_UNIT
+  return resolved.kind === 'match'
+    ? (resolved.entry.unit ?? DEFAULT_WEIGHT_UNIT)
+    : DEFAULT_WEIGHT_UNIT
 }
 
 function readFrontmatterField(

@@ -7,10 +7,16 @@ import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from './weight-unit'
 
 export type ExerciseKind = 'strength' | 'duration'
 
+/**
+ * `unit` is only present when explicitly recorded (via the registry editor or
+ * import). Absence means "no unit on file", distinct from an explicit 'kg';
+ * callers fall back to `DEFAULT_WEIGHT_UNIT` themselves rather than have this
+ * type silently synthesize one.
+ */
 export type ExerciseRegistryEntry = {
   name: string
   kind: ExerciseKind
-  unit: WeightUnit
+  unit?: WeightUnit
   aliases: string[]
 }
 
@@ -95,7 +101,7 @@ export function kindForName(registry: ExerciseRegistry, rawName: string): Exerci
 
 export function unitForName(registry: ExerciseRegistry, rawName: string): WeightUnit | null {
   const result = resolve(registry, rawName)
-  return result.kind === 'match' ? result.entry.unit : null
+  return result.kind === 'match' ? (result.entry.unit ?? null) : null
 }
 
 export function resolve(registry: ExerciseRegistry, rawName: string): ResolutionResult {
@@ -120,18 +126,25 @@ export function resolve(registry: ExerciseRegistry, rawName: string): Resolution
   return { kind: 'ambiguous', candidates: unique }
 }
 
+/**
+ * Replace the entry matching `entry.name` (case/whitespace-insensitive) or
+ * append it as new. Keying on `normalize()` keeps a case or whitespace variant
+ * from producing a second, ambiguous entry alongside the existing one.
+ */
 export function upsertEntry(
   registry: ExerciseRegistry,
   entry: ExerciseRegistryEntry,
 ): ExerciseRegistry {
-  const next = registry.entries.filter((existing) => existing.name !== entry.name)
+  const key = normalize(entry.name)
+  const next = registry.entries.filter((existing) => normalize(existing.name) !== key)
   next.push(cloneEntry(entry))
   next.sort((left, right) => left.name.localeCompare(right.name))
   return { entries: next }
 }
 
 export function removeEntry(registry: ExerciseRegistry, name: string): ExerciseRegistry {
-  return { entries: registry.entries.filter((entry) => entry.name !== name) }
+  const key = normalize(name)
+  return { entries: registry.entries.filter((entry) => normalize(entry.name) !== key) }
 }
 
 export function mergeRegistries(
@@ -170,7 +183,7 @@ export function bootstrapFromStems(
 export type RegistryEntryDraft = {
   name: string
   kind: ExerciseKind
-  unit: WeightUnit
+  unit?: WeightUnit
   aliases: string[]
 }
 

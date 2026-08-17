@@ -11,7 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Registry lookups (kind switch, upsert, remove) now match exercise names case- and
+  whitespace-insensitively, so a differently-cased workout card updates the existing
+  registry entry instead of creating a second, ambiguous one.
+- Exercise unit precedence is now frontmatter-first everywhere: the exercise note's
+  `unit:` wins when present, and the registry overlay's unit is only a fallback. Sync and
+  repair no longer overwrites a valid frontmatter unit with a registry value.
+
 ### Fixed
+
+- Switching an exercise's kind now writes `kind:` into that exercise's note frontmatter
+  when a note exists, since the note is what wins on the next read. Previously the switch
+  only updated the settings registry overlay, which a note-backed exercise silently
+  discarded on the next read despite the success notice. If the note's frontmatter can't be
+  parsed, the notice now says so instead of falsely claiming success.
+- Logging a new exercise and accepting the "create note" prompt now also adds a registry
+  overlay entry for it, so the exercise shows up in the settings Registry table instead of
+  staying invisible there forever.
+- The registry no longer synthesizes a `kg` unit for legacy entries with no unit recorded.
+  A synthesized default was indistinguishable from an explicit choice, so Sync and repair
+  could silently overwrite a hand-edited `unit: lbs` in an exercise note. Editing an entry
+  through the Settings > Registry table (even just to change an alias) no longer synthesizes
+  that default either; an unrecorded unit stays unrecorded unless the unit dropdown is
+  actually touched.
 
 ### Removed
 

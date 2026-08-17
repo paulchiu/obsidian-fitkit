@@ -65,15 +65,14 @@ describe('settings migration', () => {
     expect(migrated.deletedExercises).toEqual([])
   })
 
-  it('defaults legacy registry entries without a unit to kg', () => {
+  it('leaves legacy registry entries without a unit key unset, rather than synthesizing kg', () => {
     const migrated = settingsFromStored({
       exerciseRegistry: [{ name: 'Squat', kind: 'strength', aliases: [] }],
       schemaVersion: 1,
     } as unknown as Partial<FitKitSettings>)
 
-    expect(migrated.exerciseRegistry).toEqual([
-      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: [] },
-    ])
+    expect(migrated.exerciseRegistry).toEqual([{ name: 'Squat', kind: 'strength', aliases: [] }])
+    expect(migrated.exerciseRegistry[0]?.unit).toBeUndefined()
   })
 
   it('preserves stored deleted exercise tombstones', () => {
