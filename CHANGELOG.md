@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [0.19.1] - 2026-08-17
+
+### Added
+
+### Changed
+
+### Fixed
+
 - Next-session history badges no longer serve a stale plan after the workout editor
   autosaves. The editor now refreshes the cached index entry for the note it just wrote,
   so an edited or cleared `next::` value is reflected immediately instead of waiting for
