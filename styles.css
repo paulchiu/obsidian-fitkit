@@ -793,11 +793,36 @@ body.is-mobile .fitkit-editor-root {
   font-style: italic;
 }
 
-.fitkit-registry-section .fitkit-import-table td:nth-child(3) {
+.fitkit-registry-aliases-cell {
   max-width: 320px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.fitkit-registry-provenance {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 0 6px;
+  font-size: var(--font-ui-smaller, 12px);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.fitkit-registry-provenance.is-note {
+  color: var(--text-accent, var(--text-normal));
+}
+
+.fitkit-registry-provenance.is-overlay {
+  color: var(--text-normal);
+}
+
+.fitkit-registry-provenance.is-history {
+  color: var(--text-muted);
+  border-style: dashed;
 }
 
 .fitkit-registry-action-cell {

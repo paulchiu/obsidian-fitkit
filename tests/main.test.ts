@@ -187,6 +187,7 @@ interface TestPlugin {
   openWorkoutEditor(file: TFile): Promise<void>
   showExerciseRegistryDiagnostics(): void
   syncExerciseNotes(): Promise<void>
+  rebuildExerciseRegistry(): Promise<void>
 }
 
 const makeEditorView = (
@@ -572,6 +573,88 @@ kind: duration
     expect(contents.get(file.path)).not.toContain('kind: strength')
     expect(noticeMessages).toHaveLength(1)
     expect(noticeMessages[0]).toContain('1 registry kind conflict preserved')
+  })
+})
+
+describe('FitKitPlugin rebuildExerciseRegistry', () => {
+  beforeEach(() => {
+    noticeMessages.length = 0
+  })
+
+  it('backfills note-backed and history-only exercises, skips tombstoned, reports counts, and is idempotent', async () => {
+    const workoutFile = makeWorkoutFile('Fitness/Workouts/2026-05-08.md')
+    const squatFile = makeWorkoutFile('Fitness/Exercises/Squat.md')
+    const contents = new Map<string, string>([
+      [
+        workoutFile.path,
+        `---
+type: workout
+date: 2026-05-08
+name: Test
+---
+
+## [[Squat]]
+
+- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]
+
+## [[New Plank]]
+
+- [exercise:: [[New Plank]]] [duration:: 60]
+
+## [[Old Lift]]
+
+- [exercise:: [[Old Lift]]] [set:: 1] [weight:: 20] [reps:: 10]
+`,
+      ],
+    ])
+    const app = makeApp(
+      {},
+      {
+        getMarkdownFiles: vi.fn(() => [workoutFile, squatFile]),
+        read: vi.fn(async (target: TFile) => contents.get(target.path) ?? ''),
+      },
+    )
+    app.metadataCache.getFileCache = vi.fn((target: TFile) =>
+      target.path === squatFile.path
+        ? { frontmatter: { type: 'exercise', kind: 'strength' } }
+        : null,
+    )
+    const plugin = createPlugin(app, {
+      ...DEFAULT_SETTINGS,
+      fitnessRoot: 'Fitness',
+      exerciseRegistry: [],
+      deletedExercises: ['Old Lift'],
+    })
+
+    await plugin.rebuildExerciseRegistry()
+
+    expect(plugin.settings.exerciseRegistry).toEqual([
+      { name: 'New Plank', kind: 'duration', aliases: [] },
+      { name: 'Squat', kind: 'strength', aliases: [] },
+    ])
+    expect(plugin.settings.exerciseRegistry.every((entry) => entry.unit === undefined)).toBe(true)
+    expect(noticeMessages).toHaveLength(1)
+    expect(noticeMessages[0]).toContain('1 added from notes')
+    expect(noticeMessages[0]).toContain('1 added from history')
+    expect(noticeMessages[0]).toContain('0 already present')
+    expect(noticeMessages[0]).toContain('1 skipped')
+
+    await plugin.rebuildExerciseRegistry()
+
+    expect(plugin.settings.exerciseRegistry).toEqual([
+      { name: 'New Plank', kind: 'duration', aliases: [] },
+      { name: 'Squat', kind: 'strength', aliases: [] },
+    ])
+    expect(noticeMessages).toHaveLength(2)
+    expect(noticeMessages[1]).toContain('0 added from notes')
+    expect(noticeMessages[1]).toContain('0 added from history')
+    /**
+     * 'New Plank' is now an overlay entry, so it's excluded from history-only
+     * candidates entirely on the second pass (not merely re-flagged as already
+     * present); only 'Squat' still surfaces via the note catalog to be counted.
+     */
+    expect(noticeMessages[1]).toContain('1 already present')
+    expect(noticeMessages[1]).toContain('1 skipped')
   })
 })
 

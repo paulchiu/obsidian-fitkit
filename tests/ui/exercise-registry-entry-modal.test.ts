@@ -39,6 +39,31 @@ function createPluginStub(registry: ExerciseRegistryEntry[]): FitKitPlugin {
   } as unknown as FitKitPlugin
 }
 
+describe('ExerciseRegistryEntryModal create-mode prefill', () => {
+  beforeEach(() => {
+    obsidianMock.notices = []
+  })
+
+  it('prefills the history-only candidate name and kind so saving materializes it into the overlay', async () => {
+    const plugin = createPluginStub([])
+    const modal = new ExerciseRegistryEntryModal(
+      plugin,
+      { kind: 'create', initial: { name: 'New Plank', kind: 'duration' } },
+      vi.fn(),
+    )
+
+    const modalPrivate = modal as unknown as ModalPrivate
+    await modalPrivate.handleSave()
+
+    expect(plugin.settings.exerciseRegistry).toHaveLength(1)
+    expect(plugin.settings.exerciseRegistry[0]).toMatchObject({
+      name: 'New Plank',
+      kind: 'duration',
+      aliases: [],
+    })
+  })
+})
+
 describe('ExerciseRegistryEntryModal unit preservation', () => {
   beforeEach(() => {
     obsidianMock.notices = []

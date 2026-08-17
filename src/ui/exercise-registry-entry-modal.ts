@@ -18,7 +18,8 @@ import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
 import type FitKitPlugin from '../main'
 
 export type RegistryEntryModalMode =
-  { kind: 'create' } | { kind: 'edit'; original: ExerciseRegistryEntry }
+  | { kind: 'create'; initial?: { name: string; kind: ExerciseKind } }
+  | { kind: 'edit'; original: ExerciseRegistryEntry }
 
 export class ExerciseRegistryEntryModal extends Modal {
   private name: string
@@ -49,8 +50,8 @@ export class ExerciseRegistryEntryModal extends Modal {
       this.weightUnit = mode.original.unit ?? DEFAULT_WEIGHT_UNIT
       this.aliasesText = mode.original.aliases.join('\n')
     } else {
-      this.name = ''
-      this.exerciseKind = 'strength'
+      this.name = mode.initial?.name ?? ''
+      this.exerciseKind = mode.initial?.kind ?? 'strength'
       this.weightUnit = DEFAULT_WEIGHT_UNIT
       this.aliasesText = ''
     }

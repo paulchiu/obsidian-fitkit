@@ -51,6 +51,22 @@ export function normalize(input: string): string {
   return base.replace(EDGE_PUNCT, '').replace(INNER_WS, ' ')
 }
 
+/**
+ * Normalized keys already covered by an overlay entry: its name and every
+ * alias. A name that only matches an alias is "known" and must not be
+ * treated as missing by registry backfill or the comprehensive table.
+ */
+export function overlayKnownKeys(entries: readonly ExerciseRegistryEntry[]): Set<string> {
+  const keys = new Set<string>()
+  for (const entry of entries) {
+    keys.add(normalize(entry.name))
+    for (const alias of entry.aliases) {
+      keys.add(normalize(alias))
+    }
+  }
+  return keys
+}
+
 export function createRegistry(entries: ExerciseRegistryEntry[] = []): ExerciseRegistry {
   return { entries: entries.map(cloneEntry) }
 }

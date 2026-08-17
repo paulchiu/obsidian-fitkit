@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A "Rebuild registry" maintenance action that backfills the registry overlay with every
+  exercise note and workout-history-only name it's missing, turning the registry into a
+  comprehensive list you can curate wording, casing, and exercise splitting from. It never
+  overwrites an existing entry, never records a unit for a name it adds, and skips names
+  you've already deleted.
+
 ### Changed
 
 - Registry lookups (kind switch, upsert, remove) now match exercise names case- and
@@ -17,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Exercise unit precedence is now frontmatter-first everywhere: the exercise note's
   `unit:` wins when present, and the registry overlay's unit is only a fallback. Sync and
   repair no longer overwrites a valid frontmatter unit with a registry value.
+- The Settings > Registry table now lists every exercise the plugin knows about (notes,
+  no-note entries, and workout-history-only names), each tagged with where it comes from.
+  Editing a note-backed exercise's name or kind is disabled here, since the note wins on
+  read and an overlay edit would silently do nothing; deleting a note-backed row still
+  offers to also delete its note file.
 
 ### Fixed
 

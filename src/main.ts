@@ -16,6 +16,10 @@ import { ParseDiagnosticsModal } from './ui/parse-diagnostics-modal'
 import { renderWorkoutReadingModeSection } from './ui/workout-reading-mode'
 import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from './ui/workout-editor-view'
 import { regenerateDashboard } from './vault/dashboard'
+import {
+  applyRegistryBackfillPlan,
+  buildRegistryBackfillPlan,
+} from './vault/exercise-registry-backfill'
 import { buildExerciseRegistrySnapshot } from './vault/exercise-registry-vault'
 import { rebuildIndex, updateIndexEntry } from './vault/index'
 
@@ -168,6 +172,24 @@ export default class FitKitPlugin extends Plugin {
       return
     }
     new ParseDiagnosticsModal(this.app, this.lastDiagnostics).open()
+  }
+
+  /**
+   * Backfills settings.exerciseRegistry so it lists every exercise the plugin
+   * knows about: notes in the exercises folder, and names logged only in
+   * workout history. Never touches an existing overlay entry or materializes
+   * a unit; see exercise-registry-backfill.ts for the invariants.
+   */
+  async rebuildExerciseRegistry(): Promise<void> {
+    const plan = await buildRegistryBackfillPlan(this.app, this.settings)
+    this.settings.exerciseRegistry = applyRegistryBackfillPlan(
+      this.settings.exerciseRegistry,
+      plan.entriesToAdd,
+    )
+    await this.saveSettings()
+    new Notice(
+      `Rebuilt registry: ${plan.addedFromNotes} added from notes, ${plan.addedFromHistory} added from history-only exercises, ${plan.alreadyPresent} already present, ${plan.skippedTombstoned} skipped (ignored).`,
+    )
   }
 
   showExerciseRegistryDiagnostics(): void {
