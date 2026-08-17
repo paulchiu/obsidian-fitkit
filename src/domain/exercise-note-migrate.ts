@@ -456,7 +456,7 @@ function repairRecentSessions(
     alternateExerciseKind(kind),
     options.fitnessRoot,
   )
-  if (!isCustomRecentSessionsBlock(currentBlock, alternateCanonicalBlock)) {
+  if (!isCustomDataviewBlock(currentBlock, alternateCanonicalBlock)) {
     const next = [
       ...document.lines.slice(0, block.start),
       ...canonicalLines,
@@ -464,13 +464,13 @@ function repairRecentSessions(
     ]
     return { markdown: joinMarkdown({ ...document, lines: next }), warnings: [] }
   }
-  if (isCustomRecentSessionsBlock(currentBlock, canonicalBlock)) {
+  if (isCustomDataviewBlock(currentBlock, canonicalBlock)) {
     return {
       markdown: source,
       warnings: [{ kind: 'custom-recent-sessions' }],
     }
   }
-  if (!hasStaleRecentSessionsTarget(currentBlock, canonicalBlock)) {
+  if (!hasStaleDataviewTarget(currentBlock, canonicalBlock)) {
     return { markdown: source, warnings: [] }
   }
 
@@ -486,6 +486,14 @@ function alternateExerciseKind(kind: ExerciseKind): ExerciseKind {
   return kind === 'strength' ? 'duration' : 'strength'
 }
 
+/**
+ * Mirrors `repairRecentSessions` (minus the strength/duration kind
+ * alternation, which the Notes query has no equivalent of): a block that
+ * only differs from canonical by which exercise name it targets is treated
+ * as stale, not customised, and is rewritten silently so a rename actually
+ * follows through instead of leaving the survivor's per-session notes table
+ * permanently querying the old name.
+ */
 function repairNotesSection(
   source: string,
   options: ExerciseNoteMigrationOptions,
@@ -511,23 +519,46 @@ function repairNotesSection(
   }
 
   const block = findDataviewBlockInRange(document.lines, headingIndex + 1, end)
-  if (block) {
-    const currentBlock = document.lines.slice(block.start, block.end + 1).join('\n')
-    if (
-      currentBlock === canonicalBlock &&
-      isRangeEmptyExcept(document.lines, headingIndex + 1, end, block.start, block.end + 1)
-    ) {
-      return { markdown: source, warnings: [] }
+  const blockIsSoleContent =
+    block !== null &&
+    isRangeEmptyExcept(document.lines, headingIndex + 1, end, block.start, block.end + 1)
+  if (!block || !blockIsSoleContent) {
+    return {
+      markdown: source,
+      warnings: [{ kind: 'custom-notes-section' }],
     }
   }
 
-  return {
-    markdown: source,
-    warnings: [{ kind: 'custom-notes-section' }],
+  const currentBlock = document.lines.slice(block.start, block.end + 1).join('\n')
+  if (currentBlock === canonicalBlock) {
+    return { markdown: source, warnings: [] }
   }
+  if (isCustomDataviewBlock(currentBlock, canonicalBlock)) {
+    return {
+      markdown: source,
+      warnings: [{ kind: 'custom-notes-section' }],
+    }
+  }
+  if (!hasStaleDataviewTarget(currentBlock, canonicalBlock)) {
+    return { markdown: source, warnings: [] }
+  }
+
+  const next = [
+    ...document.lines.slice(0, block.start),
+    ...canonicalLines,
+    ...document.lines.slice(block.end + 1),
+  ]
+  return { markdown: joinMarkdown({ ...document, lines: next }), warnings: [] }
 }
 
-function hasStaleRecentSessionsTarget(currentBlock: string, canonicalBlock: string): boolean {
+/**
+ * True when `currentBlock` and `canonicalBlock` are the same Dataview query
+ * except for which exercise name they target (checked across every form the
+ * templates use: a `from`/`FROM` path, a `link(...)` call, and an inline
+ * `[exercise:: [[...]]]` field). Shared by the Recent sessions and Notes
+ * section repairs: both templates only ever vary block-to-block by name.
+ */
+function hasStaleDataviewTarget(currentBlock: string, canonicalBlock: string): boolean {
   return (
     firstFromPath(currentBlock) !== firstFromPath(canonicalBlock) ||
     firstLinkTarget(currentBlock) !== firstLinkTarget(canonicalBlock) ||
@@ -535,7 +566,7 @@ function hasStaleRecentSessionsTarget(currentBlock: string, canonicalBlock: stri
   )
 }
 
-function isCustomRecentSessionsBlock(currentBlock: string, canonicalBlock: string): boolean {
+function isCustomDataviewBlock(currentBlock: string, canonicalBlock: string): boolean {
   const current = dataviewBodyLines(currentBlock)
   const canonical = dataviewBodyLines(canonicalBlock)
   const currentFromIndex = findQueryLine(current, 'from')

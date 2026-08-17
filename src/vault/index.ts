@@ -133,7 +133,7 @@ function isInFolder(path: string, folder: string): boolean {
   return path !== folder && path.startsWith(`${folder}/`)
 }
 
-function isMarkdownFile(file: TAbstractFile | null): file is TFile {
+export function isMarkdownFile(file: TAbstractFile | null): file is TFile {
   return file !== null && (file as { extension?: unknown }).extension === 'md'
 }
 

@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   comprehensive list you can curate wording, casing, and exercise splitting from. It never
   overwrites an existing entry, never records a unit for a name it adds, and skips names
   you've already deleted.
+- A "Rename" action for note-backed Registry rows that previews every effect before writing
+  anything: the note file rename, every workout note that will change and how many rows in
+  each, the old name kept as an alias, and any wikilink it can't safely rewrite (pathed or
+  aliased forms) surfaced as left stale instead of silently guessed at. Renaming onto a name
+  already in use merges the two entries and carries the losing note's `## Notes` prose into
+  the surviving note before removing it, with an explicit warning shown first. Confirming is
+  safe to re-run: a partial failure leaves the modal open with a freshly recomputed preview so
+  confirming again finishes only what is left.
 
 ### Changed
 
@@ -25,9 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   repair no longer overwrites a valid frontmatter unit with a registry value.
 - The Settings > Registry table now lists every exercise the plugin knows about (notes,
   no-note entries, and workout-history-only names), each tagged with where it comes from.
-  Editing a note-backed exercise's name or kind is disabled here, since the note wins on
-  read and an overlay edit would silently do nothing; deleting a note-backed row still
-  offers to also delete its note file.
+  A note-backed row now offers a "Rename" action, wired to the preview-and-apply flow above,
+  in place of the previous disabled Edit button that had no effect; deleting a note-backed
+  row still offers to also delete its note file.
 
 ### Fixed
 

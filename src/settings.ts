@@ -7,6 +7,7 @@ import { parseWeightUnit } from './domain/weight-unit'
 import type FitKitPlugin from './main'
 import { DeleteRegistryEntryModal } from './ui/delete-registry-entry-modal'
 import { ExerciseRegistryEntryModal } from './ui/exercise-registry-entry-modal'
+import { ExerciseRenameModal } from './ui/exercise-rename-modal'
 import { ImportExercisesModal } from './ui/import-exercises-modal'
 import { dashboardPath, exercisesFolder, workoutsFolder } from './settings-paths'
 import {
@@ -414,12 +415,14 @@ export class FitKitSettingTab extends PluginSettingTab {
     const actions = tr.createEl('td', { cls: 'fitkit-registry-action-cell' })
 
     if (row.provenance === 'note') {
-      const editBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Edit' })
-      editBtn.disabled = true
-      editBtn.setAttr(
+      const renameBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Rename' })
+      renameBtn.setAttr(
         'title',
-        'This exercise has a note; edit the note file to change its name or kind.',
+        'Rename or merge this exercise: renames the note file and rewrites references in workout notes.',
       )
+      renameBtn.addEventListener('click', () => {
+        new ExerciseRenameModal(this.plugin, { oldName: row.name, onApplied: rerender }).open()
+      })
     } else if (row.provenance === 'history') {
       const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add to registry' })
       addBtn.addEventListener('click', () => {

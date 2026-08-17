@@ -131,15 +131,16 @@ function renderRow(row: RegistryTableRow): TestElement {
 }
 
 describe('FitKitSettingTab registry row provenance', () => {
-  it('disables editing a note-backed row instead of offering a control that does nothing', () => {
+  it('offers an enabled Rename action for a note-backed row instead of a disabled Edit', () => {
     const table = renderRow(
       baseRow({ provenance: 'note', notePath: 'Fitness/Exercises/Squat.md', kind: 'strength' }),
     )
 
-    const editButtons = findButtons(table, 'Edit')
-    expect(editButtons).toHaveLength(1)
-    expect(editButtons[0]?.disabled).toBe(true)
-    expect(editButtons[0]?.attributes.get('title')).toBeTruthy()
+    expect(findButtons(table, 'Edit')).toHaveLength(0)
+    const renameButtons = findButtons(table, 'Rename')
+    expect(renameButtons).toHaveLength(1)
+    expect(renameButtons[0]?.disabled).toBe(false)
+    expect(renameButtons[0]?.attributes.get('title')).toBeTruthy()
     expect(findButtons(table, 'Delete')).toHaveLength(1)
   })
 

@@ -968,6 +968,16 @@ ${staleRecent}
     expect(migrate(source).markdown).toBe(source)
   })
 
+  it('replaces a stale Notes link target left over from a rename, without warning', () => {
+    const staleNotes = buildNotesBlock('Back Squat', 'Fitness')
+    const source = completeStrengthNote(undefined, staleNotes)
+    const result = migrate(source)
+
+    expect(result.markdown).toContain('WHERE L.exercise = link("Squat") AND L.notes')
+    expect(result.markdown).not.toContain('WHERE L.exercise = link("Back Squat") AND L.notes')
+    expect(result.warnings).toEqual([])
+  })
+
   it('leaves customised Recent sessions dataview blocks alone', () => {
     const customRecent = `\`\`\`dataview
 TABLE WITHOUT ID
