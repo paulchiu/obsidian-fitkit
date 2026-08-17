@@ -16,7 +16,6 @@ export interface FitKitSettings {
   fitnessRoot: string
   autoOpenWorkoutEditor: boolean
   strengthRestTimerEnabled: boolean
-  autoUpdateDashboard: boolean
   autosaveDebounceMs: number
   chartSessionsWindow: number
   exerciseRegistry: ExerciseRegistryEntry[]
@@ -29,7 +28,6 @@ export const DEFAULT_SETTINGS: FitKitSettings = {
   fitnessRoot: 'Fitness',
   autoOpenWorkoutEditor: true,
   strengthRestTimerEnabled: true,
-  autoUpdateDashboard: true,
   autosaveDebounceMs: 600,
   chartSessionsWindow: 30,
   exerciseRegistry: [],
@@ -78,7 +76,6 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
     autoOpenWorkoutEditor: stored.autoOpenWorkoutEditor ?? DEFAULT_SETTINGS.autoOpenWorkoutEditor,
     strengthRestTimerEnabled:
       stored.strengthRestTimerEnabled ?? DEFAULT_SETTINGS.strengthRestTimerEnabled,
-    autoUpdateDashboard: stored.autoUpdateDashboard ?? DEFAULT_SETTINGS.autoUpdateDashboard,
     autosaveDebounceMs: stored.autosaveDebounceMs ?? DEFAULT_SETTINGS.autosaveDebounceMs,
     chartSessionsWindow: stored.chartSessionsWindow ?? DEFAULT_SETTINGS.chartSessionsWindow,
     exerciseRegistry: normalizeStoredExerciseRegistry(
@@ -177,18 +174,6 @@ export class FitKitSettingTab extends PluginSettingTab {
           settings.strengthRestTimerEnabled = value
           await this.plugin.saveSettings()
           this.plugin.refreshWorkoutEditorViews()
-        }),
-      )
-
-    new Setting(containerEl)
-      .setName('Auto-update dashboard on save')
-      .setDesc(
-        'When a workout note is saved, refresh the index entry and regenerate the dashboard.',
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(settings.autoUpdateDashboard).onChange(async (value) => {
-          settings.autoUpdateDashboard = value
-          await this.plugin.saveSettings()
         }),
       )
 

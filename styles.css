@@ -368,16 +368,11 @@ body.is-mobile .fitkit-editor-root {
   stroke-width: 2.25;
 }
 
-.fitkit-next-step {
+/* Raise specificity over .fitkit-input's width: 100% so the step field keeps its fixed width instead of stretching and wrapping. */
+.fitkit-next-row .fitkit-next-step {
   width: 84px;
   flex: 0 0 auto;
   text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-.fitkit-next-target {
-  font-size: var(--font-ui-smaller);
-  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
 
