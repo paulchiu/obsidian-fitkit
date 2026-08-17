@@ -1809,7 +1809,7 @@ describe('WorkoutEditorView next-time plan', () => {
     expect(list.findByClass('fitkit-next-row')).toBeNull()
   })
 
-  it('marks the recorded direction and previews the resulting weight', () => {
+  it('marks the recorded direction and renders no target preview', () => {
     const list = renderCard({
       name: 'Squat',
       kind: 'strength',
@@ -1822,7 +1822,7 @@ describe('WorkoutEditorView next-time plan', () => {
       .findAllByClass('fitkit-next-seg-button')
       .filter((button) => button.attributes.get('aria-pressed') === 'true')
     expect(pressed.map((button) => button.attributes.get('data-icon'))).toEqual(['arrow-up'])
-    expect(list.findByClass('fitkit-next-target')?.textContent).toBe('→ 102.5 kg')
+    expect(list.findByClass('fitkit-next-target')).toBeNull()
   })
 
   it('hides the step field when the plan is to stay', () => {
@@ -1911,12 +1911,12 @@ describe('WorkoutEditorView next-time plan', () => {
     step!.value = '5'
     step!.listenersFor('input').forEach((listener) => listener({}))
     expect(ex.next).toEqual({ direction: 'up', step: 5 })
-    expect(list.findByClass('fitkit-next-target')?.textContent).toBe('→ 105 kg')
+    expect(list.findByClass('fitkit-next-target')).toBeNull()
 
     step!.value = ''
     step!.listenersFor('input').forEach((listener) => listener({}))
     expect(ex.next).toEqual({ direction: 'up' })
-    expect(list.findByClass('fitkit-next-target')?.textContent).toBe('')
+    expect(list.findByClass('fitkit-next-target')).toBeNull()
   })
 
   it('shows the plan recorded last session as a badge', () => {

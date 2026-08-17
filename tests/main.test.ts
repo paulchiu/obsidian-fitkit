@@ -133,11 +133,12 @@ vi.mock('obsidian', () => {
   }
 })
 
-import { MarkdownView, Modal, TFile } from 'obsidian'
+import { MarkdownView, Modal, TFile, type App } from 'obsidian'
 
 import FitKitPlugin from '../src/main'
 import { DEFAULT_SETTINGS, type FitKitSettings } from '../src/settings'
 import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from '../src/ui/workout-editor-view'
+import { rebuildIndex } from '../src/vault/index'
 
 interface SetViewStateArg {
   type?: string
@@ -751,5 +752,82 @@ describe('FitKitPlugin openWorkoutEditor command path', () => {
     expect(existingEditorLeaf.view).toBeInstanceOf(WorkoutEditorView)
     const loadFile = (existingEditorLeaf.view as { loadFile: ReturnType<typeof vi.fn> }).loadFile
     expect(loadFile).toHaveBeenCalledWith(file)
+  })
+})
+
+describe('FitKitPlugin.refreshIndexEntry concurrency', () => {
+  interface RefreshTestFile {
+    path: string
+    extension: string
+    basename: string
+    stat: { mtime: number }
+  }
+
+  const REFRESH_FILE_A = 'Fitness/Workouts/2026-08-15.md'
+  const REFRESH_FILE_B = 'Fitness/Workouts/2026-08-16.md'
+
+  const buildRefreshSource = (date: string, direction: 'up' | 'down'): string =>
+    [
+      '---',
+      'type: workout',
+      `date: ${date}`,
+      'name: Push day',
+      '---',
+      '',
+      '## [[Squat]]',
+      '',
+      `- [exercise:: [[Squat]]] [next:: ${direction} 2.5]`,
+    ].join('\n')
+
+  it('does not lose an update when two refreshes are triggered before either resolves', async () => {
+    const fileA: RefreshTestFile = {
+      path: REFRESH_FILE_A,
+      extension: 'md',
+      basename: '2026-08-15',
+      stat: { mtime: 1000 },
+    }
+    const fileB: RefreshTestFile = {
+      path: REFRESH_FILE_B,
+      extension: 'md',
+      basename: '2026-08-16',
+      stat: { mtime: 1000 },
+    }
+    const files = [fileA, fileB]
+    const contents = new Map<string, string>([
+      [REFRESH_FILE_A, buildRefreshSource('2026-08-15', 'up')],
+      [REFRESH_FILE_B, buildRefreshSource('2026-08-16', 'up')],
+    ])
+    const app: MockApp = makeApp(
+      {},
+      {
+        getMarkdownFiles: vi.fn(() => files as unknown as TFile[]),
+        read: vi.fn(async (target: TFile) => contents.get(target.path) ?? ''),
+      },
+    )
+    ;(
+      app.vault as unknown as { getAbstractFileByPath: (path: string) => RefreshTestFile | null }
+    ).getAbstractFileByPath = (path: string) =>
+      files.find((candidate) => candidate.path === path) ?? null
+    const settings: FitKitSettings = { ...DEFAULT_SETTINGS }
+    const cachedIndex = await rebuildIndex(app as unknown as App, settings)
+
+    const plugin = createPlugin(app, settings) as TestPlugin & {
+      cachedIndex: typeof cachedIndex | null
+      refreshIndexEntry(path: string): Promise<void>
+    }
+    plugin.cachedIndex = cachedIndex
+
+    /** Both files change on disk after the index snapshot was taken, then get refreshed concurrently. */
+    contents.set(REFRESH_FILE_A, buildRefreshSource('2026-08-15', 'down'))
+    contents.set(REFRESH_FILE_B, buildRefreshSource('2026-08-16', 'down'))
+
+    const refreshA = plugin.refreshIndexEntry(REFRESH_FILE_A)
+    const refreshB = plugin.refreshIndexEntry(REFRESH_FILE_B)
+    await Promise.all([refreshA, refreshB])
+
+    const entryA = plugin.cachedIndex?.entries.find((entry) => entry.path === REFRESH_FILE_A)
+    const entryB = plugin.cachedIndex?.entries.find((entry) => entry.path === REFRESH_FILE_B)
+    expect(entryA?.exercises[0]?.next).toEqual({ direction: 'down', step: 2.5 })
+    expect(entryB?.exercises[0]?.next).toEqual({ direction: 'down', step: 2.5 })
   })
 })

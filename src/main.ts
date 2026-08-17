@@ -17,7 +17,7 @@ import { renderWorkoutReadingModeSection } from './ui/workout-reading-mode'
 import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from './ui/workout-editor-view'
 import { regenerateDashboard } from './vault/dashboard'
 import { buildExerciseRegistrySnapshot } from './vault/exercise-registry-vault'
-import { rebuildIndex } from './vault/index'
+import { rebuildIndex, updateIndexEntry } from './vault/index'
 
 function formatTodayIsoDate(): string {
   const d = new Date()
@@ -34,6 +34,13 @@ export default class FitKitPlugin extends Plugin {
   settings!: FitKitSettings
   cachedIndex: FitKitIndex | null = null
   lastDiagnostics: IndexDiagnostic[] = []
+
+  /**
+   * Chains overlapping calls to refreshIndexEntry, which read-modify-writes
+   * cachedIndex across an await, ensuring each runs in order with fresh data.
+   * Settled links never reject, so a failed refresh cannot stall later ones.
+   */
+  private indexRefreshQueue: Promise<void> | null = null
 
   async onload(): Promise<void> {
     await this.loadSettings()
@@ -111,6 +118,29 @@ export default class FitKitPlugin extends Plugin {
         this.lastDiagnostics.length ? `, ${this.lastDiagnostics.length} diagnostic(s)` : ''
       }.`,
     )
+  }
+
+  /**
+   * History badges and charts read the cached index, so a note saved without
+   * refreshing it serves stale data until the next manual rebuild. Chained onto
+   * indexRefreshQueue so overlapping calls apply in order instead of racing.
+   */
+  async refreshIndexEntry(path: string): Promise<void> {
+    const previous = this.indexRefreshQueue ?? Promise.resolve()
+    const run = previous.then(() => this.applyIndexRefresh(path))
+    this.indexRefreshQueue = run.then(
+      () => undefined,
+      () => undefined,
+    )
+    return run
+  }
+
+  private async applyIndexRefresh(path: string): Promise<void> {
+    if (this.cachedIndex === null) {
+      return
+    }
+    this.cachedIndex = await updateIndexEntry(this.app, this.settings, this.cachedIndex, path)
+    this.lastDiagnostics = this.cachedIndex.diagnostics
   }
 
   async rebuildDashboard(): Promise<void> {

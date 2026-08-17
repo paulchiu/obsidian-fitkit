@@ -17,10 +17,8 @@ import {
   type ExerciseRegistryEntry,
 } from '../domain/exercise-registry'
 import { filterSuggestableNames } from '../domain/exercise-suggestions'
-import { pickHeaviestSet } from '../domain/epley'
 import {
   formatNumber as formatPlanNumber,
-  nextPlanTargetWeight,
   type NextPlan,
   type NextPlanDirection,
 } from '../domain/next-plan'
@@ -520,12 +518,6 @@ export class WorkoutEditorView extends ItemView {
     })
     stepInput.value = ex.next.step === undefined ? '' : formatPlanNumber(ex.next.step)
 
-    const target = row.createSpan({ cls: 'fitkit-next-target' })
-    const syncTarget = () => {
-      target.setText(nextPlanTargetText(ex) ?? '')
-    }
-    syncTarget()
-
     stepInput.addEventListener('input', () => {
       if (!ex.next) {
         return
@@ -535,7 +527,6 @@ export class WorkoutEditorView extends ItemView {
         Number.isFinite(step) && step > 0
           ? { direction: ex.next.direction, step }
           : { direction: ex.next.direction }
-      syncTarget()
       this.markDirty()
     })
   }
@@ -1688,9 +1679,16 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     this.autoSaveInflight = true
+    /**
+     * Captured before the write so a concurrent onClose/loadFile on this view
+     * (which can null out or reassign this.session while we await below)
+     * cannot make the refresh below crash or target the wrong file.
+     */
+    const session = this.session
+    const path = session.file.path
     try {
       const nextText = serializeWorkoutNote(toWorkoutNoteModel(this.model))
-      const result = await this.session.saveIfUnchanged(nextText)
+      const result = await session.saveIfUnchanged(nextText)
       if (!result.ok) {
         this.conflictDetected = true
         new Notice('File changed on disk. Reload before further edits.')
@@ -1699,11 +1697,16 @@ export class WorkoutEditorView extends ItemView {
       }
       this.dirty = false
       this.updateMetaText()
+      /** A refresh failure is a cache-staleness problem, not a save failure; never let it surface as an unhandled rejection or block the finally below. */
+      await this.plugin.refreshIndexEntry(path).catch(() => undefined)
     } finally {
       this.autoSaveInflight = false
       if (this.autoSaveRequeued) {
         this.autoSaveRequeued = false
-        this.scheduleAutoSave()
+        /** Only reschedule if the view is still live; onClose may have torn down session/model while this save was in flight. */
+        if (this.session) {
+          this.scheduleAutoSave()
+        }
       }
     }
   }
@@ -1835,19 +1838,6 @@ function toEditorExercise(exercise: ExerciseEntry): ExerciseCard {
 
 function buildNextPlan(direction: NextPlanDirection, step: number | undefined): NextPlan {
   return direction === 'stay' || step === undefined ? { direction } : { direction, step }
-}
-
-/** Live preview of where the plan lands, against the heaviest set logged today. */
-function nextPlanTargetText(card: ExerciseCard): string | null {
-  if (!card.next) {
-    return null
-  }
-  const heaviest = pickHeaviestSet(card.strengthSets)
-  if (!heaviest || heaviest.weight <= 0) {
-    return null
-  }
-  const target = nextPlanTargetWeight(card.next, heaviest.weight)
-  return target === null ? null : `→ ${formatPlanNumber(target)} kg`
 }
 
 function toEditorStrengthSet(set: StrengthSet): EditableStrengthSet {
