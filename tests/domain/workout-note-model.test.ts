@@ -27,6 +27,128 @@ const workoutFixtures = [
   'workouts/fence-block.md',
 ] as const
 
+const fencedRoundTripCases = [
+  [
+    'after a modeled row',
+    [
+      '---',
+      'type: workout',
+      'date: 2026-08-18',
+      'name: Row fence',
+      '---',
+      '',
+      '## [[Squat]]',
+      '',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '',
+      '```txt',
+      'hello',
+      '```',
+      '',
+    ].join('\n'),
+  ],
+  [
+    'after an exercise heading',
+    [
+      '---',
+      'type: workout',
+      'date: 2026-08-18',
+      'name: Heading fence',
+      '---',
+      '',
+      '## [[Squat]]',
+      '',
+      '```txt',
+      'hello',
+      '```',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '',
+    ].join('\n'),
+  ],
+  [
+    'before a modeled row with a separator blank',
+    [
+      '---',
+      'type: workout',
+      'date: 2026-08-18',
+      'name: D',
+      '---',
+      '',
+      '## [[Squat]]',
+      '',
+      '```txt',
+      'hello',
+      '```',
+      '',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '',
+    ].join('\n'),
+  ],
+  [
+    'after preserved prose',
+    [
+      '---',
+      'type: workout',
+      'date: 2026-08-18',
+      'name: Prose fence',
+      '---',
+      '',
+      '## [[Squat]]',
+      '',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '',
+      'Keep the platform clear.',
+      '',
+      '```txt',
+      'hello',
+      '```',
+      '',
+    ].join('\n'),
+  ],
+  [
+    'at the start of the body',
+    [
+      '---',
+      'type: workout',
+      'date: 2026-08-18',
+      'name: Preamble fence',
+      '---',
+      '',
+      '```txt',
+      'hello',
+      '```',
+      '',
+      '## [[Squat]]',
+      '',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '',
+    ].join('\n'),
+  ],
+  [
+    'between two fenced blocks',
+    [
+      '---',
+      'type: workout',
+      'date: 2026-08-18',
+      'name: Two fences',
+      '---',
+      '',
+      '## [[Squat]]',
+      '',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '',
+      '```txt',
+      'first',
+      '```',
+      '',
+      '```txt',
+      'second',
+      '```',
+      '',
+    ].join('\n'),
+  ],
+] as const
+
 function expectWorkoutModel(source: string, sourcePath: string): WorkoutNoteModel {
   const result = parseWorkoutNote(source, sourcePath)
   expect(result.isWorkout).toBe(true)
@@ -115,6 +237,27 @@ describe('workout note model', () => {
     expect(firstFenceIndex).toBeLessThan(secondFenceIndex)
     expect(semanticEqual(model, reparsed)).toBe(true)
   })
+
+  it.each(fencedRoundTripCases)(
+    'round-trips a fenced block %s byte-identically',
+    (_case, source) => {
+      const serialized = serializeWorkoutNote(expectWorkoutModel(source, 'fenced-position.md'))
+
+      expect(serialized).toBe(source)
+    },
+  )
+
+  it.each(fencedRoundTripCases)(
+    'keeps a fenced block %s stable across three round-trips',
+    (_case, source) => {
+      let current = source
+
+      for (let round = 0; round < 3; round += 1) {
+        current = serializeWorkoutNote(expectWorkoutModel(current, 'stable-fenced-position.md'))
+        expect(current).toBe(source)
+      }
+    },
+  )
 
   it('serializes blank strength sets without zero weight or reps', () => {
     const serialized = serializeWorkoutNote({
@@ -227,6 +370,9 @@ describe('workout note model', () => {
     const source = fixture('workouts/hand-edited.md')
     const model = expectWorkoutModel(source, 'workouts/hand-edited.md')
     const serialized = serializeWorkoutNote(model)
+
+    /** Unrecognised inline fields are the only intentional round-trip loss. */
+    expect(serialized).toBe(source.replace(' [rpe:: 7]', ''))
 
     /** Frontmatter: unknown keys survive. */
     expect(serialized).toContain('tags:')
@@ -341,6 +487,172 @@ describe('workout note model', () => {
 
     expect(proseIndex).toBeGreaterThan(squatHeadingIndex)
     expect(proseIndex).toBeLessThan(deadliftHeadingIndex)
+  })
+
+  it.each([
+    ['lowercase wikilink', '## [[squat]]'],
+    ['aliased wikilink', '## [[Folder/Squat|Squat]]'],
+    ['plain text', '## Squat'],
+  ])('normalizes a %s exercise heading without duplicating it', (_label, heading) => {
+    const source = [
+      '---',
+      'type: workout',
+      'date: 2026-08-20',
+      'name: Squat Day',
+      '---',
+      '',
+      heading,
+      '',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '',
+    ].join('\n')
+    const expected = [
+      '---',
+      'type: workout',
+      'date: 2026-08-20',
+      'name: Squat Day',
+      '---',
+      '',
+      '## [[Squat]]',
+      '',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '',
+    ].join('\n')
+
+    const serialized = serializeWorkoutNote(expectWorkoutModel(source, 'squat-day.md'))
+
+    expect(serialized).toBe(expected)
+    expect(serialized.split('\n').filter((line) => line.startsWith('## '))).toHaveLength(1)
+  })
+
+  it('preserves a wikilink H2 with no modeled rows beneath it', () => {
+    const source = [
+      '---',
+      'type: workout',
+      'date: 2026-08-20',
+      'name: Skipped Squat',
+      '---',
+      '',
+      '## [[Squat]]',
+      '',
+      'Planned but skipped.',
+      '',
+    ].join('\n')
+
+    const serialized = serializeWorkoutNote(expectWorkoutModel(source, 'skipped-squat.md'))
+
+    expect(serialized).toBe(source)
+    expect(serialized.split('\n').filter((line) => line.startsWith('## '))).toHaveLength(1)
+  })
+
+  it('round-trips an ordinary H2 section after an exercise byte-identically', () => {
+    const source = [
+      '---',
+      'type: workout',
+      'date: 2026-08-18',
+      'name: Push Day',
+      'tags:',
+      '  - gym',
+      '---',
+      '',
+      'Felt strong today.',
+      '',
+      '## [[Bench Press]]',
+      '',
+      '- [exercise:: [[Bench Press]]] [set:: 1] [weight:: 60] [reps:: 5]',
+      '',
+      '## Session notes',
+      '',
+      'Shoulder felt tight',
+      '',
+      '### Warmup',
+      '',
+      '- band pull-aparts',
+      '',
+    ].join('\n')
+
+    const serialized = serializeWorkoutNote(expectWorkoutModel(source, 'w.md'))
+
+    expect(serialized).toBe(source)
+  })
+
+  it('round-trips an ordinary H2 section before the first exercise byte-identically', () => {
+    const source = [
+      '---',
+      'type: workout',
+      'date: 2026-08-18',
+      'name: Early notes',
+      '---',
+      '',
+      '## Session notes',
+      '',
+      'Arrived early.',
+      '',
+      '## [[Squat]]',
+      '',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '',
+    ].join('\n')
+
+    const serialized = serializeWorkoutNote(expectWorkoutModel(source, 'early-notes.md'))
+
+    expect(serialized).toBe(source)
+  })
+
+  it('round-trips an ordinary H2 section between two exercises byte-identically', () => {
+    const source = [
+      '---',
+      'type: workout',
+      'date: 2026-08-18',
+      'name: Mid-session notes',
+      '---',
+      '',
+      '## [[Squat]]',
+      '',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '',
+      '## Session notes',
+      '',
+      'Changed platforms.',
+      '',
+      '## [[Deadlift]]',
+      '',
+      '- [exercise:: [[Deadlift]]] [set:: 1] [weight:: 120] [reps:: 5]',
+      '',
+    ].join('\n')
+
+    const serialized = serializeWorkoutNote(expectWorkoutModel(source, 'mid-session-notes.md'))
+
+    expect(serialized).toBe(source)
+  })
+
+  it('keeps ordinary H2 sections stable across three round-trips', () => {
+    const source = [
+      '---',
+      'type: workout',
+      'date: 2026-08-18',
+      'name: Stable notes',
+      '---',
+      '',
+      '## [[Squat]]',
+      '',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '',
+      '## Session notes',
+      '',
+      'Keep this section stable.',
+      '',
+    ].join('\n')
+    const saves: string[] = []
+    let current = source
+
+    for (let round = 0; round < 3; round += 1) {
+      current = serializeWorkoutNote(expectWorkoutModel(current, 'stable-notes.md'))
+      saves.push(current)
+    }
+
+    expect(saves[1]).toBe(saves[0])
+    expect(saves[2]).toBe(saves[0])
   })
 
   it('changes only the edited value on a hand-edited note, leaving preserved content untouched', () => {
