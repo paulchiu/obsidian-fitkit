@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The workout editor's autosave round-trip (parse note text, then write it back) no longer
+  destroys content it does not model. Unrecognised frontmatter keys (`tags:`, `aliases:`,
+  custom keys), non-exercise bullets (task checkboxes, plain notes), nested sub-bullets, and
+  other body content (prose paragraphs, sub-headings of `###` and deeper, blockquotes,
+  embeds, tables) are now captured verbatim at parse time and re-inserted at their original
+  position on save, extending the fenced-code-block preservation that already existed. A note
+  the editor did not create can now be opened once without silently losing hand-written
+  content on the next autosave. Two exceptions remain: a non-exercise `##` heading is still
+  dropped (its body survives, only the heading line is lost), and unrecognised inline fields
+  (for example `[rpe:: 7]`) are still discarded as documented in the README.
+
 ### Removed
 
 ## [0.19.1] - 2026-08-17
