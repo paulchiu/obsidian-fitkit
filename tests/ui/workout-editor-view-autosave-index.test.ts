@@ -195,6 +195,7 @@ interface TestEditorModel {
   sourcePath: string
   exercises: TestExerciseCard[]
   preserveBlocks: unknown[]
+  frontmatterExtra: string[]
 }
 
 interface AutosaveIndexView {
@@ -269,6 +270,7 @@ const createHarness = async (): Promise<Harness> => {
       },
     ],
     preserveBlocks: [],
+    frontmatterExtra: [],
   }
 
   const view = Object.create(WorkoutEditorView.prototype) as AutosaveIndexView
@@ -436,6 +438,7 @@ const createTeardownHarness = async (): Promise<TeardownHarness> => {
       },
     ],
     preserveBlocks: [],
+    frontmatterExtra: [],
   }
 
   const view = Object.create(WorkoutEditorView.prototype) as AutosaveIndexView

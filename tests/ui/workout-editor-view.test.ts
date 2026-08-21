@@ -933,6 +933,7 @@ interface RestTimerWorkoutModel {
   sourcePath: string
   exercises: RestTimerExerciseCard[]
   preserveBlocks: unknown[]
+  frontmatterExtra: string[]
 }
 
 interface TimerView {
@@ -999,6 +1000,7 @@ describe('WorkoutEditorView rest timer', () => {
     sourcePath: 'Workouts/A.md',
     exercises,
     preserveBlocks: [],
+    frontmatterExtra: [],
   })
 
   const createRestTimerView = (ex: RestTimerExerciseCard): RestTimerView => {
@@ -1313,6 +1315,7 @@ describe('WorkoutEditorView rest timer', () => {
             },
           ],
           preserveBlocks: [],
+          frontmatterExtra: [],
         },
         isWorkout: true,
       }),

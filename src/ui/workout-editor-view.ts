@@ -113,6 +113,7 @@ interface EditorWorkoutModel {
   sourcePath: string
   exercises: ExerciseCard[]
   preserveBlocks: PreserveBlock[]
+  frontmatterExtra: string[]
 }
 
 export class WorkoutEditorView extends ItemView {
@@ -1807,6 +1808,7 @@ function toEditorWorkoutModel(
       sourcePath,
       exercises: [],
       preserveBlocks: [],
+      frontmatterExtra: [],
     }
   }
 
@@ -1817,6 +1819,7 @@ function toEditorWorkoutModel(
     sourcePath: model.sourcePath,
     exercises: model.exercises.map(toEditorExercise),
     preserveBlocks: [...model.preserveBlocks],
+    frontmatterExtra: [...model.frontmatterExtra],
   }
 }
 
@@ -1876,6 +1879,7 @@ function toWorkoutNoteModel(model: EditorWorkoutModel): WorkoutNoteModel {
     sourcePath: model.sourcePath,
     exercises: model.exercises.map(toWorkoutExercise),
     preserveBlocks: [...model.preserveBlocks],
+    frontmatterExtra: [...model.frontmatterExtra],
   }
 }
 
