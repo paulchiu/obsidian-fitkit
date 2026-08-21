@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.20.0] - 2026-08-21
+
+### Added
+
 - A "Rebuild registry" maintenance action that backfills the registry overlay with every
   exercise note and workout-history-only name it's missing, turning the registry into a
   comprehensive list you can curate wording, casing, and exercise splitting from. It never
