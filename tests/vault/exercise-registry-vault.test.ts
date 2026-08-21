@@ -84,7 +84,7 @@ describe('exercise registry vault merge', () => {
 
     expect(merged.map((entry) => entry.name)).toEqual(['Plank', 'Squat'])
     expect(merged.map((entry) => entry.kind)).toEqual(['duration', 'strength'])
-    expect(merged.map((entry) => entry.unit)).toEqual(['kg', 'lbs'])
+    expect(merged.map((entry) => entry.unit)).toEqual([undefined, 'lbs'])
   })
 
   it('preserves existing saved registry entries and aliases when a vault note also exists', () => {
@@ -105,6 +105,22 @@ describe('exercise registry vault merge', () => {
     expect(merged).toEqual([
       { name: 'Squat', kind: 'strength', unit: 'kg', aliases: ['back squat'] },
     ])
+  })
+
+  it('prefers the note frontmatter unit over a differing saved registry unit', () => {
+    const app = mockApp([
+      {
+        path: 'Fitness/Exercises/Squat.md',
+        basename: 'Squat',
+        frontmatter: { type: 'exercise', kind: 'strength', unit: 'lbs' },
+      },
+    ])
+    const merged = exerciseRegistryWithVaultNotes(
+      app,
+      settingsWithRegistry([{ name: 'Squat', kind: 'strength', unit: 'kg', aliases: [] }]),
+    )
+
+    expect(merged).toEqual([{ name: 'Squat', kind: 'strength', unit: 'lbs', aliases: [] }])
   })
 
   it('keeps no-note registry entries', () => {

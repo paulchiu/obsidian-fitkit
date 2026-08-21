@@ -49,7 +49,7 @@ export class DeleteRegistryEntryModal extends Modal {
       label.setAttr('for', 'fitkit-delete-also-file')
     } else {
       contentEl.createEl('p', {
-        text: 'No matching exercise note exists in your exercises folder. Only the registry overlay will be removed.',
+        text: 'No matching exercise note exists in your exercises folder. This exercise will be removed from the registry.',
         cls: 'fitkit-import-muted',
       })
     }

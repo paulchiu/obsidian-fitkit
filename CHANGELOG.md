@@ -9,9 +9,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A "Rebuild registry" maintenance action that backfills the registry overlay with every
+  exercise note and workout-history-only name it's missing, turning the registry into a
+  comprehensive list you can curate wording, casing, and exercise splitting from. It never
+  overwrites an existing entry, never records a unit for a name it adds, and skips names
+  you've already deleted.
+- A "Rename" action for note-backed Registry rows that previews every effect before writing
+  anything: the note file rename, every workout note that will change and how many rows in
+  each, the old name kept as an alias, and any wikilink it can't safely rewrite (pathed or
+  aliased forms) surfaced as left stale instead of silently guessed at. Renaming onto a name
+  already in use merges the two entries and carries the losing note's `## Notes` prose into
+  the surviving note before removing it, with an explicit warning shown first. Confirming is
+  safe to re-run: a partial failure leaves the modal open with a freshly recomputed preview so
+  confirming again finishes only what is left.
+
 ### Changed
 
+- Registry lookups (kind switch, upsert, remove) now match exercise names case- and
+  whitespace-insensitively, so a differently-cased workout card updates the existing
+  registry entry instead of creating a second, ambiguous one.
+- Exercise unit precedence is now frontmatter-first everywhere: the exercise note's
+  `unit:` wins when present, and the registry overlay's unit is only a fallback. Sync and
+  repair no longer overwrites a valid frontmatter unit with a registry value.
+- The Settings > Registry table now lists every exercise the plugin knows about (notes,
+  no-note entries, and workout-history-only names), each tagged with where it comes from.
+  A note-backed row now offers a "Rename" action, wired to the preview-and-apply flow above,
+  in place of the previous disabled Edit button that had no effect; deleting a note-backed
+  row still offers to also delete its note file.
+
 ### Fixed
+
+- Kind switches and exercise renames now detect matching exercise note files even when
+  malformed frontmatter keeps them out of Obsidian's metadata cache. Kind switches leave
+  such notes byte-identical and report that they could not be updated, while renames refuse
+  to proceed until the source note's frontmatter is valid.
+- Switching an exercise's kind now writes `kind:` into that exercise's note frontmatter
+  when a note exists, since the note is what wins on the next read. Previously the switch
+  only updated the settings registry overlay, which a note-backed exercise silently
+  discarded on the next read despite the success notice. If the note's frontmatter can't be
+  parsed, the notice now says so instead of falsely claiming success.
+- Logging a new exercise and accepting the "create note" prompt now also adds a registry
+  overlay entry for it, so the exercise shows up in the settings Registry table instead of
+  staying invisible there forever.
+- The registry no longer synthesizes a `kg` unit for legacy entries with no unit recorded.
+  A synthesized default was indistinguishable from an explicit choice, so Sync and repair
+  could silently overwrite a hand-edited `unit: lbs` in an exercise note. Editing an entry
+  through the Settings > Registry table (even just to change an alias) no longer synthesizes
+  that default either; an unrecorded unit stays unrecorded unless the unit dropdown is
+  actually touched.
 
 ### Removed
 

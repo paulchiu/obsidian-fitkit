@@ -62,10 +62,11 @@ export function buildExerciseRegistrySnapshot(
       })
     }
 
+    /** Frontmatter unit wins when the note has one; the saved registry unit is only a fallback. */
     entriesByKey.set(key, {
       name: note.name,
       kind: note.kind,
-      unit: saved?.unit ?? note.unit,
+      unit: note.unit ?? saved?.unit,
       aliases: saved ? [...saved.aliases] : [],
     })
   }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { createRegistry, type ExerciseRegistry } from '../../src/domain/exercise-registry'
-import { migrateExerciseNote } from '../../src/domain/exercise-note-migrate'
+import { migrateExerciseNote, setExerciseNoteKind } from '../../src/domain/exercise-note-migrate'
 import { buildNotesBlock, buildRecentSessionsBlock } from '../../src/domain/exercise-note-template'
 
 const registry = createRegistry([
@@ -406,7 +406,7 @@ unit: lbs
     expect(second.markdown).toBe(result.markdown)
   })
 
-  it('overwrites valid strength unit frontmatter from the registry and stays idempotent', () => {
+  it('never overwrites valid strength unit frontmatter from the registry, and stays idempotent', () => {
     const source = completeStrengthNote()
     const lbsRegistry = createRegistry([
       { name: 'Squat', kind: 'strength', unit: 'lbs', aliases: [] },
@@ -415,17 +415,17 @@ unit: lbs
     const result = migrate(source, { registry: lbsRegistry })
     const second = migrate(result.markdown, { registry: lbsRegistry })
 
-    expect(result.status).toBe('updated')
+    expect(result.status).toBe('already')
     expect(result.markdown).toContain(`type: exercise
 kind: strength
 metric: e1rm
-unit: lbs
+unit: kg
 ---`)
-    expect(result.markdown).not.toContain('unit: kg')
+    expect(result.markdown).not.toContain('unit: lbs')
     expect(second.markdown).toBe(result.markdown)
   })
 
-  it('updates strength unit frontmatter from a matching strength registry entry', () => {
+  it('leaves a valid strength unit frontmatter alone even with a differing registry entry', () => {
     const source = completeStrengthNoteFor('Bench', 'kg')
     const benchRegistry = createRegistry([
       { name: 'Bench', kind: 'strength', unit: 'lbs', aliases: [] },
@@ -433,13 +433,13 @@ unit: lbs
 
     const result = migrate(source, { name: 'Bench', registry: benchRegistry })
 
-    expect(result.status).toBe('updated')
+    expect(result.status).toBe('already')
     expect(result.markdown).toContain(`type: exercise
 kind: strength
 metric: e1rm
-unit: lbs
+unit: kg
 ---`)
-    expect(result.markdown).not.toContain('unit: kg')
+    expect(result.markdown).not.toContain('unit: lbs')
   })
 
   it('preserves valid strength unit frontmatter without a registry match and stays idempotent', () => {
@@ -968,6 +968,16 @@ ${staleRecent}
     expect(migrate(source).markdown).toBe(source)
   })
 
+  it('replaces a stale Notes link target left over from a rename, without warning', () => {
+    const staleNotes = buildNotesBlock('Back Squat', 'Fitness')
+    const source = completeStrengthNote(undefined, staleNotes)
+    const result = migrate(source)
+
+    expect(result.markdown).toContain('WHERE L.exercise = link("Squat") AND L.notes')
+    expect(result.markdown).not.toContain('WHERE L.exercise = link("Back Squat") AND L.notes')
+    expect(result.warnings).toEqual([])
+  })
+
   it('leaves customised Recent sessions dataview blocks alone', () => {
     const customRecent = `\`\`\`dataview
 TABLE WITHOUT ID
@@ -1173,5 +1183,67 @@ Existing notes.
     const second = migrate(result.markdown)
     expect(second.status).toBe('skipped-malformed-frontmatter')
     expect(second.markdown).toBe(source)
+  })
+})
+
+describe('setExerciseNoteKind', () => {
+  it('replaces an existing kind line', () => {
+    const source = `---
+type: exercise
+kind: duration
+---
+
+Body.
+`
+
+    const result = setExerciseNoteKind(source, 'strength')
+
+    expect(result.changed).toBe(true)
+    expect(result.markdown).toContain('kind: strength')
+    expect(result.markdown).not.toContain('kind: duration')
+  })
+
+  it('inserts a kind line when the note has none', () => {
+    const source = `---
+type: exercise
+---
+
+Body.
+`
+
+    const result = setExerciseNoteKind(source, 'duration')
+
+    expect(result.changed).toBe(true)
+    expect(result.markdown).toBe(`---
+type: exercise
+kind: duration
+---
+
+Body.
+`)
+  })
+
+  it('is a no-op when the note already records the target kind', () => {
+    const source = `---
+type: exercise
+kind: strength
+---
+
+Body.
+`
+
+    const result = setExerciseNoteKind(source, 'strength')
+
+    expect(result.changed).toBe(false)
+    expect(result.markdown).toBe(source)
+  })
+
+  it('leaves notes with no frontmatter block untouched', () => {
+    const source = 'Body with no frontmatter.\n'
+
+    const result = setExerciseNoteKind(source, 'strength')
+
+    expect(result.changed).toBe(false)
+    expect(result.markdown).toBe(source)
   })
 })

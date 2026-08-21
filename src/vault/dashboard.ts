@@ -476,7 +476,7 @@ function getExerciseUnit(
     return DEFAULT_WEIGHT_UNIT
   }
 
-  return noteUnits.get(normalize(resolved.entry.name)) ?? resolved.entry.unit
+  return noteUnits.get(normalize(resolved.entry.name)) ?? resolved.entry.unit ?? DEFAULT_WEIGHT_UNIT
 }
 
 function readFrontmatterField(

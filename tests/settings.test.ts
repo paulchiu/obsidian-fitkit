@@ -65,15 +65,14 @@ describe('settings migration', () => {
     expect(migrated.deletedExercises).toEqual([])
   })
 
-  it('defaults legacy registry entries without a unit to kg', () => {
+  it('leaves legacy registry entries without a unit key unset, rather than synthesizing kg', () => {
     const migrated = settingsFromStored({
       exerciseRegistry: [{ name: 'Squat', kind: 'strength', aliases: [] }],
       schemaVersion: 1,
     } as unknown as Partial<FitKitSettings>)
 
-    expect(migrated.exerciseRegistry).toEqual([
-      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: [] },
-    ])
+    expect(migrated.exerciseRegistry).toEqual([{ name: 'Squat', kind: 'strength', aliases: [] }])
+    expect(migrated.exerciseRegistry[0]?.unit).toBeUndefined()
   })
 
   it('preserves stored deleted exercise tombstones', () => {
@@ -182,6 +181,62 @@ describe('registry deletion tombstones', () => {
     expect(trashFile).not.toHaveBeenCalled()
     expect(settings.exerciseRegistry).toEqual([])
     expect(settings.deletedExercises).toEqual([])
+  })
+
+  it('trashes the note and tombstones a note-backed name that has no overlay entry', async () => {
+    noticeMessages.length = 0
+    const file = new TFile()
+    const settings: FitKitSettings = {
+      ...DEFAULT_SETTINGS,
+      exerciseRegistry: [],
+      deletedExercises: [],
+    }
+    const { harness, trashFile, rerender } = createDeleteHarness(settings, file)
+
+    await harness.deleteRegistryEntry('Squat', true, rerender)
+
+    expect(trashFile).toHaveBeenCalledWith(file)
+    expect(settings.exerciseRegistry).toEqual([])
+    expect(settings.deletedExercises).toEqual(['squat'])
+    expect(rerender).toHaveBeenCalledTimes(1)
+    expect(noticeMessages[0]).toContain('recorded it as ignored')
+  })
+
+  it('leaves a note-backed name with no overlay entry untouched when the file is not also deleted', async () => {
+    noticeMessages.length = 0
+    const file = new TFile()
+    const settings: FitKitSettings = {
+      ...DEFAULT_SETTINGS,
+      exerciseRegistry: [],
+      deletedExercises: [],
+    }
+    const { harness, trashFile, rerender } = createDeleteHarness(settings, file)
+
+    await harness.deleteRegistryEntry('Squat', false, rerender)
+
+    expect(trashFile).not.toHaveBeenCalled()
+    expect(settings.exerciseRegistry).toEqual([])
+    expect(settings.deletedExercises).toEqual([])
+    expect(rerender).toHaveBeenCalledTimes(1)
+    expect(noticeMessages[0]).toContain('Squat')
+  })
+
+  it('tombstones a history-only name that has neither a note nor an overlay entry', async () => {
+    noticeMessages.length = 0
+    const settings: FitKitSettings = {
+      ...DEFAULT_SETTINGS,
+      exerciseRegistry: [],
+      deletedExercises: [],
+    }
+    const { harness, trashFile, rerender } = createDeleteHarness(settings, null)
+
+    await harness.deleteRegistryEntry('New lift', false, rerender)
+
+    expect(trashFile).not.toHaveBeenCalled()
+    expect(settings.exerciseRegistry).toEqual([])
+    expect(settings.deletedExercises).toEqual(['new lift'])
+    expect(rerender).toHaveBeenCalledTimes(1)
+    expect(noticeMessages[0]).toContain('New lift')
   })
 
   it('keeps the overlay and tombstones unchanged when trashing the note fails', async () => {

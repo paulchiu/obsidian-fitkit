@@ -76,6 +76,23 @@ describe('exercise registry', () => {
     expect(next.entries).not.toBe(original.entries)
   })
 
+  it('upserts a case/whitespace variant onto the existing entry instead of duplicating it', () => {
+    const original = createRegistry([squat])
+    const next = upsertEntry(original, { ...squat, name: ' squat ', kind: 'duration' })
+
+    expect(next.entries).toHaveLength(1)
+    expect(next.entries[0]?.name).toBe(' squat ')
+    expect(next.entries[0]?.kind).toBe('duration')
+    expect(resolve(next, 'Squat').kind).toBe('match')
+  })
+
+  it('removes a case/whitespace variant of a stored name', () => {
+    const original = createRegistry([squat, plank])
+    const next = removeEntry(original, ' squat ')
+
+    expect(next.entries.map((entry) => entry.name)).toEqual(['Plank'])
+  })
+
   it('merges fresh entries without replacing existing aliases', () => {
     const existing: ExerciseRegistryEntry[] = [
       { name: 'Squat', kind: 'strength', unit: 'kg', aliases: ['squats'] },
