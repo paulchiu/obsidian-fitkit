@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [0.19.2] - 2026-08-21
+
+### Added
+
+### Changed
+
+### Fixed
+
 - The workout editor's autosave round-trip (parse note text, then write it back) no longer
   destroys content it does not model. Unrecognised frontmatter keys (`tags:`, `aliases:`,
   custom keys), non-exercise bullets (task checkboxes, plain notes), nested sub-bullets,
