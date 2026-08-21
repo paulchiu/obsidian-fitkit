@@ -424,6 +424,26 @@ Cue: keep the bar close to the shins.
 })
 
 describe('buildExerciseRenamePlanFromVault', () => {
+  it('refuses to rename a matching exercise note with unreadable frontmatter', async () => {
+    const config = settings()
+    const malformed = '---\ntype: exercise\nkind: strength\n'
+    const { app, content, renameCalls, files } = buildMockApp([
+      { path: 'Fitness/Exercises/Row.md', body: malformed },
+    ])
+
+    const plan = await buildExerciseRenamePlanFromVault(app, config, 'Row', 'Barbell Row')
+
+    expect(plan.refusal).toEqual({
+      reason: 'source-note-unreadable',
+      message:
+        "The exercise note for 'Row' could not be read. Its frontmatter must be valid before it can be renamed.",
+    })
+    expect(renameCalls).toEqual([])
+    expect(files.map((file) => file.path)).toEqual(['Fitness/Exercises/Row.md'])
+    expect(content.get('Fitness/Exercises/Row.md')).toBe(malformed)
+    expect(content.has('Fitness/Exercises/Barbell Row.md')).toBe(false)
+  })
+
   it('flags a target path collision with an unrelated file', async () => {
     const config = settings()
     const { app } = buildMockApp([

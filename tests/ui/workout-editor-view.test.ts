@@ -1084,21 +1084,25 @@ describe('WorkoutEditorView kind switch persistence', () => {
     expect(obsidianMock.notices).toEqual(['Registry now records Air bike as duration.'])
   })
 
-  it('does not claim the note was updated when its frontmatter cannot be parsed', async () => {
+  it('routes a matching unreadable note through the note writer without changing the registry', async () => {
     const { view, contents } = createPersistKindChangeView([
       {
         path: 'Fitness/Exercises/Squat.md',
         basename: 'Squat',
-        frontmatter: { type: 'exercise', kind: 'duration' },
       },
     ])
-    /** No opening `---` delimiter: findFrontmatterBounds reports 'missing', so the write is a no-op. */
-    contents.set('Fitness/Exercises/Squat.md', 'type: exercise\nkind: duration\n')
+    const malformed = '---\ntype: exercise\nkind: duration\n'
+    contents.set('Fitness/Exercises/Squat.md', malformed)
 
     await view.persistKindChange('Squat', 'strength')
 
-    expect(contents.get('Fitness/Exercises/Squat.md')).toBe('type: exercise\nkind: duration\n')
-    expect(obsidianMock.notices).not.toContain('Exercise note now records Squat as strength.')
+    expect(view.app.vault.process).toHaveBeenCalledTimes(1)
+    expect(contents.get('Fitness/Exercises/Squat.md')).toBe(malformed)
+    expect(view.plugin.settings.exerciseRegistry).toEqual([])
+    expect(view.plugin.saveSettings).not.toHaveBeenCalled()
+    expect(obsidianMock.notices).toEqual([
+      'Could not update the exercise note for Squat; its frontmatter was left unchanged.',
+    ])
   })
 })
 

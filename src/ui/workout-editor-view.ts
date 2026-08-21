@@ -36,7 +36,7 @@ import {
 } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
 import { exercisesFolder, workoutsFolder } from '../settings-paths'
-import { readExerciseCatalog } from '../vault/exercise-catalog'
+import { findExerciseNoteFile, readExerciseCatalog } from '../vault/exercise-catalog'
 import { composeExerciseNote } from '../vault/exercise-note'
 import { planExerciseFileOpen } from '../vault/exercise-file-plan'
 import { exerciseHistoryFromVault } from '../vault/exercise-history-vault'
@@ -997,7 +997,9 @@ export class WorkoutEditorView extends ItemView {
     const key = normalize(trimmed)
     const catalog = readExerciseCatalog(this.app, this.plugin.settings)
     const noteEntry = catalog.entries.find((entry) => normalize(entry.name) === key)
-    const noteFile = noteEntry ? this.app.vault.getAbstractFileByPath(noteEntry.path) : null
+    const notePath =
+      noteEntry?.path ?? findExerciseNoteFile(this.app, this.plugin.settings, trimmed)?.path
+    const noteFile = notePath ? this.app.vault.getAbstractFileByPath(notePath) : null
     if (noteFile instanceof TFile) {
       let result: ExerciseNoteKindUpdateResult | undefined
       await this.app.vault.process(noteFile, (text) => {

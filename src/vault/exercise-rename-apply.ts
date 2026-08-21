@@ -17,7 +17,7 @@ import {
 import { parseWorkoutNote } from '../domain/workout-note-model'
 import type { FitKitSettings } from '../settings'
 import { exercisesFolder, normalizeFolder, workoutsFolder } from '../settings-paths'
-import { readExerciseCatalog } from './exercise-catalog'
+import { findExerciseNoteFile, readExerciseCatalog } from './exercise-catalog'
 import { isMarkdownFile } from './index'
 
 /**
@@ -41,6 +41,8 @@ export async function buildExerciseRenamePlanFromVault(
 
   const oldKey = normalize(oldName)
   const sourceNote = catalog.find((entry) => normalize(entry.name) === oldKey) ?? null
+  const sourceNoteUnreadable =
+    sourceNote === null && findExerciseNoteFile(app, settings, oldName) !== null
   const sourceNoteText = sourceNote ? await readFileText(app, sourceNote.path) : undefined
 
   const workoutNotes = await collectWorkoutNoteTexts(app, settings)
@@ -59,6 +61,7 @@ export async function buildExerciseRenamePlanFromVault(
     deletedExercises: settings.deletedExercises ?? [],
     workoutNotes,
     sourceNoteText,
+    sourceNoteUnreadable,
     targetPathOccupiedByUnrelatedFile,
   })
 }

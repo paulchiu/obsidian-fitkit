@@ -1,6 +1,6 @@
 import type { App, CachedMetadata, TFile } from 'obsidian'
 
-import type { ExerciseKind } from '../domain/exercise-registry'
+import { normalize, type ExerciseKind } from '../domain/exercise-registry'
 import { parseWeightUnit, type WeightUnit } from '../domain/weight-unit'
 import type { FitKitSettings } from '../settings'
 import { exercisesFolder, normalizeFolder } from '../settings-paths'
@@ -21,6 +21,25 @@ export interface ExerciseCatalogDiagnostic {
 export interface ExerciseCatalogSnapshot {
   entries: ExerciseCatalogEntry[]
   diagnostics: ExerciseCatalogDiagnostic[]
+}
+
+/**
+ * Bypasses the catalog because malformed frontmatter is absent from Obsidian's
+ * metadata cache and therefore from `readExerciseCatalog`. Resolving by folder
+ * and basename lets callers distinguish an unreadable note from no note.
+ */
+export function findExerciseNoteFile(
+  app: App,
+  settings: FitKitSettings,
+  name: string,
+): TFile | null {
+  const folder = normalizeFolder(exercisesFolder(settings))
+  const key = normalize(name)
+  return (
+    app.vault
+      .getMarkdownFiles()
+      .find((file) => isFileInFolder(file, folder) && normalize(file.basename) === key) ?? null
+  )
 }
 
 export function readExerciseCatalog(app: App, settings: FitKitSettings): ExerciseCatalogSnapshot {

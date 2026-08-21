@@ -48,6 +48,8 @@ export interface ExerciseRenamePlanInput {
    * only to detect user prose in its `## Notes` section for a merge.
    */
   sourceNoteText?: string
+  /** True when a matching source file exists but is absent from the readable catalog. */
+  sourceNoteUnreadable?: boolean
   /**
    * True when the destination filename for `newName` is already occupied by
    * a file the caller could not match to `newName` in `catalog` (an
@@ -63,6 +65,7 @@ export type ExerciseRenameRefusalReason =
   | 'name-normalizes-to-nothing'
   | 'invalid-characters'
   | 'unchanged'
+  | 'source-note-unreadable'
   | 'target-collision'
 
 export interface ExerciseRenameRefusal {
@@ -149,6 +152,12 @@ export function buildExerciseRenamePlan(input: ExerciseRenamePlanInput): Exercis
   }
   if (trimmedNewName === oldName) {
     return refuse('unchanged', 'New name is identical to the current name.')
+  }
+  if (input.sourceNoteUnreadable) {
+    return refuse(
+      'source-note-unreadable',
+      `The exercise note for '${oldName}' could not be read. Its frontmatter must be valid before it can be renamed.`,
+    )
   }
   if (input.targetPathOccupiedByUnrelatedFile) {
     return refuse(

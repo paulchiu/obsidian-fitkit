@@ -39,6 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Kind switches and exercise renames now detect matching exercise note files even when
+  malformed frontmatter keeps them out of Obsidian's metadata cache. Kind switches leave
+  such notes byte-identical and report that they could not be updated, while renames refuse
+  to proceed until the source note's frontmatter is valid.
 - Switching an exercise's kind now writes `kind:` into that exercise's note frontmatter
   when a note exists, since the note is what wins on the next read. Previously the switch
   only updated the settings registry overlay, which a note-backed exercise silently
