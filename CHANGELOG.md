@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Rewrite the README around the current feature set and move the detail into dedicated `docs/`
+  pages for the workout editor, exercise registry, dashboard and charts, note format, and settings.
+- Replace the stale README screenshots and add ones for the registry, rename and merge previews,
+  reading mode, and the maintenance actions.
+
 ### Fixed
 
 ### Removed
