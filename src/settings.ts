@@ -1,4 +1,10 @@
 import { App, Notice, PluginSettingTab, Setting, TFile, normalizePath } from 'obsidian'
+import type {
+  SettingControl,
+  SettingDefinition,
+  SettingDefinitionGroup,
+  SettingDefinitionItem,
+} from 'obsidian'
 
 import { formatErrorMessage } from './domain/error'
 import type { ExerciseRegistryEntry } from './domain/exercise-registry'
@@ -110,8 +116,78 @@ function normalizeStoredExerciseRegistry(
 const CHART_WINDOW_MIN = 5
 const CHART_WINDOW_MAX = 365
 
+/** Settings the tab exposes as controls, and so as `setControlValue` keys. */
+type FitKitSettingKey =
+  | 'fitnessRoot'
+  | 'autoOpenWorkoutEditor'
+  | 'strengthRestTimerEnabled'
+  | 'autosaveDebounceMs'
+  | 'chartSessionsWindow'
+
+type FitKitSettingControl = SettingControl<FitKitSettingKey>
+
+interface SettingSection {
+  heading: string
+  rows: SettingRow[]
+}
+
+/**
+ * A row in renderer-agnostic form. `control` rows persist through
+ * `setControlValue`; `action` rows are a button; `block` rows own their markup
+ * and are given a bare element to fill.
+ */
+type SettingRow =
+  | { kind: 'control'; name: string; desc: string; control: FitKitSettingControl }
+  | { kind: 'action'; name: string; desc: string; buttonText: string; onClick: () => void }
+  | { kind: 'block'; name: string; render: (containerEl: HTMLElement) => void }
+
+export function coerceAutosaveDebounceMs(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : Number.parseInt(String(value), 10)
+  return Number.isFinite(parsed) && parsed >= 0
+    ? Math.trunc(parsed)
+    : DEFAULT_SETTINGS.autosaveDebounceMs
+}
+
+export function coerceChartSessionsWindow(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : Number.parseInt(String(value), 10)
+  return Number.isFinite(parsed)
+    ? Math.min(Math.max(Math.trunc(parsed), CHART_WINDOW_MIN), CHART_WINDOW_MAX)
+    : DEFAULT_SETTINGS.chartSessionsWindow
+}
+
+function toSettingDefinition(row: SettingRow): SettingDefinition<FitKitSettingKey> {
+  switch (row.kind) {
+    case 'control':
+      return { name: row.name, desc: row.desc, control: row.control }
+    case 'action':
+      return {
+        name: row.name,
+        desc: row.desc,
+        render: (setting) => {
+          setting.addButton((button) => button.setButtonText(row.buttonText).onClick(row.onClick))
+        },
+      }
+    case 'block':
+      return {
+        name: row.name,
+        searchable: false,
+        render: (setting) => {
+          setting.settingEl.empty()
+          setting.settingEl.addClass('fitkit-setting-block')
+          row.render(setting.settingEl)
+        },
+      }
+  }
+}
+
 export class FitKitSettingTab extends PluginSettingTab {
   plugin: FitKitPlugin
+
+  private derivedPathValues: {
+    workouts: HTMLElement
+    exercises: HTMLElement
+    dashboard: HTMLElement
+  } | null = null
 
   constructor(app: App, plugin: FitKitPlugin) {
     super(app, plugin)
@@ -121,173 +197,301 @@ export class FitKitSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this
     containerEl.empty()
+    for (const section of this.sections()) {
+      new Setting(containerEl).setName(section.heading).setHeading()
+      for (const row of section.rows) {
+        this.renderRowImperatively(containerEl, row)
+      }
+    }
+  }
+
+  /**
+   * Obsidian 1.13 and later render the tab from these definitions and skip
+   * display() entirely, and the settings search indexes them, so a row only
+   * becomes findable once its name and description live here rather than
+   * inside a render callback.
+   */
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    return this.sections().map((section): SettingDefinitionGroup<FitKitSettingKey> => ({
+      type: 'group',
+      heading: section.heading,
+      items: section.rows.map(toSettingDefinition),
+    }))
+  }
+
+  /**
+   * The single description of the tab. display() walks it for Obsidian below
+   * 1.13 and getSettingDefinitions() maps it for 1.13 and later, so the two
+   * renderings cannot drift.
+   */
+  private sections(): SettingSection[] {
+    return [
+      {
+        heading: 'Paths',
+        rows: [
+          {
+            kind: 'control',
+            name: 'Fitness root',
+            desc: 'Folder under the vault root where workouts, exercises, and the dashboard live.',
+            control: { type: 'folder', key: 'fitnessRoot', includeRoot: true },
+          },
+          {
+            kind: 'block',
+            name: 'Derived paths',
+            render: (el) => this.renderDerivedPaths(el),
+          },
+        ],
+      },
+      {
+        heading: 'Behavior',
+        rows: [
+          {
+            kind: 'control',
+            name: 'Auto-open workout editor',
+            desc: 'When opening a workout note, switch it into the editor automatically; turn this off to use normal Markdown reading mode by default.',
+            control: { type: 'toggle', key: 'autoOpenWorkoutEditor' },
+          },
+          {
+            kind: 'control',
+            name: 'Rest timer',
+            desc: 'Show a rest timer in the workout editor footer that remembers your last rest after stopping.',
+            control: { type: 'toggle', key: 'strengthRestTimerEnabled' },
+          },
+          {
+            kind: 'control',
+            name: 'Autosave debounce (ms)',
+            desc: 'How long to wait after the last edit before persisting changes in the workout editor view.',
+            control: { type: 'number', key: 'autosaveDebounceMs', min: 0 },
+          },
+        ],
+      },
+      {
+        heading: 'Charts',
+        rows: [
+          {
+            kind: 'control',
+            name: 'Chart sessions',
+            desc: "How many recent workout dates to plot on the exercise progression chart. Each chart block can override this with 'window: <N>'.",
+            control: {
+              type: 'number',
+              key: 'chartSessionsWindow',
+              min: CHART_WINDOW_MIN,
+              max: CHART_WINDOW_MAX,
+            },
+          },
+        ],
+      },
+      {
+        heading: 'Setup and maintenance',
+        rows: [
+          {
+            kind: 'block',
+            name: 'About these actions',
+            render: (el) => {
+              el.createEl('div', {
+                text: 'Use these actions when setting up the plugin, repairing generated exercise notes, or refreshing dashboard data.',
+                cls: 'setting-item-description',
+              })
+            },
+          },
+          {
+            kind: 'action',
+            name: 'Rebuild index',
+            desc: 'Scan workout notes and cache the latest index plus parse diagnostics.',
+            buttonText: 'Rebuild',
+            onClick: () => {
+              void this.plugin.rebuildWorkoutIndex()
+            },
+          },
+          {
+            kind: 'action',
+            name: 'Rebuild dashboard',
+            desc: 'Rebuild the workout index, then regenerate the dashboard note.',
+            buttonText: 'Rebuild',
+            onClick: () => {
+              void this.plugin.rebuildDashboard()
+            },
+          },
+          {
+            kind: 'action',
+            name: 'Restore hidden dashboard sections',
+            desc: 'Clear hidden-section state for the dashboard and regenerate it.',
+            buttonText: 'Restore',
+            onClick: () => {
+              void this.plugin.restoreHiddenDashboardSections()
+            },
+          },
+          {
+            kind: 'action',
+            name: 'Show parse diagnostics',
+            desc: 'Open diagnostics from the last index build, or report that none exist.',
+            buttonText: 'Show',
+            onClick: () => {
+              void this.plugin.showParseDiagnostics()
+            },
+          },
+          {
+            kind: 'action',
+            name: 'Show exercise registry diagnostics',
+            desc: 'Open exercise catalog and registry diagnostics from the current vault state.',
+            buttonText: 'Show',
+            onClick: () => {
+              void this.plugin.showExerciseRegistryDiagnostics()
+            },
+          },
+          {
+            kind: 'action',
+            name: 'Sync and repair exercise notes',
+            desc: 'Repair exercise note frontmatter, chart blocks, recent sessions, and note headings.',
+            buttonText: 'Sync',
+            onClick: () => {
+              void this.plugin.syncExerciseNotes()
+            },
+          },
+          {
+            kind: 'action',
+            name: 'Rebuild registry',
+            desc: 'Add every exercise note and workout-history-only name missing from the registry below. Never overwrites an existing entry or its unit.',
+            buttonText: 'Rebuild',
+            onClick: () => {
+              void this.plugin.rebuildExerciseRegistry()
+            },
+          },
+        ],
+      },
+      {
+        heading: 'Registry',
+        rows: [
+          {
+            kind: 'block',
+            name: 'About the registry',
+            render: (el) => {
+              el.createDiv({
+                text: 'Every exercise the plugin knows about: notes in your exercises folder, no-note registry entries, and names logged only in workout history. This is the central place to fix wording, casing, or splitting; use the rebuild action above to pull in anything missing.',
+                cls: 'setting-item-description',
+              })
+            },
+          },
+          {
+            kind: 'block',
+            name: 'Exercises',
+            render: (el) => this.renderRegistry(el),
+          },
+        ],
+      },
+    ]
+  }
+
+  /**
+   * Coerces and persists a control value, then runs the side effects the
+   * fields used to run inline. Both rendering paths write through here, so a
+   * value cannot be validated one way on 1.13 and another way below it.
+   */
+  override async setControlValue(key: string, value: unknown): Promise<void> {
     const settings = this.plugin.settings
+    switch (key) {
+      case 'fitnessRoot':
+        settings.fitnessRoot = normalizePath(String(value))
+        break
+      case 'autoOpenWorkoutEditor':
+        settings.autoOpenWorkoutEditor = Boolean(value)
+        break
+      case 'strengthRestTimerEnabled':
+        settings.strengthRestTimerEnabled = Boolean(value)
+        break
+      case 'autosaveDebounceMs':
+        settings.autosaveDebounceMs = coerceAutosaveDebounceMs(value)
+        break
+      case 'chartSessionsWindow':
+        settings.chartSessionsWindow = coerceChartSessionsWindow(value)
+        break
+      default:
+        return
+    }
+    await this.plugin.saveSettings()
+    if (key === 'fitnessRoot') {
+      this.refreshDerivedPaths()
+    }
+    if (key === 'strengthRestTimerEnabled') {
+      this.plugin.refreshWorkoutEditorViews()
+    }
+  }
 
-    new Setting(containerEl).setName('Paths').setHeading()
+  private renderRowImperatively(containerEl: HTMLElement, row: SettingRow): void {
+    if (row.kind === 'block') {
+      row.render(containerEl)
+      return
+    }
+    const setting = new Setting(containerEl).setName(row.name).setDesc(row.desc)
+    if (row.kind === 'action') {
+      setting.addButton((button) => button.setButtonText(row.buttonText).onClick(row.onClick))
+      return
+    }
+    this.addControlComponent(setting, row.control)
+  }
 
-    new Setting(containerEl)
-      .setName('Fitness root')
-      .setDesc('Folder under the vault root where workouts, exercises, and the dashboard live.')
-      .addText((text) =>
-        text.setValue(settings.fitnessRoot).onChange(async (value) => {
-          settings.fitnessRoot = normalizePath(value)
-          await this.plugin.saveSettings()
-          refreshDerivedPaths()
+  private addControlComponent(setting: Setting, control: FitKitSettingControl): void {
+    const key = control.key
+    const current = this.plugin.settings[key]
+
+    if (control.type === 'toggle') {
+      setting.addToggle((toggle) =>
+        toggle.setValue(Boolean(current)).onChange((value) => {
+          void this.setControlValue(key, value)
         }),
       )
+      return
+    }
 
-    containerEl.createEl('div', {
-      text: 'Derived paths:',
-      cls: 'setting-item-name',
-    })
+    if (control.type === 'number') {
+      setting.addText((text) => {
+        text.inputEl.type = 'number'
+        text.inputEl.min = String(control.min ?? 0)
+        if (control.max !== undefined) {
+          text.inputEl.max = String(control.max)
+        }
+        text.setValue(String(current)).onChange(async (value) => {
+          await this.setControlValue(key, value)
+          text.setValue(String(this.plugin.settings[key]))
+        })
+      })
+      return
+    }
+
+    setting.addText((text) =>
+      text.setValue(String(current)).onChange((value) => {
+        void this.setControlValue(key, value)
+      }),
+    )
+  }
+
+  private renderDerivedPaths(containerEl: HTMLElement): void {
+    containerEl.createEl('div', { text: 'Derived paths:', cls: 'setting-item-name' })
     const workoutsLine = containerEl.createEl('div', { cls: 'setting-item-description' })
     workoutsLine.createSpan({ text: 'Workouts folder: ' })
-    const workoutsValue = workoutsLine.createSpan()
+    const workouts = workoutsLine.createSpan()
     const exercisesLine = containerEl.createEl('div', { cls: 'setting-item-description' })
     exercisesLine.createSpan({ text: 'Exercises folder: ' })
-    const exercisesValue = exercisesLine.createSpan()
+    const exercises = exercisesLine.createSpan()
     const dashboardLine = containerEl.createEl('div', { cls: 'setting-item-description' })
     dashboardLine.createSpan({ text: 'Dashboard: ' })
-    const dashboardValue = dashboardLine.createSpan()
-    const refreshDerivedPaths = (): void => {
-      workoutsValue.setText(workoutsFolder(settings))
-      exercisesValue.setText(exercisesFolder(settings))
-      dashboardValue.setText(dashboardPath(settings))
+    const dashboard = dashboardLine.createSpan()
+    this.derivedPathValues = { workouts, exercises, dashboard }
+    this.refreshDerivedPaths()
+  }
+
+  private refreshDerivedPaths(): void {
+    const values = this.derivedPathValues
+    if (!values) {
+      return
     }
-    refreshDerivedPaths()
+    const settings = this.plugin.settings
+    values.workouts.setText(workoutsFolder(settings))
+    values.exercises.setText(exercisesFolder(settings))
+    values.dashboard.setText(dashboardPath(settings))
+  }
 
-    new Setting(containerEl).setName('Behavior').setHeading()
-
-    new Setting(containerEl)
-      .setName('Auto-open workout editor')
-      .setDesc(
-        'When opening a workout note, switch it into the editor automatically; turn this off to use normal Markdown reading mode by default.',
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(settings.autoOpenWorkoutEditor).onChange(async (value) => {
-          settings.autoOpenWorkoutEditor = value
-          await this.plugin.saveSettings()
-        }),
-      )
-
-    new Setting(containerEl)
-      .setName('Rest timer')
-      .setDesc(
-        'Show a rest timer in the workout editor footer that remembers your last rest after stopping.',
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(settings.strengthRestTimerEnabled).onChange(async (value) => {
-          settings.strengthRestTimerEnabled = value
-          await this.plugin.saveSettings()
-          this.plugin.refreshWorkoutEditorViews()
-        }),
-      )
-
-    new Setting(containerEl)
-      .setName('Autosave debounce (ms)')
-      .setDesc(
-        'How long to wait after the last edit before persisting changes in the workout editor view.',
-      )
-      .addText((text) => {
-        text.inputEl.type = 'number'
-        text.inputEl.min = '0'
-        text.setValue(String(settings.autosaveDebounceMs)).onChange(async (value) => {
-          const parsed = Number.parseInt(value, 10)
-          settings.autosaveDebounceMs = Number.isNaN(parsed) || parsed < 0 ? 600 : parsed
-          text.setValue(String(settings.autosaveDebounceMs))
-          await this.plugin.saveSettings()
-        })
-      })
-
-    new Setting(containerEl).setName('Charts').setHeading()
-
-    new Setting(containerEl)
-      .setName('Chart sessions')
-      .setDesc(
-        "How many recent workout dates to plot on the exercise progression chart. Each chart block can override this with 'window: <N>'.",
-      )
-      .addText((text) => {
-        text.inputEl.type = 'number'
-        text.inputEl.min = String(CHART_WINDOW_MIN)
-        text.inputEl.max = String(CHART_WINDOW_MAX)
-        text.setValue(String(settings.chartSessionsWindow)).onChange(async (value) => {
-          const parsed = Number.parseInt(value, 10)
-          const fallback = Number.isFinite(parsed)
-            ? Math.min(Math.max(parsed, CHART_WINDOW_MIN), CHART_WINDOW_MAX)
-            : DEFAULT_SETTINGS.chartSessionsWindow
-          settings.chartSessionsWindow = fallback
-          text.setValue(String(fallback))
-          await this.plugin.saveSettings()
-        })
-      })
-
-    new Setting(containerEl).setName('Setup and maintenance').setHeading()
-
-    containerEl.createEl('div', {
-      text: 'Use these actions when setting up the plugin, repairing generated exercise notes, or refreshing dashboard data.',
-      cls: 'setting-item-description',
-    })
-
-    new Setting(containerEl)
-      .setName('Rebuild index')
-      .setDesc('Scan workout notes and cache the latest index plus parse diagnostics.')
-      .addButton((button) =>
-        button.setButtonText('Rebuild').onClick(() => this.plugin.rebuildWorkoutIndex()),
-      )
-
-    new Setting(containerEl)
-      .setName('Rebuild dashboard')
-      .setDesc('Rebuild the workout index, then regenerate the dashboard note.')
-      .addButton((button) =>
-        button.setButtonText('Rebuild').onClick(() => this.plugin.rebuildDashboard()),
-      )
-
-    new Setting(containerEl)
-      .setName('Restore hidden dashboard sections')
-      .setDesc('Clear hidden-section state for the dashboard and regenerate it.')
-      .addButton((button) =>
-        button.setButtonText('Restore').onClick(() => this.plugin.restoreHiddenDashboardSections()),
-      )
-
-    new Setting(containerEl)
-      .setName('Show parse diagnostics')
-      .setDesc('Open diagnostics from the last index build, or report that none exist.')
-      .addButton((button) =>
-        button.setButtonText('Show').onClick(() => this.plugin.showParseDiagnostics()),
-      )
-
-    new Setting(containerEl)
-      .setName('Show exercise registry diagnostics')
-      .setDesc('Open exercise catalog and registry diagnostics from the current vault state.')
-      .addButton((button) =>
-        button.setButtonText('Show').onClick(() => this.plugin.showExerciseRegistryDiagnostics()),
-      )
-
-    new Setting(containerEl)
-      .setName('Sync and repair exercise notes')
-      .setDesc(
-        'Repair exercise note frontmatter, chart blocks, recent sessions, and note headings.',
-      )
-      .addButton((button) =>
-        button.setButtonText('Sync').onClick(() => this.plugin.syncExerciseNotes()),
-      )
-
-    new Setting(containerEl)
-      .setName('Rebuild registry')
-      .setDesc(
-        'Add every exercise note and workout-history-only name missing from the registry below. Never overwrites an existing entry or its unit.',
-      )
-      .addButton((button) =>
-        button.setButtonText('Rebuild').onClick(() => this.plugin.rebuildExerciseRegistry()),
-      )
-
-    new Setting(containerEl).setName('Registry').setHeading()
-
-    containerEl.createDiv({
-      text: 'Every exercise the plugin knows about: notes in your exercises folder, no-note registry entries, and names logged only in workout history. This is the central place to fix wording, casing, or splitting; use the rebuild action above to pull in anything missing.',
-      cls: 'setting-item-description',
-    })
-
+  private renderRegistry(containerEl: HTMLElement): void {
     let searchQuery = ''
     let rows: RegistryTableRow[] = []
     const registrySection = containerEl.createDiv({ cls: 'fitkit-registry-section' })

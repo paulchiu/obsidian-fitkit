@@ -759,6 +759,17 @@ body.is-mobile .fitkit-editor-root {
   margin-top: 2px;
 }
 
+/**
+ * Rows that own their markup rather than the name/control layout: the
+ * declarative settings API still wraps them in a setting item, so strip the
+ * flex row and its separator back to a plain block.
+ */
+.fitkit-setting-block {
+  display: block;
+  border-top: none;
+  padding-top: 0;
+}
+
 .fitkit-registry-section {
   display: grid;
   gap: 8px;
