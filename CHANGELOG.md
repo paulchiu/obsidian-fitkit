@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [0.21.0] - 2026-08-22
+
+### Added
+
 - Surface FitKit's settings in Obsidian's settings search on 1.13 and later by describing the tab
   declaratively. Obsidian below 1.13 keeps rendering the same tab through `display()`.
 
