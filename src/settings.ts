@@ -291,6 +291,8 @@ export class FitKitSettingTab extends PluginSettingTab {
             control: {
               type: 'number',
               key: 'autosaveDebounceMs',
+              /** A number input reports an unparseable entry as empty, and Obsidian stores this in its place. */
+              defaultValue: DEFAULT_SETTINGS.autosaveDebounceMs,
               validate: (value) => validateNumber(value, AUTOSAVE_DEBOUNCE_MIN),
             },
             fallbackBounds: { min: AUTOSAVE_DEBOUNCE_MIN },
@@ -307,6 +309,7 @@ export class FitKitSettingTab extends PluginSettingTab {
             control: {
               type: 'number',
               key: 'chartSessionsWindow',
+              defaultValue: DEFAULT_SETTINGS.chartSessionsWindow,
               validate: (value) => validateNumber(value, CHART_WINDOW_MIN, CHART_WINDOW_MAX),
             },
             fallbackBounds: { min: CHART_WINDOW_MIN, max: CHART_WINDOW_MAX },

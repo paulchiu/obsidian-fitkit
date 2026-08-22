@@ -27,6 +27,7 @@ interface DefinitionRow {
     key: string
     min?: number
     max?: number
+    defaultValue?: unknown
     validate?: (value: number) => string | void
   }
   render?: unknown
@@ -106,6 +107,17 @@ describe('setting definitions', () => {
       expect(control.min).toBeUndefined()
       expect(control.max).toBeUndefined()
       expect(typeof control.validate).toBe('function')
+    }
+
+    expect(numbers.get('autosaveDebounceMs')?.defaultValue).toBe(
+      DEFAULT_SETTINGS.autosaveDebounceMs,
+    )
+    expect(numbers.get('chartSessionsWindow')?.defaultValue).toBe(
+      DEFAULT_SETTINGS.chartSessionsWindow,
+    )
+
+    for (const control of numbers.values()) {
+      expect(control.validate?.(control.defaultValue as number)).toBeUndefined()
     }
 
     const autosave = numbers.get('autosaveDebounceMs')?.validate
