@@ -113,8 +113,24 @@ function normalizeStoredExerciseRegistry(
   }))
 }
 
+const AUTOSAVE_DEBOUNCE_MIN = 0
 const CHART_WINDOW_MIN = 5
 const CHART_WINDOW_MAX = 365
+
+/**
+ * Bounds are enforced here rather than as `min`/`max` on the control, because
+ * those become HTML constraints that reject the change before `validate` runs,
+ * leaving a browser tooltip where the setting's own message should be.
+ */
+function validateNumber(value: number, min: number, max?: number): string | void {
+  if (!Number.isFinite(value)) {
+    return 'Enter a number.'
+  }
+  if (max === undefined) {
+    return value < min ? `Enter ${min} or more.` : undefined
+  }
+  return value < min || value > max ? `Enter a number between ${min} and ${max}.` : undefined
+}
 
 /** Settings the tab exposes as controls, and so as `setControlValue` keys. */
 type FitKitSettingKey =
@@ -137,7 +153,18 @@ interface SettingSection {
  * and are given a bare element to fill.
  */
 type SettingRow =
-  | { kind: 'control'; name: string; desc: string; control: FitKitSettingControl }
+  | {
+      kind: 'control'
+      name: string
+      desc: string
+      control: FitKitSettingControl
+      /**
+       * Input constraints for the display() fallback only, which clamps on
+       * change rather than validating. See {@link validateNumber} for why the
+       * declarative control cannot carry them.
+       */
+      fallbackBounds?: { min: number; max?: number }
+    }
   | { kind: 'action'; name: string; desc: string; buttonText: string; onClick: () => void }
   | { kind: 'block'; name: string; render: (containerEl: HTMLElement) => void }
 
@@ -261,7 +288,12 @@ export class FitKitSettingTab extends PluginSettingTab {
             kind: 'control',
             name: 'Autosave debounce (ms)',
             desc: 'How long to wait after the last edit before persisting changes in the workout editor view.',
-            control: { type: 'number', key: 'autosaveDebounceMs', min: 0 },
+            control: {
+              type: 'number',
+              key: 'autosaveDebounceMs',
+              validate: (value) => validateNumber(value, AUTOSAVE_DEBOUNCE_MIN),
+            },
+            fallbackBounds: { min: AUTOSAVE_DEBOUNCE_MIN },
           },
         ],
       },
@@ -275,9 +307,9 @@ export class FitKitSettingTab extends PluginSettingTab {
             control: {
               type: 'number',
               key: 'chartSessionsWindow',
-              min: CHART_WINDOW_MIN,
-              max: CHART_WINDOW_MAX,
+              validate: (value) => validateNumber(value, CHART_WINDOW_MIN, CHART_WINDOW_MAX),
             },
+            fallbackBounds: { min: CHART_WINDOW_MIN, max: CHART_WINDOW_MAX },
           },
         ],
       },
@@ -427,10 +459,14 @@ export class FitKitSettingTab extends PluginSettingTab {
       setting.addButton((button) => button.setButtonText(row.buttonText).onClick(row.onClick))
       return
     }
-    this.addControlComponent(setting, row.control)
+    this.addControlComponent(setting, row.control, row.fallbackBounds)
   }
 
-  private addControlComponent(setting: Setting, control: FitKitSettingControl): void {
+  private addControlComponent(
+    setting: Setting,
+    control: FitKitSettingControl,
+    bounds?: { min: number; max?: number },
+  ): void {
     const key = control.key
     const current = this.plugin.settings[key]
 
@@ -446,9 +482,9 @@ export class FitKitSettingTab extends PluginSettingTab {
     if (control.type === 'number') {
       setting.addText((text) => {
         text.inputEl.type = 'number'
-        text.inputEl.min = String(control.min ?? 0)
-        if (control.max !== undefined) {
-          text.inputEl.max = String(control.max)
+        text.inputEl.min = String(bounds?.min ?? 0)
+        if (bounds?.max !== undefined) {
+          text.inputEl.max = String(bounds.max)
         }
         text.setValue(String(current)).onChange(async (value) => {
           await this.setControlValue(key, value)

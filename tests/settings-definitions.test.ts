@@ -22,7 +22,13 @@ interface DefinitionRow {
   name: string
   desc?: unknown
   searchable?: unknown
-  control?: { type: string; key: string; min?: number; max?: number }
+  control?: {
+    type: string
+    key: string
+    min?: number
+    max?: number
+    validate?: (value: number) => string | void
+  }
   render?: unknown
 }
 
@@ -72,12 +78,12 @@ describe('setting definitions', () => {
       .map((row) => row.control)
       .filter((control): control is NonNullable<DefinitionRow['control']> => control !== undefined)
 
-    expect(controls).toEqual([
-      { type: 'folder', key: 'fitnessRoot', includeRoot: true },
-      { type: 'toggle', key: 'autoOpenWorkoutEditor' },
-      { type: 'toggle', key: 'strengthRestTimerEnabled' },
-      { type: 'number', key: 'autosaveDebounceMs', min: 0 },
-      { type: 'number', key: 'chartSessionsWindow', min: 5, max: 365 },
+    expect(controls.map((control) => [control.type, control.key])).toEqual([
+      ['folder', 'fitnessRoot'],
+      ['toggle', 'autoOpenWorkoutEditor'],
+      ['toggle', 'strengthRestTimerEnabled'],
+      ['number', 'autosaveDebounceMs'],
+      ['number', 'chartSessionsWindow'],
     ])
 
     for (const control of controls) {
@@ -86,6 +92,33 @@ describe('setting definitions', () => {
         control.type === 'toggle' ? 'boolean' : control.type === 'number' ? 'number' : 'string'
       expect(typeof DEFAULT_SETTINGS[control.key as keyof FitKitSettings]).toBe(expected)
     }
+  })
+
+  it('validates number bounds rather than declaring them as input constraints', () => {
+    const numbers = new Map(
+      allRows(createTab().tab)
+        .map((row) => row.control)
+        .filter((control) => control?.type === 'number')
+        .map((control) => [control!.key, control!]),
+    )
+
+    for (const control of numbers.values()) {
+      expect(control.min).toBeUndefined()
+      expect(control.max).toBeUndefined()
+      expect(typeof control.validate).toBe('function')
+    }
+
+    const autosave = numbers.get('autosaveDebounceMs')?.validate
+    expect(autosave?.(0)).toBeUndefined()
+    expect(autosave?.(5000)).toBeUndefined()
+    expect(autosave?.(-1)).toBe('Enter 0 or more.')
+    expect(autosave?.(Number.NaN)).toBe('Enter a number.')
+
+    const chart = numbers.get('chartSessionsWindow')?.validate
+    expect(chart?.(30)).toBeUndefined()
+    expect(chart?.(4)).toBe('Enter a number between 5 and 365.')
+    expect(chart?.(366)).toBe('Enter a number between 5 and 365.')
+    expect(chart?.(Number.NaN)).toBe('Enter a number.')
   })
 
   it('gives every searchable row a description so settings search can match it', () => {
