@@ -759,6 +759,31 @@ body.is-mobile .fitkit-editor-root {
   margin-top: 2px;
 }
 
+/**
+ * Rows that own their markup rather than the name/control layout: the
+ * declarative settings API still wraps them in a setting item, so strip the
+ * flex row back to a plain block. Inside a setting group the row separator is
+ * drawn as a ::before pseudo-element, and these rows are not settings to be
+ * separated from the one above.
+ */
+.fitkit-setting-block {
+  display: block;
+  border: none;
+  border-radius: 0;
+  background-color: transparent;
+  margin-bottom: 0;
+}
+
+/* Obsidian reserves a gutter beside the first child of the name/control row. */
+.fitkit-setting-block > *:first-child {
+  margin-inline-end: 0;
+}
+
+/* Matches the specificity of Obsidian's own divider rule so this wins on order. */
+.setting-group .setting-item.fitkit-setting-block::before {
+  content: none;
+}
+
 .fitkit-registry-section {
   display: grid;
   gap: 8px;
