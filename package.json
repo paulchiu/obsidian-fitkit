@@ -29,7 +29,7 @@
     "@emnapi/runtime": "1.11.1",
     "@eslint/js": "^9.39.5",
     "@resvg/resvg-js": "^2.6.2",
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.2.0",
     "@vitest/coverage-v8": "^4.1.6",
     "esbuild": "^0.28.2",
     "eslint-plugin-obsidianmd": "^0.4.1",
