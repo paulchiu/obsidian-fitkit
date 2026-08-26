@@ -15,6 +15,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Removed
 
+## [0.21.0] - 2026-08-22
+
+### Added
+
+- Surface FitKit's settings in Obsidian's settings search on 1.13 and later by describing the tab
+  declaratively. Obsidian below 1.13 keeps rendering the same tab through `display()`.
+
+### Changed
+
+- Rewrite the README around the current feature set and move the detail into dedicated `docs/`
+  pages for the workout editor, exercise registry, dashboard and charts, note format, and settings.
+- Replace the stale README screenshots and add ones for the registry, rename and merge previews,
+  reading mode, and the maintenance actions.
+
+### Fixed
+
+### Removed
+
 ## [0.20.0] - 2026-08-21
 
 ### Added

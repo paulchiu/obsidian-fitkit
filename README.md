@@ -1,19 +1,14 @@
 # FitKit
 
-FitKit is a workout tracker that lives inside Obsidian. Your sets, reps, weight, and rest timing are stored as plain Markdown in your vault, edited through a fast structured form, and rolled up into a dashboard and per-exercise progression charts.
+FitKit is a workout tracker that lives inside Obsidian. Your sets, reps, weight, and durations are stored as plain Markdown in your vault, edited through a form built for the gym, and rolled up into a dashboard and per-exercise progression charts.
 
-## Why FitKit
+Every workout is a normal note with Dataview inline fields. No SQLite blob, no proprietary export, no cloud account. If you uninstall FitKit tomorrow, your training history is still plain text in your vault, readable in any editor. It is a plugin, so the rest of your vault can reach it: link exercises to your training notes, embed a chart in a daily note, or query your history with your own Dataview queries.
 
-- **Your data stays as Markdown.** Every workout is a normal note with Dataview inline fields. No SQLite blob, no proprietary export, no cloud account. If you uninstall FitKit tomorrow, your training history is still plain text in your vault.
-- **The editor is built for the gym.** Tap to add a set, type the weight, hit the rest timer. You are not editing Markdown between sets, you are using a form that writes Markdown for you.
-- **PBs and progression are automatic.** Once you have logged a few workouts, FitKit generates a dashboard with personal bests and a Dataview-powered history per exercise. Exercise notes get a progression chart and a recent-sessions table without you wiring anything up.
-- **It is just an Obsidian plugin.** It works with the rest of your vault: link exercises to your training notes, embed charts in a daily note, query workouts with your own Dataview queries.
-
-If you want a workout tracker that is yours, that you can read and edit in any text editor, and that does not silo your training history behind an app, FitKit is built for that.
+The editor is the part you touch mid-session. Tap to add a set, type the weight, hit the rest timer. Once you have a few workouts logged, the dashboard and the per-exercise charts fill themselves in.
 
 ## Install
 
-FitKit needs the [Dataview plugin](https://github.com/blacksmithgu/obsidian-dataview) to render history tables and recent-session views. Install Dataview first from Obsidian's community plugins.
+FitKit needs the [Dataview plugin](https://github.com/blacksmithgu/obsidian-dataview) to render history tables and recent-session views. Install it first from Obsidian's community plugins.
 
 To install FitKit with the [BRAT community plugin](https://github.com/TfTHacker/obsidian42-brat):
 
@@ -31,109 +26,62 @@ To install manually from a release:
 
 The defaults are designed so you can log a workout the moment FitKit is enabled. No setup is required.
 
-1. **Open the command palette** and run `Open today's workout`. FitKit creates today's note under `Fitness/Workouts/` and opens it in the structured workout editor.
+![Workout editor with a strength card, a duration card, and the rest timer](docs/images/workout-editor.png)
 
-   ![Workout editor with a strength exercise, rows, and rest timer](docs/images/workout-editor.png)
+1. Run `Open today's workout` from the command palette. FitKit creates today's note under `Fitness/Workouts/` and opens it in the editor.
+2. Add an exercise. Type the name, for example `Squat`. If it is new, FitKit asks whether to create an exercise note for it; say yes for anything you want to chart and revisit later.
+3. Log your sets: weight and reps for a strength exercise, or a duration for a time-based one. Tap the rest timer between sets if you want it.
+4. Before you move on, set `Next time` to how you want to load that exercise next session. It shows up as a badge the next time it comes around.
 
-2. **Add an exercise.** Type the name (for example, `Squat`). If it is a new exercise, FitKit asks whether to create an exercise note for it. Say yes for anything you want to chart and revisit later.
-
-3. **Log your sets.** Enter weight and reps for each set, or a duration in seconds for time-based exercises. Tap the rest timer between sets if you want it.
-
-4. **That is it.** The editor autosaves the note as you go. The underlying Markdown looks like this:
-
-   ```markdown
-   ---
-   type: workout
-   date: 2026-05-12
-   name: Squat Day
-   ---
-
-   ## [[Squat]]
-
-   - [exercise:: [[Squat]]] [set:: 1] [weight:: 50] [reps:: 5]
-   - [exercise:: [[Squat]]] [set:: 2] [weight:: 55] [reps:: 5]
-   ```
-
-After a few sessions, run `Rebuild dashboard` from FitKit settings to generate `Fitness/Fitness Dashboard.md` with your PBs and per-exercise history. Exercise notes pick up a progression chart and a `Recent sessions` table automatically.
-
-## Settings and defaults
-
-![FitKit settings showing the default paths and setup actions](docs/images/settings.png)
-
-The default root is `Fitness`, which gives you:
-
-- `Fitness/Workouts/` for workout notes.
-- `Fitness/Exercises/` for exercise notes.
-- `Fitness/Fitness Dashboard.md` for the generated dashboard.
-
-Change `Fitness root` only if you want those files somewhere else in your vault.
-
-Other settings worth knowing:
-
-- `Auto-open workout editor`: open workout notes in the FitKit editor by default.
-- `Rest timer`: show the workout editor rest timer.
-- `Chart sessions`: default number of recent sessions to plot in exercise charts.
-
-## Dashboard and exercise notes
-
-![Generated dashboard with PBs and Dataview history tables](docs/images/dashboard.png)
-
-![Exercise note with a progression chart and Recent sessions](docs/images/exercise-note.png)
-
-`Rebuild dashboard` scans your workout notes, updates the local index, and regenerates the dashboard with PBs and per-exercise Dataview queries.
-
-Exercise notes are normal Markdown files with `type: exercise` frontmatter. FitKit can seed them with:
-
-- A `fitkit-chart` progression chart.
-- A Dataview-powered `Recent sessions` section.
-- A `Notes` section for your own training notes.
-
-Use `Sync and repair exercise notes` if you already have exercise notes and want FitKit to add or refresh the generated sections. Use `Import exercises` when you have workout history and want FitKit to create missing exercise notes or registry entries from the names it finds.
-
-## Commands
-
-The command palette is reserved for daily workout entry.
-
-| Command                                | Description                                                                |
-| -------------------------------------- | -------------------------------------------------------------------------- |
-| `Open today's workout`                 | Create today's workout note if needed, then open it in the workout editor. |
-| `Open workout editor for current file` | Open the active Markdown file in the workout editor.                       |
-
-## Maintenance actions
-
-The settings tab has maintenance actions for generated data and diagnostics:
-
-- `Rebuild index`: rescan workout notes into the local index.
-- `Rebuild dashboard`: regenerate `Fitness/Fitness Dashboard.md` from the index.
-- `Restore hidden dashboard sections`: bring back per-exercise sections you have hidden.
-- `Show parse diagnostics`: list workout notes that failed to parse cleanly.
-- `Show exercise registry diagnostics`: report registry inconsistencies.
-- `Sync and repair exercise notes`: insert or refresh charts, `Recent sessions`, and `Notes` blocks in existing exercise notes.
-- `Import exercises`: scan workout history for missing exercise notes and registry entries.
-
-## Workout note format
-
-Workout notes use `type: workout` frontmatter. Exercise notes use `type: exercise` frontmatter. Those fields are the discriminator FitKit uses to decide which notes are canonical workout or exercise files.
-
-Dataview inline fields are the canonical workout format:
+That is it. The editor autosaves as you go, and the underlying Markdown stays readable:
 
 ```markdown
-[exercise:: [[Name]]] [set:: N] [weight:: X] [reps:: Y]
-[exercise:: [[Name]]] [duration:: S]
-[exercise:: [[Name]]] [notes:: text] [next:: up 2.5]
+---
+type: workout
+date: 2026-05-12
+name: Squat Day
+---
+
+## [[Squat]]
+
+- [exercise:: [[Squat]]] [set:: 1] [weight:: 50] [reps:: 5]
+- [exercise:: [[Squat]]] [set:: 2] [weight:: 55] [reps:: 5]
 ```
 
-Durations are stored as seconds. Fenced code blocks are reporting surfaces, not the source of truth.
+## After a few sessions
 
-`next::` records how you want to load the exercise next session: `up`, `down`, or `stay`, with an optional weight change (`up 2.5`). FitKit writes it from the workout editor and shows it on the exercise card the next time that exercise comes up. A value it cannot read is ignored rather than reported, and, like any other inline field FitKit does not recognise, it is dropped the next time the workout editor saves that note.
+Run `Rebuild dashboard` from FitKit's settings to generate `Fitness/Fitness Dashboard.md`. It lists your recent sessions, a personal best per exercise, and any next-session plans you recorded, followed by a per-exercise section backed by a Dataview query.
+
+![Generated dashboard with recent workouts, PBs, and next session plans](docs/images/dashboard.png)
+
+Exercise notes pick up a progression chart and a `Recent sessions` table without you wiring anything up. They are ordinary notes with `type: exercise` frontmatter, so the `Notes` section is yours to write in.
+
+## Maintaining your exercise list
+
+Names drift. You log 'Pushup' one week and 'Push Up' the next, or an exercise ends up living only in workout history with no note behind it. The registry in FitKit's settings lists every exercise the plugin knows about, labelled by where it came from, and is where you fix that.
+
+![Registry table showing note-backed, registry-only, and history-only exercises](docs/images/registry.png)
+
+Renaming from here renames the exercise note, rewrites every reference across your workout notes, and keeps the old name as an alias so nothing stops resolving. You see a preview of every file and row that will change, and can cancel before anything is written. Renaming onto a name already in use consolidates the two.
+
+## Documentation
+
+| Page                                                 | What it covers                                                                   |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------- |
+| [Workout editor](docs/workout-editor.md)             | Cards, sets, durations, the rest timer, next-session plans, autosave.            |
+| [Exercise registry](docs/exercise-registry.md)       | Where exercises come from, rebuilding, renaming, consolidating, kinds and units. |
+| [Dashboard and charts](docs/dashboard-and-charts.md) | What the dashboard generates, how a PB is chosen, `fitkit-chart` options.        |
+| [Note format](docs/note-format.md)                   | Frontmatter, inline fields, and exactly what survives a save.                    |
+| [Settings and maintenance](docs/settings.md)         | Every setting, every maintenance action, and the two commands.                   |
 
 ## Limitations
 
-- Conflict resolution is still manual. FitKit detects mid-edit file changes and asks you to reload before further edits.
-- SQL/WASM analytics are not implemented.
-- A custom fenced source format is not implemented.
+- Conflict resolution is manual. FitKit detects mid-edit file changes and asks you to reload before further edits.
+- Splitting one exercise into two is not implemented. Consolidating two into one is.
 - Repeat-last-workout is not implemented.
-- Strength exercises can use a per-exercise weight unit (`kg` or `lbs`) from the exercise registry editor or `unit:` frontmatter. It defaults to kg and only changes labels, with no numeric conversion.
+- Inline fields FitKit does not recognise, such as `[rpe:: 7]`, are dropped the next time the editor saves that note. Everything else in a workout note is preserved, see [Note format](docs/note-format.md#what-survives-a-save).
+- A per-exercise weight unit (`kg` or `lbs`) only changes labels. There is no numeric conversion.
+- SQL/WASM analytics and a custom fenced source format are not implemented.
 
 ## Development
 
