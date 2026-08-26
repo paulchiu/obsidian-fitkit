@@ -41,7 +41,7 @@
     "tslib": "^2.8.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.67.0",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.11"
   },
   "overrides": {
     "@emnapi/core": "1.10.0",
