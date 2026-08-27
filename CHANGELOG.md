@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The plan chip now reflects a plan set from the exercise menu straight away, instead of showing only the plan carried in from last session.
+
 ### Removed
 
 ## [1.1.1] - 2026-08-26

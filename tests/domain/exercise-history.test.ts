@@ -331,6 +331,46 @@ describe('exercise history aggregation', () => {
     expect(badge?.icon).toBe('arrow-down')
   })
 
+  it('prefers a plan recorded on the open card, measured against that card own heaviest set', () => {
+    expect(
+      formatNextPlanBadge(
+        {
+          strength: { lastSessionMax: { value: { weight: 80, reps: 5 }, date: '2026-08-10' } },
+          nextPlan: { value: { direction: 'down', step: 5 }, date: '2026-08-10' },
+        },
+        'strength',
+        { plan: { direction: 'up', step: 2.5 }, sessionMax: { weight: 100, reps: 5 } },
+      ),
+    ).toEqual({
+      text: 'Next: 102.5 kg',
+      title: 'Planned for next time: up 2.5 kg from 100 kg',
+      icon: 'arrow-up',
+    })
+  })
+
+  it('measures a plan on a card with no completed set against the last session', () => {
+    expect(
+      formatNextPlanBadge(
+        { strength: { lastSessionMax: { value: { weight: 100, reps: 5 }, date: '2026-08-10' } } },
+        'strength',
+        { plan: { direction: 'up', step: 2.5 } },
+      ),
+    ).toEqual({
+      text: 'Next: 102.5 kg',
+      title: 'Planned for next time: up 2.5 kg from 100 kg',
+      icon: 'arrow-up',
+    })
+  })
+
+  it('shows a plan recorded on a card that has no history at all', () => {
+    const badge = formatNextPlanBadge(undefined, 'strength', {
+      plan: { direction: 'up', step: 2.5 },
+    })
+
+    expect(badge?.text).toBe('Next: up 2.5 kg')
+    expect(badge?.title).toBe('Planned for next time: up 2.5 kg')
+  })
+
   it('has no plan badge for duration exercises or absent plans', () => {
     expect(
       formatNextPlanBadge(

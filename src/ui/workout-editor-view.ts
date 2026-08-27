@@ -7,6 +7,7 @@ import { formatErrorMessage } from '../domain/error'
 import {
   formatExerciseHistoryBadges,
   formatNextPlanBadge,
+  pickMaxWeightSet,
   type ExerciseHistoryByName,
   type ExerciseHistorySummary,
 } from '../domain/exercise-history'
@@ -1263,7 +1264,10 @@ export class WorkoutEditorView extends ItemView {
   private renderExerciseHistoryBadges(card: HTMLElement, ex: ExerciseCard): void {
     const summary = this.exerciseHistory?.get(ex.name)
     const badges = formatExerciseHistoryBadges(summary, ex.kind)
-    const planBadge = formatNextPlanBadge(summary, ex.kind)
+    const planBadge = formatNextPlanBadge(summary, ex.kind, {
+      plan: ex.next,
+      sessionMax: pickMaxWeightSet(ex.strengthSets),
+    })
     if (badges.length === 0 && !planBadge) {
       return
     }

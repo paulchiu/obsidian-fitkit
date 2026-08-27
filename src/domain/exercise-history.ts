@@ -38,6 +38,12 @@ export interface NextPlanBadge extends ExerciseHistoryBadge {
 
 export type ExerciseHistoryByName = Map<string, ExerciseHistorySummary>
 
+/** Plan and completed sets on the card being edited, which the note has not been indexed for yet. */
+export interface CurrentExercisePlan {
+  plan?: NextPlan
+  sessionMax?: WeightSet | null
+}
+
 interface SessionMetric<T> {
   date: string
   mtime: number
@@ -126,32 +132,40 @@ export function formatExerciseHistoryBadges(
 }
 
 /**
- * Badge for the plan the user recorded last time. Shows the resulting weight
- * when the plan carries a step and the last session gives it something to
- * apply to, since that is the number they act on at the rack; otherwise it
- * falls back to the direction alone.
+ * Badge for the plan in force on the card. A plan recorded on the open card
+ * wins over the one carried in from last session, since it is the more recent
+ * statement of intent and is the only readout the card offers for it; it is
+ * measured against that card's own heaviest set. Shows the resulting weight
+ * when the plan carries a step and there is a base to apply it to, since that
+ * is the number acted on at the rack; otherwise the direction alone.
  */
 export function formatNextPlanBadge(
   summary: ExerciseHistorySummary | undefined,
   kind: ExerciseKind,
+  current?: CurrentExercisePlan,
 ): NextPlanBadge | null {
-  const plan = summary?.nextPlan
-  if (!plan || kind !== 'strength') {
+  if (kind !== 'strength') {
     return null
   }
 
   const lastWeight = summary?.strength?.lastSessionMax?.value.weight
-  const base = lastWeight !== undefined && lastWeight > 0 ? lastWeight : null
-  const target = base === null ? null : nextPlanTargetWeight(plan.value, base)
-  const label = formatNextPlanLabel(plan.value).toLowerCase()
-  const change = plan.value.step === undefined ? label : `${label} kg`
-  const from =
-    base !== null && plan.value.direction !== 'stay' ? ` from ${formatNumber(base)} kg` : ''
+  const plan = current?.plan ?? summary?.nextPlan?.value
+  if (!plan) {
+    return null
+  }
+
+  const planned = current?.plan ? 'Planned for next time' : `Planned on ${summary?.nextPlan?.date}`
+  const baseWeight = current?.plan ? (current.sessionMax?.weight ?? lastWeight) : lastWeight
+  const base = baseWeight !== undefined && baseWeight > 0 ? baseWeight : null
+  const target = base === null ? null : nextPlanTargetWeight(plan, base)
+  const label = formatNextPlanLabel(plan).toLowerCase()
+  const change = plan.step === undefined ? label : `${label} kg`
+  const from = base !== null && plan.direction !== 'stay' ? ` from ${formatNumber(base)} kg` : ''
 
   return {
     text: target !== null ? `Next: ${formatNumber(target)} kg` : `Next: ${change}`,
-    title: `Planned on ${plan.date}: ${change}${from}`,
-    icon: nextPlanIcon(plan.value),
+    title: `${planned}: ${change}${from}`,
+    icon: nextPlanIcon(plan),
   }
 }
 

@@ -2369,6 +2369,22 @@ describe('WorkoutEditorView next-time plan', () => {
     expect(step?.disabled).toBe(disabled)
   })
 
+  it('shows the plan just set on this card, so the menu choice has a readout', () => {
+    const view = createNextPlanView({
+      name: 'Squat',
+      kind: 'strength',
+      next: { direction: 'up', step: 2.5 },
+      strengthSets: [{ set: 1, weight: 100, reps: 5 }],
+      durationEntries: [],
+    })
+    const list = new TestElement('div')
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    const badge = list.findByClass('fitkit-plan-badge')
+    expect(badge?.attributes.get('title')).toBe('Planned for next time: up 2.5 kg from 100 kg')
+    expect(badge?.children.map((child) => child.textContent).join('')).toContain('Next: 102.5 kg')
+  })
+
   it('shows the plan recorded last session as a badge', () => {
     const view = createNextPlanView({
       name: 'Squat',
