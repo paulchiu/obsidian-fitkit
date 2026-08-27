@@ -6,6 +6,7 @@ interface MockMenuItemState {
   icon?: string
   disabled?: boolean
   warning?: boolean
+  checked?: boolean
   onClick?: () => void
 }
 
@@ -86,6 +87,11 @@ vi.mock('obsidian', () => {
 
     setDisabled(_disabled: boolean): this {
       this.state.disabled = _disabled
+      return this
+    }
+
+    setChecked(checked: boolean): this {
+      this.state.checked = checked
       return this
     }
 
@@ -307,6 +313,7 @@ const createRowActionView = (): RowActionView =>
 interface CardMenuView {
   model: unknown
   openOrCreateExerciseFile?: ReturnType<typeof vi.fn>
+  openRenameExerciseModal?: ReturnType<typeof vi.fn>
   openCardMenu(evt: MouseEvent, index: number): void
 }
 
@@ -429,7 +436,12 @@ describe('WorkoutEditorView row actions', () => {
     expect(obsidianMock.menus).toHaveLength(1)
     expect(obsidianMock.menus[0]?.items.map((item) => item.title)).toEqual([
       'Open exercise file',
+      'Rename exercise',
       'Add exercise note',
+      'Plan: increase',
+      'Plan: keep',
+      'Plan: decrease',
+      'Set plan step...',
       'Switch to duration',
       'Move up',
       'Move down',
@@ -475,17 +487,28 @@ describe('WorkoutEditorView row actions', () => {
     view.renderExerciseCard(list as unknown as HTMLElement, 0)
 
     const nameButton = list.findByClass('fitkit-name-button')
-    const renameButton = list.findByClass('fitkit-rename-button')
     expect(nameButton?.attributes.get('aria-label')).toBe('Open exercise file for Squat')
     expect(nameButton?.findByClass('fitkit-name-button-text')?.textContent).toBe('Squat')
     expect(nameButton?.findByClass('fitkit-name-button-icon')?.attributes.get('data-icon')).toBe(
       'arrow-up-right',
     )
-    expect(renameButton?.attributes.get('aria-label')).toBe('Rename exercise')
-    expect(renameButton?.attributes.get('data-icon')).toBe('pencil')
+    expect(list.findByClass('fitkit-rename-button')).toBeNull()
+    expect(list.findByClass('fitkit-card-top')?.children).toHaveLength(3)
+  })
 
-    renameButton?.listenersFor('click')[0]?.({})
+  it('reaches rename through the card menu', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
+    const view = createCardMenuView()
+    view.model = {
+      exercises: [{ name: 'Squat', kind: 'strength', strengthSets: [], durationEntries: [] }],
+    }
+    view.openRenameExerciseModal = vi.fn(() => Promise.resolve())
 
+    view.openCardMenu({ currentTarget: new TestElement('button') } as unknown as MouseEvent, 0)
+
+    const rename = obsidianMock.menus[0]?.items.find((item) => item.title === 'Rename exercise')
+    expect(rename?.icon).toBe('pencil')
+    rename?.onClick?.()
     expect(view.openRenameExerciseModal).toHaveBeenCalledWith(0)
   })
 
@@ -2035,6 +2058,7 @@ interface NextPlanView {
   markDirty: ReturnType<typeof vi.fn>
   focusRowCell: ReturnType<typeof vi.fn>
   renderExerciseCard(list: HTMLElement, index: number): void
+  openCardMenu(evt: MouseEvent, index: number): void
 }
 
 describe('WorkoutEditorView next-time plan', () => {
@@ -2049,43 +2073,48 @@ describe('WorkoutEditorView next-time plan', () => {
     return view
   }
 
-  const renderCard = (ex: NextPlanExerciseCard): TestElement => {
-    const list = new TestElement('div')
-    createNextPlanView(ex).renderExerciseCard(list as unknown as HTMLElement, 0)
-    return list
+  const planItems = (
+    ex: NextPlanExerciseCard,
+    view = createNextPlanView(ex),
+  ): MockMenuItemState[] => {
+    view.openCardMenu({ currentTarget: new TestElement('button') } as unknown as MouseEvent, 0)
+    const items = obsidianMock.menus[obsidianMock.menus.length - 1]?.items ?? []
+    return items.filter((item) => item.title?.startsWith('Plan') === true)
   }
 
-  it('offers down, stay, and up on strength cards', () => {
-    const list = renderCard({
+  it('offers increase, keep, and decrease on strength cards', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
+    const items = planItems({
       name: 'Squat',
       kind: 'strength',
       strengthSets: [{ set: 1, weight: 100, reps: 5 }],
       durationEntries: [],
     })
 
-    const buttons = list.findAllByClass('fitkit-next-seg-button')
-    expect(buttons.map((button) => button.attributes.get('data-icon'))).toEqual([
-      'arrow-down',
-      'minus',
-      'arrow-up',
+    expect(items.map((item) => item.title)).toEqual([
+      'Plan: increase',
+      'Plan: keep',
+      'Plan: decrease',
     ])
-    expect(buttons.every((button) => button.attributes.get('aria-pressed') === 'false')).toBe(true)
-    expect(list.findByClass('fitkit-next-step')).toBeNull()
+    expect(items.map((item) => item.icon)).toEqual(['arrow-up', 'minus', 'arrow-down'])
+    expect(items.every((item) => item.checked === false)).toBe(true)
   })
 
-  it('omits the control on duration cards', () => {
-    const list = renderCard({
+  it('omits the plan items on duration cards', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
+    const items = planItems({
       name: 'Plank',
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{ durationSeconds: 60 }],
     })
 
-    expect(list.findByClass('fitkit-next-row')).toBeNull()
+    expect(items).toEqual([])
   })
 
-  it('marks the recorded direction and renders no target preview', () => {
-    const list = renderCard({
+  it('checks the recorded direction', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
+    const items = planItems({
       name: 'Squat',
       kind: 'strength',
       next: { direction: 'up', step: 2.5 },
@@ -2093,26 +2122,13 @@ describe('WorkoutEditorView next-time plan', () => {
       durationEntries: [],
     })
 
-    const pressed = list
-      .findAllByClass('fitkit-next-seg-button')
-      .filter((button) => button.attributes.get('aria-pressed') === 'true')
-    expect(pressed.map((button) => button.attributes.get('data-icon'))).toEqual(['arrow-up'])
-    expect(list.findByClass('fitkit-next-target')).toBeNull()
-  })
-
-  it('hides the step field when the plan is to stay', () => {
-    const list = renderCard({
-      name: 'Squat',
-      kind: 'strength',
-      next: { direction: 'stay' },
-      strengthSets: [{ set: 1, weight: 100, reps: 5 }],
-      durationEntries: [],
-    })
-
-    expect(list.findByClass('fitkit-next-step')).toBeNull()
+    expect(items.filter((item) => item.checked).map((item) => item.title)).toEqual([
+      'Plan: increase',
+    ])
   })
 
   it('records a direction when one is chosen', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
     const ex: NextPlanExerciseCard = {
       name: 'Squat',
       kind: 'strength',
@@ -2120,11 +2136,8 @@ describe('WorkoutEditorView next-time plan', () => {
       durationEntries: [],
     }
     const view = createNextPlanView(ex)
-    const list = new TestElement('div')
-    view.renderExerciseCard(list as unknown as HTMLElement, 0)
 
-    const up = list.findAllByClass('fitkit-next-seg-button')[2]
-    up?.listenersFor('click').forEach((listener) => listener({}))
+    planItems(ex, view)[0]?.onClick?.()
 
     expect(ex.next).toEqual({ direction: 'up' })
     expect(view.markDirty).toHaveBeenCalled()
@@ -2132,6 +2145,7 @@ describe('WorkoutEditorView next-time plan', () => {
   })
 
   it('clears the plan when the active direction is chosen again', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
     const ex: NextPlanExerciseCard = {
       name: 'Squat',
       kind: 'strength',
@@ -2139,17 +2153,14 @@ describe('WorkoutEditorView next-time plan', () => {
       strengthSets: [{ set: 1, weight: 100, reps: 5 }],
       durationEntries: [],
     }
-    const view = createNextPlanView(ex)
-    const list = new TestElement('div')
-    view.renderExerciseCard(list as unknown as HTMLElement, 0)
 
-    const up = list.findAllByClass('fitkit-next-seg-button')[2]
-    up?.listenersFor('click').forEach((listener) => listener({}))
+    planItems(ex)[0]?.onClick?.()
 
     expect(ex.next).toBeUndefined()
   })
 
   it('carries the step across a direction change', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
     const ex: NextPlanExerciseCard = {
       name: 'Squat',
       kind: 'strength',
@@ -2157,41 +2168,34 @@ describe('WorkoutEditorView next-time plan', () => {
       strengthSets: [{ set: 1, weight: 100, reps: 5 }],
       durationEntries: [],
     }
-    const view = createNextPlanView(ex)
-    const list = new TestElement('div')
-    view.renderExerciseCard(list as unknown as HTMLElement, 0)
 
-    const down = list.findAllByClass('fitkit-next-seg-button')[0]
-    down?.listenersFor('click').forEach((listener) => listener({}))
+    planItems(ex)[2]?.onClick?.()
 
     expect(ex.next).toEqual({ direction: 'down', step: 2.5 })
   })
 
-  it('reads the step from the field and drops it when cleared', () => {
+  it.each([
+    { label: 'no plan', next: undefined, disabled: true },
+    { label: 'a stay plan', next: { direction: 'stay' as const }, disabled: true },
+    { label: 'an up plan', next: { direction: 'up' as const }, disabled: false },
+  ])('disables the step item for $label', ({ next, disabled }) => {
+    vi.stubGlobal('HTMLElement', TestElement)
     const ex: NextPlanExerciseCard = {
       name: 'Squat',
       kind: 'strength',
-      next: { direction: 'up' },
       strengthSets: [{ set: 1, weight: 100, reps: 5 }],
       durationEntries: [],
     }
+    if (next) {
+      ex.next = next
+    }
     const view = createNextPlanView(ex)
-    const list = new TestElement('div')
-    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    view.openCardMenu({ currentTarget: new TestElement('button') } as unknown as MouseEvent, 0)
 
-    const step = list.findByClass('fitkit-next-step') as unknown as
-      (TestElement & { value: string }) | null
-    expect(step).not.toBeNull()
-
-    step!.value = '5'
-    step!.listenersFor('input').forEach((listener) => listener({}))
-    expect(ex.next).toEqual({ direction: 'up', step: 5 })
-    expect(list.findByClass('fitkit-next-target')).toBeNull()
-
-    step!.value = ''
-    step!.listenersFor('input').forEach((listener) => listener({}))
-    expect(ex.next).toEqual({ direction: 'up' })
-    expect(list.findByClass('fitkit-next-target')).toBeNull()
+    const step = obsidianMock.menus[obsidianMock.menus.length - 1]?.items.find(
+      (item) => item.title === 'Set plan step...',
+    )
+    expect(step?.disabled).toBe(disabled)
   })
 
   it('shows the plan recorded last session as a badge', () => {

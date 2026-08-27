@@ -327,66 +327,6 @@ body.is-mobile .fitkit-editor-root {
   height: 13px;
 }
 
-.fitkit-next-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.fitkit-next-seg {
-  display: inline-flex;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--background-primary);
-}
-
-.fitkit-next-seg-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  border-right: 1px solid var(--background-modifier-border);
-  background: transparent;
-  color: var(--text-muted);
-  box-shadow: none;
-  cursor: pointer;
-}
-
-.fitkit-next-seg-button:last-child {
-  border-right: none;
-}
-
-.fitkit-next-seg-button:hover,
-.fitkit-next-seg-button:focus-visible {
-  color: var(--text-normal);
-  background: var(--background-modifier-hover);
-}
-
-.fitkit-next-seg-button.is-active {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-}
-
-.fitkit-next-seg-button svg {
-  width: 15px;
-  height: 15px;
-  stroke-width: 2.25;
-}
-
-/* Raise specificity over .fitkit-input's width: 100% so the step field keeps its fixed width instead of stretching and wrapping. */
-.fitkit-next-row .fitkit-next-step {
-  width: 84px;
-  flex: 0 0 auto;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
 .fitkit-gear-button {
   display: inline-flex;
 }

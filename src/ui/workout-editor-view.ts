@@ -47,6 +47,7 @@ import { ConfirmModal } from './confirm-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
 import { KindSwitchChoiceModal, type KindSwitchChoice } from './kind-switch-choice-modal'
 import { SetNoteModal } from './set-note-modal'
+import { PlanStepModal } from './plan-step-modal'
 
 interface DragSession {
   pointerId: number
@@ -101,11 +102,11 @@ interface ExerciseCard {
 const NEXT_PLAN_OPTIONS: ReadonlyArray<{
   direction: NextPlanDirection
   icon: string
-  label: string
+  menuLabel: string
 }> = [
-  { direction: 'down', icon: 'arrow-down', label: 'Go down next time' },
-  { direction: 'stay', icon: 'minus', label: 'Stay at the same weight next time' },
-  { direction: 'up', icon: 'arrow-up', label: 'Go up next time' },
+  { direction: 'up', icon: 'arrow-up', menuLabel: 'Plan: increase' },
+  { direction: 'stay', icon: 'minus', menuLabel: 'Plan: keep' },
+  { direction: 'down', icon: 'arrow-down', menuLabel: 'Plan: decrease' },
 ]
 
 interface EditorWorkoutModel {
@@ -435,13 +436,6 @@ export class WorkoutEditorView extends ItemView {
     setIcon(linkIcon, 'arrow-up-right')
     nameButton.addEventListener('click', () => void this.openOrCreateExerciseFile(ex))
 
-    const renameBtn = top.createEl('button', {
-      cls: 'fitkit-btn fitkit-btn-muted fitkit-card-icon-button fitkit-rename-button',
-      attr: { type: 'button', 'aria-label': 'Rename exercise' },
-    })
-    setIcon(renameBtn, 'pencil')
-    renameBtn.addEventListener('click', () => void this.openRenameExerciseModal(index))
-
     const gearBtn = top.createEl('button', {
       cls: 'fitkit-btn fitkit-btn-muted fitkit-card-icon-button fitkit-gear-button',
       attr: { type: 'button', 'aria-label': 'Exercise options' },
@@ -469,70 +463,9 @@ export class WorkoutEditorView extends ItemView {
 
     if (ex.kind === 'strength') {
       this.renderStrengthTable(card, ex, index)
-      this.renderNextPlanControl(card, ex)
     } else {
       this.renderDurationTable(card, ex, index)
     }
-  }
-
-  /**
-   * Three-way toggle plus an optional step, recorded against this session and
-   * shown on the card the next time the exercise comes up. Tapping the active
-   * direction clears the plan.
-   */
-  private renderNextPlanControl(card: HTMLElement, ex: ExerciseCard): void {
-    const row = card.createDiv({ cls: 'fitkit-next-row' })
-    row.createSpan({ cls: 'fitkit-label', text: 'Next time' })
-
-    const group = row.createDiv({
-      cls: 'fitkit-next-seg',
-      attr: { role: 'group', 'aria-label': 'Plan for next session' },
-    })
-    for (const option of NEXT_PLAN_OPTIONS) {
-      const isActive = ex.next?.direction === option.direction
-      const button = group.createEl('button', {
-        cls: isActive ? 'fitkit-next-seg-button is-active' : 'fitkit-next-seg-button',
-        attr: {
-          type: 'button',
-          'aria-label': option.label,
-          'aria-pressed': isActive ? 'true' : 'false',
-        },
-      })
-      setIcon(button, option.icon)
-      button.addEventListener('click', () => {
-        ex.next = isActive ? undefined : buildNextPlan(option.direction, ex.next?.step)
-        this.markDirty()
-        this.render()
-      })
-    }
-
-    if (!ex.next || ex.next.direction === 'stay') {
-      return
-    }
-
-    const stepInput = row.createEl('input', {
-      cls: 'fitkit-input fitkit-next-step',
-      attr: {
-        type: 'text',
-        inputmode: 'decimal',
-        // eslint-disable-next-line obsidianmd/ui/sentence-case -- Unit symbols use lowercase labels.
-        placeholder: 'kg',
-        'aria-label': 'Weight change for next session',
-      },
-    })
-    stepInput.value = ex.next.step === undefined ? '' : formatPlanNumber(ex.next.step)
-
-    stepInput.addEventListener('input', () => {
-      if (!ex.next) {
-        return
-      }
-      const step = Number(stepInput.value.trim())
-      ex.next =
-        Number.isFinite(step) && step > 0
-          ? { direction: ex.next.direction, step }
-          : { direction: ex.next.direction }
-      this.markDirty()
-    })
   }
 
   private renderStrengthTable(card: HTMLElement, ex: ExerciseCard, exerciseIndex: number): void {
@@ -1192,6 +1125,50 @@ export class WorkoutEditorView extends ItemView {
     this.render()
   }
 
+  /**
+   * The plan the user records for next session. Choosing the active direction
+   * again clears it, matching the segmented control this replaced.
+   */
+  private addNextPlanMenuItems(menu: Menu, ex: ExerciseCard): void {
+    for (const option of NEXT_PLAN_OPTIONS) {
+      const isActive = ex.next?.direction === option.direction
+      menu.addItem((item) =>
+        item
+          .setTitle(option.menuLabel)
+          .setIcon(option.icon)
+          .setChecked(isActive)
+          .onClick(() => {
+            ex.next = isActive ? undefined : buildNextPlan(option.direction, ex.next?.step)
+            this.markDirty()
+            this.render()
+          }),
+      )
+    }
+
+    const canSetStep = ex.next !== undefined && ex.next.direction !== 'stay'
+    menu.addItem((item) =>
+      item
+        .setTitle('Set plan step...')
+        .setIcon('ruler')
+        .setDisabled(!canSetStep)
+        .onClick(() => {
+          const plan = ex.next
+          if (!plan || plan.direction === 'stay') {
+            return
+          }
+          new PlanStepModal(this.app, {
+            title: `Weight change for ${ex.name}`,
+            initial: plan.step === undefined ? '' : formatPlanNumber(plan.step),
+            onSave: (step) => {
+              ex.next = buildNextPlan(plan.direction, step)
+              this.markDirty()
+              this.render()
+            },
+          }).open()
+        }),
+    )
+  }
+
   private openCardMenu(evt: MouseEvent, index: number): void {
     if (!this.model) {
       return
@@ -1211,13 +1188,23 @@ export class WorkoutEditorView extends ItemView {
         .setIcon('file-text')
         .onClick(() => void this.openOrCreateExerciseFile(ex)),
     )
+    menu.addItem((item) =>
+      item
+        .setTitle('Rename exercise')
+        .setIcon('pencil')
+        .onClick(() => void this.openRenameExerciseModal(index)),
+    )
     menu.addSeparator()
     menu.addItem((item) =>
       item
         .setTitle(ex.exerciseNotes ? 'Edit exercise note' : 'Add exercise note')
-        .setIcon('pencil')
+        .setIcon('sticky-note')
         .onClick(() => this.openExerciseNoteModal(ex)),
     )
+    if (ex.kind === 'strength') {
+      menu.addSeparator()
+      this.addNextPlanMenuItems(menu, ex)
+    }
     menu.addSeparator()
     menu.addItem((item) =>
       item
