@@ -1445,6 +1445,27 @@ describe('WorkoutEditorView rest timer', () => {
     expect(view.activeRestTimer).toBeNull()
   })
 
+  it('marks only the last strength row as the live row', () => {
+    const ex: RestTimerExerciseCard = {
+      name: 'Squat',
+      kind: 'strength',
+      strengthSets: [
+        { set: 1, weight: 80, reps: 5 },
+        { set: 2, weight: 85, reps: 5 },
+        { set: 3, weight: 90 },
+      ],
+      durationEntries: [],
+    }
+    const view = createRestTimerView(ex)
+    const card = new TestElement('div')
+
+    view.renderStrengthTable(card as unknown as HTMLElement, ex, 0)
+
+    const rows = card.findAllByClass('fitkit-row')
+    expect(rows).toHaveLength(3)
+    expect(rows.map((row) => row.classes.has('fitkit-row--live'))).toEqual([false, false, true])
+  })
+
   it('renders the footer rest button only when enabled', () => {
     const ex: RestTimerExerciseCard = {
       name: 'Squat',

@@ -504,7 +504,9 @@ export class WorkoutEditorView extends ItemView {
     if (!set) {
       return
     }
-    const container = wrap.createDiv({ cls: 'fitkit-row' })
+    // The logging loop only ever touches the bottom row; the ones above it are session history.
+    const isLive = i === ex.strengthSets.length - 1
+    const container = wrap.createDiv({ cls: isLive ? 'fitkit-row fitkit-row--live' : 'fitkit-row' })
     const body = container.createDiv({ cls: 'fitkit-row-body' })
     const row = body.createDiv({ cls: 'fitkit-set-row' })
 

@@ -381,6 +381,22 @@ body.is-mobile .fitkit-editor-root {
   gap: 4px;
 }
 
+/** The row being logged right now gets a larger target than the finished rows above it. */
+.fitkit-row--live .fitkit-input {
+  min-height: 36px;
+  font-size: 15px;
+}
+
+@media (hover: none) {
+  .fitkit-row--live .fitkit-input {
+    min-height: 44px;
+  }
+}
+
+.is-narrow .fitkit-row--live .fitkit-input {
+  min-height: 44px;
+}
+
 .fitkit-set-row {
   display: grid;
   grid-template-columns: 20px repeat(2, minmax(0, 1fr));
