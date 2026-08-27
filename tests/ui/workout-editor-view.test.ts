@@ -217,6 +217,14 @@ class TestElement {
     this.attributes.set(name, value)
   }
 
+  addClass(cls: string): void {
+    this.classes.add(cls)
+  }
+
+  removeClass(cls: string): void {
+    this.classes.delete(cls)
+  }
+
   setText(text: string): void {
     this.textContent = text
   }
@@ -1264,10 +1272,10 @@ interface RestTimerView {
   render: ReturnType<typeof vi.fn>
   markDirty: ReturnType<typeof vi.fn>
   focusRowCell: ReturnType<typeof vi.fn>
+  startRestTimer: (() => void) | ReturnType<typeof vi.fn>
   refreshSettingsDrivenUi(): void
   renderFooterRestTimer(footer: HTMLElement): void
   renderStrengthTable(card: HTMLElement, ex: RestTimerExerciseCard, exerciseIndex: number): void
-  startRestTimer(): void
   stopRestTimer(): void
   tickRestTimer(): void
   loadFile(file: unknown): Promise<void>
@@ -1369,7 +1377,7 @@ describe('WorkoutEditorView rest timer', () => {
     ).toBe(false)
   })
 
-  it('focuses the Reps cell after duplicating the last set, since the weight carries over', () => {
+  it('inherits the previous weight when a set is added, and offers no duplicate button', () => {
     const ex: RestTimerExerciseCard = {
       name: 'Squat',
       kind: 'strength',
@@ -1381,14 +1389,60 @@ describe('WorkoutEditorView rest timer', () => {
 
     view.renderStrengthTable(card as unknown as HTMLElement, ex, 0)
     const actions = card.findByClass('fitkit-row-actions')
-    const dupBtn = actions?.children.find(
-      (c) => c.tagName === 'button' && c.textContent === 'Duplicate last set',
+    expect(actions?.children.map((child) => child.textContent)).not.toContain('Duplicate last set')
+
+    const addBtn = actions?.children.find(
+      (child) => child.tagName === 'button' && child.textContent === 'Add set',
     )
-    dupBtn?.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
+    addBtn?.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
 
     expect(ex.strengthSets).toHaveLength(2)
-    expect(ex.strengthSets[1]).toMatchObject({ set: 2, weight: 80, reps: 5 })
-    expect(view.focusRowCell).toHaveBeenCalledWith(0, 1, 'Reps')
+    expect(ex.strengthSets[1]).toEqual({ set: 2, weight: 80 })
+    expect(view.focusRowCell).toHaveBeenCalledWith(0, 1, 'Weight')
+  })
+
+  it.each([
+    { label: 'reps are recorded', value: '5', started: true },
+    { label: 'reps are zero', value: '0', started: false },
+    { label: 'reps are blank', value: '', started: false },
+  ])('starts the rest timer on blur when $label', ({ value, started }) => {
+    const ex: RestTimerExerciseCard = {
+      name: 'Squat',
+      kind: 'strength',
+      strengthSets: [{ set: 1, weight: 80 }],
+      durationEntries: [],
+    }
+    const view = createRestTimerView(ex)
+    view.startRestTimer = vi.fn()
+    const card = new TestElement('div')
+
+    view.renderStrengthTable(card as unknown as HTMLElement, ex, 0)
+    const reps = card.findAllByClass('fitkit-cell').find((cell) => cell.dataset.label === 'Reps')
+      ?.children[0] as unknown as (TestElement & { value: string }) | undefined
+    reps!.value = value
+    reps!.listenersFor('blur').forEach((listener) => listener({}))
+
+    expect(view.startRestTimer).toHaveBeenCalledTimes(started ? 1 : 0)
+  })
+
+  it('leaves the rest timer alone on reps blur when the setting is off', () => {
+    const ex: RestTimerExerciseCard = {
+      name: 'Squat',
+      kind: 'strength',
+      strengthSets: [{ set: 1, weight: 80 }],
+      durationEntries: [],
+    }
+    const view = createRestTimerView(ex)
+    view.plugin.settings.strengthRestTimerEnabled = false
+    const card = new TestElement('div')
+
+    view.renderStrengthTable(card as unknown as HTMLElement, ex, 0)
+    const reps = card.findAllByClass('fitkit-cell').find((cell) => cell.dataset.label === 'Reps')
+      ?.children[0] as unknown as (TestElement & { value: string }) | undefined
+    reps!.value = '5'
+    reps!.listenersFor('blur').forEach((listener) => listener({}))
+
+    expect(view.activeRestTimer).toBeNull()
   })
 
   it('renders the footer rest button only when enabled', () => {
@@ -2060,6 +2114,102 @@ interface NextPlanView {
   renderExerciseCard(list: HTMLElement, index: number): void
   openCardMenu(evt: MouseEvent, index: number): void
 }
+
+interface SeedView {
+  model: { exercises: RestTimerExerciseCard[] }
+  exerciseHistory: unknown
+  activeTimer: unknown
+  markDirty: ReturnType<typeof vi.fn>
+  render: ReturnType<typeof vi.fn>
+  applyKindSwitch(index: number, nextKind: 'strength' | 'duration', clearedRows: boolean): void
+  renderStrengthTable(card: HTMLElement, ex: RestTimerExerciseCard, exerciseIndex: number): void
+}
+
+describe('WorkoutEditorView set seeding', () => {
+  const seedStrength = (history: unknown): SeedView => {
+    const view = Object.create(WorkoutEditorView.prototype) as SeedView
+    view.model = {
+      exercises: [{ name: 'Squat', kind: 'duration', strengthSets: [], durationEntries: [{}] }],
+    }
+    view.exerciseHistory = history
+    view.activeTimer = null
+    view.markDirty = vi.fn()
+    view.render = vi.fn()
+    view.applyKindSwitch(0, 'strength', false)
+    return view
+  }
+
+  const historyFor = (summary: unknown): Map<string, unknown> => new Map([['Squat', summary]])
+
+  it('seeds the plan target as the first set weight, and never seeds reps', () => {
+    const view = seedStrength(
+      historyFor({
+        strength: { lastSessionMax: { value: { weight: 100, reps: 5 }, date: '2026-08-10' } },
+        nextPlan: { value: { direction: 'up', step: 2.5 }, date: '2026-08-10' },
+      }),
+    )
+
+    expect(view.model.exercises[0]?.strengthSets).toEqual([{ set: 1, weight: 102.5 }])
+  })
+
+  it('seeds nothing when the plan has no prior session to apply to', () => {
+    const view = seedStrength(
+      historyFor({ nextPlan: { value: { direction: 'up', step: 2.5 }, date: '2026-08-10' } }),
+    )
+
+    expect(view.model.exercises[0]?.strengthSets).toEqual([{ set: 1 }])
+  })
+
+  it('seeds nothing when there is history but no plan', () => {
+    const view = seedStrength(
+      historyFor({
+        strength: { lastSessionMax: { value: { weight: 100, reps: 5 }, date: '2026-08-10' } },
+      }),
+    )
+
+    expect(view.model.exercises[0]?.strengthSets).toEqual([{ set: 1 }])
+  })
+
+  it('seeds nothing when the plan carries no step', () => {
+    const view = seedStrength(
+      historyFor({
+        strength: { lastSessionMax: { value: { weight: 100, reps: 5 }, date: '2026-08-10' } },
+        nextPlan: { value: { direction: 'up' }, date: '2026-08-10' },
+      }),
+    )
+
+    expect(view.model.exercises[0]?.strengthSets).toEqual([{ set: 1 }])
+  })
+
+  it('marks a seeded weight unconfirmed until it is typed over', () => {
+    const view = seedStrength(
+      historyFor({
+        strength: { lastSessionMax: { value: { weight: 100, reps: 5 }, date: '2026-08-10' } },
+        nextPlan: { value: { direction: 'up', step: 2.5 }, date: '2026-08-10' },
+      }),
+    )
+    const card = new TestElement('div')
+    const ex = view.model.exercises[0] as RestTimerExerciseCard
+
+    view.renderStrengthTable(card as unknown as HTMLElement, ex, 0)
+    const weight = card
+      .findAllByClass('fitkit-cell')
+      .find((cell) => cell.dataset.label === 'Weight')?.children[0] as unknown as
+      (TestElement & { value: string }) | undefined
+    expect(weight?.classes.has('fitkit-input--unconfirmed')).toBe(true)
+
+    weight!.value = '105'
+    weight!.listenersFor('input').forEach((listener) => listener({}))
+    expect(weight?.classes.has('fitkit-input--unconfirmed')).toBe(false)
+
+    const reRendered = new TestElement('div')
+    view.renderStrengthTable(reRendered as unknown as HTMLElement, ex, 0)
+    const again = reRendered
+      .findAllByClass('fitkit-cell')
+      .find((cell) => cell.dataset.label === 'Weight')?.children[0]
+    expect(again?.classes.has('fitkit-input--unconfirmed')).toBe(false)
+  })
+})
 
 describe('WorkoutEditorView next-time plan', () => {
   const createNextPlanView = (ex: NextPlanExerciseCard): NextPlanView => {

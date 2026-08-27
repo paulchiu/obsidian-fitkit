@@ -8,6 +8,7 @@ import {
   formatExerciseHistoryBadges,
   formatNextPlanBadge,
   type ExerciseHistoryByName,
+  type ExerciseHistorySummary,
 } from '../domain/exercise-history'
 import {
   createRegistry,
@@ -21,6 +22,7 @@ import { setExerciseNoteKind } from '../domain/exercise-note-migrate'
 import { filterSuggestableNames } from '../domain/exercise-suggestions'
 import {
   formatNumber as formatPlanNumber,
+  nextPlanTargetWeight,
   type NextPlan,
   type NextPlanDirection,
 } from '../domain/next-plan'
@@ -132,6 +134,7 @@ export class WorkoutEditorView extends ItemView {
   private dragSession: DragSession | null = null
   private activeTimer: ActiveTimer | null = null
   private activeRestTimer: ActiveRestTimer | null = null
+  private seededWeightsStore?: WeakSet<EditableStrengthSet>
   private lastRestSeconds: number | null = null
 
   constructor(
@@ -484,29 +487,15 @@ export class WorkoutEditorView extends ItemView {
     const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
     const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
     addBtn.addEventListener('click', () => {
-      const nextNumber = ex.strengthSets.length + 1
-      ex.strengthSets.push({ set: nextNumber })
+      const last = ex.strengthSets[ex.strengthSets.length - 1]
+      const next: EditableStrengthSet = { set: ex.strengthSets.length + 1 }
+      if (last?.weight !== undefined) {
+        next.weight = last.weight
+      }
+      ex.strengthSets.push(next)
       this.markDirty()
       this.render()
       this.focusRowCell(exerciseIndex, ex.strengthSets.length - 1, 'Weight')
-    })
-
-    const dupBtn = actions.createEl('button', {
-      cls: 'fitkit-btn fitkit-btn-muted',
-      text: 'Duplicate last set',
-    })
-    dupBtn.toggleAttribute('disabled', ex.strengthSets.length === 0)
-    dupBtn.addEventListener('click', () => {
-      const last = ex.strengthSets[ex.strengthSets.length - 1]
-      if (!last) {
-        return
-      }
-      const copy: EditableStrengthSet = { ...last, set: (last.set ?? ex.strengthSets.length) + 1 }
-      ex.strengthSets.push(copy)
-      this.markDirty()
-      this.render()
-      // A duplicated set copies the previous weight, so focus Reps (the value most likely to change) instead.
-      this.focusRowCell(exerciseIndex, ex.strengthSets.length - 1, 'Reps')
     })
   }
 
@@ -528,7 +517,12 @@ export class WorkoutEditorView extends ItemView {
       inputmode: 'decimal',
     })
     weightInput.value = set.weight !== undefined ? String(set.weight) : ''
+    if (this.seededWeights.has(set)) {
+      weightInput.addClass('fitkit-input--unconfirmed')
+    }
     weightInput.addEventListener('input', () => {
+      this.seededWeights.delete(set)
+      weightInput.removeClass('fitkit-input--unconfirmed')
       set.weight = parseNumberInput(weightInput.value)
       this.markDirty()
     })
@@ -538,6 +532,13 @@ export class WorkoutEditorView extends ItemView {
     repsInput.addEventListener('input', () => {
       set.reps = parseNumberInput(repsInput.value)
       this.markDirty()
+    })
+    // The set is over once its reps are recorded, so rest starts itself.
+    repsInput.addEventListener('blur', () => {
+      const reps = parseNumberInput(repsInput.value)
+      if (reps !== undefined && reps > 0) {
+        this.startRestTimer()
+      }
     })
 
     this.renderRowActions(container, body, {
@@ -1047,11 +1048,23 @@ export class WorkoutEditorView extends ItemView {
     ex.kind = nextKind
     ex.strengthSets = []
     ex.durationEntries = []
-    seedEmptyRow(ex)
+    this.markSeededWeight(seedEmptyRow(ex, this.exerciseHistory?.get(ex.name)))
     this.markDirty()
     this.render()
     if (clearedRows) {
       new Notice(`Switched to ${nextKind}. Previous ${previousKind} rows were cleared.`)
+    }
+  }
+
+  /** Rows whose weight came from the plan and has not been typed over yet. View state only; never written to the note. */
+  private get seededWeights(): WeakSet<EditableStrengthSet> {
+    this.seededWeightsStore ??= new WeakSet<EditableStrengthSet>()
+    return this.seededWeightsStore
+  }
+
+  private markSeededWeight(row: EditableStrengthSet | null): void {
+    if (row) {
+      this.seededWeights.add(row)
     }
   }
 
@@ -1504,7 +1517,7 @@ export class WorkoutEditorView extends ItemView {
       strengthSets: [],
       durationEntries: [],
     }
-    seedEmptyRow(card)
+    this.markSeededWeight(seedEmptyRow(card, this.exerciseHistory?.get(trimmed)))
     this.model.exercises.push(card)
     this.markDirty()
     this.render()
@@ -1871,12 +1884,36 @@ function hasRows(card: ExerciseCard): boolean {
   return card.strengthSets.length > 0 || card.durationEntries.length > 0
 }
 
-function seedEmptyRow(card: ExerciseCard): void {
-  if (card.kind === 'strength') {
-    card.strengthSets.push({ set: 1 })
-  } else {
+/**
+ * Seed the first row of a fresh exercise. A strength row starts at the weight
+ * the plan recorded last session, since that number is chosen before the set;
+ * reps are never seeded, since they are only known after it.
+ */
+function seedEmptyRow(
+  card: ExerciseCard,
+  summary?: ExerciseHistorySummary,
+): EditableStrengthSet | null {
+  if (card.kind !== 'strength') {
     card.durationEntries.push({})
+    return null
   }
+  const target = seededSetWeight(summary)
+  if (target === null) {
+    card.strengthSets.push({ set: 1 })
+    return null
+  }
+  const row: EditableStrengthSet = { set: 1, weight: target }
+  card.strengthSets.push(row)
+  return row
+}
+
+function seededSetWeight(summary: ExerciseHistorySummary | undefined): number | null {
+  const plan = summary?.nextPlan?.value
+  const base = summary?.strength?.lastSessionMax?.value.weight
+  if (!plan || base === undefined || base <= 0) {
+    return null
+  }
+  return nextPlanTargetWeight(plan, base)
 }
 
 function toEditorWorkoutModel(

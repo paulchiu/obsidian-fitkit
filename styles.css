@@ -357,6 +357,12 @@ body.is-mobile .fitkit-editor-root {
   resize: vertical;
 }
 
+/** A weight the plugin proposed from the plan, not one the user has confirmed. */
+.fitkit-input--unconfirmed {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
 .fitkit-input[aria-invalid='true'] {
   border-color: var(--text-error);
 }
