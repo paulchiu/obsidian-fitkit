@@ -87,11 +87,6 @@ body.is-mobile .fitkit-editor-root {
   padding-bottom: 8px;
 }
 
-.fitkit-file-title {
-  margin: 0;
-  font-size: 16px;
-}
-
 .fitkit-meta {
   display: grid;
   gap: 4px;
@@ -195,6 +190,22 @@ body.is-mobile .fitkit-editor-root {
   margin: 2px 0;
   background: var(--interactive-accent);
   border-radius: 2px;
+}
+
+/** Hidden at rest on a mouse, but still focusable and still occupying its cell so the card top does not reflow on hover. */
+@media (hover: hover) and (pointer: fine) {
+  .fitkit-drag-handle {
+    opacity: 0;
+  }
+
+  .fitkit-card:hover .fitkit-drag-handle,
+  .fitkit-drag-handle:focus-visible {
+    opacity: 1;
+  }
+
+  .is-narrow .fitkit-drag-handle {
+    opacity: 1;
+  }
 }
 
 .fitkit-card-top {
@@ -380,11 +391,6 @@ body.is-mobile .fitkit-editor-root {
   display: inline-flex;
 }
 
-.fitkit-field-row {
-  display: grid;
-  gap: 4px;
-}
-
 .fitkit-label,
 .fitkit-set-label {
   font-size: 11px;
@@ -431,9 +437,16 @@ body.is-mobile .fitkit-editor-root {
 
 .fitkit-set-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 20px repeat(2, minmax(0, 1fr));
   gap: var(--size-4-2, 8px);
   align-items: center;
+}
+
+.fitkit-set-figure {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .fitkit-duration-row {

@@ -262,6 +262,19 @@ class TestElement {
     return [...own, ...this.children.flatMap((child) => child.findAllByClass(cls))]
   }
 
+  findByTag(tagName: string): TestElement | null {
+    if (this.tagName === tagName) {
+      return this
+    }
+    for (const child of this.children) {
+      const found = child.findByTag(tagName)
+      if (found) {
+        return found
+      }
+    }
+    return null
+  }
+
   listenersFor(type: string): TestListener[] {
     return this.listeners.get(type) ?? []
   }
@@ -416,6 +429,7 @@ describe('WorkoutEditorView row actions', () => {
     expect(obsidianMock.menus).toHaveLength(1)
     expect(obsidianMock.menus[0]?.items.map((item) => item.title)).toEqual([
       'Open exercise file',
+      'Add exercise note',
       'Switch to duration',
       'Move up',
       'Move down',
@@ -717,7 +731,7 @@ describe('WorkoutEditorView row actions', () => {
           },
         },
       },
-      texts: ['PB 95 kg x 8', 'Last max: 90 kg x 8 (2026-04-20)'],
+      texts: ['PB 95', 'last 90x8'],
     },
     {
       kind: 'duration',
@@ -730,7 +744,7 @@ describe('WorkoutEditorView row actions', () => {
           },
         },
       },
-      texts: ['PB 4m30s', 'Last max: 4m (2026-04-20)'],
+      texts: ['PB 4m30s', 'last 4m'],
     },
   ])('renders $kind PB and Last badges when history exists', ({ kind, history, texts }) => {
     const view = createExerciseCardRenderView()
@@ -764,7 +778,71 @@ describe('WorkoutEditorView row actions', () => {
       ?.findAllByClass('fitkit-card-badge')
       .map((badge) => badge.textContent)
     expect(badgeTexts).toEqual(texts)
-    expect(badgeTexts?.some((text) => /\d{4}-\d{2}-\d{2}/.test(text))).toBe(true)
+    const badgeTitles = historyRow
+      ?.findAllByClass('fitkit-card-badge')
+      .map((badge) => badge.attributes.get('title') ?? '')
+    expect(badgeTitles?.some((title) => /\d{4}-\d{2}-\d{2}/.test(title))).toBe(true)
+  })
+
+  it('renders no exercise notes textarea and no note line when the exercise has no note', () => {
+    const view = createExerciseCardRenderView()
+    view.model = {
+      exercises: [{ name: 'Squat', kind: 'strength', strengthSets: [], durationEntries: [] }],
+    }
+    view.exerciseHistory = new Map()
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    expect(list.findByTag('textarea')).toBeNull()
+    expect(list.findByClass('fitkit-exercise-note-line')).toBeNull()
+  })
+
+  it('renders the exercise note as a clickable note line when one exists', () => {
+    const view = createExerciseCardRenderView()
+    view.model = {
+      exercises: [
+        {
+          name: 'Squat',
+          kind: 'strength',
+          exerciseNotes: 'Belt on from set 2',
+          strengthSets: [],
+          durationEntries: [],
+        },
+      ],
+    }
+    view.exerciseHistory = new Map()
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    const line = list.findByClass('fitkit-exercise-note-line')
+    expect(list.findByTag('textarea')).toBeNull()
+    expect(line?.textContent).toBe('Belt on from set 2')
+    expect(line?.attributes.get('role')).toBe('button')
+    expect(line?.attributes.get('tabindex')).toBe('0')
+    expect(line?.listenersFor('click')).toHaveLength(1)
+    expect(line?.listenersFor('keydown')).toHaveLength(1)
+  })
+
+  it('titles the card menu note item by whether a note already exists', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
+    const view = createCardMenuView()
+    view.model = {
+      exercises: [
+        {
+          name: 'Squat',
+          kind: 'strength',
+          exerciseNotes: 'Belt on from set 2',
+          strengthSets: [],
+          durationEntries: [],
+        },
+      ],
+    }
+
+    view.openCardMenu({ currentTarget: new TestElement('button') } as unknown as MouseEvent, 0)
+
+    expect(obsidianMock.menus[0]?.items.map((item) => item.title)).toContain('Edit exercise note')
   })
 
   it('omits PB and Last badges when history is absent', () => {
@@ -1258,7 +1336,7 @@ describe('WorkoutEditorView rest timer', () => {
     view.renderStrengthTable(card as unknown as HTMLElement, ex, 0)
 
     expect(card.findByClass('fitkit-set-head')?.children.map((child) => child.textContent)).toEqual(
-      ['Set', 'Weight', 'Reps'],
+      ['', 'Weight', 'Reps'],
     )
     expect(card.findByClass('fitkit-rest-timer-button')).toBeNull()
     expect(

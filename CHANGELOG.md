@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The workout editor now shows exercise notes, set numbering and next-session planning only when they carry information, and moves rename and planning into the exercise menu.
+
 ### Fixed
 
 ### Removed

@@ -66,12 +66,12 @@ describe('exercise history aggregation', () => {
     })
     expect(formatExerciseHistoryBadges(history.get('Squat'), 'strength')).toEqual([
       {
-        text: 'PB 100 kg x 1',
-        title: 'Heaviest weight lifted (not 1RM)',
+        text: 'PB 100',
+        title: 'Heaviest weight lifted (not 1RM): 100 kg x 1',
       },
       {
-        text: 'Last max: 95 kg x 8 (2026-04-23)',
-        title: 'Heaviest weight in latest prior session',
+        text: 'last 95x8',
+        title: 'Heaviest weight in latest prior session: 95 kg x 8 (2026-04-23)',
       },
     ])
   })
@@ -114,12 +114,12 @@ describe('exercise history aggregation', () => {
     })
     expect(formatExerciseHistoryBadges(history.get('Bench press'), 'strength')).toEqual([
       {
-        text: 'PB 80 kg x 5',
-        title: 'Heaviest weight lifted (not 1RM)',
+        text: 'PB 80',
+        title: 'Heaviest weight lifted (not 1RM): 80 kg x 5',
       },
       {
-        text: 'Last max: 80 kg x 5 (2026-04-22)',
-        title: 'Heaviest weight in latest prior session',
+        text: 'last 80x5',
+        title: 'Heaviest weight in latest prior session: 80 kg x 5 (2026-04-22)',
       },
     ])
   })
@@ -178,11 +178,11 @@ describe('exercise history aggregation', () => {
     expect(formatExerciseHistoryBadges(history.get('Pull-up'), 'strength')).toEqual([
       {
         text: 'PB 20 reps',
-        title: 'Heaviest weight lifted (not 1RM)',
+        title: 'Heaviest weight lifted (not 1RM): 20 reps',
       },
       {
-        text: 'Last max: 12 reps (2026-04-22)',
-        title: 'Heaviest weight in latest prior session',
+        text: 'last 12 reps',
+        title: 'Heaviest weight in latest prior session: 12 reps (2026-04-22)',
       },
     ])
   })
@@ -214,11 +214,11 @@ describe('exercise history aggregation', () => {
     expect(formatExerciseHistoryBadges(history.get('Plank'), 'duration')).toEqual([
       {
         text: 'PB 4m30s',
-        title: 'Longest session total duration',
+        title: 'Longest session total duration: 4m30s',
       },
       {
-        text: 'Last max: 4m (2026-04-22)',
-        title: 'Latest prior session total duration',
+        text: 'last 4m',
+        title: 'Latest prior session total duration: 4m (2026-04-22)',
       },
     ])
   })
