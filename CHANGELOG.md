@@ -9,9 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- New sets prefill their weight from the previous set, or from the plan recorded last session, so a set can be logged without retyping a number the plugin already knows.
+- The rest timer starts automatically when reps are entered.
+
 ### Changed
 
+- The workout editor now shows exercise notes, set numbering and next-session planning only when they carry information, and moves rename and planning into the exercise menu.
+
 ### Fixed
+
+- The plan chip now reflects a plan set from the exercise menu straight away, instead of showing only the plan carried in from last session.
 
 ### Removed
 

@@ -92,6 +92,17 @@ describe('index helpers', () => {
     ).toEqual({ weight: 100, reps: 5 })
   })
 
+  it('ignores a set carrying a weight but no reps, so a set in progress never counts', () => {
+    expect(pickHeaviestSet([{ set: 1, weight: 200 }])).toBeNull()
+    expect(
+      pickHeaviestSet([
+        { set: 1, weight: 100, reps: 5 },
+        { set: 2, weight: 200 },
+      ]),
+    ).toEqual({ weight: 100, reps: 5, set: 1 })
+    expect(pickBestSet([{ weight: 200 }])).toBeNull()
+  })
+
   it('picks positive-weight sets before zero-weight sets', () => {
     expect(
       pickHeaviestSet([

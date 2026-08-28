@@ -7,7 +7,9 @@ import { formatErrorMessage } from '../domain/error'
 import {
   formatExerciseHistoryBadges,
   formatNextPlanBadge,
+  pickMaxWeightSet,
   type ExerciseHistoryByName,
+  type ExerciseHistorySummary,
 } from '../domain/exercise-history'
 import {
   createRegistry,
@@ -21,6 +23,7 @@ import { setExerciseNoteKind } from '../domain/exercise-note-migrate'
 import { filterSuggestableNames } from '../domain/exercise-suggestions'
 import {
   formatNumber as formatPlanNumber,
+  nextPlanTargetWeight,
   type NextPlan,
   type NextPlanDirection,
 } from '../domain/next-plan'
@@ -47,6 +50,7 @@ import { ConfirmModal } from './confirm-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
 import { KindSwitchChoiceModal, type KindSwitchChoice } from './kind-switch-choice-modal'
 import { SetNoteModal } from './set-note-modal'
+import { PlanStepModal } from './plan-step-modal'
 
 interface DragSession {
   pointerId: number
@@ -101,11 +105,11 @@ interface ExerciseCard {
 const NEXT_PLAN_OPTIONS: ReadonlyArray<{
   direction: NextPlanDirection
   icon: string
-  label: string
+  menuLabel: string
 }> = [
-  { direction: 'down', icon: 'arrow-down', label: 'Go down next time' },
-  { direction: 'stay', icon: 'minus', label: 'Stay at the same weight next time' },
-  { direction: 'up', icon: 'arrow-up', label: 'Go up next time' },
+  { direction: 'up', icon: 'arrow-up', menuLabel: 'Plan: increase' },
+  { direction: 'stay', icon: 'minus', menuLabel: 'Plan: keep' },
+  { direction: 'down', icon: 'arrow-down', menuLabel: 'Plan: decrease' },
 ]
 
 interface EditorWorkoutModel {
@@ -131,6 +135,7 @@ export class WorkoutEditorView extends ItemView {
   private dragSession: DragSession | null = null
   private activeTimer: ActiveTimer | null = null
   private activeRestTimer: ActiveRestTimer | null = null
+  private seededWeightsStore?: WeakSet<EditableStrengthSet>
   private lastRestSeconds: number | null = null
 
   constructor(
@@ -373,23 +378,17 @@ export class WorkoutEditorView extends ItemView {
 
   private renderHeader(container: HTMLElement): void {
     const header = container.createDiv({ cls: 'fitkit-header' })
-    const file = this.session?.file
-    header.createEl('h3', { cls: 'fitkit-file-title', text: file?.basename ?? 'Workout' })
 
     const meta = header.createDiv({ cls: 'fitkit-meta' })
     if (this.model?.isFitKitWorkout) {
       const nameField = meta.createDiv({ cls: 'fitkit-name-field' })
-      nameField.createEl('label', {
-        cls: 'fitkit-label',
-        text: 'Workout name',
-        attr: { for: 'fitkit-workout-name' },
-      })
       const nameInput = nameField.createEl('input', {
         cls: 'fitkit-workout-name-input',
         attr: {
           type: 'text',
           id: 'fitkit-workout-name',
           placeholder: 'Untitled workout',
+          'aria-label': 'Workout name',
         },
       })
       nameInput.value = this.model.name
@@ -441,13 +440,6 @@ export class WorkoutEditorView extends ItemView {
     setIcon(linkIcon, 'arrow-up-right')
     nameButton.addEventListener('click', () => void this.openOrCreateExerciseFile(ex))
 
-    const renameBtn = top.createEl('button', {
-      cls: 'fitkit-btn fitkit-btn-muted fitkit-card-icon-button fitkit-rename-button',
-      attr: { type: 'button', 'aria-label': 'Rename exercise' },
-    })
-    setIcon(renameBtn, 'pencil')
-    renameBtn.addEventListener('click', () => void this.openRenameExerciseModal(index))
-
     const gearBtn = top.createEl('button', {
       cls: 'fitkit-btn fitkit-btn-muted fitkit-card-icon-button fitkit-gear-button',
       attr: { type: 'button', 'aria-label': 'Exercise options' },
@@ -457,88 +449,35 @@ export class WorkoutEditorView extends ItemView {
 
     this.renderExerciseHistoryBadges(card, ex)
 
-    const notesRow = card.createDiv({ cls: 'fitkit-field-row' })
-    notesRow.createEl('label', { cls: 'fitkit-label', text: 'Exercise notes' })
-    const notesArea = notesRow.createEl('textarea', { cls: 'fitkit-textarea' })
-    notesArea.value = ex.exerciseNotes ?? ''
-    notesArea.addEventListener('input', () => {
-      ex.exerciseNotes = notesArea.value.length > 0 ? notesArea.value : undefined
-      this.markDirty()
-    })
+    if (ex.exerciseNotes && ex.exerciseNotes.length > 0) {
+      const line = card.createDiv({
+        cls: 'fitkit-note-line fitkit-exercise-note-line',
+        attr: { role: 'button', tabindex: '0' },
+      })
+      line.setText(ex.exerciseNotes)
+      const open = (): void => this.openExerciseNoteModal(ex)
+      line.addEventListener('click', open)
+      line.addEventListener('keydown', (evt) => {
+        if (evt.key === 'Enter' || evt.key === ' ') {
+          evt.preventDefault()
+          open()
+        }
+      })
+    }
 
     if (ex.kind === 'strength') {
       this.renderStrengthTable(card, ex, index)
-      this.renderNextPlanControl(card, ex)
     } else {
       this.renderDurationTable(card, ex, index)
     }
-  }
-
-  /**
-   * Three-way toggle plus an optional step, recorded against this session and
-   * shown on the card the next time the exercise comes up. Tapping the active
-   * direction clears the plan.
-   */
-  private renderNextPlanControl(card: HTMLElement, ex: ExerciseCard): void {
-    const row = card.createDiv({ cls: 'fitkit-next-row' })
-    row.createSpan({ cls: 'fitkit-label', text: 'Next time' })
-
-    const group = row.createDiv({
-      cls: 'fitkit-next-seg',
-      attr: { role: 'group', 'aria-label': 'Plan for next session' },
-    })
-    for (const option of NEXT_PLAN_OPTIONS) {
-      const isActive = ex.next?.direction === option.direction
-      const button = group.createEl('button', {
-        cls: isActive ? 'fitkit-next-seg-button is-active' : 'fitkit-next-seg-button',
-        attr: {
-          type: 'button',
-          'aria-label': option.label,
-          'aria-pressed': isActive ? 'true' : 'false',
-        },
-      })
-      setIcon(button, option.icon)
-      button.addEventListener('click', () => {
-        ex.next = isActive ? undefined : buildNextPlan(option.direction, ex.next?.step)
-        this.markDirty()
-        this.render()
-      })
-    }
-
-    if (!ex.next || ex.next.direction === 'stay') {
-      return
-    }
-
-    const stepInput = row.createEl('input', {
-      cls: 'fitkit-input fitkit-next-step',
-      attr: {
-        type: 'text',
-        inputmode: 'decimal',
-        // eslint-disable-next-line obsidianmd/ui/sentence-case -- Unit symbols use lowercase labels.
-        placeholder: 'kg',
-        'aria-label': 'Weight change for next session',
-      },
-    })
-    stepInput.value = ex.next.step === undefined ? '' : formatPlanNumber(ex.next.step)
-
-    stepInput.addEventListener('input', () => {
-      if (!ex.next) {
-        return
-      }
-      const step = Number(stepInput.value.trim())
-      ex.next =
-        Number.isFinite(step) && step > 0
-          ? { direction: ex.next.direction, step }
-          : { direction: ex.next.direction }
-      this.markDirty()
-    })
   }
 
   private renderStrengthTable(card: HTMLElement, ex: ExerciseCard, exerciseIndex: number): void {
     const wrap = card.createDiv({ cls: 'fitkit-set-area' })
 
     const header = wrap.createDiv({ cls: 'fitkit-set-row fitkit-set-head' })
-    header.createSpan({ cls: 'fitkit-set-label', text: 'Set' })
+    // The set column is a figure now, too narrow for a label; the rows still name it.
+    header.createSpan({ cls: 'fitkit-set-label fitkit-set-figure' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Weight' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Reps' })
 
@@ -549,29 +488,15 @@ export class WorkoutEditorView extends ItemView {
     const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
     const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
     addBtn.addEventListener('click', () => {
-      const nextNumber = ex.strengthSets.length + 1
-      ex.strengthSets.push({ set: nextNumber })
+      const last = ex.strengthSets[ex.strengthSets.length - 1]
+      const next: EditableStrengthSet = { set: ex.strengthSets.length + 1 }
+      if (last?.weight !== undefined) {
+        next.weight = last.weight
+      }
+      ex.strengthSets.push(next)
       this.markDirty()
       this.render()
       this.focusRowCell(exerciseIndex, ex.strengthSets.length - 1, 'Weight')
-    })
-
-    const dupBtn = actions.createEl('button', {
-      cls: 'fitkit-btn fitkit-btn-muted',
-      text: 'Duplicate last set',
-    })
-    dupBtn.toggleAttribute('disabled', ex.strengthSets.length === 0)
-    dupBtn.addEventListener('click', () => {
-      const last = ex.strengthSets[ex.strengthSets.length - 1]
-      if (!last) {
-        return
-      }
-      const copy: EditableStrengthSet = { ...last, set: (last.set ?? ex.strengthSets.length) + 1 }
-      ex.strengthSets.push(copy)
-      this.markDirty()
-      this.render()
-      // A duplicated set copies the previous weight, so focus Reps (the value most likely to change) instead.
-      this.focusRowCell(exerciseIndex, ex.strengthSets.length - 1, 'Reps')
     })
   }
 
@@ -580,16 +505,14 @@ export class WorkoutEditorView extends ItemView {
     if (!set) {
       return
     }
-    const container = wrap.createDiv({ cls: 'fitkit-row' })
+    // The logging loop only ever touches the bottom row; the ones above it are session history.
+    const isLive = i === ex.strengthSets.length - 1
+    const container = wrap.createDiv({ cls: isLive ? 'fitkit-row fitkit-row--live' : 'fitkit-row' })
     const body = container.createDiv({ cls: 'fitkit-row-body' })
     const row = body.createDiv({ cls: 'fitkit-set-row' })
 
-    const setInput = this.createInputCell(row, 'Set', { type: 'number', inputmode: 'numeric' })
-    setInput.value = set.set !== undefined ? String(set.set) : ''
-    setInput.addEventListener('input', () => {
-      set.set = parseNumberInput(setInput.value)
-      this.markDirty()
-    })
+    const setCell = this.createCell(row, 'Set', 'fitkit-set-figure')
+    setCell.setText(String(set.set ?? i + 1))
 
     const weightInput = this.createInputCell(row, 'Weight', {
       type: 'number',
@@ -597,7 +520,12 @@ export class WorkoutEditorView extends ItemView {
       inputmode: 'decimal',
     })
     weightInput.value = set.weight !== undefined ? String(set.weight) : ''
+    if (this.seededWeights.has(set)) {
+      weightInput.addClass('fitkit-input--unconfirmed')
+    }
     weightInput.addEventListener('input', () => {
+      this.seededWeights.delete(set)
+      weightInput.removeClass('fitkit-input--unconfirmed')
       set.weight = parseNumberInput(weightInput.value)
       this.markDirty()
     })
@@ -607,6 +535,13 @@ export class WorkoutEditorView extends ItemView {
     repsInput.addEventListener('input', () => {
       set.reps = parseNumberInput(repsInput.value)
       this.markDirty()
+    })
+    // The set is over once its reps are recorded, so rest starts itself.
+    repsInput.addEventListener('blur', () => {
+      const reps = parseNumberInput(repsInput.value)
+      if (reps !== undefined && reps > 0) {
+        this.startRestTimer()
+      }
     })
 
     this.renderRowActions(container, body, {
@@ -619,6 +554,13 @@ export class WorkoutEditorView extends ItemView {
       },
       onNoteSave: (next) => {
         set.note = next
+        this.markDirty()
+        this.render()
+      },
+      onRenumber: () => {
+        ex.strengthSets.forEach((row, index) => {
+          row.set = index + 1
+        })
         this.markDirty()
         this.render()
       },
@@ -761,6 +703,18 @@ export class WorkoutEditorView extends ItemView {
     })
   }
 
+  private openExerciseNoteModal(ex: ExerciseCard): void {
+    new SetNoteModal(this.app, {
+      title: `Note for ${ex.name}`,
+      initial: ex.exerciseNotes ?? '',
+      onSave: (next) => {
+        ex.exerciseNotes = next && next.length > 0 ? next : undefined
+        this.markDirty()
+        this.render()
+      },
+    }).open()
+  }
+
   private renderRowActions(
     container: HTMLElement,
     body: HTMLElement,
@@ -769,6 +723,7 @@ export class WorkoutEditorView extends ItemView {
       currentNote: string | undefined
       onDelete: () => void
       onNoteSave: (next: string | undefined) => void
+      onRenumber?: () => void
     },
   ): void {
     const openNoteModal = (): void => {
@@ -782,7 +737,7 @@ export class WorkoutEditorView extends ItemView {
       void this.confirmAndDeleteRow(opts.label, opts.onDelete)
     }
 
-    this.renderRowKebab(body, opts.label, openNoteModal, triggerDelete)
+    this.renderRowKebab(body, opts.label, openNoteModal, triggerDelete, opts.onRenumber)
 
     if (opts.currentNote && opts.currentNote.length > 0) {
       const line = container.createDiv({
@@ -805,6 +760,7 @@ export class WorkoutEditorView extends ItemView {
     label: string,
     onNote: () => void,
     onDelete: () => void,
+    onRenumber?: () => void,
   ): void {
     const kebab = body.createEl('button', {
       cls: 'fitkit-btn fitkit-btn-muted fitkit-row-kebab',
@@ -815,6 +771,11 @@ export class WorkoutEditorView extends ItemView {
       evt.stopPropagation()
       const menu = new Menu()
       menu.addItem((item) => item.setTitle('Edit note').setIcon('pencil').onClick(onNote))
+      if (onRenumber) {
+        menu.addItem((item) =>
+          item.setTitle('Renumber sets').setIcon('list-ordered').onClick(onRenumber),
+        )
+      }
       menu.addItem((item) =>
         item.setTitle('Delete row').setIcon('trash-2').setWarning(true).onClick(onDelete),
       )
@@ -1090,11 +1051,23 @@ export class WorkoutEditorView extends ItemView {
     ex.kind = nextKind
     ex.strengthSets = []
     ex.durationEntries = []
-    seedEmptyRow(ex)
+    this.markSeededWeight(seedEmptyRow(ex, this.exerciseHistory?.get(ex.name)))
     this.markDirty()
     this.render()
     if (clearedRows) {
       new Notice(`Switched to ${nextKind}. Previous ${previousKind} rows were cleared.`)
+    }
+  }
+
+  /** Rows whose weight came from the plan and has not been typed over yet. View state only; never written to the note. */
+  private get seededWeights(): WeakSet<EditableStrengthSet> {
+    this.seededWeightsStore ??= new WeakSet<EditableStrengthSet>()
+    return this.seededWeightsStore
+  }
+
+  private markSeededWeight(row: EditableStrengthSet | null): void {
+    if (row) {
+      this.seededWeights.add(row)
     }
   }
 
@@ -1168,6 +1141,50 @@ export class WorkoutEditorView extends ItemView {
     this.render()
   }
 
+  /**
+   * The plan the user records for next session. Choosing the active direction
+   * again clears it, matching the segmented control this replaced.
+   */
+  private addNextPlanMenuItems(menu: Menu, ex: ExerciseCard): void {
+    for (const option of NEXT_PLAN_OPTIONS) {
+      const isActive = ex.next?.direction === option.direction
+      menu.addItem((item) =>
+        item
+          .setTitle(option.menuLabel)
+          .setIcon(option.icon)
+          .setChecked(isActive)
+          .onClick(() => {
+            ex.next = isActive ? undefined : buildNextPlan(option.direction, ex.next?.step)
+            this.markDirty()
+            this.render()
+          }),
+      )
+    }
+
+    const canSetStep = ex.next !== undefined && ex.next.direction !== 'stay'
+    menu.addItem((item) =>
+      item
+        .setTitle('Set plan step...')
+        .setIcon('ruler')
+        .setDisabled(!canSetStep)
+        .onClick(() => {
+          const plan = ex.next
+          if (!plan || plan.direction === 'stay') {
+            return
+          }
+          new PlanStepModal(this.app, {
+            title: `Weight change for ${ex.name}`,
+            initial: plan.step === undefined ? '' : formatPlanNumber(plan.step),
+            onSave: (step) => {
+              ex.next = buildNextPlan(plan.direction, step)
+              this.markDirty()
+              this.render()
+            },
+          }).open()
+        }),
+    )
+  }
+
   private openCardMenu(evt: MouseEvent, index: number): void {
     if (!this.model) {
       return
@@ -1187,6 +1204,23 @@ export class WorkoutEditorView extends ItemView {
         .setIcon('file-text')
         .onClick(() => void this.openOrCreateExerciseFile(ex)),
     )
+    menu.addItem((item) =>
+      item
+        .setTitle('Rename exercise')
+        .setIcon('pencil')
+        .onClick(() => void this.openRenameExerciseModal(index)),
+    )
+    menu.addSeparator()
+    menu.addItem((item) =>
+      item
+        .setTitle(ex.exerciseNotes ? 'Edit exercise note' : 'Add exercise note')
+        .setIcon('sticky-note')
+        .onClick(() => this.openExerciseNoteModal(ex)),
+    )
+    if (ex.kind === 'strength') {
+      menu.addSeparator()
+      this.addNextPlanMenuItems(menu, ex)
+    }
     menu.addSeparator()
     menu.addItem((item) =>
       item
@@ -1230,7 +1264,10 @@ export class WorkoutEditorView extends ItemView {
   private renderExerciseHistoryBadges(card: HTMLElement, ex: ExerciseCard): void {
     const summary = this.exerciseHistory?.get(ex.name)
     const badges = formatExerciseHistoryBadges(summary, ex.kind)
-    const planBadge = formatNextPlanBadge(summary, ex.kind)
+    const planBadge = formatNextPlanBadge(summary, ex.kind, {
+      plan: ex.next,
+      sessionMax: pickMaxWeightSet(ex.strengthSets),
+    })
     if (badges.length === 0 && !planBadge) {
       return
     }
@@ -1486,7 +1523,7 @@ export class WorkoutEditorView extends ItemView {
       strengthSets: [],
       durationEntries: [],
     }
-    seedEmptyRow(card)
+    this.markSeededWeight(seedEmptyRow(card, this.exerciseHistory?.get(trimmed)))
     this.model.exercises.push(card)
     this.markDirty()
     this.render()
@@ -1685,10 +1722,25 @@ export class WorkoutEditorView extends ItemView {
     this.scheduleAutoSave()
   }
 
+  /**
+   * The meta line is the only place the file identifies itself now that the
+   * pane heading is gone. Workout notes are date-named, so the date is dropped
+   * when it just repeats the basename.
+   */
   private metaLineText(): string {
+    const basename = this.session?.file?.basename
+    const identity: string[] = []
+    if (basename) {
+      identity.push(basename)
+    }
+    const date = this.model?.date
+    if (date && date !== basename) {
+      identity.push(date)
+    }
+
     const parts: string[] = []
-    if (this.model?.date) {
-      parts.push(`date: ${this.model.date}`)
+    if (identity.length > 0) {
+      parts.push(identity.join(', '))
     }
     if (this.dirty) {
       parts.push('unsaved')
@@ -1838,12 +1890,36 @@ function hasRows(card: ExerciseCard): boolean {
   return card.strengthSets.length > 0 || card.durationEntries.length > 0
 }
 
-function seedEmptyRow(card: ExerciseCard): void {
-  if (card.kind === 'strength') {
-    card.strengthSets.push({ set: 1 })
-  } else {
+/**
+ * Seed the first row of a fresh exercise. A strength row starts at the weight
+ * the plan recorded last session, since that number is chosen before the set;
+ * reps are never seeded, since they are only known after it.
+ */
+function seedEmptyRow(
+  card: ExerciseCard,
+  summary?: ExerciseHistorySummary,
+): EditableStrengthSet | null {
+  if (card.kind !== 'strength') {
     card.durationEntries.push({})
+    return null
   }
+  const target = seededSetWeight(summary)
+  if (target === null) {
+    card.strengthSets.push({ set: 1 })
+    return null
+  }
+  const row: EditableStrengthSet = { set: 1, weight: target }
+  card.strengthSets.push(row)
+  return row
+}
+
+function seededSetWeight(summary: ExerciseHistorySummary | undefined): number | null {
+  const plan = summary?.nextPlan?.value
+  const base = summary?.strength?.lastSessionMax?.value.weight
+  if (!plan || base === undefined || base <= 0) {
+    return null
+  }
+  return nextPlanTargetWeight(plan, base)
 }
 
 function toEditorWorkoutModel(

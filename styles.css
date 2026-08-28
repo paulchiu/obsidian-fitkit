@@ -87,11 +87,6 @@ body.is-mobile .fitkit-editor-root {
   padding-bottom: 8px;
 }
 
-.fitkit-file-title {
-  margin: 0;
-  font-size: 16px;
-}
-
 .fitkit-meta {
   display: grid;
   gap: 4px;
@@ -195,6 +190,22 @@ body.is-mobile .fitkit-editor-root {
   margin: 2px 0;
   background: var(--interactive-accent);
   border-radius: 2px;
+}
+
+/** Hidden at rest on a mouse, but still focusable and still occupying its cell so the card top does not reflow on hover. */
+@media (hover: hover) and (pointer: fine) {
+  .fitkit-drag-handle {
+    opacity: 0;
+  }
+
+  .fitkit-card:hover .fitkit-drag-handle,
+  .fitkit-drag-handle:focus-visible {
+    opacity: 1;
+  }
+
+  .is-narrow .fitkit-drag-handle {
+    opacity: 1;
+  }
 }
 
 .fitkit-card-top {
@@ -316,73 +327,8 @@ body.is-mobile .fitkit-editor-root {
   height: 13px;
 }
 
-.fitkit-next-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.fitkit-next-seg {
-  display: inline-flex;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  overflow: hidden;
-  background: var(--background-primary);
-}
-
-.fitkit-next-seg-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  border-right: 1px solid var(--background-modifier-border);
-  background: transparent;
-  color: var(--text-muted);
-  box-shadow: none;
-  cursor: pointer;
-}
-
-.fitkit-next-seg-button:last-child {
-  border-right: none;
-}
-
-.fitkit-next-seg-button:hover,
-.fitkit-next-seg-button:focus-visible {
-  color: var(--text-normal);
-  background: var(--background-modifier-hover);
-}
-
-.fitkit-next-seg-button.is-active {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-}
-
-.fitkit-next-seg-button svg {
-  width: 15px;
-  height: 15px;
-  stroke-width: 2.25;
-}
-
-/* Raise specificity over .fitkit-input's width: 100% so the step field keeps its fixed width instead of stretching and wrapping. */
-.fitkit-next-row .fitkit-next-step {
-  width: 84px;
-  flex: 0 0 auto;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
 .fitkit-gear-button {
   display: inline-flex;
-}
-
-.fitkit-field-row {
-  display: grid;
-  gap: 4px;
 }
 
 .fitkit-label,
@@ -411,6 +357,12 @@ body.is-mobile .fitkit-editor-root {
   resize: vertical;
 }
 
+/** A weight the plugin proposed from the plan, not one the user has confirmed. */
+.fitkit-input--unconfirmed {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
 .fitkit-input[aria-invalid='true'] {
   border-color: var(--text-error);
 }
@@ -429,11 +381,34 @@ body.is-mobile .fitkit-editor-root {
   gap: 4px;
 }
 
+/** The row being logged right now gets a larger target than the finished rows above it. */
+.fitkit-row--live .fitkit-input {
+  min-height: 36px;
+  font-size: 15px;
+}
+
+@media (hover: none) {
+  .fitkit-row--live .fitkit-input {
+    min-height: 44px;
+  }
+}
+
+.is-narrow .fitkit-row--live .fitkit-input {
+  min-height: 44px;
+}
+
 .fitkit-set-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 20px repeat(2, minmax(0, 1fr));
   gap: var(--size-4-2, 8px);
   align-items: center;
+}
+
+.fitkit-set-figure {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .fitkit-duration-row {
