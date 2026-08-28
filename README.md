@@ -31,7 +31,7 @@ The defaults are designed so you can log a workout the moment FitKit is enabled.
 1. Run `Open today's workout` from the command palette. FitKit creates today's note under `Fitness/Workouts/` and opens it in the editor.
 2. Add an exercise. Type the name, for example `Squat`. If it is new, FitKit asks whether to create an exercise note for it; say yes for anything you want to chart and revisit later.
 3. Log your sets: weight and reps for a strength exercise, or a duration for a time-based one. Tap the rest timer between sets if you want it.
-4. Before you move on, set `Next time` to how you want to load that exercise next session. It shows up as a badge the next time it comes around.
+4. Before you move on, open the card menu and set a plan for next session: increase, keep, or decrease, with an optional weight step. It shows up as a badge on the card, and prefills the weight the next time that exercise comes around.
 
 That is it. The editor autosaves as you go, and the underlying Markdown stays readable:
 

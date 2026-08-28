@@ -23,25 +23,29 @@ Leave `Create exercise note` ticked for anything you want to chart and revisit; 
 
 ## The exercise card
 
-Each exercise gets a card. The header holds the name plus three controls: an arrow that opens (or creates) the exercise note, a pencil that points the card at a different exercise, and a gear that opens the card menu.
+Each exercise gets a card. The header holds the name and the card menu, plus a drag handle on the left that appears when you hover the card or reach it with the keyboard. On a touch device or a narrow pane the handle is always visible.
 
-The pencil is scoped to this workout. It suggests names already in your exercises folder or workout history, and if the name you pick is a different kind it asks before switching the card over. To rename an exercise everywhere, use the registry instead, see [Exercise registry](exercise-registry.md#renaming-an-exercise).
+The card menu covers `Open exercise file`, `Rename exercise`, `Add exercise note` / `Edit exercise note`, the plan items described under [Planning your next session](#planning-your-next-session), `Switch to strength` / `Switch to duration`, `Move up`, `Move down`, and `Remove exercise`.
 
-The card menu covers `Open exercise file`, `Switch to strength` / `Switch to duration`, `Move up`, `Move down`, and `Remove exercise`. Cards can also be dragged by the handle on the left.
+`Rename exercise` is scoped to this workout: it points the card at a different exercise. It suggests names already in your exercises folder or workout history, and if the name you pick is a different kind it asks before switching the card over. To rename an exercise everywhere, use the registry instead, see [Exercise registry](exercise-registry.md#renaming-an-exercise).
 
 Under the header sit the history badges:
 
 - `PB` is the heaviest weight lifted for a strength exercise, or the longest session total for a duration one. It is a real lift, not an estimated 1RM.
-- `Last max` is the same measure taken from the most recent prior session, with that session's date.
-- `Next` appears when you recorded a plan last time, and resolves the weight where it can (`Next: 22.5 kg`).
+- `last` is the same measure taken from the most recent prior session.
+- `Next` shows the plan in force, and resolves the weight where it can (`Next: 22.5 kg`). A plan you set on this card wins over the one carried in from last session, so the badge reflects your choice as soon as you make it.
 
-Badges only show once there is history to draw on, so a brand new exercise starts bare.
+Badges are terse so several fit one line on a phone; hover one for the full sentence and its date. `PB` and `last` only appear once there is history to draw on, so a brand new exercise starts bare.
 
-`Exercise notes` is a free-text field that persists as a `[notes:: ...]` field on a header row for that exercise.
+An exercise note is added from the card menu and renders as a line under the badges once one exists; click the line to edit it. It persists as a `[notes:: ...]` field on a header row for that exercise.
 
 ## Logging sets
 
-Strength cards give you a `Set`, `Weight` and `Reps` row per set. `Add set` appends an empty one; `Duplicate last set` copies the previous values so you can log five identical sets with four taps. The kebab on each row holds `Edit note` and `Delete row`; a saved row note renders under the row and reopens the editor when clicked.
+Strength cards give you a `Set` figure, a `Weight` field and a `Reps` field per set. The set figure shows the number stored in the note rather than a running count, so a hand-edited `1, 3, 7` stays as you wrote it; `Renumber sets` in the row menu resequences from 1 when you want it tidied. `Add set` appends a row carrying the previous set's weight, with reps left empty. The kebab on each row holds `Edit note`, `Renumber sets` and `Delete row`; a saved row note renders under the row and reopens the editor when clicked.
+
+The last row of a strength card is the one you are logging, so its fields are drawn larger than the finished rows above them, and larger again on a phone or a narrow pane.
+
+The first set of a new card prefills its weight from the plan you recorded for that exercise last session, applied to that session's top set. A proposed weight is drawn dashed until you type over it. Reps are never prefilled: weight is what you choose before a set, reps are what you count after it. A row holding a weight and no reps counts for nothing until you record them, so it cannot become a personal best or move your history while the set is still in progress.
 
 Duration cards swap weight and reps for a single `Duration` field, plus a play button beside `Add duration entry` that fills the entry live and writes it on stop. The field accepts three shapes:
 
@@ -53,15 +57,13 @@ Whatever you type is normalised to the unit form on blur, and stored in the note
 
 ## Planning your next session
 
-![Next time control with 'up' selected and a 2.5 kg step](images/next-time.png)
+The card menu records how you want to load the exercise next session: `Plan: increase`, `Plan: keep`, or `Plan: decrease`. Choosing the direction that is already set clears it. With increase or decrease chosen, `Set plan step...` takes the weight change; it stays greyed out until there is a direction to attach a step to.
 
-The `Next time` control records how you want to load the exercise next session: down, same, or up. Choosing up or down reveals a weight step with optional weight increase.
-
-This is a note to yourself, not an instruction the plugin acts on. It is written as `[next:: up 2.5]`, surfaces as the `Next` badge the next time that exercise comes up, and is listed under `Next session plans` on the dashboard. A `[next:: ...]` value that does not start with `up`, `down`, or `stay` is ignored rather than reported, so hand-written wording passes through untouched.
+This is a note to yourself, not an instruction the plugin acts on. It is written as `[next:: up 2.5]`, surfaces as the `Next` badge on the card straight away and again the next time that exercise comes up, and is listed under `Next session plans` on the dashboard. A `[next:: ...]` value that does not start with `up`, `down`, or `stay` is ignored rather than reported, so hand-written wording passes through untouched.
 
 ## Rest timer
 
-The footer holds a rest timer that counts up from zero and shows `Last rest 90s` once you stop it. It is a live aid only; rest is not written into the note. Turn it off under `Rest timer` in settings if you time rests elsewhere.
+The footer holds a rest timer that counts up from zero and shows `Last rest 90s` once you stop it. It starts on its own when you enter reps, since recording reps is what ends a set. It is a live aid only; rest is not written into the note. Turn it off under `Rest timer` in settings if you time rests elsewhere.
 
 The timer on a duration card is a separate thing, and that one does write into the duration field.
 
