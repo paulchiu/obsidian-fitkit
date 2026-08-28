@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [1.2.0] - 2026-08-28
+
+### Added
+
 - New sets prefill their weight from the previous set, or from the plan recorded last session, so a set can be logged without retyping a number the plugin already knows.
 - The rest timer starts automatically when reps are entered.
 
