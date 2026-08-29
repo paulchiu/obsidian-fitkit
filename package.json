@@ -29,10 +29,10 @@
     "@emnapi/runtime": "1.11.1",
     "@eslint/js": "^9.39.5",
     "@resvg/resvg-js": "^2.6.2",
-    "@types/node": "^26.2.0",
+    "@types/node": "^26.3.0",
     "@vitest/coverage-v8": "^4.1.6",
     "esbuild": "^0.28.2",
-    "eslint-plugin-obsidianmd": "^0.4.1",
+    "eslint-plugin-obsidianmd": "^0.4.2",
     "globals": "^17.11.0",
     "jiti": "^2.7.0",
     "jsdom": "^29.1.1",
@@ -40,7 +40,7 @@
     "prettier": "^3.9.6",
     "tslib": "^2.8.1",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.67.0",
+    "typescript-eslint": "^8.68.0",
     "vitest": "^4.1.11"
   },
   "overrides": {
