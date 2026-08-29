@@ -1915,6 +1915,26 @@ describe('WorkoutEditorView duration timer', () => {
     expect(view.render).toHaveBeenCalledTimes(1)
   })
 
+  it('leaves focus alone when a duration set is added, since the timer fills it', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 60 }],
+    }
+    const view = createTimerView(ex)
+    const card = new TestElement('div')
+
+    view.renderDurationTable(card as unknown as HTMLElement, ex, 0)
+    const addBtn = card
+      .findByClass('fitkit-row-actions')
+      ?.children.find((c) => c.tagName === 'button' && c.textContent === 'Add set')
+    addBtn?.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
+
+    expect(ex.durationEntries).toHaveLength(2)
+    expect(view.focusRowCell).not.toHaveBeenCalled()
+  })
+
   it('clicking Add set while a timer is running writes back and appends', () => {
     const ex: TimerExerciseCard = {
       name: 'Plank',

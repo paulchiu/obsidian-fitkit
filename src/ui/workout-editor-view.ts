@@ -580,7 +580,6 @@ export class WorkoutEditorView extends ItemView {
       ex.durationEntries.push({})
       this.markDirty()
       this.render()
-      this.focusRowCell(exerciseIndex, ex.durationEntries.length - 1, 'Duration')
     })
 
     const isRunningHere = this.activeTimer?.card === ex
