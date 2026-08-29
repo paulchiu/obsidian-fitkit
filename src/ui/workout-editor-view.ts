@@ -536,14 +536,6 @@ export class WorkoutEditorView extends ItemView {
       set.reps = parseNumberInput(repsInput.value)
       this.markDirty()
     })
-    // The set is over once its reps are recorded, so rest starts itself.
-    repsInput.addEventListener('blur', () => {
-      const reps = parseNumberInput(repsInput.value)
-      if (reps !== undefined && reps > 0) {
-        this.startRestTimer()
-      }
-    })
-
     this.renderRowActions(container, body, {
       label: `set ${i + 1}`,
       currentNote: set.note,
@@ -571,7 +563,8 @@ export class WorkoutEditorView extends ItemView {
     const wrap = card.createDiv({ cls: 'fitkit-set-area' })
 
     const header = wrap.createDiv({ cls: 'fitkit-set-row fitkit-duration-row fitkit-set-head' })
-    header.createSpan({ cls: 'fitkit-set-label', text: 'Set' })
+    // The set column is a figure now, too narrow for a label; the rows still name it.
+    header.createSpan({ cls: 'fitkit-set-label fitkit-set-figure' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Duration' })
 
     for (let i = 0; i < ex.durationEntries.length; i++) {
@@ -579,7 +572,7 @@ export class WorkoutEditorView extends ItemView {
     }
 
     const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
-    const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add duration entry' })
+    const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
     addBtn.addEventListener('click', () => {
       if (this.activeTimer && this.activeTimer.card === ex) {
         this.stopTimer({ write: true })
@@ -624,12 +617,8 @@ export class WorkoutEditorView extends ItemView {
     const body = container.createDiv({ cls: 'fitkit-row-body' })
     const row = body.createDiv({ cls: 'fitkit-set-row fitkit-duration-row' })
 
-    const setInput = this.createInputCell(row, 'Set', { type: 'number', inputmode: 'numeric' })
-    setInput.value = durationEntry.set !== undefined ? String(durationEntry.set) : String(i + 1)
-    setInput.addEventListener('input', () => {
-      durationEntry.set = parseNumberInput(setInput.value)
-      this.markDirty()
-    })
+    const setCell = this.createCell(row, 'Set', 'fitkit-set-figure')
+    setCell.setText(String(durationEntry.set ?? i + 1))
 
     const durationCell = this.createCell(row, 'Duration')
     if (isTiming && this.activeTimer) {
@@ -657,6 +646,13 @@ export class WorkoutEditorView extends ItemView {
       },
       onNoteSave: (next) => {
         durationEntry.note = next
+        this.markDirty()
+        this.render()
+      },
+      onRenumber: () => {
+        ex.durationEntries.forEach((entry, index) => {
+          entry.set = index + 1
+        })
         this.markDirty()
         this.render()
       },

@@ -1401,11 +1401,7 @@ describe('WorkoutEditorView rest timer', () => {
     expect(view.focusRowCell).toHaveBeenCalledWith(0, 1, 'Weight')
   })
 
-  it.each([
-    { label: 'reps are recorded', value: '5', started: true },
-    { label: 'reps are zero', value: '0', started: false },
-    { label: 'reps are blank', value: '', started: false },
-  ])('starts the rest timer on blur when $label', ({ value, started }) => {
+  it('never starts the rest timer from reps entry, since rest is started by hand', () => {
     const ex: RestTimerExerciseCard = {
       name: 'Squat',
       kind: 'strength',
@@ -1419,29 +1415,10 @@ describe('WorkoutEditorView rest timer', () => {
     view.renderStrengthTable(card as unknown as HTMLElement, ex, 0)
     const reps = card.findAllByClass('fitkit-cell').find((cell) => cell.dataset.label === 'Reps')
       ?.children[0] as unknown as (TestElement & { value: string }) | undefined
-    reps!.value = value
-    reps!.listenersFor('blur').forEach((listener) => listener({}))
-
-    expect(view.startRestTimer).toHaveBeenCalledTimes(started ? 1 : 0)
-  })
-
-  it('leaves the rest timer alone on reps blur when the setting is off', () => {
-    const ex: RestTimerExerciseCard = {
-      name: 'Squat',
-      kind: 'strength',
-      strengthSets: [{ set: 1, weight: 80 }],
-      durationEntries: [],
-    }
-    const view = createRestTimerView(ex)
-    view.plugin.settings.strengthRestTimerEnabled = false
-    const card = new TestElement('div')
-
-    view.renderStrengthTable(card as unknown as HTMLElement, ex, 0)
-    const reps = card.findAllByClass('fitkit-cell').find((cell) => cell.dataset.label === 'Reps')
-      ?.children[0] as unknown as (TestElement & { value: string }) | undefined
     reps!.value = '5'
     reps!.listenersFor('blur').forEach((listener) => listener({}))
 
+    expect(view.startRestTimer).not.toHaveBeenCalled()
     expect(view.activeRestTimer).toBeNull()
   })
 
@@ -1760,9 +1737,10 @@ describe('WorkoutEditorView duration timer', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
+    obsidianMock.menus = []
   })
 
-  it('renders Start timer next to Add duration entry when no timer is active', () => {
+  it('renders Start timer next to Add set when no timer is active', () => {
     const ex: TimerExerciseCard = {
       name: 'Plank',
       kind: 'duration',
@@ -1776,8 +1754,53 @@ describe('WorkoutEditorView duration timer', () => {
 
     const actions = card.findByClass('fitkit-row-actions')
     const buttons = actions?.children.filter((c) => c.tagName === 'button') ?? []
-    expect(buttons.map((b) => b.textContent)).toEqual(['Add duration entry', 'Start timer'])
+    expect(buttons.map((b) => b.textContent)).toEqual(['Add set', 'Start timer'])
     expect(buttons[1]?.attributes.get('data-icon')).toBe('play')
+  })
+
+  it('shows the duration set number as a figure rather than an editable field', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 60 }, { set: 7, durationSeconds: 30 }],
+    }
+    const view = createTimerView(ex)
+    const card = new TestElement('div')
+
+    view.renderDurationTable(card as unknown as HTMLElement, ex, 0)
+
+    expect(card.findByClass('fitkit-set-head')?.children.map((child) => child.textContent)).toEqual(
+      ['', 'Duration'],
+    )
+    const setCells = card
+      .findAllByClass('fitkit-cell')
+      .filter((cell) => cell.dataset.label === 'Set')
+    expect(setCells.map((cell) => cell.textContent)).toEqual(['1', '7'])
+    expect(setCells.flatMap((cell) => cell.children)).toEqual([])
+  })
+
+  it('renumbers duration rows from the row menu', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [
+        { set: 4, durationSeconds: 60 },
+        { set: 9, durationSeconds: 30 },
+      ],
+    }
+    const view = createTimerView(ex)
+    const card = new TestElement('div')
+
+    view.renderDurationTable(card as unknown as HTMLElement, ex, 0)
+    const kebab = card.findByClass('fitkit-row-kebab')
+    kebab?.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
+    const renumber = obsidianMock.menus[0]?.items.find((item) => item.title === 'Renumber sets')
+    renumber?.onClick?.()
+
+    expect(ex.durationEntries.map((entry) => entry.set)).toEqual([1, 2])
+    expect(view.markDirty).toHaveBeenCalled()
   })
 
   it('renders Stop timer with square icon when the card is the active timer', () => {
@@ -1802,7 +1825,7 @@ describe('WorkoutEditorView duration timer', () => {
 
     const actions = card.findByClass('fitkit-row-actions')
     const buttons = actions?.children.filter((c) => c.tagName === 'button') ?? []
-    expect(buttons.map((b) => b.textContent)).toEqual(['Add duration entry', 'Stop timer'])
+    expect(buttons.map((b) => b.textContent)).toEqual(['Add set', 'Stop timer'])
     expect(buttons[1]?.attributes.get('data-icon')).toBe('square')
   })
 
@@ -1892,7 +1915,7 @@ describe('WorkoutEditorView duration timer', () => {
     expect(view.render).toHaveBeenCalledTimes(1)
   })
 
-  it('clicking Add duration entry while a timer is running writes back and appends', () => {
+  it('clicking Add set while a timer is running writes back and appends', () => {
     const ex: TimerExerciseCard = {
       name: 'Plank',
       kind: 'duration',
@@ -1908,7 +1931,7 @@ describe('WorkoutEditorView duration timer', () => {
     view.renderDurationTable(card as unknown as HTMLElement, ex, 0)
     const actions = card.findByClass('fitkit-row-actions')
     const addBtn = actions?.children.find(
-      (c) => c.tagName === 'button' && c.textContent === 'Add duration entry',
+      (c) => c.tagName === 'button' && c.textContent === 'Add set',
     )
     addBtn?.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
 

@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The rest timer no longer starts by itself when reps are entered; start and stop it from the footer button.
+- Duration set numbers are now a figure rather than an editable field, resequenced from `Renumber sets` in the row menu, matching strength sets.
+- `Add duration entry` on a duration card is now `Add set`.
+
 ### Fixed
 
 ### Removed

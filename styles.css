@@ -412,7 +412,7 @@ body.is-mobile .fitkit-editor-root {
 }
 
 .fitkit-duration-row {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 20px minmax(0, 1fr);
 }
 
 .fitkit-cell {
