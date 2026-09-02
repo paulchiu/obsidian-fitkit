@@ -1,34 +1,22 @@
 # FitKit
 
-FitKit is a workout tracker that lives inside Obsidian. Your sets, reps, weight, and durations are stored as plain Markdown in your vault, edited through a form built for the gym, and rolled up into a dashboard and per-exercise progression charts.
+FitKit is a workout tracker for Obsidian. Your sets, reps, weight, and durations are stored as plain Markdown in your vault, edited through a form built for use during workouts, with a rolled-up dashboard and per-exercise progression charts when you need it.
 
-Every workout is a normal note with Dataview inline fields. No SQLite blob, no proprietary export, no cloud account. If you uninstall FitKit tomorrow, your training history is still plain text in your vault, readable in any editor. It is a plugin, so the rest of your vault can reach it: link exercises to your training notes, embed a chart in a daily note, or query your history with your own Dataview queries.
+Every workout is a normal note with Dataview inline fields. If you uninstall FitKit tomorrow, your training history is still plain text in your vault. You choose where to store the notes and how you use your data.
 
-The editor is the part you touch mid-session. Tap to add a set, type the weight, hit the rest timer. Once you have a few workouts logged, the dashboard and the per-exercise charts fill themselves in.
+The workout editor is optimised to be low-touch so you can expend workout effort on reps rather than data entry. Tap to add a set, type the weight, that's it. Once you have a few workouts logged, the dashboard and the per-exercise charts auto-populate.
 
 ## Install
 
 FitKit needs the [Dataview plugin](https://github.com/blacksmithgu/obsidian-dataview) to render history tables and recent-session views. Install it first from Obsidian's community plugins.
 
-FitKit is not in the community plugin directory yet, so this path works once it is listed.
-
-To install FitKit from Obsidian's community plugins browser:
+FitKit is listed in [Obsidian's community plugin directory](https://community.obsidian.md/plugins/fitkit). To install it from the community plugins browser:
 
 1. Open Settings, then Community plugins, then Browse.
 2. Search for FitKit.
 3. Select Install, then Enable.
 
-To install FitKit with the [BRAT community plugin](https://github.com/TfTHacker/obsidian42-brat):
-
-1. Install BRAT.
-2. Add `https://github.com/paulchiu/obsidian-fitkit` as a beta plugin.
-3. Enable FitKit from Obsidian's community plugins list.
-
-To install manually from a release:
-
-1. Download `main.js`, `manifest.json`, and `styles.css` from the release.
-2. Put them in `<vault>/.obsidian/plugins/fitkit/`, creating the folder if needed.
-3. Reload Obsidian, then enable FitKit from the community plugins list.
+For beta builds with BRAT or a manual install from a GitHub release, see [Install](docs/install.md).
 
 ## Log your first workout
 
@@ -81,6 +69,7 @@ Renaming from here renames the exercise note, rewrites every reference across yo
 | [Dashboard and charts](docs/dashboard-and-charts.md) | What the dashboard generates, how a PB is chosen, `fitkit-chart` options.        |
 | [Note format](docs/note-format.md)                   | Frontmatter, inline fields, and exactly what survives a save.                    |
 | [Settings and maintenance](docs/settings.md)         | Every setting, every maintenance action, and the two commands.                   |
+| [Install](docs/install.md)                           | Installing with BRAT for beta builds, and installing manually from a release.    |
 
 ## Limitations
 
@@ -92,6 +81,8 @@ Renaming from here renames the exercise note, rewrites every reference across yo
 - SQL/WASM analytics and a custom fenced source format are not implemented.
 
 ## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to propose changes and what a good PR looks like.
 
 Run `npm install` to install dependencies.
 
