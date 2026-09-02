@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [1.2.2] - 2026-09-02
+
+### Added
+
 - `authorUrl` in the plugin manifest, so the community directory listing links back to the author.
 
 ### Changed
