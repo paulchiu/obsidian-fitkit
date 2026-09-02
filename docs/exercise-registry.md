@@ -31,7 +31,7 @@ Backfilled entries deliberately carry no unit, because an explicit registry unit
 
 `Import exercises`, the button beside `Add entry`, is the interactive version. It lists names found in workout notes with their registry and note-file status, and lets you choose per exercise whether to create a note, a no-note entry, or neither.
 
-![Import exercises modal classifying two names by registry and note-file status](images/import-exercises.png)
+![Import exercises modal classifying five workout-note names by registry and note-file status](images/import-exercises.png)
 
 ## Renaming an exercise
 
