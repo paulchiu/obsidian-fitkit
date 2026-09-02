@@ -18,6 +18,11 @@ jobs:
     name: Bump version, tag, and publish release
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    # Scoped here rather than top-level so only this job gets the attestation signing token.
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     steps:
       - name: Checkout main
         uses: actions/checkout@v7
@@ -102,6 +107,44 @@ jobs:
           fs.writeFileSync(path, updated);
           EOF
 
+      - name: Extract release notes from CHANGELOG
+        if: steps.bump.outputs.result != 'norelease'
+        id: notes
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
+          # Written outside the repo so `prettier --check .` never sees it.
+          NOTES_PATH: ${{ runner.temp }}/release-notes.md
+        run: |
+          node - <<'EOF'
+          const fs = require('fs');
+          const version = process.env.NEW_VERSION;
+          const notesPath = process.env.NOTES_PATH;
+          const lines = fs.readFileSync('CHANGELOG.md', 'utf8').split('\n');
+          const start = lines.findIndex((line) => line.startsWith(`## [${version}]`));
+          const kept = [];
+          if (start !== -1) {
+            const rest = lines.slice(start + 1);
+            const end = rest.findIndex((line) => line.startsWith('## ['));
+            const section = end === -1 ? rest : rest.slice(0, end);
+            let i = section.findIndex((line) => line.startsWith('### '));
+            if (i === -1) i = section.length;
+            const preamble = section.slice(0, i).join('\n').trim();
+            if (preamble) kept.push(preamble, '');
+            while (i < section.length) {
+              let j = i + 1;
+              while (j < section.length && !section[j].startsWith('### ')) j++;
+              // Drop Keep-a-Changelog subsections that carry no bullets.
+              const body = section.slice(i + 1, j).join('\n').trim();
+              if (body) kept.push(section[i], '', body, '');
+              i = j;
+            }
+          }
+          const repo = process.env.GITHUB_REPOSITORY;
+          const fallback = `Release ${version}. No changelog entries were recorded for this version; see [CHANGELOG.md](https://github.com/${repo}/blob/${version}/CHANGELOG.md).`;
+          fs.writeFileSync(notesPath, `${kept.join('\n').trim() || fallback}\n`);
+          EOF
+          echo "path=$NOTES_PATH" >> "$GITHUB_OUTPUT"
+
       - name: Build
         if: steps.bump.outputs.result != 'norelease'
         run: npm run build
@@ -124,10 +167,20 @@ jobs:
           # Push branch and tag together so the tag never appears on the remote without its commit.
           git push origin main "$VERSION"
 
+      - name: Attest build provenance
+        if: steps.bump.outputs.result != 'norelease'
+        # Last step before publish, so the attested bytes are the ones uploaded.
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            main.js
+            styles.css
+
       - name: Publish GitHub release
         if: steps.bump.outputs.result != 'norelease'
         uses: softprops/action-gh-release@v3
         with:
+          body_path: ${{ steps.notes.outputs.path }}
           name: ${{ steps.version.outputs.new_version }}
           tag_name: ${{ steps.version.outputs.new_version }}
           draft: false
