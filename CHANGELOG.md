@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+### Fixed
+
+### Removed
+
+## [1.2.4] - 2026-09-02
+
+### Added
+
+### Changed
+
 - FitKit now reads only the files inside its configured Fitness folders instead of listing every file in the vault.
 
 ### Fixed
