@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+### Fixed
+
+### Removed
+
+## [1.2.3] - 2026-09-02
+
+### Added
+
+### Changed
+
 - Timers (autosave debounce, exercise timer, rest timer, modal focus) now schedule on `window` instead of `activeWindow`, matching the official plugin guideline. Timers scheduled from a focused popout previously died with that popout, which could drop an autosave flush or stall a running timer.
 - The exercise unit picker renders its options from the shared weight-unit list, and the duration placeholder comes from the duration formatter, so the labels stay in step with the domain layer. Displayed text is unchanged.
 
