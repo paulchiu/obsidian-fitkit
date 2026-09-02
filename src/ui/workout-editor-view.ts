@@ -2,7 +2,11 @@ import type { App, WorkspaceLeaf } from 'obsidian'
 import { ItemView, Menu, Modal, Notice, TFile, normalizePath, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
-import { formatDurationInput, parseDurationInput } from '../domain/duration-input'
+import {
+  formatDurationInput,
+  parseDurationInput,
+  ZERO_DURATION_DISPLAY,
+} from '../domain/duration-input'
 import { formatErrorMessage } from '../domain/error'
 import {
   formatExerciseHistoryBadges,
@@ -201,7 +205,7 @@ export class WorkoutEditorView extends ItemView {
     this.stopTimer({ write: true })
     this.clearRestTimerState()
     if (this.autoSaveTimer !== null) {
-      activeWindow.clearTimeout(this.autoSaveTimer)
+      window.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null
     }
     await this.flushAutoSave()
@@ -224,7 +228,7 @@ export class WorkoutEditorView extends ItemView {
     this.stopTimer({ write: true })
     this.clearRestTimerState()
     if (this.autoSaveTimer !== null) {
-      activeWindow.clearTimeout(this.autoSaveTimer)
+      window.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null
     }
     if (this.session && this.dirty && !this.conflictDetected) {
@@ -246,9 +250,7 @@ export class WorkoutEditorView extends ItemView {
       const elapsed = Date.now() - skeletonShownAt
       const minSkeletonMs = 500
       if (elapsed < minSkeletonMs) {
-        await new Promise<void>((resolve) =>
-          activeWindow.setTimeout(resolve, minSkeletonMs - elapsed),
-        )
+        await new Promise<void>((resolve) => window.setTimeout(resolve, minSkeletonMs - elapsed))
       }
     }
     this.render()
@@ -264,7 +266,7 @@ export class WorkoutEditorView extends ItemView {
     this.abortTimer()
     this.clearRestTimer()
     if (this.autoSaveTimer !== null) {
-      activeWindow.clearTimeout(this.autoSaveTimer)
+      window.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null
     }
     const { model, isWorkout } = await this.session.load()
@@ -664,8 +666,7 @@ export class WorkoutEditorView extends ItemView {
       attr: {
         type: 'text',
         inputmode: 'text',
-        // eslint-disable-next-line obsidianmd/ui/sentence-case -- "0s" is a duration placeholder; "s" is the seconds unit symbol.
-        placeholder: '0s',
+        placeholder: ZERO_DURATION_DISPLAY,
       },
     })
     input.setAttr('aria-label', 'Duration')
@@ -813,7 +814,7 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     const accumulator = entry.durationSeconds ?? 0
-    const intervalId = activeWindow.setInterval(() => this.tickTimer(), 1000)
+    const intervalId = window.setInterval(() => this.tickTimer(), 1000)
     this.activeTimer = {
       card,
       entry,
@@ -831,7 +832,7 @@ export class WorkoutEditorView extends ItemView {
     if (!timer) {
       return
     }
-    activeWindow.clearInterval(timer.intervalId)
+    window.clearInterval(timer.intervalId)
     if (opts.write) {
       timer.entry.durationSeconds = this.liveSeconds(timer)
       this.markDirty()
@@ -869,7 +870,7 @@ export class WorkoutEditorView extends ItemView {
     if (this.activeTimer) {
       this.stopTimer({ write: true, render: false })
     }
-    const intervalId = activeWindow.setInterval(() => this.tickRestTimer(), 1000)
+    const intervalId = window.setInterval(() => this.tickRestTimer(), 1000)
     this.activeRestTimer = {
       startedAtMs: Date.now(),
       intervalId,
@@ -894,7 +895,7 @@ export class WorkoutEditorView extends ItemView {
     if (!timer) {
       return
     }
-    activeWindow.clearInterval(timer.intervalId)
+    window.clearInterval(timer.intervalId)
     this.activeRestTimer = null
   }
 
@@ -1755,9 +1756,9 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     if (this.autoSaveTimer !== null) {
-      activeWindow.clearTimeout(this.autoSaveTimer)
+      window.clearTimeout(this.autoSaveTimer)
     }
-    this.autoSaveTimer = activeWindow.setTimeout(() => {
+    this.autoSaveTimer = window.setTimeout(() => {
       this.autoSaveTimer = null
       void this.flushAutoSave()
     }, this.plugin.settings.autosaveDebounceMs)

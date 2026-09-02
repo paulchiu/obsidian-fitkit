@@ -70,7 +70,7 @@ Official references (authoritative):
 - **UI text:** all user-visible strings (settings, command names, modal copy, locale JSON/TS) are sentence case.
 - **Commands:** don't include the word "command" or duplicate the plugin id in command IDs/names. Don't set default hotkeys.
 - **Vault I/O:** use `vault.process(file, current => next)` for background rewrites and the `Editor` API for active-file edits. Use `fileManager.trashFile(file)` for deletes. Look files up with `vault.getAbstractFileByPath(path)`. Normalize all user-supplied paths with `normalizePath()`. Never touch the filesystem directly.
-- **Popout safety:** use `activeWindow` / `activeDocument` (declared as ESLint readonly globals here) and `activeWindow.setTimeout` / `setInterval`. Bare `window` / `document` / `setTimeout` break in popout windows.
+- **Popout safety:** use `activeWindow` / `activeDocument` (declared as ESLint readonly globals here) for DOM lookups and event targets, but `window.setTimeout` / `setInterval` / `clearTimeout` / `clearInterval` for timers, since a timer owned by a popout dies when that popout closes. Bare `document` / `setTimeout` break in popout windows.
 - **DOM:** build elements via Obsidian helpers (`createEl`, `createDiv`, `createSpan`). Never use `document.createElement`, `innerHTML`, `outerHTML`, or inline styles. All styling lives in `styles.css` using Obsidian CSS variables.
 - **Network & platform:** `requestUrl()` over `fetch()`; `Platform.isMobile` over `navigator.userAgent`.
 - **Lifecycle:** register subscriptions with `this.registerEvent / registerDomEvent / registerInterval`. Don't store view references on the plugin or call `detachLeavesOfType` in `onunload`.

@@ -153,7 +153,7 @@ function modalElements(modal: SetNoteModal): ModalElements {
 
 describe('set note modal', () => {
   beforeEach(() => {
-    vi.stubGlobal('activeWindow', {
+    vi.stubGlobal('window', {
       setTimeout: (callback: () => void): number => {
         callback()
         return 1

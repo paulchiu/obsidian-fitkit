@@ -14,7 +14,7 @@ import {
   upsertEntry,
   validateEntryDraft,
 } from '../domain/exercise-registry'
-import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
+import { DEFAULT_WEIGHT_UNIT, WEIGHT_UNITS, type WeightUnit } from '../domain/weight-unit'
 import type FitKitPlugin from '../main'
 
 export type RegistryEntryModalMode =
@@ -91,10 +91,9 @@ export class ExerciseRegistryEntryModal extends Modal {
     this.unitField = contentEl.createDiv({ cls: 'fitkit-registry-field' })
     this.unitField.createEl('label', { text: 'Unit', cls: 'fitkit-registry-field-label' })
     this.unitSelect = this.unitField.createEl('select', { cls: 'fitkit-registry-select' })
-    // eslint-disable-next-line obsidianmd/ui/sentence-case -- Unit symbols use lowercase labels.
-    this.unitSelect.createEl('option', { value: 'kg', text: 'kg' })
-    // eslint-disable-next-line obsidianmd/ui/sentence-case -- Unit symbols use lowercase labels.
-    this.unitSelect.createEl('option', { value: 'lbs', text: 'lbs' })
+    for (const unit of WEIGHT_UNITS) {
+      this.unitSelect.createEl('option', { value: unit, text: unit })
+    }
     this.unitSelect.value = this.weightUnit
     this.unitWarning = this.unitField.createDiv({ cls: 'fitkit-registry-field-warning' })
     this.unitSelect.addEventListener('change', () => {

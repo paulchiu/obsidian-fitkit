@@ -1348,11 +1348,11 @@ describe('WorkoutEditorView rest timer', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-05-03T00:00:00Z'))
     /**
-     * The node test environment has no `window`, so point the popout-safe
-     * `activeWindow` global the source relies on at the test realm's global.
+     * The node test environment has no `window`, so point the `window` global
+     * the source schedules timers on at the test realm's global.
      */
     // eslint-disable-next-line obsidianmd/no-global-this -- The test realm's global object is the only handle available for stubbing.
-    vi.stubGlobal('activeWindow', globalThis)
+    vi.stubGlobal('window', globalThis)
   })
 
   afterEach(() => {
@@ -1677,7 +1677,7 @@ describe('WorkoutEditorView rest timer', () => {
     view.lastRestSeconds = 12
     view.activeRestTimer = {
       startedAtMs: Date.now(),
-      intervalId: activeWindow.setInterval(() => undefined, 1000),
+      intervalId: window.setInterval(() => undefined, 1000),
       labelEl: null,
     }
 
@@ -1734,11 +1734,11 @@ describe('WorkoutEditorView duration timer', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-04-28T00:00:00Z'))
     /**
-     * The node test environment has no `window`, so point the popout-safe
-     * `activeWindow` global the source relies on at the test realm's global.
+     * The node test environment has no `window`, so point the `window` global
+     * the source schedules timers on at the test realm's global.
      */
     // eslint-disable-next-line obsidianmd/no-global-this -- The test realm's global object is the only handle available for stubbing.
-    vi.stubGlobal('activeWindow', globalThis)
+    vi.stubGlobal('window', globalThis)
   })
 
   afterEach(() => {
