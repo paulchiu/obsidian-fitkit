@@ -10,6 +10,14 @@ The editor is the part you touch mid-session. Tap to add a set, type the weight,
 
 FitKit needs the [Dataview plugin](https://github.com/blacksmithgu/obsidian-dataview) to render history tables and recent-session views. Install it first from Obsidian's community plugins.
 
+FitKit is not in the community plugin directory yet, so this path works once it is listed.
+
+To install FitKit from Obsidian's community plugins browser:
+
+1. Open Settings, then Community plugins, then Browse.
+2. Search for FitKit.
+3. Select Install, then Enable.
+
 To install FitKit with the [BRAT community plugin](https://github.com/TfTHacker/obsidian42-brat):
 
 1. Install BRAT.
