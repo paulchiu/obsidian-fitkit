@@ -25,13 +25,16 @@ const UNIT_SECONDS: Record<string, number> = {
   s: SECOND,
 }
 
+/** Canonical rendering of a zero duration, used as the duration input's placeholder. */
+export const ZERO_DURATION_DISPLAY = '0s'
+
 export function formatDurationInput(seconds: number | undefined): string {
   if (seconds === undefined || !Number.isFinite(seconds)) {
     return ''
   }
   let remaining = Math.max(0, Math.round(seconds))
   if (remaining === 0) {
-    return '0s'
+    return ZERO_DURATION_DISPLAY
   }
 
   const parts: string[] = []

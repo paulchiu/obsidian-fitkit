@@ -507,8 +507,14 @@ body.is-mobile .fitkit-editor-root {
 
 .fitkit-set-note-modal-shell {
   max-height: calc(100vh - 32px);
-  max-height: calc(100dvh - 32px);
   overflow: hidden;
+}
+
+/* iOS 15.0 to 15.3 sits inside the supported range but predates dvh, so vh above stays as the fallback. */
+@supports (height: 100dvh) {
+  .fitkit-set-note-modal-shell {
+    max-height: calc(100dvh - 32px);
+  }
 }
 
 .fitkit-set-note-modal {

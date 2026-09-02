@@ -462,9 +462,9 @@ const createTeardownHarness = async (): Promise<TeardownHarness> => {
 describe('WorkoutEditorView autosave survives teardown races on the shared view', () => {
   beforeEach(() => {
     vi.stubGlobal('HTMLElement', class {})
-    /** flushAutoSave's finally block may call scheduleAutoSave, which reaches for the Obsidian `activeWindow` global; alias it to the real Node timers. */
+    /** flushAutoSave's finally block may call scheduleAutoSave, which schedules on `window`; alias it to the real Node timers. */
     // eslint-disable-next-line obsidianmd/no-global-this -- The test realm's global object is the only handle available for stubbing.
-    vi.stubGlobal('activeWindow', globalThis)
+    vi.stubGlobal('window', globalThis)
   })
 
   it('does not throw or reject when the view is torn down while an autosave is in flight', async () => {

@@ -48,7 +48,6 @@ export default tseslint.config(
       'obsidianmd/no-unsupported-api': 'off',
       'obsidianmd/prefer-file-manager-trash-file': 'off',
       'obsidianmd/prefer-instanceof': 'off',
-      'obsidianmd/prefer-window-timers': 'off',
       'obsidianmd/no-global-this': 'off',
     },
   },
@@ -56,15 +55,13 @@ export default tseslint.config(
     files: ['**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}'],
     /**
      * Restates obsidianmd's `no-restricted-disable` list (ESLint replaces rule
-     * options rather than merging them) so two rules can still be silenced
-     * inline where the codebase has a documented reason: `ui/sentence-case` for
-     * unit symbols like "kg" and "0s", and `no-global-this` for the test-harness
-     * `vi.stubGlobal('activeWindow', globalThis)` bootstrapping.
+     * options rather than merging them) so `no-global-this` can still be
+     * silenced inline for the test-harness `vi.stubGlobal('activeWindow',
+     * globalThis)` bootstrapping.
      *
      * Patterns are matched with gitignore semantics, so `obsidianmd/*` excludes
-     * the `obsidianmd/ui` segment wholesale and nothing beneath it can be
-     * re-included. The `ui` pair below reopens that segment before restricting
-     * its rules individually.
+     * the `obsidianmd/ui` segment wholesale. The `ui` pair below reopens that
+     * segment before restricting its rules individually.
      */
     rules: {
       'eslint-comments/no-restricted-disable': [
@@ -72,7 +69,6 @@ export default tseslint.config(
         'obsidianmd/*',
         '!obsidianmd/ui',
         'obsidianmd/ui/*',
-        '!obsidianmd/ui/sentence-case',
         '!obsidianmd/no-global-this',
         'no-console',
         'no-restricted-globals',
@@ -96,14 +92,7 @@ export default tseslint.config(
       'obsidianmd/prefer-file-manager-trash-file': 'error',
       'obsidianmd/prefer-instanceof': 'error',
       'obsidianmd/no-global-this': 'error',
-      /**
-       * Intentionally left off. `prefer-window-timers` wants bare `window.setTimeout`
-       * / `window.setInterval`, which breaks in Obsidian popout windows. This project
-       * mandates `activeWindow.setTimeout` / `activeWindow.setInterval` for popout
-       * safety (see AGENTS.md "Popout safety"), so enabling this rule would push the
-       * source in the opposite direction of the documented convention.
-       */
-      'obsidianmd/prefer-window-timers': 'off',
+      'obsidianmd/prefer-window-timers': 'error',
     },
   },
   {

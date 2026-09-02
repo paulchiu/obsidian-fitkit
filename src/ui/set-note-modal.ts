@@ -44,7 +44,7 @@ export class SetNoteModal extends Modal {
     })
     save.addEventListener('click', () => this.commit(textarea.value))
 
-    activeWindow.setTimeout(() => {
+    window.setTimeout(() => {
       textarea.focus()
       const length = textarea.value.length
       textarea.setSelectionRange(length, length)

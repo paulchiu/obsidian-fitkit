@@ -1,4 +1,5 @@
 import { Modal, type App } from 'obsidian'
+import { DEFAULT_WEIGHT_UNIT } from '../domain/weight-unit'
 
 export interface PlanStepModalOptions {
   title: string
@@ -39,8 +40,7 @@ export class PlanStepModal extends Modal {
         id: 'fitkit-plan-step-input',
         type: 'text',
         inputmode: 'decimal',
-        // eslint-disable-next-line obsidianmd/ui/sentence-case -- Unit symbols use lowercase labels.
-        placeholder: 'kg',
+        placeholder: DEFAULT_WEIGHT_UNIT,
       },
     })
     input.value = this.options.initial
@@ -60,7 +60,7 @@ export class PlanStepModal extends Modal {
       }
     })
 
-    activeWindow.setTimeout(() => {
+    window.setTimeout(() => {
       input.focus()
       input.select()
     }, 0)
