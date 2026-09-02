@@ -37,6 +37,7 @@ import type { ChartSeries } from '../../src/domain/exercise-chart'
 import type { FitKitIndex } from '../../src/domain/types'
 import type { FitKitSettings } from '../../src/settings'
 import { renderExerciseChartBlock } from '../../src/ui/exercise-chart-block'
+import { buildMockVaultFolderTree } from '../fixtures/mock-vault-folder-tree'
 
 type ChartBlockPlugin = Parameters<typeof renderExerciseChartBlock>[0]
 type Frontmatter = Record<string, unknown>
@@ -105,7 +106,7 @@ function createPlugin(
     app: {
       vault: {
         getAbstractFileByPath: (path: string) => files.find((file) => file.path === path) ?? null,
-        getMarkdownFiles: () => files,
+        ...buildMockVaultFolderTree(files),
       },
       metadataCache: {
         getFileCache: (file: TFile) => ({ frontmatter: frontmatterByPath.get(file.path) }),

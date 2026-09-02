@@ -17,6 +17,7 @@ import type { BestSet, ExerciseIndexRow, FitKitIndex, IndexEntry, WeightSet } fr
 import type { FitKitSettings } from '../settings'
 import { dashboardPath, exercisesFolder, normalizeFolder, workoutsFolder } from '../settings-paths'
 import { exerciseRegistryWithVaultNotes } from './exercise-registry-vault'
+import { markdownFilesInFolder } from './folder-scan'
 
 interface ExerciseAggregate {
   exerciseName: string
@@ -364,14 +365,9 @@ function buildExerciseMetricMap(
 }
 
 function readExerciseNoteMetrics(app: App, settings: FitKitSettings): Map<string, ExerciseMetric> {
-  const folder = exercisesFolder(settings)
   const metrics = new Map<string, ExerciseMetric>()
 
-  for (const file of app.vault.getMarkdownFiles()) {
-    if (!file.path.startsWith(`${folder}/`)) {
-      continue
-    }
-
+  for (const file of markdownFilesInFolder(app, exercisesFolder(settings))) {
     const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter
     const type = readFrontmatterField(frontmatter, 'type')
     const kind = readFrontmatterField(frontmatter, 'kind')
@@ -432,14 +428,9 @@ function buildExerciseUnitMap(
 }
 
 function readExerciseNoteUnits(app: App, settings: FitKitSettings): Map<string, WeightUnit> {
-  const folder = exercisesFolder(settings)
   const units = new Map<string, WeightUnit>()
 
-  for (const file of app.vault.getMarkdownFiles()) {
-    if (!file.path.startsWith(`${folder}/`)) {
-      continue
-    }
-
+  for (const file of markdownFilesInFolder(app, exercisesFolder(settings))) {
     const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter
     const type = readFrontmatterField(frontmatter, 'type')
     const kind = readFrontmatterField(frontmatter, 'kind')

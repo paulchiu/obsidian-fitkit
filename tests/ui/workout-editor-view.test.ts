@@ -167,6 +167,7 @@ vi.mock('../../src/vault/exercise-registry-vault', () => ({
 
 import { TFile } from 'obsidian'
 import { WorkoutEditorView } from '../../src/ui/workout-editor-view'
+import { buildMockVaultFolderTree, type MockVaultFolder } from '../fixtures/mock-vault-folder-tree'
 
 interface TestElementOptions {
   cls?: string
@@ -1092,7 +1093,7 @@ interface PersistKindChangeMarkdownFile {
 interface PersistKindChangeView {
   app: {
     vault: {
-      getMarkdownFiles: () => PersistKindChangeMarkdownFile[]
+      getFolderByPath: (path: string) => MockVaultFolder | null
       getAbstractFileByPath: ReturnType<typeof vi.fn>
       process: ReturnType<typeof vi.fn>
     }
@@ -1130,7 +1131,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
     const view = Object.create(WorkoutEditorView.prototype) as PersistKindChangeView
     view.app = {
       vault: {
-        getMarkdownFiles: () => markdownFiles,
+        getFolderByPath: buildMockVaultFolderTree(markdownFiles).getFolderByPath,
         getAbstractFileByPath: vi.fn((path: string) => filesByPath.get(path) ?? null),
         process: vi.fn(async (file: { path: string }, callback: (text: string) => string) => {
           const next = callback(contents.get(file.path) ?? '')

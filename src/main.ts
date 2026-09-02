@@ -21,6 +21,7 @@ import {
   buildRegistryBackfillPlan,
 } from './vault/exercise-registry-backfill'
 import { buildExerciseRegistrySnapshot } from './vault/exercise-registry-vault'
+import { markdownFilesInFolder } from './vault/folder-scan'
 import { rebuildIndex, updateIndexEntry } from './vault/index'
 
 function formatTodayIsoDate(): string {
@@ -301,10 +302,7 @@ export default class FitKitPlugin extends Plugin {
   }
 
   async syncExerciseNotes(): Promise<void> {
-    const folder = exercisesFolder(this.settings)
-    const files = this.app.vault
-      .getMarkdownFiles()
-      .filter((file) => file.path.startsWith(`${folder}/`))
+    const files = markdownFilesInFolder(this.app, exercisesFolder(this.settings))
     const snapshot = buildExerciseRegistrySnapshot(this.app, this.settings)
     const registry = createRegistry(this.settings.exerciseRegistry)
     const conflictPaths = new Set<string>()

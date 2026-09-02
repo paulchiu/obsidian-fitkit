@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { FitKitSettings } from '../../src/settings'
 import { readExerciseCatalog } from '../../src/vault/exercise-catalog'
+import { buildMockVaultFolderTree } from '../fixtures/mock-vault-folder-tree'
 
 vi.mock('obsidian', () => ({
   normalizePath: (path: string) => path.replace(/^\/+/, '').replace(/\/+$/, ''),
@@ -19,9 +20,7 @@ function mockApp(markdownFiles: MockMarkdownFile[]): App {
     markdownFiles.map((file) => [file.path, file.frontmatter] as const),
   )
   return {
-    vault: {
-      getMarkdownFiles: () => markdownFiles as unknown as TFile[],
-    },
+    vault: buildMockVaultFolderTree(markdownFiles),
     metadataCache: {
       getFileCache: (file: TFile) => ({
         frontmatter: frontmatterByPath.get(file.path),

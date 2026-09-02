@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import type { FitKitIndex } from '../../src/domain/types'
 import type { FitKitSettings } from '../../src/settings'
 import { composeDashboard, regenerateDashboard } from '../../src/vault/dashboard'
+import { buildMockVaultFolderTree } from '../fixtures/mock-vault-folder-tree'
 
 const emptyIndex: FitKitIndex = {
   schemaVersion: 1,
@@ -66,7 +67,7 @@ function mockDashboardApp(markdownFiles: MockMarkdownFile[]): {
   return {
     app: {
       vault: {
-        getMarkdownFiles: () => markdownFiles as unknown as TFile[],
+        ...buildMockVaultFolderTree(markdownFiles),
         getAbstractFileByPath: () => null,
         process: async (_file: TFile, callback: (current: string) => string): Promise<string> => {
           dashboardMarkdown = callback(dashboardMarkdown)

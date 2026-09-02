@@ -143,6 +143,7 @@ import FitKitPlugin from '../src/main'
 import { DEFAULT_SETTINGS, type FitKitSettings } from '../src/settings'
 import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from '../src/ui/workout-editor-view'
 import { rebuildIndex } from '../src/vault/index'
+import { buildMockVaultFolderTree, type MockVaultFolder } from './fixtures/mock-vault-folder-tree'
 
 interface SetViewStateArg {
   type?: string
@@ -169,7 +170,7 @@ interface MockWorkspace {
 }
 
 interface MockVault {
-  getMarkdownFiles: () => TFile[]
+  getFolderByPath: (path: string) => MockVaultFolder | null
   read: (file: TFile) => Promise<string>
   process: (file: TFile, callback: (live: string) => string) => Promise<void>
 }
@@ -275,7 +276,7 @@ const makeApp = (
     ...overrides,
   },
   vault: {
-    getMarkdownFiles: vi.fn(() => []),
+    getFolderByPath: vi.fn(() => null),
     read: vi.fn(async () => ''),
     process: vi.fn(async () => undefined),
     ...vaultOverrides,
@@ -363,7 +364,7 @@ describe('FitKitPlugin exercise registry diagnostics', () => {
     const app = makeApp(
       {},
       {
-        getMarkdownFiles: vi.fn(() => [file]),
+        getFolderByPath: buildMockVaultFolderTree([file]).getFolderByPath,
       },
     )
     app.metadataCache.getFileCache = vi.fn((target: TFile) =>
@@ -509,7 +510,7 @@ type: exercise
     const app = makeApp(
       {},
       {
-        getMarkdownFiles: vi.fn(() => [file]),
+        getFolderByPath: buildMockVaultFolderTree([file]).getFolderByPath,
         read: vi.fn(async (target: TFile) => contents.get(target.path) ?? ''),
         process: vi.fn(async (target: TFile, callback: (live: string) => string) => {
           contents.set(target.path, callback(contents.get(target.path) ?? ''))
@@ -553,7 +554,7 @@ kind: duration
     const app = makeApp(
       {},
       {
-        getMarkdownFiles: vi.fn(() => [file]),
+        getFolderByPath: buildMockVaultFolderTree([file]).getFolderByPath,
         read: vi.fn(async (target: TFile) => contents.get(target.path) ?? ''),
         process: vi.fn(async (target: TFile, callback: (live: string) => string) => {
           contents.set(target.path, callback(contents.get(target.path) ?? ''))
@@ -614,7 +615,7 @@ name: Test
     const app = makeApp(
       {},
       {
-        getMarkdownFiles: vi.fn(() => [workoutFile, squatFile]),
+        getFolderByPath: buildMockVaultFolderTree([workoutFile, squatFile]).getFolderByPath,
         read: vi.fn(async (target: TFile) => contents.get(target.path) ?? ''),
       },
     )
@@ -887,7 +888,7 @@ describe('FitKitPlugin.refreshIndexEntry concurrency', () => {
     const app: MockApp = makeApp(
       {},
       {
-        getMarkdownFiles: vi.fn(() => files as unknown as TFile[]),
+        getFolderByPath: buildMockVaultFolderTree(files).getFolderByPath,
         read: vi.fn(async (target: TFile) => contents.get(target.path) ?? ''),
       },
     )

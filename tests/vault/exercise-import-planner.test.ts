@@ -7,6 +7,7 @@ import {
   buildExerciseImportPlan,
   ExerciseImportApplyError,
 } from '../../src/vault/exercise-import-planner'
+import { buildMockVaultFolderTree } from '../fixtures/mock-vault-folder-tree'
 
 vi.mock('obsidian', () => ({
   normalizePath: (path: string) => path.replace(/\/+/g, '/'),
@@ -73,7 +74,7 @@ function mockApp(
 
   const app = {
     vault: {
-      getMarkdownFiles: () => markdownFiles as unknown as TFile[],
+      ...buildMockVaultFolderTree(markdownFiles),
       cachedRead: (file: TFile) => Promise.resolve(bodyByPath.get(file.path) ?? ''),
       getAbstractFileByPath: (path: string) =>
         existingPaths.has(path) || createdFiles.has(path) ? { path } : null,

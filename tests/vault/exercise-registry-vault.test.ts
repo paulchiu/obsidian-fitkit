@@ -6,6 +6,7 @@ import {
   buildExerciseRegistrySnapshot,
   exerciseRegistryWithVaultNotes,
 } from '../../src/vault/exercise-registry-vault'
+import { buildMockVaultFolderTree } from '../fixtures/mock-vault-folder-tree'
 
 vi.mock('obsidian', () => ({
   normalizePath: (path: string) => path.replace(/^\/+/, '').replace(/\/+$/, ''),
@@ -22,9 +23,7 @@ function mockApp(markdownFiles: MockMarkdownFile[]): App {
     markdownFiles.map((file) => [file.path, file.frontmatter] as const),
   )
   return {
-    vault: {
-      getMarkdownFiles: () => markdownFiles as unknown as TFile[],
-    },
+    vault: buildMockVaultFolderTree(markdownFiles),
     metadataCache: {
       getFileCache: (file: TFile) => ({
         frontmatter: frontmatterByPath.get(file.path),

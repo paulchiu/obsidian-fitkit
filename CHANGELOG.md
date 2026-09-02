@@ -11,7 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- FitKit now reads only the files inside its configured Fitness folders instead of listing every file in the vault.
+
 ### Fixed
+
+- Setting the fitness root to the vault root no longer leaves the workout index, exercise notes, dashboard metrics, and autocomplete suggestions silently empty; the folder scan now matches a root-anchored Workouts or Exercises folder correctly.
 
 ### Removed
 

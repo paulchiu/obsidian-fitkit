@@ -142,6 +142,7 @@ import { DEFAULT_SETTINGS, type FitKitSettings } from '../../src/settings'
 import { WorkoutEditorView } from '../../src/ui/workout-editor-view'
 import { FileSession } from '../../src/vault/file-session'
 import { rebuildIndex } from '../../src/vault/index'
+import { buildMockVaultFolderTree, type MockVaultFolder } from '../fixtures/mock-vault-folder-tree'
 
 const WORKOUT_PATH = 'Fitness/Workouts/2026-08-15.md'
 
@@ -167,7 +168,7 @@ interface TestFile {
 }
 
 interface TestVault {
-  getMarkdownFiles: () => TestFile[]
+  getFolderByPath: (path: string) => MockVaultFolder | null
   read: (file: TestFile) => Promise<string>
   process: (file: TestFile, callback: (text: string) => string) => Promise<void>
   getAbstractFileByPath: (path: string) => TestFile | null
@@ -238,7 +239,7 @@ const createHarness = async (): Promise<Harness> => {
   }
   const contents = new Map<string, string>([[WORKOUT_PATH, initialSource]])
   const vault: TestVault = {
-    getMarkdownFiles: () => [file],
+    getFolderByPath: buildMockVaultFolderTree([file]).getFolderByPath,
     read: async (target) => contents.get(target.path) ?? '',
     process: async (target, callback) => {
       contents.set(target.path, callback(contents.get(target.path) ?? ''))
@@ -404,7 +405,7 @@ const createTeardownHarness = async (): Promise<TeardownHarness> => {
   })
 
   const vault: TestVault = {
-    getMarkdownFiles: () => [fileA, fileB],
+    getFolderByPath: buildMockVaultFolderTree([fileA, fileB]).getFolderByPath,
     read: async (target) => contents.get(target.path) ?? '',
     process: async (target, callback) => {
       await saveGate

@@ -9,20 +9,16 @@ import {
 } from '../domain/workout-note-model'
 import type { FitKitSettings } from '../settings'
 import { normalizeFolder, workoutsFolder } from '../settings-paths'
+import { markdownFilesInFolder } from './folder-scan'
 
 /**
  * Full vault scan. Lists markdown files under the configured workouts folder.
  */
 export async function rebuildIndex(app: App, settings: FitKitSettings): Promise<FitKitIndex> {
-  const folder = workoutsFolder(settings)
   const entries: IndexEntry[] = []
   const diagnostics: IndexDiagnostic[] = []
 
-  for (const file of app.vault.getMarkdownFiles()) {
-    if (!isInFolder(file.path, folder)) {
-      continue
-    }
-
+  for (const file of markdownFilesInFolder(app, workoutsFolder(settings))) {
     const source = await app.vault.read(file)
     const result = parseWorkoutNote(source, file.path)
     if (!result.isWorkout || !result.model) {

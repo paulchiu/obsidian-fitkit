@@ -1,4 +1,4 @@
-import type { App, TFile } from 'obsidian'
+import type { App } from 'obsidian'
 import { normalizePath } from 'obsidian'
 
 import {
@@ -13,9 +13,10 @@ import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
 import type { ExerciseEntry, WorkoutNoteModel } from '../domain/workout-note-model'
 import { parseWorkoutNote } from '../domain/workout-note-model'
 import type { FitKitSettings } from '../settings'
-import { exercisesFolder, normalizeFolder, workoutsFolder } from '../settings-paths'
+import { exercisesFolder, workoutsFolder } from '../settings-paths'
 import { composeExerciseNote } from './exercise-note'
 import { buildExerciseRegistrySnapshot } from './exercise-registry-vault'
+import { markdownFilesInFolder } from './folder-scan'
 import { ensureParentFolder } from './vault-utils'
 
 export type ExerciseImportRowStatus = 'known' | 'missing' | 'ignored'
@@ -204,12 +205,8 @@ interface Candidate {
 }
 
 async function collectCandidates(app: App, settings: FitKitSettings): Promise<Candidate[]> {
-  const folder = normalizeFolder(workoutsFolder(settings))
   const models: WorkoutNoteModel[] = []
-  const files = app.vault
-    .getMarkdownFiles()
-    .filter((file) => isFileInFolder(file, folder))
-    .sort((left, right) => left.path.localeCompare(right.path))
+  const files = markdownFilesInFolder(app, workoutsFolder(settings))
 
   for (const file of files) {
     const text = await app.vault.cachedRead(file)
@@ -259,10 +256,6 @@ function dedupeExercises(exercises: ExerciseEntry[]): ExerciseEntry[] {
     byName.set(key, exercise)
   }
   return [...byName.values()]
-}
-
-function isFileInFolder(file: TFile, folder: string): boolean {
-  return file.path.startsWith(`${folder}/`)
 }
 
 function normalizeTombstones(names: readonly string[]): string[] {

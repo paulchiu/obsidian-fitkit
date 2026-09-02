@@ -8,6 +8,7 @@ import {
   buildRegistryBackfillPlan,
   computeRegistryBackfillPlan,
 } from '../../src/vault/exercise-registry-backfill'
+import { buildMockVaultFolderTree } from '../fixtures/mock-vault-folder-tree'
 
 vi.mock('obsidian', () => ({
   normalizePath: (path: string) => path.replace(/\/+/g, '/'),
@@ -159,7 +160,7 @@ function mockApp(markdownFiles: MockMarkdownFile[]): App {
   const bodyByPath = new Map(markdownFiles.map((file) => [file.path, file.body ?? ''] as const))
   return {
     vault: {
-      getMarkdownFiles: () => markdownFiles as unknown as TFile[],
+      ...buildMockVaultFolderTree(markdownFiles),
       read: (file: TFile) => Promise.resolve(bodyByPath.get(file.path) ?? ''),
       cachedRead: () => Promise.reject(new Error('must use vault.read, not cachedRead')),
     },
