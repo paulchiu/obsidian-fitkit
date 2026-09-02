@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `authorUrl` in the plugin manifest, so the community directory listing links back to the author.
+
 ### Changed
+
+- Modal titles now use Obsidian's `Modal.setTitle()` instead of a heading element inside the modal body, matching the platform convention and the community directory's review guidelines.
 
 ### Fixed
 

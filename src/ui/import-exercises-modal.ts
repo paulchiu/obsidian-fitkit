@@ -29,14 +29,14 @@ export class ImportExercisesModal extends Modal {
   onOpen(): void {
     this.contentEl.empty()
     this.contentEl.addClass('fitkit-import-modal')
-    this.contentEl.createEl('h2', { text: this.options.title ?? 'Import exercises' })
+    this.setTitle(this.options.title ?? 'Import exercises')
     this.contentEl.createEl('p', {
       text:
         this.options.description ??
         'Review exercise names found in workout notes and choose which exercise notes or no-note registry entries to create.',
       cls: 'fitkit-import-muted',
     })
-    this.contentEl.createEl('div', {
+    this.contentEl.createDiv({
       text: 'Loading exercises...',
       cls: 'fitkit-import-muted',
     })
@@ -63,7 +63,7 @@ export class ImportExercisesModal extends Modal {
     const { contentEl } = this
     contentEl.empty()
     contentEl.addClass('fitkit-import-modal')
-    contentEl.createEl('h2', { text: this.options.title ?? 'Import exercises' })
+    this.setTitle(this.options.title ?? 'Import exercises')
     contentEl.createEl('p', {
       text:
         this.options.description ??
@@ -71,11 +71,11 @@ export class ImportExercisesModal extends Modal {
       cls: 'fitkit-import-muted',
     })
     if (this.applyWarning) {
-      contentEl.createEl('div', { text: this.applyWarning, cls: 'fitkit-warn' })
+      contentEl.createDiv({ text: this.applyWarning, cls: 'fitkit-warn' })
     }
 
     if (this.rows.length === 0) {
-      contentEl.createEl('div', {
+      contentEl.createDiv({
         text: 'No exercises found.',
         cls: 'fitkit-import-muted',
       })
@@ -266,8 +266,8 @@ export class ImportExercisesModal extends Modal {
     const { contentEl } = this
     contentEl.empty()
     contentEl.addClass('fitkit-import-modal')
-    contentEl.createEl('h2', { text: this.options.title ?? 'Import exercises' })
-    contentEl.createEl('div', { text: message, cls: 'fitkit-warn' })
+    this.setTitle(this.options.title ?? 'Import exercises')
+    contentEl.createDiv({ text: message, cls: 'fitkit-warn' })
     const actions = contentEl.createDiv({ cls: 'fitkit-import-actions' })
     const close = actions.createEl('button', { text: 'Close', cls: 'fitkit-btn' })
     close.addEventListener('click', () => this.close())

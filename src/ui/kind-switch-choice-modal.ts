@@ -28,7 +28,7 @@ export class KindSwitchChoiceModal extends Modal {
     const { exerciseName, currentKind, nextKind, hasRows, registryKind } = this.options
     contentEl.empty()
     contentEl.addClass('fitkit-kind-confirm-modal')
-    contentEl.createEl('h2', { text: `Switch ${exerciseName} to ${nextKind}?` })
+    this.setTitle(`Switch ${exerciseName} to ${nextKind}?`)
 
     if (hasRows) {
       contentEl.createEl('p', {

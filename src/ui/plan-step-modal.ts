@@ -25,7 +25,7 @@ export class PlanStepModal extends Modal {
     contentEl.empty()
     this.modalEl.addClass('fitkit-set-note-modal-shell')
     contentEl.addClass('fitkit-set-note-modal')
-    contentEl.createEl('h2', { text: this.options.title })
+    this.setTitle(this.options.title)
 
     const field = contentEl.createDiv({ cls: 'fitkit-set-note-field' })
     field.createEl('label', {

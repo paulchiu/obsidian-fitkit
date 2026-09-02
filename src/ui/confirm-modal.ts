@@ -22,7 +22,7 @@ export class ConfirmModal extends Modal {
     const { contentEl } = this
     contentEl.empty()
     contentEl.addClass('fitkit-kind-confirm-modal')
-    contentEl.createEl('h2', { text: this.options.title })
+    this.setTitle(this.options.title)
     contentEl.createEl('p', { text: this.options.message })
 
     const actions = contentEl.createDiv({ cls: 'fitkit-confirm-actions' })

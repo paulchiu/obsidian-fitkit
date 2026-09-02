@@ -323,7 +323,7 @@ export class FitKitSettingTab extends PluginSettingTab {
             kind: 'block',
             name: 'About these actions',
             render: (el) => {
-              el.createEl('div', {
+              el.createDiv({
                 text: 'Use these actions when setting up the plugin, repairing generated exercise notes, or refreshing dashboard data.',
                 cls: 'setting-item-description',
               })
@@ -505,14 +505,14 @@ export class FitKitSettingTab extends PluginSettingTab {
   }
 
   private renderDerivedPaths(containerEl: HTMLElement): void {
-    containerEl.createEl('div', { text: 'Derived paths:', cls: 'setting-item-name' })
-    const workoutsLine = containerEl.createEl('div', { cls: 'setting-item-description' })
+    containerEl.createDiv({ text: 'Derived paths:', cls: 'setting-item-name' })
+    const workoutsLine = containerEl.createDiv({ cls: 'setting-item-description' })
     workoutsLine.createSpan({ text: 'Workouts folder: ' })
     const workouts = workoutsLine.createSpan()
-    const exercisesLine = containerEl.createEl('div', { cls: 'setting-item-description' })
+    const exercisesLine = containerEl.createDiv({ cls: 'setting-item-description' })
     exercisesLine.createSpan({ text: 'Exercises folder: ' })
     const exercises = exercisesLine.createSpan()
-    const dashboardLine = containerEl.createEl('div', { cls: 'setting-item-description' })
+    const dashboardLine = containerEl.createDiv({ cls: 'setting-item-description' })
     dashboardLine.createSpan({ text: 'Dashboard: ' })
     const dashboard = dashboardLine.createSpan()
     this.derivedPathValues = { workouts, exercises, dashboard }
