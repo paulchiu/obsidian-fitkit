@@ -21,7 +21,7 @@ export class ParseDiagnosticsModal extends Modal {
   onOpen(): void {
     const { contentEl } = this
     contentEl.empty()
-    contentEl.createEl('h2', { text: this.title })
+    this.setTitle(this.title)
 
     for (const diagnostic of this.diagnostics) {
       contentEl.createEl('h3', { text: diagnostic.path ?? diagnostic.name ?? 'General diagnostic' })

@@ -62,9 +62,7 @@ export class ExerciseRegistryEntryModal extends Modal {
     const { contentEl } = this
     contentEl.empty()
     contentEl.addClass('fitkit-registry-entry-modal')
-    contentEl.createEl('h2', {
-      text: this.mode.kind === 'edit' ? 'Edit registry entry' : 'Add registry entry',
-    })
+    this.setTitle(this.mode.kind === 'edit' ? 'Edit registry entry' : 'Add registry entry')
 
     const nameField = contentEl.createDiv({ cls: 'fitkit-registry-field' })
     nameField.createEl('label', { text: 'Name', cls: 'fitkit-registry-field-label' })

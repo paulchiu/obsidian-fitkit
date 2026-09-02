@@ -6,6 +6,13 @@ vi.mock('obsidian', () => {
   class Modal {
     contentEl = new TestElement('div')
 
+    titleEl = new TestElement('div')
+
+    setTitle(title: string): this {
+      this.titleEl.textContent = title
+      return this
+    }
+
     constructor(readonly app: unknown) {}
 
     open(): void {}
@@ -385,6 +392,17 @@ describe('ExerciseRenameModal cancel', () => {
     obsidianMock.notices = []
     vi.mocked(buildExerciseRenamePlanFromVault).mockReset()
     vi.mocked(applyExerciseRenamePlan).mockReset()
+  })
+
+  it('names the modal through setTitle rather than a heading in the body', () => {
+    const plugin = createPluginStub()
+    const modal = new ExerciseRenameModal(plugin as unknown as FitKitPlugin, { oldName: 'Row' })
+
+    modal.onOpen()
+
+    const modalPrivate = modal as unknown as ModalPrivate & { titleEl: TestElement }
+    expect(modalPrivate.titleEl.textContent).toBe('Rename exercise')
+    expect(modalPrivate.contentEl.children.some((child) => child.tagName === 'h2')).toBe(false)
   })
 
   it('writes nothing when cancelled at the input stage', () => {

@@ -26,7 +26,7 @@ export class DeleteRegistryEntryModal extends Modal {
     const { contentEl } = this
     contentEl.empty()
     contentEl.addClass('fitkit-kind-confirm-modal')
-    contentEl.createEl('h2', { text: 'Delete exercise?' })
+    this.setTitle('Delete exercise?')
     contentEl.createEl('p', {
       text: `Remove the registry overlay for '${this.options.entryName}'? Existing workout history is not rewritten.`,
     })

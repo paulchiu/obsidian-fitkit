@@ -35,6 +35,13 @@ vi.mock('obsidian', () => {
   class Modal {
     contentEl = new TestElement('div')
 
+    titleEl = new TestElement('div')
+
+    setTitle(title: string): this {
+      this.titleEl.textContent = title
+      return this
+    }
+
     constructor(readonly app: unknown) {}
 
     open(): void {}

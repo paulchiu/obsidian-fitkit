@@ -59,6 +59,10 @@ vi.mock('obsidian', () => {
   class Modal {
     contentEl = {}
     constructor(_app: unknown) {}
+
+    setTitle(_title: string): this {
+      return this
+    }
     open(): void {}
     close(): void {}
   }

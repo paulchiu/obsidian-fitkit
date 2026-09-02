@@ -1826,7 +1826,7 @@ class UnknownExerciseModal extends Modal {
   onOpen(): void {
     const { contentEl } = this
     contentEl.empty()
-    contentEl.createEl('h2', { text: 'Add exercise' })
+    this.setTitle('Add exercise')
     contentEl.createEl('p', {
       text: this.wasDeleted
         ? `"${this.name}" was previously deleted and ignored. Add it again?`

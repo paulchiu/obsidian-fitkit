@@ -121,6 +121,13 @@ vi.mock('obsidian', () => {
     contentEl = new TestElement('div')
     modalEl = new TestElement('div')
 
+    titleEl = new TestElement('div')
+
+    setTitle(title: string): this {
+      this.titleEl.textContent = title
+      return this
+    }
+
     constructor(readonly app: unknown) {}
 
     close(): void {
@@ -137,6 +144,7 @@ import { SetNoteModal } from '../../src/ui/set-note-modal'
 interface ModalElements {
   contentEl: TestElement
   modalEl: TestElement
+  titleEl: TestElement
 }
 
 function modalElements(modal: SetNoteModal): ModalElements {
@@ -171,6 +179,20 @@ describe('set note modal', () => {
     expect(contentEl.findByClass('fitkit-set-note-modal')).not.toBeNull()
     expect(contentEl.findByClass('fitkit-set-note-actions')).not.toBeNull()
     expect(contentEl.findByTag('textarea')?.focused).toBe(true)
+  })
+
+  it('names the modal through setTitle rather than a heading in the body', () => {
+    const modal = new SetNoteModal({} as never, {
+      title: 'Note for set 2',
+      initial: '',
+      onSave: vi.fn(),
+    })
+
+    modal.onOpen()
+
+    const { contentEl, titleEl } = modalElements(modal)
+    expect(titleEl.textContent).toBe('Note for set 2')
+    expect(contentEl.findByTag('h2')).toBeNull()
   })
 
   it('saves non-empty note text and clears the modal shell class on close', () => {

@@ -114,7 +114,7 @@ export class ExerciseRenameModal extends Modal {
     const { contentEl } = this
     contentEl.empty()
     contentEl.addClass('fitkit-import-modal')
-    contentEl.createEl('h2', { text: 'Rename exercise' })
+    this.setTitle('Rename exercise')
 
     if (this.applyWarning) {
       contentEl.createDiv({ text: this.applyWarning, cls: 'fitkit-warn' })
