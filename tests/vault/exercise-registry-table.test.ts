@@ -7,6 +7,7 @@ import {
   buildRegistryTableRows,
   filterRegistryTableRows,
 } from '../../src/vault/exercise-registry-table'
+import { buildMockVaultFolderTree } from '../fixtures/mock-vault-folder-tree'
 
 vi.mock('obsidian', () => ({
   normalizePath: (path: string) => path.replace(/\/+/g, '/'),
@@ -45,7 +46,7 @@ function mockApp(markdownFiles: MockMarkdownFile[]): App {
   const bodyByPath = new Map(markdownFiles.map((file) => [file.path, file.body ?? ''] as const))
   return {
     vault: {
-      getMarkdownFiles: () => markdownFiles as unknown as TFile[],
+      ...buildMockVaultFolderTree(markdownFiles),
       cachedRead: (file: TFile) => Promise.resolve(bodyByPath.get(file.path) ?? ''),
       read: () => Promise.reject(new Error('table rows should use cachedRead, not read')),
     },

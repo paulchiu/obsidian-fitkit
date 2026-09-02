@@ -3,7 +3,8 @@ import type { App } from 'obsidian'
 import { normalize, type ExerciseKind } from '../domain/exercise-registry'
 import { parseWorkoutNote, type WorkoutNoteModel } from '../domain/workout-note-model'
 import type { FitKitSettings } from '../settings'
-import { normalizeFolder, workoutsFolder } from '../settings-paths'
+import { workoutsFolder } from '../settings-paths'
+import { markdownFilesInFolder } from './folder-scan'
 
 export interface HistoryOnlyCandidate {
   name: string
@@ -24,11 +25,7 @@ export async function collectHistoryOnlyCandidates(
   knownKeys: ReadonlySet<string>,
   readMode: 'cached' | 'fresh' = 'cached',
 ): Promise<HistoryOnlyCandidate[]> {
-  const folder = normalizeFolder(workoutsFolder(settings))
-  const files = app.vault
-    .getMarkdownFiles()
-    .filter((file) => file.path.startsWith(`${folder}/`))
-    .sort((left, right) => left.path.localeCompare(right.path))
+  const files = markdownFilesInFolder(app, workoutsFolder(settings))
 
   const byKey = new Map<string, HistoryOnlyCandidate>()
   for (const file of files) {

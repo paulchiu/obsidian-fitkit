@@ -1,6 +1,10 @@
+import type { App } from 'obsidian'
 import { describe, expect, it } from 'vitest'
 
 import { epleyE1rm, pickBestSet, pickHeaviestSet } from '../../src/domain/epley'
+import type { FitKitSettings } from '../../src/settings'
+import { rebuildIndex } from '../../src/vault/index'
+import { buildMockVaultFolderTree } from '../fixtures/mock-vault-folder-tree'
 
 describe('index helpers', () => {
   it('calculates Epley e1RM', () => {
@@ -155,5 +159,37 @@ describe('index helpers', () => {
         { weight: 90, reps: 8 },
       ]),
     ).toEqual({ weight: 90, reps: 8 })
+  })
+})
+
+describe('rebuildIndex', () => {
+  const settings: FitKitSettings = {
+    fitnessRoot: '',
+    autoOpenWorkoutEditor: true,
+    strengthRestTimerEnabled: true,
+    autosaveDebounceMs: 600,
+    chartSessionsWindow: 30,
+    exerciseRegistry: [],
+    deletedExercises: [],
+    hiddenDashboardSectionsByPath: {},
+    schemaVersion: 1,
+  }
+
+  it('finds workout notes under a root-anchored Workouts folder when the fitness root is the vault root', async () => {
+    const path = 'Workouts/2026-01-01.md'
+    const source = ['---', 'type: workout', 'date: 2026-01-01', 'name: Push day', '---', ''].join(
+      '\n',
+    )
+    const tree = buildMockVaultFolderTree([{ path, stat: { mtime: 1000 } }])
+    const app = {
+      vault: {
+        getFolderByPath: tree.getFolderByPath,
+        read: async () => source,
+      },
+    } as unknown as App
+
+    const index = await rebuildIndex(app, settings)
+
+    expect(index.entries.map((entry) => entry.path)).toEqual([path])
   })
 })

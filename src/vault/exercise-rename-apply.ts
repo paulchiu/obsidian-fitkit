@@ -18,6 +18,7 @@ import { parseWorkoutNote } from '../domain/workout-note-model'
 import type { FitKitSettings } from '../settings'
 import { exercisesFolder, normalizeFolder, workoutsFolder } from '../settings-paths'
 import { findExerciseNoteFile, readExerciseCatalog } from './exercise-catalog'
+import { markdownFilesInFolder } from './folder-scan'
 import { isMarkdownFile } from './index'
 
 /**
@@ -394,11 +395,7 @@ async function collectWorkoutNoteTexts(
   app: App,
   settings: FitKitSettings,
 ): Promise<{ path: string; text: string }[]> {
-  const folder = normalizeFolder(workoutsFolder(settings))
-  const files = app.vault
-    .getMarkdownFiles()
-    .filter((file) => file.path.startsWith(`${folder}/`))
-    .sort((left, right) => left.path.localeCompare(right.path))
+  const files = markdownFilesInFolder(app, workoutsFolder(settings))
 
   const notes: { path: string; text: string }[] = []
   for (const file of files) {

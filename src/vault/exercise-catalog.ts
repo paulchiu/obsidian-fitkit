@@ -3,7 +3,8 @@ import type { App, CachedMetadata, TFile } from 'obsidian'
 import { normalize, type ExerciseKind } from '../domain/exercise-registry'
 import { parseWeightUnit, type WeightUnit } from '../domain/weight-unit'
 import type { FitKitSettings } from '../settings'
-import { exercisesFolder, normalizeFolder } from '../settings-paths'
+import { exercisesFolder } from '../settings-paths'
+import { markdownFilesInFolder } from './folder-scan'
 
 export interface ExerciseCatalogEntry {
   name: string
@@ -33,25 +34,19 @@ export function findExerciseNoteFile(
   settings: FitKitSettings,
   name: string,
 ): TFile | null {
-  const folder = normalizeFolder(exercisesFolder(settings))
   const key = normalize(name)
   return (
-    app.vault
-      .getMarkdownFiles()
-      .find((file) => isFileInFolder(file, folder) && normalize(file.basename) === key) ?? null
+    markdownFilesInFolder(app, exercisesFolder(settings)).find(
+      (file) => normalize(file.basename) === key,
+    ) ?? null
   )
 }
 
 export function readExerciseCatalog(app: App, settings: FitKitSettings): ExerciseCatalogSnapshot {
-  const folder = normalizeFolder(exercisesFolder(settings))
   const entries: ExerciseCatalogEntry[] = []
   const diagnostics: ExerciseCatalogDiagnostic[] = []
 
-  for (const file of app.vault.getMarkdownFiles()) {
-    if (!isFileInFolder(file, folder)) {
-      continue
-    }
-
+  for (const file of markdownFilesInFolder(app, exercisesFolder(settings))) {
     const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter
     if (!isExerciseFrontmatter(frontmatter)) {
       continue
@@ -78,10 +73,6 @@ export function readExerciseCatalog(app: App, settings: FitKitSettings): Exercis
   diagnostics.sort((left, right) => left.path.localeCompare(right.path))
 
   return { entries, diagnostics }
-}
-
-function isFileInFolder(file: TFile, folder: string): boolean {
-  return file.path.startsWith(`${folder}/`)
 }
 
 function isExerciseFrontmatter(frontmatter: CachedMetadata['frontmatter'] | undefined): boolean {

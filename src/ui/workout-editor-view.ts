@@ -49,6 +49,7 @@ import { planExerciseFileOpen } from '../vault/exercise-file-plan'
 import { exerciseHistoryFromVault } from '../vault/exercise-history-vault'
 import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
 import { FileSession } from '../vault/file-session'
+import { markdownFilesInFolder } from '../vault/folder-scan'
 import { ensureParentFolder } from '../vault/vault-utils'
 import { ConfirmModal } from './confirm-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
@@ -1673,23 +1674,17 @@ export class WorkoutEditorView extends ItemView {
 
   private async collectExerciseSuggestions(): Promise<string[]> {
     const names = new Set<string>()
-    const files = this.app.vault.getMarkdownFiles()
     const exerciseFolder = exercisesFolder(this.plugin.settings)
     const workoutFolder = workoutsFolder(this.plugin.settings)
     const registryKeys = new Set(
       this.plugin.settings.exerciseRegistry.map((entry) => normalize(entry.name)),
     )
 
-    for (const file of files) {
-      if (isInFolder(file.path, exerciseFolder)) {
-        names.add(file.basename)
-      }
+    for (const file of markdownFilesInFolder(this.app, exerciseFolder)) {
+      names.add(file.basename)
     }
 
-    for (const file of files) {
-      if (!isInFolder(file.path, workoutFolder)) {
-        continue
-      }
+    for (const file of markdownFilesInFolder(this.app, workoutFolder)) {
       try {
         const text = await this.app.vault.cachedRead(file)
         const result = parseWorkoutNote(text, file.path)
@@ -2052,10 +2047,6 @@ function toDurationEntry(entry: EditableDurationEntry): DurationEntry {
     durationEntry.note = entry.note
   }
   return durationEntry
-}
-
-function isInFolder(path: string, folder: string): boolean {
-  return path !== folder && path.startsWith(`${folder}/`)
 }
 
 function readCardIndex(card: HTMLElement): number | null {

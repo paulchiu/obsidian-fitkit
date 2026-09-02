@@ -8,6 +8,7 @@ import {
   applyExerciseRenamePlan,
   buildExerciseRenamePlanFromVault,
 } from '../../src/vault/exercise-rename-apply'
+import { buildMockVaultFolderTree } from '../fixtures/mock-vault-folder-tree'
 
 vi.mock('obsidian', () => ({
   normalizePath: (path: string) => path.replace(/\/+/g, '/'),
@@ -72,7 +73,8 @@ function buildMockApp(seeds: Seed[], options: { failRename?: boolean } = {}) {
    */
   const app = {
     vault: {
-      getMarkdownFiles: () => [...files],
+      /** Rebuilt from `files` on every call: `renameFile` and `trashFile` mutate it in place, and later calls in a test must see those mutations. */
+      getFolderByPath: (path: string) => buildMockVaultFolderTree(files).getFolderByPath(path),
       getAbstractFileByPath: (path: string) => files.find((file) => file.path === path) ?? null,
       read: async (file: MockFile) => content.get(file.path) ?? '',
       process: async (file: MockFile, callback: (live: string) => string) => {
