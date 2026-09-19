@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import { createRegistry, type ExerciseRegistry } from '../../src/domain/exercise-registry'
-import { migrateExerciseNote, setExerciseNoteKind } from '../../src/domain/exercise-note-migrate'
+import {
+  migrateExerciseNote,
+  setExerciseNoteKind,
+  setExerciseNoteLevels,
+} from '../../src/domain/exercise-note-migrate'
 import { buildNotesBlock, buildRecentSessionsBlock } from '../../src/domain/exercise-note-template'
 
 const registry = createRegistry([
@@ -1443,6 +1447,84 @@ Body.
     const source = 'Body with no frontmatter.\n'
 
     const result = setExerciseNoteKind(source, 'strength')
+
+    expect(result.changed).toBe(false)
+    expect(result.markdown).toBe(source)
+  })
+})
+
+describe('setExerciseNoteLevels', () => {
+  it('replaces an existing ladder with the edited rungs', () => {
+    const source = `---
+type: exercise
+kind: bodyweight
+levels:
+  - Wall push-up
+  - Knee push-up
+---
+
+Body.
+`
+
+    const result = setExerciseNoteLevels(source, ['Incline push-up', 'Full push-up'])
+
+    expect(result.changed).toBe(true)
+    expect(result.markdown).toBe(`---
+type: exercise
+kind: bodyweight
+levels:
+  - Incline push-up
+  - Full push-up
+---
+
+Body.
+`)
+  })
+
+  it('inserts a ladder after the kind line when the note has none', () => {
+    const source = `---
+type: exercise
+kind: bodyweight
+---
+
+Body.
+`
+
+    const result = setExerciseNoteLevels(source, ['Wall push-up'])
+
+    expect(result.changed).toBe(true)
+    expect(result.markdown).toBe(`---
+type: exercise
+kind: bodyweight
+levels:
+  - Wall push-up
+---
+
+Body.
+`)
+  })
+
+  it('leaves notes with no frontmatter block untouched', () => {
+    const source = 'Body with no frontmatter.\n'
+
+    const result = setExerciseNoteLevels(source, ['Wall push-up'])
+
+    expect(result.changed).toBe(false)
+    expect(result.markdown).toBe(source)
+  })
+
+  it('is a no-op when the ladder already matches', () => {
+    const source = `---
+type: exercise
+kind: bodyweight
+levels:
+  - Wall push-up
+---
+
+Body.
+`
+
+    const result = setExerciseNoteLevels(source, ['Wall push-up'])
 
     expect(result.changed).toBe(false)
     expect(result.markdown).toBe(source)

@@ -2,7 +2,7 @@ import type { App, TFile } from 'obsidian'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { FitKitSettings } from '../../src/settings'
-import { readExerciseCatalog } from '../../src/vault/exercise-catalog'
+import { findExerciseNotePath, readExerciseCatalog } from '../../src/vault/exercise-catalog'
 import { buildMockVaultFolderTree } from '../fixtures/mock-vault-folder-tree'
 
 vi.mock('obsidian', () => ({
@@ -316,5 +316,31 @@ describe('exercise catalog', () => {
     ])
     expect(snapshot.entries[0]?.levels).toBeUndefined()
     expect(snapshot.diagnostics).toEqual([])
+  })
+})
+
+describe('findExerciseNotePath', () => {
+  it('returns the catalog path when an exercise note exists', () => {
+    const app = mockApp([
+      {
+        path: 'Fitness/Exercises/Push-up.md',
+        basename: 'Push-up',
+        frontmatter: { type: 'exercise', kind: 'bodyweight' },
+      },
+    ])
+
+    expect(findExerciseNotePath(app, settings(), 'Push-up')).toBe('Fitness/Exercises/Push-up.md')
+  })
+
+  it('returns null when no exercise note exists', () => {
+    const app = mockApp([
+      {
+        path: 'Fitness/Exercises/Squat.md',
+        basename: 'Squat',
+        frontmatter: { type: 'exercise', kind: 'strength' },
+      },
+    ])
+
+    expect(findExerciseNotePath(app, settings(), 'Push-up')).toBeNull()
   })
 })

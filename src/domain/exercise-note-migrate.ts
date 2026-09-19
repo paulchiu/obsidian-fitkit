@@ -117,6 +117,76 @@ export interface ExerciseNoteKindUpdateResult {
   changed: boolean
 }
 
+export interface ExerciseNoteLevelsUpdateResult {
+  markdown: string
+  changed: boolean
+}
+
+/**
+ * Rewrites the `levels:` ladder in an exercise note's frontmatter, inserting
+ * a block list after `kind:` when the note has none. The writer only emits
+ * block form; a one-line flow list is replaced rather than extended.
+ */
+export function setExerciseNoteLevels(
+  source: string,
+  levels: readonly string[],
+): ExerciseNoteLevelsUpdateResult {
+  const normalizedSource = normalizeMarkdownSource(source)
+  const bounds = findFrontmatterBounds(normalizedSource.markdown)
+  if (bounds.status !== 'found') {
+    return { markdown: source, changed: false }
+  }
+  const lines = normalizedSource.markdown.split('\n')
+  const frontmatterLines = lines.slice(bounds.start + 1, bounds.end)
+  const replacement = ['levels:', ...levels.map((rung) => `  - ${rung}`)]
+  const levelsLineIndex = findFrontmatterKeyLine(frontmatterLines, 'levels')
+  const nextFrontmatterLines =
+    levelsLineIndex < 0
+      ? insertLines(frontmatterLines, levelsInsertIndex(frontmatterLines), replacement)
+      : [
+          ...frontmatterLines.slice(0, levelsLineIndex),
+          ...replacement,
+          ...frontmatterLines.slice(
+            levelsLineIndex + 1 + countListItemLines(frontmatterLines, levelsLineIndex + 1),
+          ),
+        ]
+  const markdown = [
+    ...lines.slice(0, bounds.start + 1),
+    ...nextFrontmatterLines,
+    ...lines.slice(bounds.end),
+  ].join('\n')
+  const restored = restoreMarkdownSource(markdown, normalizedSource)
+  if (restored === source) {
+    return { markdown: source, changed: false }
+  }
+  return { markdown: restored, changed: true }
+}
+
+/** Insertion point for a new ladder: after `kind:`, else after `type:`, else last. */
+function levelsInsertIndex(lines: ReadonlyArray<string>): number {
+  const kindIndex = findFrontmatterKeyLine(lines, 'kind')
+  if (kindIndex >= 0) {
+    return kindIndex + 1
+  }
+  const typeIndex = findFrontmatterKeyLine(lines, 'type')
+  if (typeIndex >= 0) {
+    return typeIndex + 1
+  }
+  return lines.length
+}
+
+/** Contiguous block-sequence items (`  - rung`) from `start`, for ladder replacement. */
+function countListItemLines(lines: ReadonlyArray<string>, start: number): number {
+  let count = 0
+  for (let index = start; index < lines.length; index += 1) {
+    if (!/^\s+-\s/.test(lines[index] ?? '')) {
+      break
+    }
+    count += 1
+  }
+  return count
+}
+
 /**
  * Writes `kind:` directly into an exercise note's frontmatter, without the
  * rest of migrateExerciseNote's repair pass. Used when the user explicitly

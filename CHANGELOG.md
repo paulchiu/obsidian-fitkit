@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Reading view and history badges now show bodyweight rung names instead of bare level numbers, with a `Level N` fallback when no ladder names the rung. The bodyweight personal best is the highest rung reached, ties broken by reps then load, and `[next::]` plans work over the ladder (`Same level` holds, steps count rungs and clamp to the ladder ends).
 - The workout editor now renders bodyweight exercises as a full card: a level stepper and rung menu per row, reps and optional load inputs, a load column that appears only while a row carries load, and an add-set action that copies the previous rung and focuses reps. A rung name shortens to its compact form only when the name itself overruns its cell.
 - Next-time plans on bodyweight exercises now read as counts of rungs wherever they appear: the reading view, the dashboard, and the plan step prompt, which asks for a rung change instead of a weight change.
+- A bodyweight card menu can now edit its ladder (one rung per line), writing to the exercise note when one exists and to the registry otherwise. An edit that changes what an already-logged level means lists each affected level with its old and new rung and applies only on confirmation, and switching an exercise to bodyweight seeds a one-rung ladder and offers to mark its already-logged sets as level 1.
 
 ### Changed
 

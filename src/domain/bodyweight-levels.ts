@@ -29,6 +29,50 @@ export function formatBodyweightLevelShort(level: number): string {
   return `L${level}`
 }
 
+/** A logged position whose rung name an edit would change, with both meanings. */
+export interface BodyweightLadderChange {
+  level: number
+  from: string
+  to: string
+}
+
+/**
+ * Occupied positions whose rung name differs between ladders, in level
+ * order. Appending rungs changes nothing logged and reports nothing; only
+ * levels some logged set occupies can appear.
+ */
+export function describeBodyweightLadderChanges(
+  oldLevels: readonly string[],
+  newLevels: readonly string[],
+  occupiedLevels: readonly number[],
+): BodyweightLadderChange[] {
+  const seen = new Set<number>()
+  const changes: BodyweightLadderChange[] = []
+  for (const level of [...occupiedLevels].sort((left, right) => left - right)) {
+    if (!Number.isInteger(level) || level < 1 || seen.has(level)) {
+      continue
+    }
+    seen.add(level)
+    const from = bodyweightLevelName(oldLevels, level)
+    const to = bodyweightLevelName(newLevels, level)
+    if (from !== to) {
+      changes.push({ level, from, to })
+    }
+  }
+  return changes
+}
+
+/**
+ * Rung names from a one-per-line edit box. Blank lines carry no rung, so
+ * they drop out; an all-blank box parses to empty, which the caller refuses.
+ */
+export function parseBodyweightLadderText(raw: string): string[] {
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+}
+
 /**
  * Pick the best bodyweight set: highest level wins outright, then reps,
  * then load. Sets without a usable level are ignored. Returns null when

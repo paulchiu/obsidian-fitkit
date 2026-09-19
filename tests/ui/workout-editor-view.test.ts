@@ -3,6 +3,7 @@ import { EXERCISE_KINDS } from '../../src/domain/exercise-kind'
 import type { ExerciseRegistryEntry } from '../../src/domain/exercise-registry'
 import type {
   DurationExerciseEntry,
+  ExerciseEntry,
   StrengthExerciseEntry,
 } from '../../src/domain/workout-note-model'
 
@@ -1677,6 +1678,357 @@ describe('WorkoutEditorView kind switch persistence', () => {
       'Could not update the exercise note for Squat; its frontmatter was left unchanged.',
     ])
   })
+  interface PersistLadderView extends PersistKindChangeView {
+    render: ReturnType<typeof vi.fn>
+    persistLadder(name: string, levels: string[]): Promise<void>
+  }
+
+  describe('WorkoutEditorView ladder persistence', () => {
+    const createPersistLadderView = (
+      markdownFiles: PersistKindChangeMarkdownFile[],
+      exerciseRegistry: ExerciseRegistryEntry[] = [],
+    ): { view: PersistLadderView; contents: Map<string, string> } => {
+      const { view, contents } = createPersistKindChangeView(markdownFiles, exerciseRegistry)
+      const ladderView = view as unknown as PersistLadderView
+      ladderView.render = vi.fn()
+      return { view: ladderView, contents }
+    }
+
+    beforeEach(() => {
+      obsidianMock.notices = []
+    })
+
+    afterEach(() => {
+      obsidianMock.menus = []
+      vi.unstubAllGlobals()
+    })
+
+    it('writes the edited ladder into the exercise note and leaves the registry untouched', async () => {
+      const { view, contents } = createPersistLadderView([
+        {
+          path: 'Fitness/Exercises/Push-up.md',
+          basename: 'Push-up',
+          frontmatter: { type: 'exercise', kind: 'bodyweight' },
+        },
+      ])
+      contents.set(
+        'Fitness/Exercises/Push-up.md',
+        '---\ntype: exercise\nkind: bodyweight\nlevels:\n  - Wall push-up\n---\n',
+      )
+
+      await view.persistLadder('Push-up', ['Incline push-up', 'Knee push-up'])
+
+      expect(contents.get('Fitness/Exercises/Push-up.md')).toContain('  - Incline push-up\n')
+      expect(contents.get('Fitness/Exercises/Push-up.md')).toContain('  - Knee push-up\n')
+      expect(contents.get('Fitness/Exercises/Push-up.md')).not.toContain('Wall push-up')
+      expect(view.plugin.settings.exerciseRegistry).toEqual([])
+      expect(view.plugin.saveSettings).not.toHaveBeenCalled()
+      expect(obsidianMock.notices).toEqual(['Exercise note now records levels for Push-up.'])
+    })
+
+    it('writes the ladder to the registry when no exercise note exists', async () => {
+      const { view } = createPersistLadderView([])
+
+      await view.persistLadder('Push-up', ['Wall push-up', 'Knee push-up'])
+
+      expect(view.app.vault.process).not.toHaveBeenCalled()
+      expect(view.plugin.settings.exerciseRegistry).toMatchObject([
+        { name: 'Push-up', kind: 'bodyweight', levels: ['Wall push-up', 'Knee push-up'] },
+      ])
+      expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
+      expect(obsidianMock.notices).toEqual(['Registry now records levels for Push-up.'])
+      expect(view.render).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  interface LadderGateCard {
+    name: string
+    kind: 'bodyweight'
+    strengthSets: unknown[]
+    durationEntries: unknown[]
+    bodyweightSets: { level?: number }[]
+  }
+
+  interface LadderGateView extends PersistLadderView {
+    confirmLadderChanges: (name: string, changes: unknown[]) => Promise<boolean>
+    confirmLadderEdit(ex: LadderGateCard, levels: string[]): Promise<void>
+  }
+
+  describe('WorkoutEditorView ladder history warning', () => {
+    const ladderEntry = (levels: string[]): ExerciseRegistryEntry => ({
+      name: 'Push-up',
+      kind: 'bodyweight',
+      levels: [...levels],
+      aliases: [],
+    })
+    const cardWithLevels = (levels: (number | undefined)[]): LadderGateCard => ({
+      name: 'Push-up',
+      kind: 'bodyweight',
+      strengthSets: [],
+      durationEntries: [],
+      bodyweightSets: levels.map((level) => ({ level })),
+    })
+    const createGateView = (
+      markdownFiles: PersistKindChangeMarkdownFile[],
+      registryLevels: string[],
+      confirmed: boolean,
+    ): { view: LadderGateView; confirm: ReturnType<typeof vi.fn> } => {
+      const { view } = createPersistKindChangeView(
+        markdownFiles,
+        registryLevels.length > 0 ? [ladderEntry(registryLevels)] : [],
+      )
+      const gateView = view as unknown as LadderGateView
+      gateView.render = vi.fn()
+      const confirm = vi.fn(async () => confirmed)
+      gateView.confirmLadderChanges = confirm
+      registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue(
+        registryLevels.length > 0 ? [ladderEntry(registryLevels)] : [],
+      )
+      return { view: gateView, confirm }
+    }
+
+    beforeEach(() => {
+      obsidianMock.notices = []
+    })
+
+    afterEach(() => {
+      obsidianMock.menus = []
+      vi.unstubAllGlobals()
+    })
+
+    it('applies an appended rung without prompting', async () => {
+      const { view, confirm } = createGateView([], ['Wall push-up', 'Knee push-up'], true)
+
+      await view.confirmLadderEdit(cardWithLevels([1, 2]), [
+        'Wall push-up',
+        'Knee push-up',
+        'Full push-up',
+      ])
+
+      expect(confirm).not.toHaveBeenCalled()
+      expect(view.plugin.settings.exerciseRegistry).toMatchObject([
+        { name: 'Push-up', levels: ['Wall push-up', 'Knee push-up', 'Full push-up'] },
+      ])
+      expect(obsidianMock.notices).toEqual(['Registry now records levels for Push-up.'])
+    })
+
+    it('applies a renamed occupied rung on confirm', async () => {
+      const { view, confirm } = createGateView([], ['Wall push-up', 'Knee push-up'], true)
+
+      await view.confirmLadderEdit(cardWithLevels([2]), ['Wall push-up', 'Full push-up'])
+
+      expect(confirm).toHaveBeenCalledTimes(1)
+      expect(view.plugin.settings.exerciseRegistry).toMatchObject([
+        { name: 'Push-up', levels: ['Wall push-up', 'Full push-up'] },
+      ])
+      expect(obsidianMock.notices).toEqual(['Registry now records levels for Push-up.'])
+    })
+
+    it('leaves the ladder untouched when the warning is declined', async () => {
+      const { view, confirm } = createGateView([], ['Wall push-up', 'Knee push-up'], false)
+
+      await view.confirmLadderEdit(cardWithLevels([2]), ['Wall push-up', 'Full push-up'])
+
+      expect(confirm).toHaveBeenCalledTimes(1)
+      expect(view.plugin.settings.exerciseRegistry).toMatchObject([
+        { name: 'Push-up', levels: ['Wall push-up', 'Knee push-up'] },
+      ])
+      expect(view.plugin.saveSettings).not.toHaveBeenCalled()
+      expect(view.app.vault.process).not.toHaveBeenCalled()
+      expect(obsidianMock.notices).toEqual([])
+    })
+
+    it('treats levels logged in saved workout notes as occupied', async () => {
+      const workoutText = [
+        '---',
+        'type: workout',
+        'date: 2026-09-01',
+        'name: Bodyweight day',
+        '---',
+        '',
+        '## [[Push-up]]',
+        '',
+        '- [exercise:: [[Push-up]]] [level:: 2] [reps:: 8]',
+        '',
+      ].join('\n')
+      const { view, confirm } = createGateView(
+        [{ path: 'Fitness/Workouts/2026-09-01.md', basename: '2026-09-01' }],
+        ['Wall push-up', 'Knee push-up'],
+        true,
+      )
+      Object.assign(view.app.vault, { cachedRead: vi.fn(async () => workoutText) })
+
+      await view.confirmLadderEdit(cardWithLevels([]), ['Wall push-up', 'Full push-up'])
+
+      expect(confirm).toHaveBeenCalledTimes(1)
+      expect(view.plugin.settings.exerciseRegistry).toMatchObject([
+        { name: 'Push-up', levels: ['Wall push-up', 'Full push-up'] },
+      ])
+    })
+  })
+
+  interface RelabelView extends PersistLadderView {
+    model: { exercises: LadderGateCard[] }
+    markDirty: ReturnType<typeof vi.fn>
+    confirmFirstLevelRelabel: (message: string) => Promise<boolean>
+    seedBodyweightLadder(ex: LadderGateCard): Promise<void>
+    offerFirstLevelRelabel(index: number, previous: ExerciseEntry): Promise<void>
+  }
+
+  describe('WorkoutEditorView switch to bodyweight', () => {
+    const bodyweightCard = (): LadderGateCard => ({
+      name: 'Push-up',
+      kind: 'bodyweight',
+      strengthSets: [],
+      durationEntries: [],
+      bodyweightSets: [{}],
+    })
+    const previousStrength = (): StrengthExerciseEntry => ({
+      exerciseName: 'Push-up',
+      kind: 'strength',
+      strengthSets: [
+        { set: 1, weight: 10, reps: 8 },
+        { set: 2, weight: 10, reps: 6 },
+        { set: 3, reps: 5 },
+      ],
+    })
+    const createRelabelView = (
+      registryEntries: ExerciseRegistryEntry[],
+      confirmed: boolean,
+    ): { view: RelabelView; confirm: ReturnType<typeof vi.fn> } => {
+      const { view } = createPersistKindChangeView([], [])
+      const relabelView = view as unknown as RelabelView
+      relabelView.render = vi.fn()
+      relabelView.markDirty = vi.fn()
+      relabelView.model = { exercises: [bodyweightCard()] }
+      const confirm = vi.fn(async () => confirmed)
+      relabelView.confirmFirstLevelRelabel = confirm
+      registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue(registryEntries)
+      return { view: relabelView, confirm }
+    }
+
+    beforeEach(() => {
+      obsidianMock.notices = []
+    })
+
+    afterEach(() => {
+      obsidianMock.menus = []
+      vi.unstubAllGlobals()
+    })
+
+    it('seeds a single rung named after the exercise when no ladder exists', async () => {
+      const { view } = createRelabelView([], true)
+
+      await view.seedBodyweightLadder(view.model.exercises[0] as LadderGateCard)
+
+      expect(view.plugin.settings.exerciseRegistry).toMatchObject([
+        { name: 'Push-up', kind: 'bodyweight', levels: ['Push-up'] },
+      ])
+      expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
+    })
+
+    it('leaves an existing ladder alone when seeding', async () => {
+      const { view } = createRelabelView(
+        [{ name: 'Push-up', kind: 'bodyweight', levels: ['Wall push-up'], aliases: [] }],
+        true,
+      )
+
+      await view.seedBodyweightLadder(view.model.exercises[0] as LadderGateCard)
+
+      expect(view.plugin.settings.exerciseRegistry).toEqual([])
+      expect(view.plugin.saveSettings).not.toHaveBeenCalled()
+      expect(view.app.vault.process).not.toHaveBeenCalled()
+    })
+
+    it('states the real set count and marks rows as level 1 on confirm', async () => {
+      const { view, confirm } = createRelabelView([], true)
+
+      await view.offerFirstLevelRelabel(0, previousStrength())
+
+      expect(confirm).toHaveBeenCalledTimes(1)
+      expect(confirm.mock.calls[0]?.[0]).toContain('3 already-logged sets')
+      expect(view.model.exercises[0]?.bodyweightSets).toEqual([
+        { level: 1, set: 1, reps: 8, load: 10 },
+        { level: 1, set: 2, reps: 6, load: 10 },
+        { level: 1, set: 3, reps: 5 },
+      ])
+      expect(view.markDirty).toHaveBeenCalled()
+    })
+
+    it('leaves the cleared card untouched when declined', async () => {
+      const { view, confirm } = createRelabelView([], false)
+
+      await view.offerFirstLevelRelabel(0, previousStrength())
+
+      expect(confirm).toHaveBeenCalledTimes(1)
+      expect(view.model.exercises[0]?.bodyweightSets).toEqual([{}])
+      expect(view.markDirty).not.toHaveBeenCalled()
+    })
+
+    it('stays silent when there is nothing to mark', async () => {
+      const { view, confirm } = createRelabelView([], true)
+
+      await view.offerFirstLevelRelabel(0, {
+        exerciseName: 'Push-up',
+        kind: 'strength',
+        strengthSets: [],
+      })
+
+      expect(confirm).not.toHaveBeenCalled()
+      expect(view.model.exercises[0]?.bodyweightSets).toEqual([{}])
+    })
+
+    it('switches end to end: clears rows, seeds a ladder, then offers the real count', async () => {
+      const { view } = createPersistKindChangeView([], [])
+      const switchView = view as unknown as RelabelView & {
+        model: {
+          exercises: {
+            name: string
+            kind: 'strength' | 'bodyweight'
+            strengthSets: { set?: number; weight?: number; reps?: number }[]
+            durationEntries: { set?: number; durationSeconds?: number }[]
+            bodyweightSets: { set?: number; level?: number; reps?: number; load?: number }[]
+          }[]
+        }
+        chooseKindSwitch: () => Promise<string>
+        switchKind: (index: number, nextKind: 'bodyweight') => Promise<void>
+      }
+      switchView.render = vi.fn()
+      switchView.markDirty = vi.fn()
+      switchView.model = {
+        exercises: [
+          {
+            name: 'Push-up',
+            kind: 'strength',
+            strengthSets: [
+              { set: 1, weight: 10, reps: 8 },
+              { set: 2, reps: 5 },
+            ],
+            durationEntries: [],
+            bodyweightSets: [],
+          },
+        ],
+      }
+      switchView.chooseKindSwitch = async () => 'workout-and-registry'
+      const confirm = vi.fn(async () => true)
+      switchView.confirmFirstLevelRelabel = confirm
+      registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([])
+
+      await switchView.switchKind(0, 'bodyweight')
+
+      const card = switchView.model.exercises[0]
+      expect(card?.kind).toBe('bodyweight')
+      expect(card?.bodyweightSets).toEqual([
+        { level: 1, set: 1, reps: 8, load: 10 },
+        { level: 1, set: 2, reps: 5 },
+      ])
+      expect(confirm).toHaveBeenCalledTimes(1)
+      expect(confirm.mock.calls[0]?.[0]).toContain('2 already-logged sets')
+      expect(view.plugin.settings.exerciseRegistry).toMatchObject([
+        { name: 'Push-up', kind: 'bodyweight', levels: ['Push-up'] },
+      ])
+    })
+  })
 })
 
 interface TimerExerciseCard {
@@ -3005,5 +3357,43 @@ describe('WorkoutEditorView editor round-trip', () => {
     }
 
     expect(toWorkoutExercise(toEditorExercise(entry))).toEqual(entry)
+  })
+})
+
+describe('WorkoutEditorView edit levels menu', () => {
+  afterEach(() => {
+    obsidianMock.menus = []
+    vi.unstubAllGlobals()
+  })
+
+  const titlesFor = (kind: 'strength' | 'bodyweight'): Array<string | undefined> => {
+    vi.stubGlobal('HTMLElement', TestElement)
+    const view = createCardMenuView()
+    view.model = {
+      exercises: [
+        {
+          name: 'Push-up',
+          kind,
+          strengthSets: [],
+          durationEntries: [],
+          bodyweightSets: [],
+        },
+      ],
+    }
+    view.openCardMenu({ currentTarget: new TestElement('button') } as unknown as MouseEvent, 0)
+    return (obsidianMock.menus[obsidianMock.menus.length - 1]?.items ?? []).map(
+      (item) => item.title,
+    )
+  }
+
+  it('offers Edit levels on a bodyweight card, after the exercise note item', () => {
+    const titles = titlesFor('bodyweight')
+
+    expect(titles).toContain('Edit levels')
+    expect(titles.indexOf('Edit levels')).toBe(titles.indexOf('Add exercise note') + 1)
+  })
+
+  it('offers no Edit levels item on a strength card', () => {
+    expect(titlesFor('strength')).not.toContain('Edit levels')
   })
 })

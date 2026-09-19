@@ -3,6 +3,14 @@ import { buildNotesBlock, buildRecentSessionsBlock } from '../domain/exercise-no
 import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
 
 /**
+ * Usable starting ladder for a bodyweight exercise with no rungs yet: one
+ * rung named after the exercise, so the level menu is never empty.
+ */
+export function defaultBodyweightLevels(exerciseName: string): string[] {
+  return [exerciseName]
+}
+
+/**
  * Pure: build the seeded markdown body for a freshly-created exercise note.
  *
  * The Recent sessions Dataview block must stay byte-aligned with `dataviewQuery`
@@ -16,7 +24,7 @@ export function composeExerciseNote(
   kind: ExerciseKind,
   workoutsFolderPath: string,
   unit: WeightUnit = DEFAULT_WEIGHT_UNIT,
-  levels: string[] = [exerciseName],
+  levels: string[] = defaultBodyweightLevels(exerciseName),
 ): string {
   const lines: string[] = []
   lines.push('---')

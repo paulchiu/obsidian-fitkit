@@ -28,6 +28,25 @@ export interface ExerciseCatalogSnapshot {
 }
 
 /**
+ * Path of the exercise note that owns `name`, or null when no note exists.
+ * A catalog hit wins; the folder scan only covers notes whose frontmatter
+ * never reached the cache.
+ */
+export function findExerciseNotePath(
+  app: App,
+  settings: FitKitSettings,
+  name: string,
+): string | null {
+  const key = normalize(name)
+  const catalog = readExerciseCatalog(app, settings)
+  const catalogPath = catalog.entries.find((entry) => normalize(entry.name) === key)?.path
+  if (catalogPath !== undefined) {
+    return catalogPath
+  }
+  return findExerciseNoteFile(app, settings, name)?.path ?? null
+}
+
+/**
  * Bypasses the catalog because malformed frontmatter is absent from Obsidian's
  * metadata cache and therefore from `readExerciseCatalog`. Resolving by folder
  * and basename lets callers distinguish an unreadable note from no note.

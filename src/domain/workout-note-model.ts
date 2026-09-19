@@ -81,6 +81,62 @@ export interface BodyweightExerciseEntry extends ExerciseEntryBase {
 
 export type ExerciseEntry = StrengthExerciseEntry | DurationExerciseEntry | BodyweightExerciseEntry
 
+/**
+ * Rows a switch to bodyweight could mark as the first level: every logged
+ * strength or duration row. Bodyweight rows already name a rung, so a
+ * bodyweight entry offers nothing.
+ */
+export function countFirstLevelRelabelSets(entry: ExerciseEntry): number {
+  switch (entry.kind) {
+    case 'strength':
+      return entry.strengthSets.length
+    case 'duration':
+      return entry.durationEntries.length
+    case 'bodyweight':
+      return 0
+  }
+}
+
+/**
+ * Mark an entry's logged rows as the first rung. Reps and notes carry over,
+ * and a logged weight carries as load (added weight is the only weight a
+ * bodyweight row can hold); a duration has no rep count to keep.
+ */
+export function relabelSetsAsFirstLevel(entry: ExerciseEntry): BodyweightSet[] {
+  switch (entry.kind) {
+    case 'strength':
+      return entry.strengthSets.map((set) => {
+        const marked: BodyweightSet = { level: 1 }
+        if (set.set !== undefined) {
+          marked.set = set.set
+        }
+        if (set.reps !== undefined) {
+          marked.reps = set.reps
+        }
+        if (set.weight !== undefined) {
+          marked.load = set.weight
+        }
+        if (set.note !== undefined) {
+          marked.note = set.note
+        }
+        return marked
+      })
+    case 'duration':
+      return entry.durationEntries.map((row) => {
+        const marked: BodyweightSet = { level: 1 }
+        if (row.set !== undefined) {
+          marked.set = row.set
+        }
+        if (row.note !== undefined) {
+          marked.note = row.note
+        }
+        return marked
+      })
+    case 'bodyweight':
+      return entry.bodyweightSets.map((set) => ({ ...set }))
+  }
+}
+
 export function withNoteAndNext<T extends ExerciseEntry>(
   entry: T,
   note: string | undefined,

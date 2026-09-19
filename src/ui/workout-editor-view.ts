@@ -3,9 +3,11 @@ import { ItemView, Menu, Modal, Notice, TFile, normalizePath, setIcon } from 'ob
 
 import { reorderArray } from '../domain/array-utils'
 import {
+  describeBodyweightLadderChanges,
   formatBodyweightLevelLabel,
   formatBodyweightLevelShort,
   pickBestBodyweightSet,
+  type BodyweightLadderChange,
 } from '../domain/bodyweight-levels'
 import {
   formatDurationInput,
@@ -29,8 +31,11 @@ import {
   upsertEntry,
   type ExerciseRegistryEntry,
 } from '../domain/exercise-registry'
-import type { ExerciseNoteKindUpdateResult } from '../domain/exercise-note-migrate'
-import { setExerciseNoteKind } from '../domain/exercise-note-migrate'
+import type {
+  ExerciseNoteKindUpdateResult,
+  ExerciseNoteLevelsUpdateResult,
+} from '../domain/exercise-note-migrate'
+import { setExerciseNoteKind, setExerciseNoteLevels } from '../domain/exercise-note-migrate'
 import { filterSuggestableNames } from '../domain/exercise-suggestions'
 import {
   formatNumber as formatPlanNumber,
@@ -39,7 +44,9 @@ import {
   type NextPlanDirection,
 } from '../domain/next-plan'
 import {
+  countFirstLevelRelabelSets,
   parseWorkoutNote,
+  relabelSetsAsFirstLevel,
   serializeWorkoutNote,
   withNoteAndNext,
   type BodyweightExerciseEntry,
@@ -55,8 +62,8 @@ import {
 } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
 import { exercisesFolder, workoutsFolder } from '../settings-paths'
-import { findExerciseNoteFile, readExerciseCatalog } from '../vault/exercise-catalog'
-import { composeExerciseNote } from '../vault/exercise-note'
+import { findExerciseNotePath } from '../vault/exercise-catalog'
+import { composeExerciseNote, defaultBodyweightLevels } from '../vault/exercise-note'
 import { planExerciseFileOpen } from '../vault/exercise-file-plan'
 import { exerciseHistoryFromVault } from '../vault/exercise-history-vault'
 import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
@@ -64,6 +71,7 @@ import { FileSession } from '../vault/file-session'
 import { markdownFilesInFolder } from '../vault/folder-scan'
 import { ensureParentFolder } from '../vault/vault-utils'
 import { ConfirmModal } from './confirm-modal'
+import { EditLevelsModal } from './edit-levels-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
 import { KindSwitchChoiceModal, type KindSwitchChoice } from './kind-switch-choice-modal'
 import { SetNoteModal } from './set-note-modal'
@@ -980,6 +988,125 @@ export class WorkoutEditorView extends ItemView {
     }).open()
   }
 
+  private openEditLevelsModal(ex: ExerciseCard): void {
+    new EditLevelsModal(this.app, {
+      exerciseName: ex.name,
+      initial: this.levelsFor(ex.name) ?? defaultBodyweightLevels(ex.name),
+      onSave: (levels) => {
+        void this.confirmLadderEdit(ex, levels)
+      },
+    }).open()
+  }
+
+  /**
+   * Applies an edited ladder behind the history warning: occupied positions
+   * whose meaning would change are reported first, and the edit only
+   * proceeds on confirmation. Logged sets keep their numbers throughout.
+   */
+  private async confirmLadderEdit(ex: ExerciseCard, levels: string[]): Promise<void> {
+    const previous = this.levelsFor(ex.name) ?? []
+    const changes = describeBodyweightLadderChanges(previous, levels, [
+      ...(await this.occupiedBodyweightLevels(ex)),
+    ])
+    if (changes.length > 0) {
+      const confirmed = await this.confirmLadderChanges(ex.name, changes)
+      if (!confirmed) {
+        return
+      }
+    }
+    await this.persistLadder(ex.name, levels)
+  }
+
+  private confirmLadderChanges(name: string, changes: BodyweightLadderChange[]): Promise<boolean> {
+    const lines = changes.map(
+      (change) =>
+        `Level ${change.level} currently means '${change.from}' and would come to mean '${change.to}'.`,
+    )
+    return new Promise((resolve) => {
+      new ConfirmModal(
+        this.app,
+        {
+          title: `Change what logged levels mean for ${name}?`,
+          message: `This edit changes what some already-logged levels mean. ${lines.join(' ')} Logged sets keep their numbers.`,
+          confirmText: 'Apply edit',
+          cancelText: 'Cancel',
+        },
+        resolve,
+      ).open()
+    })
+  }
+
+  /**
+   * Levels with logged sets for an exercise: the card's rows plus every rung
+   * recorded for it across saved workout notes. Unreadable notes are
+   * skipped; the warning must never block on them.
+   */
+  private async occupiedBodyweightLevels(ex: ExerciseCard): Promise<Set<number>> {
+    const occupied = new Set<number>()
+    for (const set of ex.bodyweightSets) {
+      if (set.level !== undefined) {
+        occupied.add(set.level)
+      }
+    }
+    const key = normalize(ex.name)
+    for (const file of markdownFilesInFolder(this.app, workoutsFolder(this.plugin.settings))) {
+      let text: string
+      try {
+        text = await this.app.vault.cachedRead(file)
+      } catch {
+        continue
+      }
+      const parsed = parseWorkoutNote(text, file.path)
+      if (!parsed.isWorkout || !parsed.model) {
+        continue
+      }
+      for (const entry of parsed.model.exercises) {
+        if (entry.kind !== 'bodyweight' || normalize(entry.exerciseName) !== key) {
+          continue
+        }
+        for (const set of entry.bodyweightSets) {
+          occupied.add(set.level)
+        }
+      }
+    }
+    return occupied
+  }
+
+  /**
+   * Writes an edited ladder to whichever store wins on read: the exercise
+   * note when one exists, else the registry entry (created when missing).
+   */
+  private async persistLadder(name: string, levels: string[]): Promise<void> {
+    const trimmed = name.trim()
+    if (!trimmed) {
+      return
+    }
+    const notePath = findExerciseNotePath(this.app, this.plugin.settings, trimmed)
+    const noteFile = notePath ? this.app.vault.getAbstractFileByPath(notePath) : null
+    if (noteFile instanceof TFile) {
+      let result: ExerciseNoteLevelsUpdateResult | undefined
+      await this.app.vault.process(noteFile, (text) => {
+        result = setExerciseNoteLevels(text, levels)
+        return result.markdown
+      })
+      if (result?.changed) {
+        new Notice(`Exercise note now records levels for ${trimmed}.`)
+      }
+      return
+    }
+    const settings = this.plugin.settings
+    const current = createRegistry(settings.exerciseRegistry)
+    const key = normalize(trimmed)
+    const existing = current.entries.find((entry) => normalize(entry.name) === key)
+    const nextEntry: ExerciseRegistryEntry = existing
+      ? { ...existing, aliases: [...existing.aliases], levels: [...levels] }
+      : { name: trimmed, kind: 'bodyweight', aliases: [], levels: [...levels] }
+    settings.exerciseRegistry = upsertEntry(current, nextEntry).entries
+    await this.plugin.saveSettings()
+    new Notice(`Registry now records levels for ${trimmed}.`)
+    this.render()
+  }
+
   private renderRowActions(
     container: HTMLElement,
     body: HTMLElement,
@@ -1224,10 +1351,72 @@ export class WorkoutEditorView extends ItemView {
     if (choice === 'cancel') {
       return
     }
+    /** Captured before the switch clears the card; the relabel offer below marks these as level 1. */
+    const relabelSource = nextKind === 'bodyweight' ? toWorkoutExercise(ex) : null
     this.applyKindSwitch(index, nextKind, hadRows)
     if (choice === 'workout-and-registry') {
       await this.persistKindChange(ex.name, nextKind)
     }
+    if (nextKind === 'bodyweight' && relabelSource) {
+      await this.seedBodyweightLadder(ex)
+      await this.offerFirstLevelRelabel(index, relabelSource)
+    }
+  }
+
+  /**
+   * Seeds a fresh bodyweight card's ladder with one rung named after the
+   * exercise, the same default a new bodyweight note carries, so the level
+   * menu is usable immediately. An existing ladder is left alone.
+   */
+  private async seedBodyweightLadder(ex: ExerciseCard): Promise<void> {
+    if ((this.levelsFor(ex.name) ?? []).length > 0) {
+      return
+    }
+    await this.persistLadder(ex.name, defaultBodyweightLevels(ex.name))
+  }
+
+  /**
+   * Offers to mark the rows cleared by a switch to bodyweight as the first
+   * rung. The count comes from the pre-switch entry, so the prompt states
+   * the real number; declining keeps the cleared card as the switch left it.
+   */
+  private async offerFirstLevelRelabel(index: number, previous: ExerciseEntry): Promise<void> {
+    if (!this.model) {
+      return
+    }
+    const count = countFirstLevelRelabelSets(previous)
+    if (count === 0) {
+      return
+    }
+    const ex = this.model.exercises[index]
+    if (!ex || ex.kind !== 'bodyweight') {
+      return
+    }
+    const sets = count === 1 ? '1 already-logged set' : `${count} already-logged sets`
+    const confirmed = await this.confirmFirstLevelRelabel(
+      `${ex.name} has ${sets} in this workout. Mark them as level 1 of the new ladder? Strength weights carry as load, and declining keeps the cleared card.`,
+    )
+    if (!confirmed) {
+      return
+    }
+    ex.bodyweightSets = relabelSetsAsFirstLevel(previous)
+    this.markDirty()
+    this.render()
+  }
+
+  private confirmFirstLevelRelabel(message: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      new ConfirmModal(
+        this.app,
+        {
+          title: 'Mark logged sets as level 1?',
+          message,
+          confirmText: 'Mark as level 1',
+          cancelText: 'Cancel',
+        },
+        resolve,
+      ).open()
+    })
   }
 
   /**
@@ -1241,11 +1430,7 @@ export class WorkoutEditorView extends ItemView {
     if (!trimmed) {
       return
     }
-    const key = normalize(trimmed)
-    const catalog = readExerciseCatalog(this.app, this.plugin.settings)
-    const noteEntry = catalog.entries.find((entry) => normalize(entry.name) === key)
-    const notePath =
-      noteEntry?.path ?? findExerciseNoteFile(this.app, this.plugin.settings, trimmed)?.path
+    const notePath = findExerciseNotePath(this.app, this.plugin.settings, trimmed)
     const noteFile = notePath ? this.app.vault.getAbstractFileByPath(notePath) : null
     if (noteFile instanceof TFile) {
       let result: ExerciseNoteKindUpdateResult | undefined
@@ -1502,6 +1687,14 @@ export class WorkoutEditorView extends ItemView {
         .setIcon('sticky-note')
         .onClick(() => this.openExerciseNoteModal(ex)),
     )
+    if (ex.kind === 'bodyweight') {
+      menu.addItem((item) =>
+        item
+          .setTitle('Edit levels')
+          .setIcon('list')
+          .onClick(() => this.openEditLevelsModal(ex)),
+      )
+    }
     if (ex.kind === 'strength' || ex.kind === 'bodyweight') {
       menu.addSeparator()
       this.addNextPlanMenuItems(menu, ex)

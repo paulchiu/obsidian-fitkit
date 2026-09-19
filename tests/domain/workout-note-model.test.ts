@@ -4,9 +4,15 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import type { WorkoutNoteModel } from '../../src/domain/workout-note-model'
+import type {
+  BodyweightExerciseEntry,
+  DurationExerciseEntry,
+  WorkoutNoteModel,
+} from '../../src/domain/workout-note-model'
 import {
+  countFirstLevelRelabelSets,
   parseWorkoutNote,
+  relabelSetsAsFirstLevel,
   semanticEqual,
   serializeWorkoutNote,
 } from '../../src/domain/workout-note-model'
@@ -1228,5 +1234,63 @@ describe('workout note model', () => {
 
     expect(result.isWorkout).toBe(true)
     expect(result.model?.exercises).toHaveLength(3)
+  })
+})
+
+describe('relabelSetsAsFirstLevel', () => {
+  it('counts the strength rows a switch to bodyweight could mark as level 1', () => {
+    expect(
+      countFirstLevelRelabelSets({
+        exerciseName: 'Push-up',
+        kind: 'strength',
+        strengthSets: [
+          { set: 1, weight: 10, reps: 8 },
+          { set: 2, weight: 10, reps: 6 },
+          { set: 3, reps: 5 },
+        ],
+      }),
+    ).toBe(3)
+  })
+
+  it('marks strength rows as level 1, carrying weight as load', () => {
+    expect(
+      relabelSetsAsFirstLevel({
+        exerciseName: 'Dip',
+        kind: 'strength',
+        strengthSets: [
+          { set: 1, weight: 10, reps: 8, note: 'Steady' },
+          { set: 2, reps: 6 },
+        ],
+      }),
+    ).toEqual([
+      { level: 1, set: 1, reps: 8, load: 10, note: 'Steady' },
+      { level: 1, set: 2, reps: 6 },
+    ])
+  })
+
+  it('marks duration rows as level 1, keeping notes but no reps', () => {
+    const entry: DurationExerciseEntry = {
+      exerciseName: 'Plank',
+      kind: 'duration',
+      durationEntries: [
+        { set: 1, durationSeconds: 60, note: 'Hard' },
+        { set: 2, durationSeconds: 45 },
+      ],
+    }
+    expect(countFirstLevelRelabelSets(entry)).toBe(2)
+    expect(relabelSetsAsFirstLevel(entry)).toEqual([
+      { level: 1, set: 1, note: 'Hard' },
+      { level: 1, set: 2 },
+    ])
+  })
+
+  it('offers nothing when the entry already names its rungs', () => {
+    const entry: BodyweightExerciseEntry = {
+      exerciseName: 'Push-up',
+      kind: 'bodyweight',
+      bodyweightSets: [{ level: 2, reps: 8 }],
+    }
+    expect(countFirstLevelRelabelSets(entry)).toBe(0)
+    expect(relabelSetsAsFirstLevel(entry)).toEqual([{ level: 2, reps: 8 }])
   })
 })
