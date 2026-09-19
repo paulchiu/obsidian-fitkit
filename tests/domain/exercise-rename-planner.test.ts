@@ -490,6 +490,24 @@ TABLE WITHOUT ID file.link
     )
     expect(plan.resultUnit).toBe('lbs')
   })
+
+  it('carries forward the ladder when the renamed entry owns one', () => {
+    const plan = buildExerciseRenamePlan(
+      baseInput({
+        oldName: 'Push-up',
+        newName: 'Pushup',
+        registry: [
+          {
+            name: 'Push-up',
+            kind: 'bodyweight',
+            levels: ['Wall push-up', 'Knee push-up'],
+            aliases: [],
+          },
+        ],
+      }),
+    )
+    expect(plan.resultLevels).toEqual(['Wall push-up', 'Knee push-up'])
+  })
 })
 
 describe('rewriteWorkoutNoteOccurrences', () => {

@@ -283,4 +283,21 @@ describe('ExerciseRegistryEntryModal unit preservation', () => {
 
     expect(plugin.settings.exerciseRegistry[0]?.unit).toBe('lbs')
   })
+
+  it('keeps the ladder when an edit changes only the aliases', async () => {
+    const original: ExerciseRegistryEntry = {
+      name: 'Push-up',
+      kind: 'bodyweight',
+      levels: ['Wall push-up', 'Knee push-up'],
+      aliases: [],
+    }
+    const plugin = createPluginStub([original])
+    const modal = new ExerciseRegistryEntryModal(plugin, { kind: 'edit', original }, vi.fn())
+
+    const modalPrivate = modal as unknown as ModalPrivate
+    modalPrivate.aliasesText = 'Pushup'
+    await modalPrivate.handleSave()
+
+    expect(plugin.settings.exerciseRegistry[0]?.levels).toEqual(['Wall push-up', 'Knee push-up'])
+  })
 })

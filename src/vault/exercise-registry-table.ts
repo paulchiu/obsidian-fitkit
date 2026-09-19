@@ -12,6 +12,7 @@ export interface RegistryTableRow {
   name: string
   kind: ExerciseKind
   unit?: WeightUnit
+  levels?: string[]
   aliases: string[]
   /**
    * 'note': backed by an exercise note, which wins on read; editing name or
@@ -51,6 +52,7 @@ export async function buildRegistryTableRows(
       name: entry.name,
       kind: entry.kind,
       unit: entry.unit,
+      levels: entry.levels ? [...entry.levels] : undefined,
       aliases: entry.aliases,
       provenance: notePath ? 'note' : 'overlay',
       notePath,
@@ -67,6 +69,7 @@ export async function buildRegistryTableRows(
       name: candidate.name,
       kind: candidate.kind,
       unit: undefined,
+      levels: undefined,
       aliases: [],
       provenance: 'history',
       notePath: null,

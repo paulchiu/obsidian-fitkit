@@ -2,6 +2,7 @@ import type { App, WorkspaceLeaf } from 'obsidian'
 import { ItemView, Menu, Modal, Notice, TFile, normalizePath, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
+import { pickBestBodyweightSet } from '../domain/bodyweight-levels'
 import {
   formatDurationInput,
   parseDurationInput,
@@ -19,6 +20,7 @@ import {
 import {
   createRegistry,
   kindForName,
+  levelsForName,
   normalize,
   upsertEntry,
   type ExerciseRegistryEntry,
@@ -1309,7 +1311,7 @@ export class WorkoutEditorView extends ItemView {
         .setIcon('sticky-note')
         .onClick(() => this.openExerciseNoteModal(ex)),
     )
-    if (ex.kind === 'strength') {
+    if (ex.kind === 'strength' || ex.kind === 'bodyweight') {
       menu.addSeparator()
       this.addNextPlanMenuItems(menu, ex)
     }
@@ -1358,13 +1360,27 @@ export class WorkoutEditorView extends ItemView {
     }
   }
 
+  /** Ladder for rung names and plans, preferring the exercise note via the merged snapshot. */
+  private levelsFor(name: string): string[] | undefined {
+    return levelsForName(
+      createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings)),
+      name,
+    )
+  }
+
   private renderExerciseHistoryBadges(card: HTMLElement, ex: ExerciseCard): void {
     const summary = this.exerciseHistory?.get(ex.name)
-    const badges = formatExerciseHistoryBadges(summary, ex.kind)
-    const planBadge = formatNextPlanBadge(summary, ex.kind, {
-      plan: ex.next,
-      sessionMax: pickMaxWeightSet(ex.strengthSets),
-    })
+    const badges = formatExerciseHistoryBadges(summary, ex.kind, this.levelsFor(ex.name))
+    const planBadge = formatNextPlanBadge(
+      summary,
+      ex.kind,
+      {
+        plan: ex.next,
+        sessionMax: pickMaxWeightSet(ex.strengthSets),
+        sessionBodyweightMax: pickBestBodyweightSet(ex.bodyweightSets ?? []),
+      },
+      this.levelsFor(ex.name),
+    )
     if (badges.length === 0 && !planBadge) {
       return
     }

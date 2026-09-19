@@ -315,6 +315,7 @@ function updateRegistryOverlay(settings: FitKitSettings, plan: ExerciseRenamePla
     name: plan.newName,
     kind: plan.resultKind,
     unit: plan.resultUnit,
+    levels: plan.resultLevels ? [...plan.resultLevels] : undefined,
     aliases: plan.aliasesToKeep,
   })
   settings.exerciseRegistry = registry.entries

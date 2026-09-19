@@ -108,10 +108,16 @@ function createPlugin(): FitKitPlugin {
     app: {
       vault: {
         getAbstractFileByPath: () => null,
+        getFolderByPath: () => null,
       },
       metadataCache: {
         getFileCache: () => null,
       },
+    },
+    settings: {
+      fitnessRoot: 'Fitness',
+      exerciseRegistry: [],
+      deletedExercises: [],
     },
   } as unknown as FitKitPlugin
 }
@@ -196,6 +202,49 @@ describe('workout reading mode rendering', () => {
     )
 
     expect(root.findByClass('fitkit-reading-plan')?.allText()).toContain('Next time: up 2.5 kg')
+  })
+
+  it('shows bodyweight rung names from the registry ladder', () => {
+    const section = [
+      '## [[Push-up]]',
+      '',
+      '- [exercise:: [[Push-up]]] [set:: 1] [level:: 2] [reps:: 10]',
+    ].join('\n')
+    const root = createRenderedSection([
+      '[exercise:: [[Push-up]]] [set:: 1] [level:: 2] [reps:: 10]',
+    ])
+    const plugin = createPlugin()
+    plugin.settings.exerciseRegistry = [
+      {
+        name: 'Push-up',
+        kind: 'bodyweight',
+        levels: ['Wall push-up', 'Knee push-up'],
+        aliases: [],
+      },
+    ]
+
+    renderWorkoutReadingModeSection(plugin, root as unknown as HTMLElement, createContext(section))
+
+    expect(root.allText()).toContain('Knee push-up')
+  })
+
+  it('falls back to the bare level when no ladder is on file', () => {
+    const section = [
+      '## [[Push-up]]',
+      '',
+      '- [exercise:: [[Push-up]]] [set:: 1] [level:: 2] [reps:: 10]',
+    ].join('\n')
+    const root = createRenderedSection([
+      '[exercise:: [[Push-up]]] [set:: 1] [level:: 2] [reps:: 10]',
+    ])
+
+    renderWorkoutReadingModeSection(
+      createPlugin(),
+      root as unknown as HTMLElement,
+      createContext(section),
+    )
+
+    expect(root.allText()).toContain('Level 2')
   })
 
   it('does not render when the source rows cannot be safely hidden', () => {

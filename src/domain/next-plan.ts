@@ -4,11 +4,13 @@
  * exercise card the next time the exercise comes up.
  */
 
+import type { ExerciseKind } from './exercise-kind'
+
 export type NextPlanDirection = 'up' | 'down' | 'stay'
 
 export interface NextPlan {
   direction: NextPlanDirection
-  /** Weight change to make next session. Absent means the direction alone. */
+  /** Change to make next session: kilograms for strength, rungs for bodyweight. Absent means the direction alone. */
   step?: number
 }
 
@@ -40,12 +42,37 @@ export function formatNextPlan(plan: NextPlan): string {
 }
 
 /** Sentence-case description for badges and previews, without the unit. */
-export function formatNextPlanLabel(plan: NextPlan): string {
+export function formatNextPlanLabel(plan: NextPlan, kind: ExerciseKind = 'strength'): string {
   if (plan.direction === 'stay') {
-    return 'Same weight'
+    return kind === 'bodyweight' ? 'Same level' : 'Same weight'
   }
   const direction = plan.direction === 'up' ? 'Up' : 'Down'
   return plan.step === undefined ? direction : `${direction} ${formatNumber(plan.step)}`
+}
+
+/**
+ * Apply the plan to the rung it was recorded against. The step counts rungs,
+ * so a fractional step lands on the nearest rung and the target clamps to
+ * the ends of the ladder. Returns null when the plan carries no step or
+ * names no usable ladder.
+ */
+export function nextPlanTargetLevel(
+  plan: NextPlan,
+  baseLevel: number,
+  levelCount: number,
+): number | null {
+  if (!Number.isFinite(baseLevel) || !Number.isFinite(levelCount) || levelCount < 1) {
+    return null
+  }
+  const count = Math.floor(levelCount)
+  if (plan.direction === 'stay') {
+    return Math.min(Math.max(Math.round(baseLevel), 1), count)
+  }
+  if (plan.step === undefined) {
+    return null
+  }
+  const target = plan.direction === 'up' ? baseLevel + plan.step : baseLevel - plan.step
+  return Math.min(Math.max(Math.round(target), 1), count)
 }
 
 /**

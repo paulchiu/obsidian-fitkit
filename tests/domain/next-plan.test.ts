@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatNextPlan,
   formatNextPlanLabel,
+  nextPlanTargetLevel,
   nextPlanTargetWeight,
   parseNextPlan,
 } from '../../src/domain/next-plan'
@@ -54,6 +55,11 @@ describe('next plan formatting', () => {
     expect(formatNextPlanLabel({ direction: 'down' })).toBe('Down')
     expect(formatNextPlanLabel({ direction: 'stay' })).toBe('Same weight')
   })
+
+  it('labels a bodyweight hold as the level rather than the weight', () => {
+    expect(formatNextPlanLabel({ direction: 'stay' }, 'bodyweight')).toBe('Same level')
+    expect(formatNextPlanLabel({ direction: 'up', step: 1 }, 'bodyweight')).toBe('Up 1')
+  })
 })
 
 describe('next plan targets', () => {
@@ -72,5 +78,13 @@ describe('next plan targets', () => {
 
   it('never plans a negative weight', () => {
     expect(nextPlanTargetWeight({ direction: 'down', step: 5 }, 2.5)).toBe(0)
+  })
+
+  it('moves a bodyweight plan by rungs and clamps to the ends of the ladder', () => {
+    expect(nextPlanTargetLevel({ direction: 'up', step: 1 }, 4, 5)).toBe(5)
+    expect(nextPlanTargetLevel({ direction: 'up', step: 2 }, 5, 5)).toBe(5)
+    expect(nextPlanTargetLevel({ direction: 'down', step: 3 }, 1, 5)).toBe(1)
+    expect(nextPlanTargetLevel({ direction: 'stay' }, 3, 5)).toBe(3)
+    expect(nextPlanTargetLevel({ direction: 'up' }, 3, 5)).toBeNull()
   })
 })

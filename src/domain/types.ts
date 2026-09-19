@@ -12,6 +12,13 @@ export interface WeightSet {
   reps: number
 }
 
+/** Best bodyweight set of a session, normalized so missing reps or load read as 0. */
+export interface BodyweightBestSet {
+  level: number
+  reps: number
+  load: number
+}
+
 export interface LastSessionMax<T> {
   value: T
   date: string
@@ -26,6 +33,8 @@ export interface ExerciseIndexRow {
   totalDurationSeconds?: number
   /** Highest rung index logged for a bodyweight exercise; the rung names land with the ladder. */
   maxLevel?: number
+  /** Best bodyweight set of the session: highest level, then reps, then load. */
+  maxBodyweightSet?: BodyweightBestSet
   next?: NextPlan
 }
 

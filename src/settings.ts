@@ -696,7 +696,13 @@ export class FitKitSettingTab extends PluginSettingTab {
           this.plugin,
           {
             kind: 'edit',
-            original: { name: row.name, kind: row.kind, unit: row.unit, aliases: row.aliases },
+            original: {
+              name: row.name,
+              kind: row.kind,
+              unit: row.unit,
+              levels: row.levels ? [...row.levels] : undefined,
+              aliases: row.aliases,
+            },
           },
           rerender,
         ).open()

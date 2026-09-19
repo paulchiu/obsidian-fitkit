@@ -1,5 +1,6 @@
 import type { App, TAbstractFile, TFile } from 'obsidian'
 
+import { pickBestBodyweightSet } from '../domain/bodyweight-levels'
 import { pickBestSet, pickHeaviestSet } from '../domain/epley'
 import type { ExerciseIndexRow, FitKitIndex, IndexDiagnostic, IndexEntry } from '../domain/types'
 import {
@@ -108,6 +109,7 @@ function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
         kind: exercise.kind,
         totalSets: exercise.bodyweightSets.length,
         maxLevel: levels.length > 0 ? Math.max(...levels) : undefined,
+        maxBodyweightSet: pickBestBodyweightSet(exercise.bodyweightSets) ?? undefined,
         next: exercise.next,
       }
     }

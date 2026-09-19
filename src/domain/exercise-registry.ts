@@ -217,6 +217,7 @@ export type RegistryEntryDraft = {
   name: string
   kind: ExerciseKind
   unit?: WeightUnit
+  levels?: string[]
   aliases: string[]
 }
 
@@ -255,7 +256,13 @@ export function sanitizeEntryDraft(draft: RegistryEntryDraft): RegistryEntryDraf
     seen.add(key)
     aliases.push(trimmed)
   }
-  return { name, kind: draft.kind, unit: draft.unit, aliases }
+  return {
+    name,
+    kind: draft.kind,
+    unit: draft.unit,
+    levels: draft.levels ? [...draft.levels] : undefined,
+    aliases,
+  }
 }
 
 /**
@@ -364,6 +371,7 @@ export function renameEntry(
     name: next.name,
     kind: next.kind,
     unit: next.unit,
+    levels: next.levels ? [...next.levels] : undefined,
     aliases: dedupedAliases,
   })
 }

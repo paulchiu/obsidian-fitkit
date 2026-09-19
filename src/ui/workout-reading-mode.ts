@@ -1,7 +1,9 @@
 import { TFile, type MarkdownPostProcessorContext } from 'obsidian'
 
 import { EXERCISE_KIND_LABELS, assertUnreachableKind } from '../domain/exercise-kind'
+import { bodyweightLevelName } from '../domain/bodyweight-levels'
 import { formatDurationInput } from '../domain/duration-input'
+import { createRegistry, levelsForName } from '../domain/exercise-registry'
 import { formatNextPlanLabel } from '../domain/next-plan'
 import { parseWorkoutNote } from '../domain/workout-note-model'
 import type {
@@ -11,6 +13,7 @@ import type {
   StrengthSet,
 } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
+import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
 
 const WORKOUT_SOURCE_ROW = /^\s*[-*]\s+.*\[exercise::/
 
@@ -45,7 +48,7 @@ export function renderWorkoutReadingModeSection(
     return
   }
 
-  renderExercisePreview(el, exercise)
+  renderExercisePreview(el, exercise, plugin)
 }
 
 export function formatWeight(value: number | undefined): string {
@@ -130,7 +133,11 @@ function hideRecognisedSourceRows(el: HTMLElement, sourceRowCount: number): numb
   return toHide.size
 }
 
-function renderExercisePreview(el: HTMLElement, exercise: ExerciseEntry): void {
+function renderExercisePreview(
+  el: HTMLElement,
+  exercise: ExerciseEntry,
+  plugin: FitKitPlugin,
+): void {
   const wrap = el.createDiv({ cls: 'fitkit-reading-preview' })
   const summary = wrap.createDiv({ cls: 'fitkit-reading-summary' })
   summary.createSpan({
@@ -157,7 +164,11 @@ function renderExercisePreview(el: HTMLElement, exercise: ExerciseEntry): void {
       renderStrengthTable(wrap, exercise.strengthSets)
       break
     case 'bodyweight':
-      renderBodyweightTable(wrap, exercise.bodyweightSets)
+      renderBodyweightTable(
+        wrap,
+        exercise.bodyweightSets,
+        levelsForExercise(plugin, exercise.exerciseName),
+      )
       break
     case 'duration':
       renderDurationTable(wrap, exercise.durationEntries)
@@ -198,8 +209,19 @@ function renderStrengthTable(container: HTMLElement, sets: StrengthSet[]): void 
   }
 }
 
-/** Rung names arrive with the ladder; until then the level number stands alone. */
-function renderBodyweightTable(container: HTMLElement, sets: BodyweightSet[]): void {
+/** Note-backed ladder wins via the merged snapshot; absent means no ladder on file. */
+function levelsForExercise(plugin: FitKitPlugin, name: string): string[] | undefined {
+  return levelsForName(
+    createRegistry(exerciseRegistryWithVaultNotes(plugin.app, plugin.settings)),
+    name,
+  )
+}
+
+function renderBodyweightTable(
+  container: HTMLElement,
+  sets: BodyweightSet[],
+  levels: readonly string[] | undefined,
+): void {
   if (sets.length === 0) {
     renderEmpty(container, 'No bodyweight rows recorded.')
     return
@@ -213,7 +235,7 @@ function renderBodyweightTable(container: HTMLElement, sets: BodyweightSet[]): v
     }
     const row = body.createEl('tr')
     row.createEl('td', { text: formatSet(set.set ?? index + 1) })
-    row.createEl('td', { text: formatNumber(set.level) })
+    row.createEl('td', { text: bodyweightLevelName(levels, set.level) })
     row.createEl('td', { text: formatReps(set.reps) })
     row.createEl('td', { text: formatWeight(set.load) })
     row.createEl('td', { text: set.note ?? '-' })

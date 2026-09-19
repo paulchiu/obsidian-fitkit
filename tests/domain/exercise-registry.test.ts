@@ -435,4 +435,25 @@ describe('renameEntry', () => {
       expect(result.entry.name).toBe('Back Squat')
     }
   })
+
+  it('keeps the ladder when an entry that owns one is renamed', () => {
+    const registry = createRegistry([
+      {
+        name: 'Push-up',
+        kind: 'bodyweight',
+        levels: ['Wall push-up', 'Knee push-up'],
+        aliases: [],
+      },
+    ])
+    const next = renameEntry(registry, 'Push-up', {
+      name: 'Pushup',
+      kind: 'bodyweight',
+      levels: ['Wall push-up', 'Knee push-up'],
+      aliases: [],
+    })
+    expect(next.entries.find((row) => row.name === 'Pushup')?.levels).toEqual([
+      'Wall push-up',
+      'Knee push-up',
+    ])
+  })
 })

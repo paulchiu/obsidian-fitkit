@@ -11,10 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Workout notes now recognise a `bodyweight` exercise kind whose rows carry `[level::]` (with optional `[reps::]` and `[load::]`). Parsing, note round-trip, and the reading view table are in place; the ladder, history badges, and full editor card follow in later changes.
 - Bodyweight exercise notes now declare the ordered `levels:` ladder the `[level::]` index points at. The note ladder wins over a saved registry ladder (with a diagnostic on disagreement), repairs and new notes seed a one-rung ladder, and switching a note to bodyweight sheds strength-only `metric:`/`unit:` lines.
+- Reading view and history badges now show bodyweight rung names instead of bare level numbers, with a `Level N` fallback when no ladder names the rung. The bodyweight personal best is the highest rung reached, ties broken by reps then load, and `[next::]` plans work over the ladder (`Same level` holds, steps count rungs and clamp to the ladder ends).
 
 ### Changed
 
 ### Fixed
+
+- Editing or renaming a no-note bodyweight registry entry no longer drops its `levels:` ladder.
 
 ### Removed
 
