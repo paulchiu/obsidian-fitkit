@@ -67,7 +67,7 @@ A rung name too long for its cell shortens to a compact form (`L2`), and grows b
 
 The card menu records how you want to load the exercise next session: `Plan: increase`, `Plan: keep`, or `Plan: decrease`. Choosing the direction that is already set clears it. With increase or decrease chosen, `Set plan step...` takes the step; it stays greyed out until there is a direction to attach a step to.
 
-This is a note to yourself, not an instruction the plugin acts on. It is written as `[next:: up 2.5]`, surfaces as the `Next` badge on the card straight away and again the next time that exercise comes up, and is listed under `Next session plans` on the dashboard. The step is a weight change for a strength exercise and a rung count for a bodyweight one. A `[next:: ...]` value that does not start with `up`, `down`, or `stay` is ignored rather than reported, so hand-written wording passes through untouched.
+This is a note to yourself, not an instruction the plugin acts on. It is written as `[next:: up 2.5]`, surfaces as the `Next` badge on the card straight away and again the next time that exercise comes up, and is listed under `Next session plans` on the dashboard. The step is a weight change for a strength exercise and a rung count for a bodyweight one. A `[next:: ...]` value that does not start with `up`, `down`, or `stay` is ignored rather than reported, and is dropped the next time the note is saved.
 
 ## Rest timer
 
