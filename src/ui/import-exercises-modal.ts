@@ -1,7 +1,7 @@
 import { Modal, Notice } from 'obsidian'
 
 import { formatErrorMessage } from '../domain/error'
-import { EXERCISE_KINDS, parseExerciseKind } from '../domain/exercise-kind'
+import { EXERCISE_KINDS, EXERCISE_KIND_LABELS, parseExerciseKind } from '../domain/exercise-kind'
 import type FitKitPlugin from '../main'
 import {
   ExerciseImportApplyError,
@@ -125,7 +125,7 @@ export class ImportExercisesModal extends Modal {
     for (const kind of EXERCISE_KINDS) {
       select.createEl('option', {
         value: kind,
-        text: kind.charAt(0).toUpperCase() + kind.slice(1),
+        text: EXERCISE_KIND_LABELS[kind],
       })
     }
     select.value = row.kind

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   EXERCISE_KINDS,
+  EXERCISE_KIND_LABELS,
   parseExerciseKind,
   type ExerciseKind,
 } from '../../src/domain/exercise-kind'
@@ -12,6 +13,13 @@ import type { ExerciseKind as ModelExerciseKind } from '../../src/domain/workout
 describe('exercise kind', () => {
   it('declares strength and duration as the only kinds', () => {
     expect([...EXERCISE_KINDS] satisfies ExerciseKind[]).toEqual(['strength', 'duration'])
+  })
+
+  it('labels every kind without deriving the display name from the wire value', () => {
+    expect(EXERCISE_KIND_LABELS satisfies Record<ExerciseKind, string>).toEqual({
+      strength: 'Strength',
+      duration: 'Duration',
+    })
   })
 
   it('parses known exercise kinds case-insensitively', () => {

@@ -15,7 +15,7 @@ import {
   validateEntryDraft,
 } from '../domain/exercise-registry'
 import { DEFAULT_WEIGHT_UNIT, WEIGHT_UNITS, type WeightUnit } from '../domain/weight-unit'
-import { EXERCISE_KINDS, parseExerciseKind } from '../domain/exercise-kind'
+import { EXERCISE_KINDS, EXERCISE_KIND_LABELS, parseExerciseKind } from '../domain/exercise-kind'
 import type FitKitPlugin from '../main'
 
 export type RegistryEntryModalMode =
@@ -84,7 +84,7 @@ export class ExerciseRegistryEntryModal extends Modal {
     for (const kind of EXERCISE_KINDS) {
       this.kindSelect.createEl('option', {
         value: kind,
-        text: kind.charAt(0).toUpperCase() + kind.slice(1),
+        text: EXERCISE_KIND_LABELS[kind],
       })
     }
     this.kindSelect.value = this.exerciseKind

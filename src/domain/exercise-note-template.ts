@@ -15,17 +15,21 @@ export function buildNotesBlock(name: string, fitnessRoot: string): string {
 
 function recentSessionsQuery(name: string, kind: ExerciseKind, fitnessRoot: string): string[] {
   const workouts = workoutsFolder({ fitnessRoot })
-  if (kind === 'duration') {
-    return [
-      'table without id file.link as Session, duration + "s" as Duration',
-      `from "${workouts}"`,
-      'flatten file.lists as item',
-      `where contains(item.text, "[exercise:: [[${name}]]]") and item.duration`,
-      'sort file.name desc',
-      'limit 12',
-    ]
-  }
-  return [
+  return RECENT_SESSIONS_QUERIES[kind](name, workouts)
+}
+
+type RecentSessionsQuery = (name: string, workouts: string) => string[]
+
+const RECENT_SESSIONS_QUERIES: Record<ExerciseKind, RecentSessionsQuery> = {
+  duration: (name, workouts) => [
+    'table without id file.link as Session, duration + "s" as Duration',
+    `from "${workouts}"`,
+    'flatten file.lists as item',
+    `where contains(item.text, "[exercise:: [[${name}]]]") and item.duration`,
+    'sort file.name desc',
+    'limit 12',
+  ],
+  strength: (name, workouts) => [
     'TABLE WITHOUT ID',
     '  file.link AS Workout,',
     '  L.set AS Set,',
@@ -36,7 +40,7 @@ function recentSessionsQuery(name: string, kind: ExerciseKind, fitnessRoot: stri
     `WHERE L.exercise = link("${name}") AND L.set`,
     'SORT file.name DESC, L.set ASC',
     'LIMIT 10',
-  ]
+  ],
 }
 
 function notesQuery(name: string, fitnessRoot: string): string[] {

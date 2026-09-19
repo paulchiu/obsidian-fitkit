@@ -1,5 +1,6 @@
 import { TFile, type MarkdownPostProcessorContext } from 'obsidian'
 
+import { EXERCISE_KIND_LABELS, assertUnreachableKind } from '../domain/exercise-kind'
 import { formatDurationInput } from '../domain/duration-input'
 import { formatNextPlanLabel } from '../domain/next-plan'
 import { parseWorkoutNote } from '../domain/workout-note-model'
@@ -129,7 +130,7 @@ function renderExercisePreview(el: HTMLElement, exercise: ExerciseEntry): void {
   const summary = wrap.createDiv({ cls: 'fitkit-reading-summary' })
   summary.createSpan({
     cls: 'fitkit-reading-kind',
-    text: exercise.kind === 'strength' ? 'Strength' : 'Duration',
+    text: EXERCISE_KIND_LABELS[exercise.kind],
   })
   summary.createSpan({ cls: 'fitkit-reading-count', text: exerciseCountText(exercise) })
 
@@ -146,17 +147,29 @@ function renderExercisePreview(el: HTMLElement, exercise: ExerciseEntry): void {
     })
   }
 
-  if (exercise.kind === 'strength') {
-    renderStrengthTable(wrap, exercise.strengthSets)
-  } else {
-    renderDurationTable(wrap, exercise.durationEntries)
+  switch (exercise.kind) {
+    case 'strength':
+      renderStrengthTable(wrap, exercise.strengthSets)
+      break
+    case 'duration':
+      renderDurationTable(wrap, exercise.durationEntries)
+      break
+    default:
+      assertUnreachableKind(exercise)
   }
 }
 
 function exerciseCountText(exercise: ExerciseEntry): string {
-  const count =
-    exercise.kind === 'strength' ? exercise.strengthSets.length : exercise.durationEntries.length
-  return count === 1 ? '1 row' : `${count} rows`
+  switch (exercise.kind) {
+    case 'strength':
+      return exercise.strengthSets.length === 1 ? '1 row' : `${exercise.strengthSets.length} rows`
+    case 'duration':
+      return exercise.durationEntries.length === 1
+        ? '1 row'
+        : `${exercise.durationEntries.length} rows`
+    default:
+      return assertUnreachableKind(exercise)
+  }
 }
 
 function renderStrengthTable(container: HTMLElement, sets: StrengthSet[]): void {
