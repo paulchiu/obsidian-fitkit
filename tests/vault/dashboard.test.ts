@@ -475,6 +475,113 @@ describe('dashboard composer', () => {
     expect(dashboardMarkdown()).not.toContain('200kg x 5')
   })
 
+  it('treats a strength note carrying another kind of metric as the default', async () => {
+    const { app, dashboardMarkdown } = mockDashboardApp([
+      {
+        path: 'Fitness/Exercises/Bench Press.md',
+        basename: 'Bench Press',
+        frontmatter: { type: 'exercise', kind: 'strength', metric: 'level' },
+      },
+    ])
+
+    await regenerateDashboard(
+      app,
+      settingsWithRegistry([{ name: 'Bench Press', kind: 'strength', unit: 'kg', aliases: [] }]),
+      {
+        ...emptyIndex,
+        entries: [
+          {
+            path: 'Fitness/Workouts/2026-04-24.md',
+            mtime: 1,
+            date: '2026-04-24',
+            name: 'Workout',
+            exercises: [
+              {
+                exerciseName: 'Bench Press',
+                kind: 'strength',
+                bestSet: { weight: 90, reps: 10, e1rm: 120 },
+                maxWeightSet: { weight: 105, reps: 1 },
+                totalSets: 2,
+              },
+            ],
+          },
+          {
+            path: 'Fitness/Workouts/2026-04-25.md',
+            mtime: 1,
+            date: '2026-04-25',
+            name: 'Workout',
+            exercises: [
+              {
+                exerciseName: 'Bench Press',
+                kind: 'strength',
+                bestSet: { weight: 100, reps: 3, e1rm: 110 },
+                maxWeightSet: { weight: 105, reps: 3 },
+                totalSets: 2,
+              },
+            ],
+          },
+        ],
+      },
+    )
+
+    expect(dashboardMarkdown()).toContain(
+      '- **[[#Bench Press|Bench Press]]:** 90kg x 10 (e1rm 120.0kg)',
+    )
+  })
+
+  it('trusts a strength note carrying the weight metric', async () => {
+    const { app, dashboardMarkdown } = mockDashboardApp([
+      {
+        path: 'Fitness/Exercises/Bench Press.md',
+        basename: 'Bench Press',
+        frontmatter: { type: 'exercise', kind: 'strength', metric: 'weight' },
+      },
+    ])
+
+    await regenerateDashboard(
+      app,
+      settingsWithRegistry([{ name: 'Bench Press', kind: 'strength', unit: 'kg', aliases: [] }]),
+      {
+        ...emptyIndex,
+        entries: [
+          {
+            path: 'Fitness/Workouts/2026-04-24.md',
+            mtime: 1,
+            date: '2026-04-24',
+            name: 'Workout',
+            exercises: [
+              {
+                exerciseName: 'Bench Press',
+                kind: 'strength',
+                bestSet: { weight: 90, reps: 10, e1rm: 120 },
+                maxWeightSet: { weight: 105, reps: 1 },
+                totalSets: 2,
+              },
+            ],
+          },
+          {
+            path: 'Fitness/Workouts/2026-04-25.md',
+            mtime: 1,
+            date: '2026-04-25',
+            name: 'Workout',
+            exercises: [
+              {
+                exerciseName: 'Bench Press',
+                kind: 'strength',
+                bestSet: { weight: 100, reps: 3, e1rm: 110 },
+                maxWeightSet: { weight: 105, reps: 3 },
+                totalSets: 2,
+              },
+            ],
+          },
+        ],
+      },
+    )
+
+    expect(dashboardMarkdown()).toContain('- **[[#Bench Press|Bench Press]]:** 105kg x 3')
+    expect(dashboardMarkdown()).not.toContain('e1rm')
+  })
+
   it('renders bodyweight PBs as reps in weight metric mode', () => {
     const markdown = composeDashboard(
       {
@@ -598,6 +705,148 @@ describe('dashboard composer', () => {
       ].join('\n'),
     )
     expect(markdown).not.toContain('contains(item.text, "[exercise:: [[Squat]]]")')
+  })
+
+  it('renders bodyweight Dataview tables using list fields like the strength query', () => {
+    const markdown = composeDashboard(
+      {
+        ...emptyIndex,
+        entries: [
+          {
+            path: 'Fitness/Workouts/2026-04-24.md',
+            mtime: 1,
+            date: '2026-04-24',
+            name: 'Workout',
+            exercises: [
+              {
+                exerciseName: 'Push-up',
+                kind: 'bodyweight',
+                maxBodyweightSet: { level: 2, reps: 8, load: 0 },
+                totalSets: 1,
+              },
+            ],
+          },
+        ],
+      },
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+    )
+
+    expect(markdown).toContain(
+      [
+        'TABLE WITHOUT ID',
+        '  file.link AS Workout,',
+        '  L.level AS Level,',
+        '  L.reps AS Reps,',
+        '  L.load AS Load',
+        'FROM "Fitness/Workouts"',
+        'FLATTEN file.lists AS L',
+        'WHERE L.exercise = link("Push-up") AND L.level',
+        'SORT file.name DESC, L.level ASC',
+        'LIMIT 10',
+      ].join('\n'),
+    )
+  })
+
+  it('reports a bodyweight personal best as rung and reps', () => {
+    const markdown = composeDashboard(
+      {
+        ...emptyIndex,
+        entries: [
+          {
+            path: 'Fitness/Workouts/2026-04-24.md',
+            mtime: 1,
+            date: '2026-04-24',
+            name: 'Workout',
+            exercises: [
+              {
+                exerciseName: 'Push-up',
+                kind: 'bodyweight',
+                maxBodyweightSet: { level: 2, reps: 8, load: 0 },
+                totalSets: 3,
+              },
+            ],
+          },
+        ],
+      },
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+      new Map(),
+      new Map(),
+      new Map([['Push-up', ['Wall push-up', 'Knee push-up', 'Push-up']]]),
+    )
+
+    expect(markdown).toContain('- **[[#Push-up|Push-up]]:** Knee push-up x 8')
+  })
+
+  it('reports no completed sets for a bodyweight exercise with no best set', () => {
+    const markdown = composeDashboard(
+      {
+        ...emptyIndex,
+        entries: [
+          {
+            path: 'Fitness/Workouts/2026-04-24.md',
+            mtime: 1,
+            date: '2026-04-24',
+            name: 'Workout',
+            exercises: [{ exerciseName: 'Push-up', kind: 'bodyweight', totalSets: 0 }],
+          },
+        ],
+      },
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+    )
+
+    expect(markdown).toContain('- **[[#Push-up|Push-up]]:** no completed sets')
+  })
+
+  it('ranks bodyweight personal bests by level before reps', () => {
+    const markdown = composeDashboard(
+      {
+        ...emptyIndex,
+        entries: [
+          {
+            path: 'Fitness/Workouts/2026-04-24.md',
+            mtime: 1,
+            date: '2026-04-24',
+            name: 'Workout',
+            exercises: [
+              {
+                exerciseName: 'Push-up',
+                kind: 'bodyweight',
+                maxBodyweightSet: { level: 2, reps: 12, load: 0 },
+                totalSets: 1,
+              },
+            ],
+          },
+          {
+            path: 'Fitness/Workouts/2026-04-25.md',
+            mtime: 1,
+            date: '2026-04-25',
+            name: 'Workout',
+            exercises: [
+              {
+                exerciseName: 'Push-up',
+                kind: 'bodyweight',
+                maxBodyweightSet: { level: 3, reps: 5, load: 0 },
+                totalSets: 1,
+              },
+            ],
+          },
+        ],
+      },
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+      new Map(),
+      new Map(),
+      new Map([['Push-up', ['Wall push-up', 'Knee push-up', 'Full push-up']]]),
+    )
+
+    expect(markdown).toContain('- **[[#Push-up|Push-up]]:** Full push-up x 5')
   })
 
   it('ignores zero-rep best sets when rendering PBs', () => {

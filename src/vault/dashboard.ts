@@ -1,21 +1,35 @@
 import type { App, CachedMetadata, TAbstractFile, TFile } from 'obsidian'
 
-import { formatRungUnit } from '../domain/bodyweight-levels'
+import {
+  bodyweightLevelName,
+  formatRungUnit,
+  pickBestBodyweightSet,
+  type BodyweightLadder,
+} from '../domain/bodyweight-levels'
 import { type ExerciseKind } from '../domain/exercise-kind'
 import {
   DEFAULT_EXERCISE_METRIC,
+  VALID_EXERCISE_METRICS,
   parseExerciseMetric,
   type ExerciseMetric,
 } from '../domain/exercise-metric'
 import {
   createRegistry,
+  levelsForName,
   normalize,
   resolve,
   type ExerciseRegistry,
 } from '../domain/exercise-registry'
 import { formatNextPlanLabel, type NextPlan } from '../domain/next-plan'
 import { DEFAULT_WEIGHT_UNIT, parseWeightUnit, type WeightUnit } from '../domain/weight-unit'
-import type { BestSet, ExerciseIndexRow, FitKitIndex, IndexEntry, WeightSet } from '../domain/types'
+import type {
+  BestSet,
+  BodyweightBestSet,
+  ExerciseIndexRow,
+  FitKitIndex,
+  IndexEntry,
+  WeightSet,
+} from '../domain/types'
 import type { FitKitSettings } from '../settings'
 import { dashboardPath, exercisesFolder, normalizeFolder, workoutsFolder } from '../settings-paths'
 import { exerciseRegistryWithVaultNotes } from './exercise-registry-vault'
@@ -27,6 +41,8 @@ interface ExerciseAggregate {
   metric: ExerciseMetric
   unit: WeightUnit
   pbSet?: StrengthPbSet
+  pbBodyweightSet?: BodyweightBestSet
+  ladder?: BodyweightLadder
   totalSets: number
   totalDurationSeconds: number
   sessionCount: number
@@ -56,8 +72,15 @@ export function composeDashboard(
   hiddenKeys: ReadonlySet<string>,
   exerciseMetrics: ReadonlyMap<string, ExerciseMetric> = new Map(),
   exerciseUnits: ReadonlyMap<string, WeightUnit> = new Map(),
+  exerciseLadders: ReadonlyMap<string, BodyweightLadder> = new Map(),
 ): string {
-  const exercises = visibleExerciseAggregates(index, hiddenKeys, exerciseMetrics, exerciseUnits)
+  const exercises = visibleExerciseAggregates(
+    index,
+    hiddenKeys,
+    exerciseMetrics,
+    exerciseUnits,
+    exerciseLadders,
+  )
   return composeDashboardFromAggregates(index, workoutsFolderPath, exercisesFolderPath, exercises)
 }
 
@@ -72,7 +95,14 @@ export async function regenerateDashboard(
   const exercisesPath = exercisesFolder(settings)
   const exerciseMetrics = buildExerciseMetricMap(app, settings, index)
   const exerciseUnits = buildExerciseUnitMap(app, settings, index)
-  const exercises = visibleExerciseAggregates(index, hiddenKeys, exerciseMetrics, exerciseUnits)
+  const exerciseLadders = buildExerciseLadderMap(app, settings, index)
+  const exercises = visibleExerciseAggregates(
+    index,
+    hiddenKeys,
+    exerciseMetrics,
+    exerciseUnits,
+    exerciseLadders,
+  )
   const markdown = composeDashboardFromAggregates(index, folder, exercisesPath, exercises)
   const existing = app.vault.getAbstractFileByPath(path)
 
@@ -151,8 +181,9 @@ function visibleExerciseAggregates(
   hiddenKeys: ReadonlySet<string>,
   exerciseMetrics: ReadonlyMap<string, ExerciseMetric>,
   exerciseUnits: ReadonlyMap<string, WeightUnit>,
+  exerciseLadders: ReadonlyMap<string, BodyweightLadder>,
 ): ExerciseAggregate[] {
-  return aggregateExercises(index, exerciseMetrics, exerciseUnits)
+  return aggregateExercises(index, exerciseMetrics, exerciseUnits, exerciseLadders)
     .filter((exercise) => !hiddenKeys.has(`exercise:${exercise.exerciseName}`))
     .sort((left, right) => left.exerciseName.localeCompare(right.exerciseName))
 }
@@ -161,13 +192,20 @@ function aggregateExercises(
   index: FitKitIndex,
   exerciseMetrics: ReadonlyMap<string, ExerciseMetric>,
   exerciseUnits: ReadonlyMap<string, WeightUnit>,
+  exerciseLadders: ReadonlyMap<string, BodyweightLadder>,
 ): ExerciseAggregate[] {
   const exercises = new Map<string, ExerciseAggregate>()
 
   for (const entry of index.entries) {
     const sessionExercises = new Set<string>()
     for (const row of entry.exercises) {
-      const aggregate = getAggregate(exercises, row, exerciseMetrics, exerciseUnits)
+      const aggregate = getAggregate(
+        exercises,
+        row,
+        exerciseMetrics,
+        exerciseUnits,
+        exerciseLadders,
+      )
       aggregate.totalSets += row.totalSets ?? 0
       aggregate.totalDurationSeconds += row.totalDurationSeconds ?? 0
       if (!sessionExercises.has(row.exerciseName)) {
@@ -177,6 +215,13 @@ function aggregateExercises(
       const candidate = pickDashboardSet(row, aggregate.metric)
       if (candidate && isBetterDashboardSet(candidate, aggregate.pbSet, aggregate.metric)) {
         aggregate.pbSet = candidate
+      }
+      const bodyweightCandidate = pickBodyweightDashboardSet(row)
+      if (
+        bodyweightCandidate &&
+        isBetterBodyweightDashboardSet(bodyweightCandidate, aggregate.pbBodyweightSet)
+      ) {
+        aggregate.pbBodyweightSet = bodyweightCandidate
       }
       if (row.next) {
         const planned: PlannedSession = {
@@ -200,6 +245,7 @@ function getAggregate(
   row: ExerciseIndexRow,
   exerciseMetrics: ReadonlyMap<string, ExerciseMetric>,
   exerciseUnits: ReadonlyMap<string, WeightUnit>,
+  exerciseLadders: ReadonlyMap<string, BodyweightLadder>,
 ): ExerciseAggregate {
   const existing = exercises.get(row.exerciseName)
   if (existing) {
@@ -211,6 +257,7 @@ function getAggregate(
     kind: row.kind,
     metric: exerciseMetrics.get(row.exerciseName) ?? DEFAULT_EXERCISE_METRIC,
     unit: exerciseUnits.get(row.exerciseName) ?? DEFAULT_WEIGHT_UNIT,
+    ladder: exerciseLadders.get(row.exerciseName),
     totalSets: 0,
     totalDurationSeconds: 0,
     sessionCount: 0,
@@ -224,8 +271,10 @@ function formatPb(exercise: ExerciseAggregate): string {
 
   switch (exercise.kind) {
     case 'bodyweight': {
-      const sessionLabel = exercise.sessionCount === 1 ? 'session' : 'sessions'
-      return `- **${link}:** total ${exercise.totalSets} sets across ${exercise.sessionCount} ${sessionLabel}`
+      if (!exercise.pbBodyweightSet) {
+        return `- **${link}:** no completed sets`
+      }
+      return `- **${link}:** ${formatBodyweightDashboardSet(exercise.pbBodyweightSet, exercise.ladder)}`
     }
     case 'duration': {
       const sessionLabel = exercise.sessionCount === 1 ? 'session' : 'sessions'
@@ -277,12 +326,16 @@ function dataviewQuery(exercise: ExerciseAggregate, workoutsFolderPath: string):
   switch (exercise.kind) {
     case 'bodyweight':
       return [
-        'table without id file.link as Session, level as Level',
-        `from "${workoutsFolderPath}"`,
-        'flatten file.lists as item',
-        `where contains(item.text, "[exercise:: [[${exercise.exerciseName}]]]") and item.level`,
-        'sort file.name desc',
-        'limit 12',
+        'TABLE WITHOUT ID',
+        '  file.link AS Workout,',
+        '  L.level AS Level,',
+        '  L.reps AS Reps,',
+        '  L.load AS Load',
+        `FROM "${workoutsFolderPath}"`,
+        'FLATTEN file.lists AS L',
+        `WHERE L.exercise = link("${exercise.exerciseName}") AND L.level`,
+        'SORT file.name DESC, L.level ASC',
+        'LIMIT 10',
       ]
     case 'duration':
       return [
@@ -341,6 +394,32 @@ function isBetterDashboardSet(
   return (candidate.e1rm ?? 0) > (current.e1rm ?? 0)
 }
 
+/** Bodyweight best of a session row; other kinds contribute nothing here. */
+function pickBodyweightDashboardSet(row: ExerciseIndexRow): BodyweightBestSet | null {
+  if (row.kind !== 'bodyweight') {
+    return null
+  }
+  return row.maxBodyweightSet ?? null
+}
+
+/**
+ * Better bodyweight set under the shared best-set ordering. The winner is
+ * always one of the two inputs, so a new winner differs from the current.
+ */
+function isBetterBodyweightDashboardSet(
+  candidate: BodyweightBestSet,
+  current: BodyweightBestSet | undefined,
+): boolean {
+  if (!current) {
+    return true
+  }
+  const best = pickBestBodyweightSet([current, candidate])
+  return (
+    best !== null &&
+    (best.level !== current.level || best.reps !== current.reps || best.load !== current.load)
+  )
+}
+
 function validWeightSet(set: WeightSet | undefined): set is WeightSet {
   return (
     set !== undefined &&
@@ -353,6 +432,15 @@ function validWeightSet(set: WeightSet | undefined): set is WeightSet {
 
 function validBestSet(set: BestSet | undefined): set is BestSet {
   return validWeightSet(set) && Number.isFinite(set.e1rm) && set.e1rm > 0
+}
+
+/** Sibling of the strength line: rung name where strength names weight, then reps. */
+function formatBodyweightDashboardSet(
+  set: BodyweightBestSet,
+  ladder: BodyweightLadder | undefined,
+): string {
+  const name = bodyweightLevelName(ladder, set.level)
+  return set.reps > 0 ? `${name} x ${set.reps}` : name
 }
 
 function formatDashboardSet(set: StrengthPbSet, metric: ExerciseMetric, unit: WeightUnit): string {
@@ -413,8 +501,14 @@ function readExerciseNoteMetrics(app: App, settings: FitKitSettings): Map<string
       continue
     }
 
+    /**
+     * Strength-only statistic read from frontmatter; a metric of another
+     * kind reads as the default, the way it did before the metric union
+     * widened to cover bodyweight.
+     */
+    const parsed = parseExerciseMetric(readFrontmatterField(frontmatter, 'metric'))
     const metric =
-      parseExerciseMetric(readFrontmatterField(frontmatter, 'metric')) ?? DEFAULT_EXERCISE_METRIC
+      parsed && VALID_EXERCISE_METRICS.strength.includes(parsed) ? parsed : DEFAULT_EXERCISE_METRIC
     metrics.set(normalize(file.basename), metric)
   }
 
@@ -437,6 +531,31 @@ function getExerciseMetric(
   }
 
   return noteMetrics.get(normalize(resolved.entry.name)) ?? DEFAULT_EXERCISE_METRIC
+}
+
+/**
+ * Ladder per bodyweight exercise from the vault-backed registry, so the
+ * dashboard names rungs the same way the chart does.
+ */
+function buildExerciseLadderMap(
+  app: App,
+  settings: FitKitSettings,
+  index: FitKitIndex,
+): Map<string, BodyweightLadder> {
+  const registry = createRegistry(exerciseRegistryWithVaultNotes(app, settings))
+  const ladders = new Map<string, BodyweightLadder>()
+  for (const entry of index.entries) {
+    for (const row of entry.exercises) {
+      if (row.kind !== 'bodyweight' || ladders.has(row.exerciseName)) {
+        continue
+      }
+      const ladder = levelsForName(registry, row.exerciseName)
+      if (ladder) {
+        ladders.set(row.exerciseName, ladder)
+      }
+    }
+  }
+  return ladders
 }
 
 function buildExerciseUnitMap(

@@ -171,4 +171,10 @@ describe('exercise chart svg', () => {
 
     expect(yLabelTexts(root)).toEqual(['Rung 2', 'Rung 9', 'Rung 10'])
   })
+
+  it('never labels a rung zero for a single level-1 session', () => {
+    const root = render(levelSeries([1]), { ladder: ['Wall push-up', 'Knee push-up'] })
+
+    expect(yLabelTexts(root)).toEqual(['Wall push-up', 'Knee push-up'])
+  })
 })

@@ -8,6 +8,7 @@ import {
 } from './exercise-registry'
 import {
   DEFAULT_EXERCISE_METRIC,
+  VALID_EXERCISE_METRICS,
   parseExerciseMetric,
   type ExerciseMetric,
 } from './exercise-metric'
@@ -330,7 +331,7 @@ function repairFrontmatter(
       nextFrontmatterLines = insertLines(nextFrontmatterLines, kindLineIndex + 1, [
         `metric: ${DEFAULT_EXERCISE_METRIC}`,
       ])
-    } else if (frontmatterMetric(nextFrontmatterLines[metricLineIndex] ?? '') === null) {
+    } else if (frontmatterStrengthMetric(nextFrontmatterLines[metricLineIndex] ?? '') === null) {
       nextFrontmatterLines = replaceLine(
         nextFrontmatterLines,
         metricLineIndex,
@@ -502,6 +503,15 @@ function frontmatterKind(lines: ReadonlyArray<string>): ExerciseKind | null {
 
 function frontmatterMetric(line: string): ExerciseMetric | null {
   return parseExerciseMetric(scalarValue(line))
+}
+
+/**
+ * A metric line the migrate pass trusts on a strength note. Unknown text
+ * repairs to the default, and so does a known metric of another kind.
+ */
+function frontmatterStrengthMetric(line: string): ExerciseMetric | null {
+  const metric = frontmatterMetric(line)
+  return metric && VALID_EXERCISE_METRICS.strength.includes(metric) ? metric : null
 }
 
 /**

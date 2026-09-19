@@ -477,6 +477,34 @@ describe('buildExerciseChartSeries', () => {
     expect(formatChartValue(233.3, { ...baseSeries, metric: 'e1rm', unit: 'lbs' })).toBe('233.3lbs')
   })
 
+  it('names the rung in a level tooltip instead of a duration', () => {
+    const baseSeries = {
+      exerciseName: 'Push-up',
+      kind: 'bodyweight',
+      points: [],
+      windowRequested: 30,
+      totalDates: 0,
+    } satisfies Omit<ChartSeries, 'metric' | 'unit'>
+    const series: ChartSeries = { ...baseSeries, metric: 'level', unit: 'level' }
+
+    expect(formatChartTooltip('2026-04-01', 2, series, ['Wall push-up', 'Knee push-up'])).toBe(
+      '2026-04-01: Knee push-up',
+    )
+  })
+
+  it('reads a reps tooltip as a rep count', () => {
+    const baseSeries = {
+      exerciseName: 'Push-up',
+      kind: 'bodyweight',
+      points: [],
+      windowRequested: 30,
+      totalDates: 0,
+    } satisfies Omit<ChartSeries, 'metric' | 'unit'>
+    const series: ChartSeries = { ...baseSeries, metric: 'reps', unit: 'reps' }
+
+    expect(formatChartTooltip('2026-04-01', 8, series)).toBe('2026-04-01: 8 reps')
+  })
+
   it('labels weight chart axes with the active unit', () => {
     const series = buildExerciseChartSeries(
       fitKitIndex([

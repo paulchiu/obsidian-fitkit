@@ -562,6 +562,16 @@ unit: lbs
     expect(second.markdown).toBe(result.markdown)
   })
 
+  it('repairs a strength metric that belongs to another kind', () => {
+    const source = completeStrengthNote().replace('metric: e1rm', 'metric: level')
+
+    const result = migrate(source)
+
+    expect(result.status).toBe('updated')
+    expect(result.markdown).toContain('metric: e1rm')
+    expect(result.markdown).not.toContain('metric: level')
+  })
+
   it('leaves an existing metric key unchanged', () => {
     const source = completeStrengthNote().replace('metric: e1rm', 'metric: weight')
 

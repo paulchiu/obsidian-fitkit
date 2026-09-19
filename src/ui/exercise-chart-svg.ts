@@ -57,7 +57,7 @@ export function renderExerciseChartSvg(
   drawMetricLabel(svg, series)
   drawYLabels(svg, range, series, options.ladder)
   drawXLabels(svg, series)
-  drawSeries(svg, series, range)
+  drawSeries(svg, series, range, options.ladder)
 }
 
 function buildTitle(series: ChartSeries): string {
@@ -248,6 +248,7 @@ function drawSeries(
   svg: SVGSVGElement,
   series: ChartSeries,
   range: { min: number; max: number },
+  ladder: BodyweightLadder | undefined,
 ): void {
   const points = series.points
   const coords = points.map((point, index) => {
@@ -278,7 +279,7 @@ function drawSeries(
       },
     })
     const titleEl = dot.createSvg('title')
-    titleEl.textContent = formatChartTooltip(point.date, point.value, series)
+    titleEl.textContent = formatChartTooltip(point.date, point.value, series, ladder)
   }
 }
 
@@ -315,11 +316,17 @@ function computeY(value: number, range: { min: number; max: number }): number {
   return MARGIN_TOP + (1 - ratio) * PLOT_HEIGHT
 }
 
-export function formatChartTooltip(date: string, value: number, series: ChartSeries): string {
+/** Tooltip for a dot: a level names its rung, every other metric formats its value. */
+export function formatChartTooltip(
+  date: string,
+  value: number,
+  series: ChartSeries,
+  ladder?: BodyweightLadder,
+): string {
   if (series.metric === 'e1rm') {
-    return `${date}: e1rm ${formatChartValue(value, series)}`
+    return `${date}: e1rm ${formatChartValue(value, series, ladder)}`
   }
-  return `${date}: ${formatChartValue(value, series)}`
+  return `${date}: ${formatChartValue(value, series, ladder)}`
 }
 
 export function chartYAxisTitle(series: ChartSeries): string | null {
@@ -335,7 +342,18 @@ export function chartYAxisTitle(series: ChartSeries): string | null {
   return null
 }
 
-export function formatChartValue(value: number, series: ChartSeries): string {
+/**
+ * Value text for axes and tooltips. A level names its rung (the axis point
+ * is the rung name, so the tooltip matches it) rather than a duration.
+ */
+export function formatChartValue(
+  value: number,
+  series: ChartSeries,
+  ladder?: BodyweightLadder,
+): string {
+  if (series.metric === 'level') {
+    return bodyweightLevelName(ladder, value)
+  }
   if (series.metric === 'e1rm') {
     return `${value.toFixed(1)}${series.unit}`
   }
