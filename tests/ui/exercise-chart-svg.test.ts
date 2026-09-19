@@ -114,6 +114,20 @@ function polylinePairs(root: TestElement): Array<{ x: number; y: number }> {
 }
 
 describe('exercise chart svg', () => {
+  it('gives a level axis a wider left margin than a numeric one', () => {
+    const levelRoot = render(levelSeries([1, 2]), { ladder: ['Wall push-up', 'Knee push-up'] })
+    const strengthRoot = render(strengthSeries([80, 85]))
+    const levelLabelX = descendants(levelRoot)
+      .filter((node) => node.tag === 'text' && node.attrs['text-anchor'] === 'end')
+      .map((node) => Number(node.attrs['x']))
+    const strengthLabelX = descendants(strengthRoot)
+      .filter((node) => node.tag === 'text' && node.attrs['text-anchor'] === 'end')
+      .map((node) => Number(node.attrs['x']))
+
+    expect(levelLabelX[0]).toBe(132)
+    expect(strengthLabelX[0]).toBe(48)
+  })
+
   it('draws a level series as a step line that holds each rung until the next session', () => {
     const pairs = polylinePairs(render(levelSeries([2, 3])))
 
@@ -122,7 +136,7 @@ describe('exercise chart svg', () => {
      * bottom edge and rung 3 at the top, so a held line must rise there.
      */
     expect(pairs).toEqual([
-      { x: 56, y: 276 },
+      { x: 140, y: 276 },
       { x: 784, y: 276 },
       { x: 784, y: 16 },
     ])
@@ -165,6 +179,34 @@ describe('exercise chart svg', () => {
     })
 
     expect(yLabelTexts(root)).toEqual(['Wall push-up', 'Knee push-up', 'Push-up'])
+  })
+
+  it('shortens an overlong rung name while keeping its distinguishing start', () => {
+    const longName = `Diamond push-up ${'x'.repeat(200)}`
+    const root = render(levelSeries([1, 2]), { ladder: ['Wall push-up', longName] })
+    const labels = yLabelTexts(root)
+
+    expect(labels[0]).toBe('Wall push-up')
+    expect(labels[1]).not.toBe(longName)
+    expect(labels[1]?.startsWith('Diamond')).toBe(true)
+    expect(labels[1]?.endsWith('\u2026')).toBe(true)
+    expect(new Set(labels).size).toBe(labels.length)
+  })
+
+  it('keeps the full rung name where the axis label shortens it', () => {
+    const longName = `Diamond push-up ${'x'.repeat(200)}`
+    const root = render(levelSeries([1, 2]), { ladder: ['Wall push-up', longName] })
+    const labels = descendants(root).filter(
+      (node) => node.tag === 'text' && node.attrs['text-anchor'] === 'end',
+    )
+    const shortened = labels.filter((node) => node.textContent.endsWith('\u2026'))
+    const shortenedTitles = shortened.flatMap((node) =>
+      node.children.filter((child) => child.tag === 'title').map((child) => child.textContent),
+    )
+
+    expect(labels.map((node) => node.textContent)).toContain('Wall push-up')
+    expect(shortened).toHaveLength(1)
+    expect(shortenedTitles).toEqual([longName])
   })
 
   it('falls back to the level number for rungs the ladder no longer names', () => {

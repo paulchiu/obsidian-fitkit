@@ -7,11 +7,32 @@ const MARGIN_LEFT = 56
 const MARGIN_RIGHT = 16
 const MARGIN_TOP = 16
 const MARGIN_BOTTOM = 44
-const PLOT_WIDTH = VIEW_WIDTH - MARGIN_LEFT - MARGIN_RIGHT
 const PLOT_HEIGHT = VIEW_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM
 const Y_TICKS = 4
+/** Level labels are words, so their axis takes a wider margin than a numeric one; the plot narrows to pay for it. */
+const LEVEL_MARGIN_LEFT = 140
 /** Level axes reuse the numeric axis label budget, so long ladders thin to the same count. */
 const MAX_LEVEL_TICKS = Y_TICKS + 1
+/** Rung-name characters a level label shows before shortening. SVG has no measuring path, so a fixed budget stands in for the widened margin. */
+const LEVEL_LABEL_MAX_CHARS = 20
+
+/** Shorten a rung name past the axis budget, keeping the distinguishing start and marking the cut. */
+function shortenLevelLabel(name: string): string {
+  if (name.length <= LEVEL_LABEL_MAX_CHARS) {
+    return name
+  }
+  return `${name.slice(0, LEVEL_LABEL_MAX_CHARS - 1)}…`
+}
+
+/** Left margin for a series: rung names need words of room, numbers do not. */
+function marginLeft(series: ChartSeries): number {
+  return series.metric === 'level' ? LEVEL_MARGIN_LEFT : MARGIN_LEFT
+}
+
+/** Plot width for a series, narrowing as its left margin widens. */
+function plotWidth(series: ChartSeries): number {
+  return VIEW_WIDTH - marginLeft(series) - MARGIN_RIGHT
+}
 
 export interface RenderChartOptions {
   notes?: string[]
@@ -53,7 +74,7 @@ export function renderExerciseChartSvg(
   const values = series.points.map((point) => point.value)
   const range = niceRange(values)
   drawGrid(svg, range, series)
-  drawAxes(svg)
+  drawAxes(svg, series)
   drawMetricLabel(svg, series)
   drawYLabels(svg, range, series, options.ladder)
   drawXLabels(svg, series)
@@ -87,8 +108,8 @@ function drawGrid(
       svg.createSvg('line', {
         cls: 'fitkit-chart-grid',
         attr: {
-          x1: MARGIN_LEFT,
-          x2: MARGIN_LEFT + PLOT_WIDTH,
+          x1: marginLeft(series),
+          x2: marginLeft(series) + plotWidth(series),
           y1: y,
           y2: y,
         },
@@ -102,8 +123,8 @@ function drawGrid(
     svg.createSvg('line', {
       cls: 'fitkit-chart-grid',
       attr: {
-        x1: MARGIN_LEFT,
-        x2: MARGIN_LEFT + PLOT_WIDTH,
+        x1: marginLeft(series),
+        x2: marginLeft(series) + plotWidth(series),
         y1: y,
         y2: y,
       },
@@ -111,12 +132,12 @@ function drawGrid(
   }
 }
 
-function drawAxes(svg: SVGSVGElement): void {
+function drawAxes(svg: SVGSVGElement, series: ChartSeries): void {
   svg.createSvg('line', {
     cls: 'fitkit-chart-axis',
     attr: {
-      x1: MARGIN_LEFT,
-      x2: MARGIN_LEFT,
+      x1: marginLeft(series),
+      x2: marginLeft(series),
       y1: MARGIN_TOP,
       y2: MARGIN_TOP + PLOT_HEIGHT,
     },
@@ -124,8 +145,8 @@ function drawAxes(svg: SVGSVGElement): void {
   svg.createSvg('line', {
     cls: 'fitkit-chart-axis',
     attr: {
-      x1: MARGIN_LEFT,
-      x2: MARGIN_LEFT + PLOT_WIDTH,
+      x1: marginLeft(series),
+      x2: marginLeft(series) + plotWidth(series),
       y1: MARGIN_TOP + PLOT_HEIGHT,
       y2: MARGIN_TOP + PLOT_HEIGHT,
     },
@@ -149,7 +170,7 @@ function drawYLabels(
     const label = svg.createSvg('text', {
       cls: 'fitkit-chart-axis-label',
       attr: {
-        x: MARGIN_LEFT - 8,
+        x: marginLeft(series) - 8,
         y: y + 4,
         'text-anchor': 'end',
       },
@@ -171,15 +192,19 @@ function drawLevelYLabels(
 ): void {
   for (const level of pickLevelTickLevels(range, series)) {
     const y = computeY(level, range)
+    const fullName = bodyweightLevelName(ladder, level)
     const label = svg.createSvg('text', {
       cls: 'fitkit-chart-axis-label',
       attr: {
-        x: MARGIN_LEFT - 8,
+        x: marginLeft(series) - 8,
         y: y + 4,
         'text-anchor': 'end',
       },
     })
-    label.textContent = bodyweightLevelName(ladder, level)
+    label.textContent = shortenLevelLabel(fullName)
+    if (label.textContent !== fullName) {
+      label.createSvg('title').textContent = fullName
+    }
   }
 }
 
@@ -234,7 +259,7 @@ function drawMetricLabel(svg: SVGSVGElement, series: ChartSeries): void {
   const title = svg.createSvg('text', {
     cls: 'fitkit-chart-axis-label',
     attr: {
-      x: MARGIN_LEFT,
+      x: marginLeft(series),
       y: MARGIN_TOP - 4,
       'text-anchor': 'start',
     },
@@ -250,7 +275,7 @@ function drawXLabels(svg: SVGSVGElement, series: ChartSeries): void {
     if (!point) {
       continue
     }
-    const x = computeX(index, series.points.length)
+    const x = computeX(index, series.points.length, series)
     const label = svg.createSvg('text', {
       cls: 'fitkit-chart-axis-label',
       attr: {
@@ -271,7 +296,7 @@ function drawSeries(
 ): void {
   const points = series.points
   const coords = points.map((point, index) => {
-    const x = computeX(index, points.length)
+    const x = computeX(index, points.length, series)
     const y = computeY(point.value, range)
     return { x, y, point }
   })
@@ -320,12 +345,14 @@ function stepLinePoints(coords: ReadonlyArray<{ x: number; y: number }>): string
   return stepped
 }
 
-function computeX(index: number, count: number): number {
+function computeX(index: number, count: number, series: ChartSeries): number {
+  const left = marginLeft(series)
+  const width = plotWidth(series)
   if (count <= 1) {
-    return MARGIN_LEFT + PLOT_WIDTH / 2
+    return left + width / 2
   }
   const ratio = index / (count - 1)
-  return MARGIN_LEFT + ratio * PLOT_WIDTH
+  return left + ratio * width
 }
 
 function computeY(value: number, range: { min: number; max: number }): number {
