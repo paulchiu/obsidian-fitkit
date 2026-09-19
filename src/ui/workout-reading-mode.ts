@@ -147,17 +147,15 @@ function renderExercisePreview(el: HTMLElement, exercise: ExerciseEntry): void {
   }
 
   if (exercise.kind === 'strength') {
-    renderStrengthTable(wrap, exercise.strengthSets ?? [])
+    renderStrengthTable(wrap, exercise.strengthSets)
   } else {
-    renderDurationTable(wrap, exercise.durationEntries ?? [])
+    renderDurationTable(wrap, exercise.durationEntries)
   }
 }
 
 function exerciseCountText(exercise: ExerciseEntry): string {
   const count =
-    exercise.kind === 'strength'
-      ? (exercise.strengthSets ?? []).length
-      : (exercise.durationEntries ?? []).length
+    exercise.kind === 'strength' ? exercise.strengthSets.length : exercise.durationEntries.length
   return count === 1 ? '1 row' : `${count} rows`
 }
 

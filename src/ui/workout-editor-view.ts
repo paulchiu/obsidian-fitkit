@@ -35,9 +35,11 @@ import {
   parseWorkoutNote,
   serializeWorkoutNote,
   type DurationEntry,
+  type DurationExerciseEntry,
   type ExerciseEntry,
   type ExerciseKind,
   type PreserveBlock,
+  type StrengthExerciseEntry,
   type StrengthSet,
   type WorkoutNoteModel,
 } from '../domain/workout-note-model'
@@ -1945,8 +1947,10 @@ function toEditorExercise(exercise: ExerciseEntry): ExerciseCard {
   const card: ExerciseCard = {
     name: exercise.exerciseName,
     kind: exercise.kind,
-    strengthSets: (exercise.strengthSets ?? []).map(toEditorStrengthSet),
-    durationEntries: (exercise.durationEntries ?? []).map(toEditorDurationEntry),
+    strengthSets:
+      exercise.kind === 'strength' ? exercise.strengthSets.map(toEditorStrengthSet) : [],
+    durationEntries:
+      exercise.kind === 'duration' ? exercise.durationEntries.map(toEditorDurationEntry) : [],
   }
   if (exercise.note !== undefined) {
     card.exerciseNotes = exercise.note
@@ -2002,20 +2006,32 @@ function toWorkoutNoteModel(model: EditorWorkoutModel): WorkoutNoteModel {
 }
 
 function toWorkoutExercise(card: ExerciseCard): ExerciseEntry {
-  const exercise: ExerciseEntry = {
+  const note = card.exerciseNotes
+  const next = card.next
+  if (card.kind === 'strength') {
+    const exercise: StrengthExerciseEntry = {
+      exerciseName: card.name,
+      kind: card.kind,
+      strengthSets: card.strengthSets.map(toStrengthSet),
+    }
+    if (note !== undefined) {
+      exercise.note = note
+    }
+    if (next !== undefined) {
+      exercise.next = next
+    }
+    return exercise
+  }
+  const exercise: DurationExerciseEntry = {
     exerciseName: card.name,
     kind: card.kind,
+    durationEntries: card.durationEntries.map(toDurationEntry),
   }
-  if (card.exerciseNotes !== undefined) {
-    exercise.note = card.exerciseNotes
+  if (note !== undefined) {
+    exercise.note = note
   }
-  if (card.next !== undefined) {
-    exercise.next = card.next
-  }
-  if (card.kind === 'strength') {
-    exercise.strengthSets = card.strengthSets.map(toStrengthSet)
-  } else {
-    exercise.durationEntries = card.durationEntries.map(toDurationEntry)
+  if (next !== undefined) {
+    exercise.next = next
   }
   return exercise
 }

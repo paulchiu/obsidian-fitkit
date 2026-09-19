@@ -101,12 +101,11 @@ function toEntry(file: TFile, model: WorkoutNoteModel): IndexEntry {
 
 function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
   if (exercise.kind === 'duration') {
-    const durationEntries = exercise.durationEntries ?? []
     return {
       exerciseName: exercise.exerciseName,
       kind: exercise.kind,
-      totalSets: durationEntries.length,
-      totalDurationSeconds: durationEntries.reduce(
+      totalSets: exercise.durationEntries.length,
+      totalDurationSeconds: exercise.durationEntries.reduce(
         (total, entry) => total + entry.durationSeconds,
         0,
       ),
@@ -114,13 +113,12 @@ function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
     }
   }
 
-  const strengthSets = exercise.strengthSets ?? []
   return {
     exerciseName: exercise.exerciseName,
     kind: exercise.kind,
-    bestSet: pickBestSet(strengthSets) ?? undefined,
-    maxWeightSet: pickHeaviestSet(strengthSets) ?? undefined,
-    totalSets: strengthSets.length,
+    bestSet: pickBestSet(exercise.strengthSets) ?? undefined,
+    maxWeightSet: pickHeaviestSet(exercise.strengthSets) ?? undefined,
+    totalSets: exercise.strengthSets.length,
     next: exercise.next,
   }
 }

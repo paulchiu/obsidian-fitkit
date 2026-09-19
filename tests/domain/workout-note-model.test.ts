@@ -199,6 +199,105 @@ describe('workout note model', () => {
     ).toBe(true)
   })
 
+  it('carries only one payload per entry, keyed by kind', () => {
+    const model = expectWorkoutModel(
+      [
+        '---',
+        'type: workout',
+        'date: 2026-04-24',
+        'name: Kind Payloads',
+        '---',
+        '',
+        '## [[Squat]]',
+        '',
+        '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+        '',
+        '## [[Plank]]',
+        '',
+        '- [exercise:: [[Plank]]] [duration:: 60]',
+      ].join('\n'),
+      'kind-payloads.md',
+    )
+
+    expect(model.exercises).toHaveLength(2)
+    const strength = model.exercises[0]
+    const duration = model.exercises[1]
+    expect('durationEntries' in (strength as object)).toBe(false)
+    expect('strengthSets' in (duration as object)).toBe(false)
+    expect(strength).toEqual({
+      exerciseName: 'Squat',
+      kind: 'strength',
+      strengthSets: [{ set: 1, weight: 100, reps: 5 }],
+    })
+    expect(duration).toEqual({
+      exerciseName: 'Plank',
+      kind: 'duration',
+      durationEntries: [{ durationSeconds: 60 }],
+    })
+  })
+
+  it('coerces strength rows to a duration entry carrying only the duration rows', () => {
+    const result = parseWorkoutNote(
+      [
+        '---',
+        'type: workout',
+        'date: 2026-04-24',
+        'name: Mixed Rows',
+        '---',
+        '',
+        '## [[Squat]]',
+        '',
+        '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+        '- [exercise:: [[Squat]]] [duration:: 60]',
+      ].join('\n'),
+      'mixed-rows.md',
+    )
+
+    expect(result.warnings).toContain(
+      'mixed-rows.md: Exercise "Squat" has both strength and duration rows; dropping strength data.',
+    )
+    expect(result.model?.exercises).toHaveLength(1)
+    const entry = result.model?.exercises[0]
+    expect(entry?.kind).toBe('duration')
+    expect('strengthSets' in (entry as object)).toBe(false)
+    expect(entry).toEqual({
+      exerciseName: 'Squat',
+      kind: 'duration',
+      durationEntries: [{ durationSeconds: 60 }],
+    })
+  })
+
+  it('coerces duration rows to a strength entry carrying only the strength rows', () => {
+    const result = parseWorkoutNote(
+      [
+        '---',
+        'type: workout',
+        'date: 2026-04-24',
+        'name: Mixed Rows',
+        '---',
+        '',
+        '## [[Plank]]',
+        '',
+        '- [exercise:: [[Plank]]] [duration:: 60]',
+        '- [exercise:: [[Plank]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      ].join('\n'),
+      'mixed-rows-mirror.md',
+    )
+
+    expect(result.warnings).toContain(
+      'mixed-rows-mirror.md: Exercise "Plank" has both strength and duration rows; dropping duration data.',
+    )
+    expect(result.model?.exercises).toHaveLength(1)
+    const entry = result.model?.exercises[0]
+    expect(entry?.kind).toBe('strength')
+    expect('durationEntries' in (entry as object)).toBe(false)
+    expect(entry).toEqual({
+      exerciseName: 'Plank',
+      kind: 'strength',
+      strengthSets: [{ set: 1, weight: 100, reps: 5 }],
+    })
+  })
+
   it('preserves fenced blocks in serialized output', () => {
     const model = expectWorkoutModel(fixture('workouts/fence-block.md'), 'workouts/fence-block.md')
     const serialized = serializeWorkoutNote(model)
@@ -660,7 +759,11 @@ describe('workout note model', () => {
     const baseline = serializeWorkoutNote(expectWorkoutModel(source, 'workouts/hand-edited.md'))
 
     const edited = expectWorkoutModel(source, 'workouts/hand-edited.md')
-    const benchSets = edited.exercises[0]?.strengthSets
+    const bench = edited.exercises[0]
+    if (bench?.kind !== 'strength') {
+      throw new Error('hand-edited.md first exercise did not parse as strength')
+    }
+    const benchSets = bench.strengthSets
     expect(benchSets?.[1]).toBeDefined()
     if (benchSets?.[1]) {
       benchSets[1].weight = 70
@@ -686,7 +789,11 @@ describe('workout note model', () => {
     const source = fixture('workouts/hand-edited.md')
     const model = expectWorkoutModel(source, 'workouts/hand-edited.md')
 
-    expect(model.exercises[0]?.strengthSets?.[0]).toEqual({ set: 1, weight: 60, reps: 8 })
+    const first = model.exercises[0]
+    if (first?.kind !== 'strength') {
+      throw new Error('hand-edited.md first exercise did not parse as strength')
+    }
+    expect(first.strengthSets?.[0]).toEqual({ set: 1, weight: 60, reps: 8 })
     const serialized = serializeWorkoutNote(model)
     expect(serialized).not.toContain('rpe')
   })
