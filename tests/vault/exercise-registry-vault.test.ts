@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { FitKitSettings } from '../../src/settings'
 import {
+  applyLadderOverrides,
+  bodyweightLevelsFor,
   buildExerciseRegistrySnapshot,
   exerciseRegistryWithVaultNotes,
 } from '../../src/vault/exercise-registry-vault'
@@ -188,5 +190,120 @@ describe('exercise registry vault merge', () => {
     expect(snapshot.entries).toEqual([
       { name: 'Restored', kind: 'duration', unit: 'kg', aliases: ['again'] },
     ])
+  })
+
+  it('prefers the note ladder over a differing saved ladder and emits a diagnostic', () => {
+    const snapshot = buildExerciseRegistrySnapshot(
+      mockApp([
+        {
+          path: 'Fitness/Exercises/Push-up.md',
+          basename: 'Push-up',
+          frontmatter: { type: 'exercise', kind: 'bodyweight', levels: ['Tuck'] },
+        },
+      ]),
+      settingsWithRegistry([
+        {
+          name: 'Push-up',
+          kind: 'bodyweight',
+          levels: ['Support hold', 'Tuck'],
+          aliases: ['pushup'],
+        },
+      ]),
+    )
+
+    expect(snapshot.entries).toEqual([
+      { name: 'Push-up', kind: 'bodyweight', levels: ['Tuck'], aliases: ['pushup'] },
+    ])
+    expect(snapshot.diagnostics).toEqual([
+      {
+        kind: 'registry-levels-conflict',
+        name: 'Push-up',
+        path: 'Fitness/Exercises/Push-up.md',
+        warnings: [
+          "Saved registry levels 'Support hold, Tuck' differ from note levels 'Tuck'; using note levels.",
+        ],
+      },
+    ])
+  })
+
+  it('stays silent when the note and saved ladders match', () => {
+    const snapshot = buildExerciseRegistrySnapshot(
+      mockApp([
+        {
+          path: 'Fitness/Exercises/Push-up.md',
+          basename: 'Push-up',
+          frontmatter: { type: 'exercise', kind: 'bodyweight', levels: ['Tuck'] },
+        },
+      ]),
+      settingsWithRegistry([
+        { name: 'Push-up', kind: 'bodyweight', levels: ['Tuck'], aliases: [] },
+      ]),
+    )
+
+    expect(snapshot.entries).toEqual([
+      { name: 'Push-up', kind: 'bodyweight', levels: ['Tuck'], aliases: [] },
+    ])
+    expect(snapshot.diagnostics).toEqual([])
+  })
+
+  it('keeps a saved ladder when the note declares none', () => {
+    const snapshot = buildExerciseRegistrySnapshot(
+      mockApp([
+        {
+          path: 'Fitness/Exercises/Push-up.md',
+          basename: 'Push-up',
+          frontmatter: { type: 'exercise', kind: 'bodyweight' },
+        },
+      ]),
+      settingsWithRegistry([
+        { name: 'Push-up', kind: 'bodyweight', levels: ['Tuck'], aliases: [] },
+      ]),
+    )
+
+    expect(snapshot.entries).toEqual([
+      { name: 'Push-up', kind: 'bodyweight', levels: ['Tuck'], aliases: [] },
+    ])
+    expect(snapshot.diagnostics).toEqual([])
+  })
+
+  it('reads a ladder through the merged snapshot, preferring the note', () => {
+    const app = mockApp([
+      {
+        path: 'Fitness/Exercises/Push-up.md',
+        basename: 'Push-up',
+        frontmatter: { type: 'exercise', kind: 'bodyweight', levels: ['Wall', 'Knee'] },
+      },
+    ])
+    const settings = settingsWithRegistry([
+      { name: 'Push-up', kind: 'bodyweight', levels: ['Stale'], aliases: [] },
+    ])
+
+    expect(bodyweightLevelsFor(app, settings, 'Push-up')).toEqual(['Wall', 'Knee'])
+    expect(bodyweightLevelsFor(app, settings, 'Unknown')).toBeUndefined()
+  })
+
+  it('overlays a just-written ladder onto its snapshot entry by normalized name', () => {
+    const result = applyLadderOverrides(
+      [
+        { name: 'Push-up', kind: 'bodyweight', levels: ['Wall push-up'], aliases: [] },
+        { name: 'Squat', kind: 'strength', aliases: [] },
+      ],
+      new Map([['  PUSH-UP  ', ['Incline push-up', 'Knee push-up']]]),
+    )
+
+    expect(result.find((entry) => entry.name === 'Push-up')?.levels).toEqual([
+      'Incline push-up',
+      'Knee push-up',
+    ])
+    expect(result.find((entry) => entry.name === 'Squat')?.levels).toBeUndefined()
+  })
+
+  it('ignores overrides with no snapshot entry instead of inventing one', () => {
+    const result = applyLadderOverrides(
+      [{ name: 'Squat', kind: 'strength', aliases: [] }],
+      new Map([['Push-up', ['Push-up']]]),
+    )
+
+    expect(result).toEqual([{ name: 'Squat', kind: 'strength', aliases: [] }])
   })
 })

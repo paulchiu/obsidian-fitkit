@@ -18,6 +18,11 @@ export type ExerciseRegistryEntry = {
   name: string
   kind: ExerciseKind
   unit?: WeightUnit
+  /**
+   * Ordered bodyweight rung names. Absent means "no ladder on file",
+   * distinct from an empty ladder; callers treat absence as no ladder.
+   */
+  levels?: string[]
   aliases: string[]
 }
 
@@ -77,6 +82,7 @@ function cloneEntry(entry: ExerciseRegistryEntry): ExerciseRegistryEntry {
     name: entry.name,
     kind: entry.kind,
     unit: entry.unit,
+    levels: entry.levels ? [...entry.levels] : undefined,
     aliases: [...entry.aliases],
   }
 }
@@ -119,6 +125,16 @@ export function kindForName(registry: ExerciseRegistry, rawName: string): Exerci
 export function unitForName(registry: ExerciseRegistry, rawName: string): WeightUnit | null {
   const result = resolve(registry, rawName)
   return result.kind === 'match' ? (result.entry.unit ?? null) : null
+}
+
+/**
+ * Return the ladder of the registry entry matching `rawName` exactly. Returns
+ * undefined when the name is unknown, resolves ambiguously, or has no ladder;
+ * callers treat absence as no ladder rather than an empty one.
+ */
+export function levelsForName(registry: ExerciseRegistry, rawName: string): string[] | undefined {
+  const result = resolve(registry, rawName)
+  return result.kind === 'match' ? result.entry.levels : undefined
 }
 
 export function resolve(registry: ExerciseRegistry, rawName: string): ResolutionResult {
@@ -201,6 +217,7 @@ export type RegistryEntryDraft = {
   name: string
   kind: ExerciseKind
   unit?: WeightUnit
+  levels?: string[]
   aliases: string[]
 }
 
@@ -239,7 +256,13 @@ export function sanitizeEntryDraft(draft: RegistryEntryDraft): RegistryEntryDraf
     seen.add(key)
     aliases.push(trimmed)
   }
-  return { name, kind: draft.kind, unit: draft.unit, aliases }
+  return {
+    name,
+    kind: draft.kind,
+    unit: draft.unit,
+    levels: draft.levels ? [...draft.levels] : undefined,
+    aliases,
+  }
 }
 
 /**
@@ -348,6 +371,7 @@ export function renameEntry(
     name: next.name,
     kind: next.kind,
     unit: next.unit,
+    levels: next.levels ? [...next.levels] : undefined,
     aliases: dedupedAliases,
   })
 }

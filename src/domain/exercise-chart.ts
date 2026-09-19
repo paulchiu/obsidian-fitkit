@@ -73,6 +73,7 @@ export function buildExerciseChartSeries(
 function defaultSeriesMetric(kind: ExerciseKind, metric: ExerciseMetric): ChartSeriesMetric {
   switch (kind) {
     case 'duration':
+    case 'bodyweight':
       return 'duration'
     case 'strength':
       return metric
@@ -152,6 +153,7 @@ function pickMetric(
 ): number | null {
   switch (kind) {
     case 'duration':
+    case 'bodyweight':
       return pickDurationMetric(row)
     case 'strength':
       return pickStrengthMetric(row, metric)

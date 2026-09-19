@@ -41,6 +41,18 @@ const RECENT_SESSIONS_QUERIES: Record<ExerciseKind, RecentSessionsQuery> = {
     'SORT file.name DESC, L.set ASC',
     'LIMIT 10',
   ],
+  bodyweight: (name, workouts) => [
+    'TABLE WITHOUT ID',
+    '  file.link AS Workout,',
+    '  L.level AS Level,',
+    '  L.reps AS Reps,',
+    '  L.load AS Load',
+    `FROM "${workouts}"`,
+    'FLATTEN file.lists AS L',
+    `WHERE L.exercise = link("${name}") AND L.level`,
+    'SORT file.name DESC, L.level ASC',
+    'LIMIT 10',
+  ],
 }
 
 function notesQuery(name: string, fitnessRoot: string): string[] {

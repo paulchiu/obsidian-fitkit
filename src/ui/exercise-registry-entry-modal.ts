@@ -29,6 +29,7 @@ export class ExerciseRegistryEntryModal extends Modal {
   /** True once the user interacts with the unit dropdown; gates whether buildDraft() may record a unit at all. */
   private unitTouched: boolean
   private aliasesText: string
+  private levels: string[] | undefined
   private nameInput!: HTMLInputElement
   private kindSelect!: HTMLSelectElement
   private unitField!: HTMLDivElement
@@ -50,11 +51,13 @@ export class ExerciseRegistryEntryModal extends Modal {
       this.exerciseKind = mode.original.kind
       this.weightUnit = mode.original.unit ?? DEFAULT_WEIGHT_UNIT
       this.aliasesText = mode.original.aliases.join('\n')
+      this.levels = mode.original.levels ? [...mode.original.levels] : undefined
     } else {
       this.name = mode.initial?.name ?? ''
       this.exerciseKind = mode.initial?.kind ?? 'strength'
       this.weightUnit = DEFAULT_WEIGHT_UNIT
       this.aliasesText = ''
+      this.levels = undefined
     }
     this.unitTouched = false
   }
@@ -145,6 +148,7 @@ export class ExerciseRegistryEntryModal extends Modal {
       name: this.name,
       kind: this.exerciseKind,
       unit: this.resolveDraftUnit(),
+      levels: this.levels ? [...this.levels] : undefined,
       aliases: this.aliasesText.split('\n'),
     })
   }

@@ -5,6 +5,7 @@ import {
   bootstrapFromStems,
   createRegistry,
   kindForName,
+  levelsForName,
   mergeRegistries,
   removeEntry,
   renameEntry,
@@ -147,6 +148,22 @@ describe('exercise registry', () => {
     expect(mergeRegistries(existing, fresh)).toEqual([
       { name: 'squat', kind: 'strength', unit: 'kg', aliases: ['squats'] },
     ])
+  })
+
+  it('returns the ladder by canonical name and alias, and undefined when none is recorded', () => {
+    const registry = createRegistry([
+      {
+        name: 'Push-up',
+        kind: 'bodyweight',
+        levels: ['Support hold', 'Tuck', 'Advanced tuck'],
+        aliases: ['pushup'],
+      },
+      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: [] },
+    ])
+
+    expect(levelsForName(registry, 'Push-up')).toEqual(['Support hold', 'Tuck', 'Advanced tuck'])
+    expect(levelsForName(registry, 'pushup')).toEqual(['Support hold', 'Tuck', 'Advanced tuck'])
+    expect(levelsForName(registry, 'Squat')).toBeUndefined()
   })
 })
 
@@ -417,5 +434,26 @@ describe('renameEntry', () => {
     if (result.kind === 'match') {
       expect(result.entry.name).toBe('Back Squat')
     }
+  })
+
+  it('keeps the ladder when an entry that owns one is renamed', () => {
+    const registry = createRegistry([
+      {
+        name: 'Push-up',
+        kind: 'bodyweight',
+        levels: ['Wall push-up', 'Knee push-up'],
+        aliases: [],
+      },
+    ])
+    const next = renameEntry(registry, 'Push-up', {
+      name: 'Pushup',
+      kind: 'bodyweight',
+      levels: ['Wall push-up', 'Knee push-up'],
+      aliases: [],
+    })
+    expect(next.entries.find((row) => row.name === 'Pushup')?.levels).toEqual([
+      'Wall push-up',
+      'Knee push-up',
+    ])
   })
 })

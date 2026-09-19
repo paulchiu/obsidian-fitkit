@@ -3,6 +3,15 @@ import { ItemView, Menu, Modal, Notice, TFile, normalizePath, setIcon } from 'ob
 
 import { reorderArray } from '../domain/array-utils'
 import {
+  defaultBodyweightLevels,
+  describeBodyweightLadderChanges,
+  formatBodyweightLevelLabel,
+  formatBodyweightLevelShort,
+  pickBestBodyweightSet,
+  type BodyweightLadder,
+  type BodyweightLadderChange,
+} from '../domain/bodyweight-levels'
+import {
   formatDurationInput,
   parseDurationInput,
   ZERO_DURATION_DISPLAY,
@@ -19,12 +28,17 @@ import {
 import {
   createRegistry,
   kindForName,
+  levelsForName,
   normalize,
   upsertEntry,
+  type ExerciseRegistry,
   type ExerciseRegistryEntry,
 } from '../domain/exercise-registry'
-import type { ExerciseNoteKindUpdateResult } from '../domain/exercise-note-migrate'
-import { setExerciseNoteKind } from '../domain/exercise-note-migrate'
+import type {
+  ExerciseNoteKindUpdateResult,
+  ExerciseNoteLevelsUpdateResult,
+} from '../domain/exercise-note-migrate'
+import { setExerciseNoteKind, setExerciseNoteLevels } from '../domain/exercise-note-migrate'
 import { filterSuggestableNames } from '../domain/exercise-suggestions'
 import {
   formatNumber as formatPlanNumber,
@@ -34,8 +48,12 @@ import {
 } from '../domain/next-plan'
 import {
   parseWorkoutNote,
+  relabelSetsAsFirstLevel,
   serializeWorkoutNote,
+  setRowCount,
   withNoteAndNext,
+  type BodyweightExerciseEntry,
+  type BodyweightSet,
   type DurationEntry,
   type DurationExerciseEntry,
   type ExerciseEntry,
@@ -47,15 +65,21 @@ import {
 } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
 import { exercisesFolder, workoutsFolder } from '../settings-paths'
-import { findExerciseNoteFile, readExerciseCatalog } from '../vault/exercise-catalog'
+import { findExerciseNotePath } from '../vault/exercise-catalog'
 import { composeExerciseNote } from '../vault/exercise-note'
 import { planExerciseFileOpen } from '../vault/exercise-file-plan'
 import { exerciseHistoryFromVault } from '../vault/exercise-history-vault'
-import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
+import {
+  applyLadderOverrides,
+  bodyweightLevelsFor,
+  exerciseRegistryWithVaultNotes,
+  sameLevels,
+} from '../vault/exercise-registry-vault'
 import { FileSession } from '../vault/file-session'
 import { markdownFilesInFolder } from '../vault/folder-scan'
 import { ensureParentFolder } from '../vault/vault-utils'
 import { ConfirmModal } from './confirm-modal'
+import { EditLevelsModal } from './edit-levels-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
 import { KindSwitchChoiceModal, type KindSwitchChoice } from './kind-switch-choice-modal'
 import { SetNoteModal } from './set-note-modal'
@@ -102,6 +126,14 @@ interface EditableDurationEntry {
   note?: string
 }
 
+interface EditableBodyweightSet {
+  set?: number
+  level?: number
+  reps?: number
+  load?: number
+  note?: string
+}
+
 interface ExerciseCard {
   name: string
   kind: ExerciseKind
@@ -109,12 +141,14 @@ interface ExerciseCard {
   next?: NextPlan
   strengthSets: EditableStrengthSet[]
   durationEntries: EditableDurationEntry[]
+  bodyweightSets: EditableBodyweightSet[]
 }
 
 /** Column label of the cell focused after adding an exercise, per kind. */
 const FOCUS_COLUMN_LABELS: Record<ExerciseKind, string> = {
   strength: 'Weight',
   duration: 'Duration',
+  bodyweight: 'Reps',
 }
 
 const NEXT_PLAN_OPTIONS: ReadonlyArray<{
@@ -151,7 +185,18 @@ export class WorkoutEditorView extends ItemView {
   private activeTimer: ActiveTimer | null = null
   private activeRestTimer: ActiveRestTimer | null = null
   private seededWeightsStore?: WeakSet<EditableStrengthSet>
+  private ladderOverridesStore?: Map<string, string[]>
   private lastRestSeconds: number | null = null
+  /**
+   * Ladders this session wrote that the metadata cache may not report yet.
+   * Renders overlay them until the snapshot catches up, so a card never
+   * shows the rungs from before its own write. Lazily created because
+   * prototype-built views never run field initializers.
+   */
+  private get ladderOverrides(): Map<string, string[]> {
+    this.ladderOverridesStore ??= new Map<string, string[]>()
+    return this.ladderOverridesStore
+  }
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -232,7 +277,42 @@ export class WorkoutEditorView extends ItemView {
   }
 
   private updateNarrowState(): void {
-    this.contentEl.classList.toggle('is-narrow', this.contentEl.clientWidth < 600)
+    this.setNarrowState(this.contentEl.clientWidth < 600, this.contentEl.clientWidth < 360)
+    this.refreshLevelLabels()
+  }
+
+  /** Narrow state through the Obsidian class helpers so the test realm can observe it. */
+  private setNarrowState(narrow: boolean, compact: boolean): void {
+    if (narrow) {
+      this.contentEl.addClass('is-narrow')
+    } else {
+      this.contentEl.removeClass('is-narrow')
+    }
+    if (compact) {
+      this.contentEl.addClass('is-compact')
+    } else {
+      this.contentEl.removeClass('is-compact')
+    }
+  }
+
+  /**
+   * Refit every rung label after a resize. Labels fit themselves on first
+   * render; only a width change afterwards can overflow a new one. Each
+   * label unshortens before measuring, so the measure always reads live
+   * widths and every tick converges instead of oscillating.
+   */
+  private refreshLevelLabels(): void {
+    for (const label of this.contentEl.querySelectorAll('.fitkit-bodyweight-level-label')) {
+      if (!label.instanceOf(HTMLElement)) {
+        continue
+      }
+      const full = label.querySelector('.fitkit-bodyweight-level-full')
+      if (!full?.instanceOf(HTMLElement)) {
+        continue
+      }
+      label.removeClass('is-label-short')
+      this.fitLevelLabel(label, full)
+    }
   }
 
   async loadFile(file: TFile): Promise<void> {
@@ -342,8 +422,10 @@ export class WorkoutEditorView extends ItemView {
     }
 
     const list = container.createDiv({ cls: 'fitkit-exercise-list' })
+    /** One merged snapshot per render: every card reads its ladder from this instead of rebuilding it. */
+    const registry = this.registryForRender()
     for (let i = 0; i < this.model.exercises.length; i++) {
-      this.renderExerciseCard(list, i)
+      this.renderExerciseCard(list, i, registry)
     }
 
     const footer = container.createDiv({ cls: 'fitkit-footer' })
@@ -416,7 +498,7 @@ export class WorkoutEditorView extends ItemView {
     meta.createSpan({ cls: 'fitkit-meta-line', text: this.metaLineText() })
   }
 
-  private renderExerciseCard(list: HTMLElement, index: number): void {
+  private renderExerciseCard(list: HTMLElement, index: number, registry?: ExerciseRegistry): void {
     if (!this.model) {
       return
     }
@@ -424,6 +506,8 @@ export class WorkoutEditorView extends ItemView {
     if (!ex) {
       return
     }
+    /** Direct card renders (and tests) build their own snapshot; full renders share one. */
+    const snapshot = registry ?? this.registryForRender()
 
     const card = list.createDiv({ cls: 'fitkit-card' })
     card.dataset.exerciseIndex = String(index)
@@ -460,7 +544,7 @@ export class WorkoutEditorView extends ItemView {
     setIcon(gearBtn, 'settings')
     gearBtn.addEventListener('click', (evt) => this.openCardMenu(evt, index))
 
-    this.renderExerciseHistoryBadges(card, ex)
+    this.renderExerciseHistoryBadges(card, ex, snapshot)
 
     if (ex.exerciseNotes && ex.exerciseNotes.length > 0) {
       const line = card.createDiv({
@@ -481,6 +565,9 @@ export class WorkoutEditorView extends ItemView {
     switch (ex.kind) {
       case 'strength':
         this.renderStrengthTable(card, ex, index)
+        break
+      case 'bodyweight':
+        this.renderBodyweightTable(card, ex, index, snapshot)
         break
       case 'duration':
         this.renderDurationTable(card, ex, index)
@@ -575,6 +662,232 @@ export class WorkoutEditorView extends ItemView {
         this.render()
       },
     })
+  }
+
+  private renderBodyweightTable(
+    card: HTMLElement,
+    ex: ExerciseCard,
+    exerciseIndex: number,
+    registry: ExerciseRegistry,
+  ): void {
+    card.addClass('fitkit-bodyweight-card')
+    const levels = levelsForName(registry, ex.name)
+    const showLoad = ex.bodyweightSets.some((entry) => entry.load !== undefined)
+    const wrap = card.createDiv({ cls: 'fitkit-set-area' })
+
+    const header = wrap.createDiv({
+      cls: showLoad
+        ? 'fitkit-bodyweight-row fitkit-set-head has-load'
+        : 'fitkit-bodyweight-row fitkit-set-head',
+    })
+    header.createSpan({ cls: 'fitkit-set-label fitkit-set-figure' })
+    header.createSpan({ cls: 'fitkit-set-label', text: 'Level' })
+    header.createSpan({ cls: 'fitkit-set-label', text: 'Reps' })
+    if (showLoad) {
+      header.createSpan({ cls: 'fitkit-set-label', text: 'Load' })
+    }
+    header.createSpan({ cls: 'fitkit-bodyweight-head-spacer', attr: { 'aria-hidden': 'true' } })
+
+    for (let i = 0; i < ex.bodyweightSets.length; i++) {
+      this.renderBodyweightRow(wrap, ex, i, levels, showLoad)
+    }
+
+    const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
+    const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
+    addBtn.addEventListener('click', () => {
+      const last = ex.bodyweightSets[ex.bodyweightSets.length - 1]
+      ex.bodyweightSets.push({ set: ex.bodyweightSets.length + 1, level: last?.level ?? 1 })
+      this.markDirty()
+      this.render()
+      this.focusRowCell(exerciseIndex, ex.bodyweightSets.length - 1, 'Reps')
+    })
+  }
+
+  private renderBodyweightRow(
+    wrap: HTMLElement,
+    ex: ExerciseCard,
+    i: number,
+    levels: BodyweightLadder | undefined,
+    showLoad: boolean,
+  ): void {
+    const set = ex.bodyweightSets[i]
+    if (!set) {
+      return
+    }
+    const level = set.level ?? 1
+    const container = wrap.createDiv({ cls: 'fitkit-row' })
+    const body = container.createDiv({ cls: 'fitkit-row-body' })
+    const row = body.createDiv({
+      cls: showLoad ? 'fitkit-bodyweight-row has-load' : 'fitkit-bodyweight-row',
+    })
+
+    const setCell = this.createCell(row, 'Set', 'fitkit-set-figure')
+    setCell.setText(String(set.set ?? i + 1))
+
+    this.renderBodyweightLevelCell(row, ex, i, levels, level)
+
+    const repsInput = this.createInputCell(row, 'Reps', { type: 'number', inputmode: 'numeric' })
+    repsInput.value = set.reps !== undefined ? String(set.reps) : ''
+    repsInput.addEventListener('input', () => {
+      set.reps = parseNumberInput(repsInput.value)
+      this.markDirty()
+    })
+
+    if (showLoad) {
+      const loadCell = this.createCell(row, 'Load', 'fitkit-bodyweight-load')
+      if (set.load !== undefined) {
+        const loadInput = loadCell.createEl('input', {
+          cls: 'fitkit-input',
+          attr: { type: 'number', step: '0.1', inputmode: 'decimal' },
+        })
+        loadInput.setAttr('aria-label', 'Load')
+        loadInput.value = String(set.load)
+        loadInput.addEventListener('input', () => {
+          set.load = parseNumberInput(loadInput.value)
+          this.markDirty()
+        })
+      }
+    }
+
+    this.renderRowActions(container, body, {
+      label: `bodyweight entry ${i + 1}`,
+      currentNote: set.note,
+      onDelete: () => {
+        ex.bodyweightSets.splice(i, 1)
+        this.markDirty()
+        this.render()
+      },
+      onNoteSave: (next) => {
+        set.note = next
+        this.markDirty()
+        this.render()
+      },
+      onRenumber: () => {
+        ex.bodyweightSets.forEach((entry, index) => {
+          entry.set = index + 1
+        })
+        this.markDirty()
+        this.render()
+      },
+      loadMenu: {
+        hasLoad: set.load !== undefined,
+        onAddLoad: () => {
+          const previous = ex.bodyweightSets[i - 1]
+          set.load = previous?.load ?? 0
+          this.markDirty()
+          this.render()
+        },
+        onRemoveLoad: () => {
+          set.load = undefined
+          this.markDirty()
+          this.render()
+        },
+      },
+    })
+  }
+
+  private renderBodyweightLevelCell(
+    row: HTMLElement,
+    ex: ExerciseCard,
+    rowIndex: number,
+    levels: BodyweightLadder | undefined,
+    level: number,
+  ): void {
+    const rungCount = levels?.length ?? 0
+    const cell = this.createCell(row, 'Level')
+    const stepper = cell.createDiv({ cls: 'fitkit-bodyweight-stepper' })
+
+    const minus = stepper.createEl('button', {
+      cls: 'fitkit-btn fitkit-bodyweight-step',
+      attr: { type: 'button', 'aria-label': `Lower level for set ${rowIndex + 1}` },
+    })
+    setIcon(minus, 'minus')
+    minus.disabled = level <= 1
+    minus.addEventListener('click', () => {
+      if (level > 1) {
+        this.setBodyweightLevel(ex, rowIndex, level - 1)
+      }
+    })
+
+    const label = stepper.createEl('button', {
+      cls: 'fitkit-bodyweight-level-label',
+      attr: {
+        type: 'button',
+        'aria-haspopup': 'menu',
+        'aria-label': `Level for set ${rowIndex + 1}: ${formatBodyweightLevelLabel(levels, level)}`,
+      },
+    })
+    const full = label.createSpan({
+      cls: 'fitkit-bodyweight-level-full',
+      text: formatBodyweightLevelLabel(levels, level),
+    })
+    label.createSpan({
+      cls: 'fitkit-bodyweight-level-short',
+      text: formatBodyweightLevelShort(level),
+    })
+    const chevron = label.createSpan({
+      cls: 'fitkit-bodyweight-level-chevron',
+      attr: { 'aria-hidden': 'true' },
+    })
+    setIcon(chevron, 'chevron-down')
+    label.addEventListener('click', () => {
+      const menu = new Menu()
+      const top = Math.max(rungCount, level)
+      for (let n = 1; n <= top; n++) {
+        const target = n
+        menu.addItem((item) =>
+          item
+            .setTitle(formatBodyweightLevelLabel(levels, target))
+            .setChecked(target === level)
+            .onClick(() => this.setBodyweightLevel(ex, rowIndex, target)),
+        )
+      }
+      const rect = label.getBoundingClientRect()
+      menu.showAtPosition({ x: rect.left, y: rect.bottom })
+    })
+
+    const plus = stepper.createEl('button', {
+      cls: 'fitkit-btn fitkit-bodyweight-step',
+      attr: { type: 'button', 'aria-label': `Raise level for set ${rowIndex + 1}` },
+    })
+    setIcon(plus, 'plus')
+    plus.disabled = rungCount === 0 || level >= rungCount
+    plus.addEventListener('click', () => {
+      if (rungCount > 0 && level < rungCount) {
+        this.setBodyweightLevel(ex, rowIndex, level + 1)
+      }
+    })
+    this.fitLevelLabel(label, full)
+  }
+
+  private setBodyweightLevel(ex: ExerciseCard, rowIndex: number, level: number): void {
+    const set = ex.bodyweightSets[rowIndex]
+    if (!set) {
+      return
+    }
+    set.level = level
+    this.markDirty()
+    this.render()
+  }
+
+  /**
+   * Shorten a rung name that overflows its own text slot. A shortened label
+   * hides its measured span, so fitting one directly keeps it short; resize
+   * refits unshorten first so the measure below always reads live widths.
+   */
+  private fitLevelLabel(
+    label: HTMLElement,
+    full: HTMLElement,
+    widths: LevelLabelWidths = measureLevelLabelWidths(full),
+  ): void {
+    if (label.hasClass('is-label-short')) {
+      return
+    }
+    if (shouldShortenLevelLabel(widths.content, widths.available)) {
+      label.addClass('is-label-short')
+    } else {
+      label.removeClass('is-label-short')
+    }
   }
 
   private renderDurationTable(card: HTMLElement, ex: ExerciseCard, exerciseIndex: number): void {
@@ -727,6 +1040,160 @@ export class WorkoutEditorView extends ItemView {
     }).open()
   }
 
+  private openEditLevelsModal(ex: ExerciseCard): void {
+    new EditLevelsModal(this.app, {
+      exerciseName: ex.name,
+      initial: this.currentBodyweightLevels(ex.name) ?? defaultBodyweightLevels(ex.name),
+      onSave: (levels) => {
+        void this.confirmLadderEdit(ex, levels)
+      },
+    }).open()
+  }
+
+  /**
+   * Applies an edited ladder behind the history warning: occupied positions
+   * whose meaning would change are reported first, and the edit only
+   * proceeds on confirmation. Logged sets keep their numbers throughout.
+   */
+  private async confirmLadderEdit(ex: ExerciseCard, levels: string[]): Promise<void> {
+    const previous = this.currentBodyweightLevels(ex.name) ?? []
+    const changes = describeBodyweightLadderChanges(previous, levels, [
+      ...(await this.occupiedBodyweightLevels(ex)),
+    ])
+    if (changes.length > 0) {
+      const confirmed = await this.confirmLadderChanges(ex.name, changes)
+      if (!confirmed) {
+        return
+      }
+    }
+    await this.persistLadder(ex.name, levels)
+  }
+
+  private confirmLadderChanges(name: string, changes: BodyweightLadderChange[]): Promise<boolean> {
+    const warning = formatLadderChangesWarning(name, changes)
+    return new Promise((resolve) => {
+      new ConfirmModal(
+        this.app,
+        {
+          title: warning.title,
+          message: warning.message,
+          confirmText: 'Apply edit',
+          cancelText: 'Cancel',
+        },
+        resolve,
+      ).open()
+    })
+  }
+
+  /**
+   * Levels with logged sets for an exercise: the card's rows plus every rung
+   * recorded for it across saved workout notes. Unreadable notes are
+   * skipped; the warning must never block on them.
+   */
+  private async occupiedBodyweightLevels(ex: ExerciseCard): Promise<Set<number>> {
+    const occupied = new Set<number>()
+    for (const set of ex.bodyweightSets) {
+      if (set.level !== undefined) {
+        occupied.add(set.level)
+      }
+    }
+    const key = normalize(ex.name)
+    for (const file of markdownFilesInFolder(this.app, workoutsFolder(this.plugin.settings))) {
+      let text: string
+      try {
+        text = await this.app.vault.cachedRead(file)
+      } catch {
+        continue
+      }
+      const parsed = parseWorkoutNote(text, file.path)
+      if (!parsed.isWorkout || !parsed.model) {
+        continue
+      }
+      for (const entry of parsed.model.exercises) {
+        if (entry.kind !== 'bodyweight' || normalize(entry.exerciseName) !== key) {
+          continue
+        }
+        for (const set of entry.bodyweightSets) {
+          occupied.add(set.level)
+        }
+      }
+    }
+    return occupied
+  }
+
+  /**
+   * Snapshot for rendering, with ladders this session wrote overlaid.
+   * Vault writes land on disk before the metadata cache reports them, so
+   * the render straight after a ladder write would otherwise show stale rungs.
+   */
+  private registryForRender(): ExerciseRegistry {
+    const snapshot = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
+    this.pruneLadderOverrides(snapshot)
+    return createRegistry(applyLadderOverrides(snapshot.entries, this.ladderOverrides))
+  }
+
+  /**
+   * Freshest ladder for decisions and menus: a value this session wrote
+   * wins until the snapshot reports it, so later reads never shadow it.
+   */
+  private currentBodyweightLevels(name: string): string[] | undefined {
+    const override = this.ladderOverrides.get(normalize(name))
+    if (override !== undefined) {
+      return [...override]
+    }
+    return bodyweightLevelsFor(this.app, this.plugin.settings, name)
+  }
+
+  /**
+   * Drops overrides the snapshot has caught up with. Without this a later
+   * outside edit to the same ladder would stay hidden behind the override.
+   */
+  private pruneLadderOverrides(snapshot: ExerciseRegistry): void {
+    for (const [key, levels] of this.ladderOverrides) {
+      if (sameLevels(levelsForName(snapshot, key) ?? [], levels)) {
+        this.ladderOverrides.delete(key)
+      }
+    }
+  }
+
+  /**
+   * Writes an edited ladder to whichever store wins on read: the exercise
+   * note when one exists, else the registry entry (created when missing).
+   */
+  private async persistLadder(name: string, levels: string[]): Promise<void> {
+    const trimmed = name.trim()
+    if (!trimmed) {
+      return
+    }
+    const notePath = findExerciseNotePath(this.app, this.plugin.settings, trimmed)
+    const noteFile = notePath ? this.app.vault.getAbstractFileByPath(notePath) : null
+    if (noteFile instanceof TFile) {
+      let result: ExerciseNoteLevelsUpdateResult | undefined
+      await this.app.vault.process(noteFile, (text) => {
+        result = setExerciseNoteLevels(text, levels)
+        return result.markdown
+      })
+      if (result?.changed) {
+        this.ladderOverrides.set(normalize(trimmed), [...levels])
+        new Notice(`Exercise note now records levels for ${trimmed}.`)
+      }
+      this.render()
+      return
+    }
+    const settings = this.plugin.settings
+    const current = createRegistry(settings.exerciseRegistry)
+    const key = normalize(trimmed)
+    const existing = current.entries.find((entry) => normalize(entry.name) === key)
+    const nextEntry: ExerciseRegistryEntry = existing
+      ? { ...existing, aliases: [...existing.aliases], levels: [...levels] }
+      : { name: trimmed, kind: 'bodyweight', aliases: [], levels: [...levels] }
+    settings.exerciseRegistry = upsertEntry(current, nextEntry).entries
+    await this.plugin.saveSettings()
+    this.ladderOverrides.set(key, [...levels])
+    new Notice(`Registry now records levels for ${trimmed}.`)
+    this.render()
+  }
+
   private renderRowActions(
     container: HTMLElement,
     body: HTMLElement,
@@ -736,6 +1203,7 @@ export class WorkoutEditorView extends ItemView {
       onDelete: () => void
       onNoteSave: (next: string | undefined) => void
       onRenumber?: () => void
+      loadMenu?: { hasLoad: boolean; onAddLoad: () => void; onRemoveLoad: () => void }
     },
   ): void {
     const openNoteModal = (): void => {
@@ -749,7 +1217,14 @@ export class WorkoutEditorView extends ItemView {
       void this.confirmAndDeleteRow(opts.label, opts.onDelete)
     }
 
-    this.renderRowKebab(body, opts.label, openNoteModal, triggerDelete, opts.onRenumber)
+    this.renderRowKebab(
+      body,
+      opts.label,
+      openNoteModal,
+      triggerDelete,
+      opts.onRenumber,
+      opts.loadMenu,
+    )
 
     if (opts.currentNote && opts.currentNote.length > 0) {
       const line = container.createDiv({
@@ -773,6 +1248,7 @@ export class WorkoutEditorView extends ItemView {
     onNote: () => void,
     onDelete: () => void,
     onRenumber?: () => void,
+    loadMenu?: { hasLoad: boolean; onAddLoad: () => void; onRemoveLoad: () => void },
   ): void {
     const kebab = body.createEl('button', {
       cls: 'fitkit-btn fitkit-btn-muted fitkit-row-kebab',
@@ -783,6 +1259,17 @@ export class WorkoutEditorView extends ItemView {
       evt.stopPropagation()
       const menu = new Menu()
       menu.addItem((item) => item.setTitle('Edit note').setIcon('pencil').onClick(onNote))
+      if (loadMenu) {
+        if (loadMenu.hasLoad) {
+          menu.addItem((item) =>
+            item.setTitle('Remove load').setIcon('minus').onClick(loadMenu.onRemoveLoad),
+          )
+        } else {
+          menu.addItem((item) =>
+            item.setTitle('Add load').setIcon('plus').onClick(loadMenu.onAddLoad),
+          )
+        }
+      }
       if (onRenumber) {
         menu.addItem((item) =>
           item.setTitle('Renumber sets').setIcon('list-ordered').onClick(onRenumber),
@@ -951,28 +1438,89 @@ export class WorkoutEditorView extends ItemView {
     if (choice === 'cancel') {
       return
     }
+    /** Captured before the switch clears the card; the relabel offer below marks these as level 1. */
+    const relabelSource = nextKind === 'bodyweight' ? toWorkoutExercise(ex) : null
     this.applyKindSwitch(index, nextKind, hadRows)
     if (choice === 'workout-and-registry') {
       await this.persistKindChange(ex.name, nextKind)
     }
+    if (nextKind === 'bodyweight' && relabelSource) {
+      /** Workout-only leaves durable stores alone: a ladder seeded into a note whose kind was not switched would be unreadable, and a registry entry would leak past the chosen scope. */
+      if (choice === 'workout-and-registry') {
+        await this.seedBodyweightLadder(ex)
+      }
+      await this.offerFirstLevelRelabel(index, relabelSource)
+    }
   }
 
   /**
-   * Writes the kind switch to whichever store wins on read. An exercise note
-   * always beats the registry overlay (see buildExerciseRegistrySnapshot), so
-   * the note is updated when one exists; the registry is only the fallback
-   * for no-note exercises.
+   * Seeds a fresh bodyweight card's ladder with one rung named after the
+   * exercise, the same default a new bodyweight note carries, so the level
+   * menu is usable immediately. An existing ladder is left alone.
+   */
+  private async seedBodyweightLadder(ex: ExerciseCard): Promise<void> {
+    if ((this.currentBodyweightLevels(ex.name) ?? []).length > 0) {
+      return
+    }
+    await this.persistLadder(ex.name, defaultBodyweightLevels(ex.name))
+  }
+
+  /**
+   * Offers to mark the rows cleared by a switch to bodyweight as the first
+   * rung. The count comes from the pre-switch entry, so the prompt states
+   * the real number; declining keeps the cleared card as the switch left it.
+   */
+  private async offerFirstLevelRelabel(index: number, previous: ExerciseEntry): Promise<void> {
+    if (!this.model) {
+      return
+    }
+    const count = setRowCount(previous)
+    if (count === 0) {
+      return
+    }
+    const ex = this.model.exercises[index]
+    if (!ex || ex.kind !== 'bodyweight') {
+      return
+    }
+    const sets = count === 1 ? '1 already-logged set' : `${count} already-logged sets`
+    const confirmed = await this.confirmFirstLevelRelabel(
+      `${ex.name} has ${sets} in this workout. Mark them as level 1 of the new ladder? Strength weights carry as load, and declining keeps the cleared card.`,
+    )
+    if (!confirmed) {
+      return
+    }
+    ex.bodyweightSets = relabelSetsAsFirstLevel(previous)
+    this.markDirty()
+    this.render()
+  }
+
+  private confirmFirstLevelRelabel(message: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      new ConfirmModal(
+        this.app,
+        {
+          title: 'Mark logged sets as level 1?',
+          message,
+          confirmText: 'Mark as level 1',
+          cancelText: 'Cancel',
+        },
+        resolve,
+      ).open()
+    })
+  }
+
+  /**
+   * Writes the kind switch to the exercise note when one exists, and to the
+   * registry either way. An exercise note always beats the registry overlay
+   * (see buildExerciseRegistrySnapshot), so the note decides behaviour; the
+   * registry copy keeps the settings table and its readers truthful.
    */
   private async persistKindChange(name: string, nextKind: ExerciseKind): Promise<void> {
     const trimmed = name.trim()
     if (!trimmed) {
       return
     }
-    const key = normalize(trimmed)
-    const catalog = readExerciseCatalog(this.app, this.plugin.settings)
-    const noteEntry = catalog.entries.find((entry) => normalize(entry.name) === key)
-    const notePath =
-      noteEntry?.path ?? findExerciseNoteFile(this.app, this.plugin.settings, trimmed)?.path
+    const notePath = findExerciseNotePath(this.app, this.plugin.settings, trimmed)
     const noteFile = notePath ? this.app.vault.getAbstractFileByPath(notePath) : null
     if (noteFile instanceof TFile) {
       let result: ExerciseNoteKindUpdateResult | undefined
@@ -982,6 +1530,12 @@ export class WorkoutEditorView extends ItemView {
       })
       if (result?.changed) {
         new Notice(`Exercise note now records ${trimmed} as ${nextKind}.`)
+        /**
+         * The registry is read on its own by the settings table, so leaving
+         * it behind would mislead the next reader and raise a conflict
+         * against the note that just won. The note still wins on read.
+         */
+        await this.persistRegistryKind(trimmed, nextKind)
       } else {
         new Notice(
           `Could not update the exercise note for ${trimmed}; its frontmatter was left unchanged.`,
@@ -1063,6 +1617,7 @@ export class WorkoutEditorView extends ItemView {
     ex.kind = nextKind
     ex.strengthSets = []
     ex.durationEntries = []
+    ex.bodyweightSets = []
     this.markSeededWeight(seedEmptyRow(ex, this.exerciseHistory?.get(ex.name)))
     this.markDirty()
     this.render()
@@ -1185,7 +1740,8 @@ export class WorkoutEditorView extends ItemView {
             return
           }
           new PlanStepModal(this.app, {
-            title: `Weight change for ${ex.name}`,
+            exerciseName: ex.name,
+            kind: ex.kind,
             initial: plan.step === undefined ? '' : formatPlanNumber(plan.step),
             onSave: (step) => {
               ex.next = buildNextPlan(plan.direction, step)
@@ -1227,7 +1783,15 @@ export class WorkoutEditorView extends ItemView {
         .setIcon('sticky-note')
         .onClick(() => this.openExerciseNoteModal(ex)),
     )
-    if (ex.kind === 'strength') {
+    if (ex.kind === 'bodyweight') {
+      menu.addItem((item) =>
+        item
+          .setTitle('Edit levels')
+          .setIcon('list')
+          .onClick(() => this.openEditLevelsModal(ex)),
+      )
+    }
+    if (ex.kind === 'strength' || ex.kind === 'bodyweight') {
       menu.addSeparator()
       this.addNextPlanMenuItems(menu, ex)
     }
@@ -1276,13 +1840,25 @@ export class WorkoutEditorView extends ItemView {
     }
   }
 
-  private renderExerciseHistoryBadges(card: HTMLElement, ex: ExerciseCard): void {
+  private renderExerciseHistoryBadges(
+    card: HTMLElement,
+    ex: ExerciseCard,
+    registry: ExerciseRegistry,
+  ): void {
     const summary = this.exerciseHistory?.get(ex.name)
-    const badges = formatExerciseHistoryBadges(summary, ex.kind)
-    const planBadge = formatNextPlanBadge(summary, ex.kind, {
-      plan: ex.next,
-      sessionMax: pickMaxWeightSet(ex.strengthSets),
-    })
+    /** One lookup per card: both badge kinds read the same ladder. */
+    const levels = levelsForName(registry, ex.name)
+    const badges = formatExerciseHistoryBadges(summary, ex.kind, levels)
+    const planBadge = formatNextPlanBadge(
+      summary,
+      ex.kind,
+      {
+        plan: ex.next,
+        sessionMax: pickMaxWeightSet(ex.strengthSets),
+        sessionBodyweightMax: pickBestBodyweightSet(ex.bodyweightSets),
+      },
+      levels,
+    )
     if (badges.length === 0 && !planBadge) {
       return
     }
@@ -1537,6 +2113,7 @@ export class WorkoutEditorView extends ItemView {
       kind,
       strengthSets: [],
       durationEntries: [],
+      bodyweightSets: [],
     }
     this.markSeededWeight(seedEmptyRow(card, this.exerciseHistory?.get(trimmed)))
     this.model.exercises.push(card)
@@ -1681,8 +2258,17 @@ export class WorkoutEditorView extends ItemView {
       if (!confirmed) {
         return
       }
+      /** Captured before the switch clears the card, mirroring the card menu path. */
+      const relabelSource = nextKind === 'bodyweight' ? toWorkoutExercise(target) : null
       target.name = trimmed
       this.applyKindSwitch(index, nextKind, hadRows)
+      if (nextKind === 'bodyweight' && relabelSource) {
+        const switched = this.model.exercises[index]
+        if (switched) {
+          await this.seedBodyweightLadder(switched)
+        }
+        await this.offerFirstLevelRelabel(index, relabelSource)
+      }
       return
     }
     target.name = trimmed
@@ -1875,6 +2461,30 @@ class UnknownExerciseModal extends Modal {
   }
 }
 
+/**
+ * Widths behind a rung label decision: the text slot against its content.
+ * A separate function so tests can observe the measuring path; element
+ * widths read zero in the test realm unless the test sets them.
+ */
+export interface LevelLabelWidths {
+  available: number
+  content: number
+}
+
+/** The text span against its own slot, never the padded button around it. */
+export function measureLevelLabelWidths(full: HTMLElement): LevelLabelWidths {
+  return { available: full.clientWidth, content: full.scrollWidth }
+}
+
+/**
+ * Whether a rung name needs its compact form. The name shortens only when
+ * its own rendered width overruns the space the cell offers, so an
+ * arbitrarily long ladder name still fits on a wide window.
+ */
+export function shouldShortenLevelLabel(labelWidth: number, availableWidth: number): boolean {
+  return labelWidth > availableWidth
+}
+
 function parseNumberInput(raw: string): number | undefined {
   const trimmed = raw.trim()
   if (trimmed.length === 0) {
@@ -1896,7 +2506,11 @@ function setAriaInvalid(element: HTMLElement, invalid: boolean): void {
 }
 
 function hasRows(card: ExerciseCard): boolean {
-  return card.strengthSets.length > 0 || card.durationEntries.length > 0
+  return (
+    card.strengthSets.length > 0 ||
+    card.durationEntries.length > 0 ||
+    card.bodyweightSets.length > 0
+  )
 }
 
 /**
@@ -1909,22 +2523,23 @@ function seedEmptyRow(
   summary?: ExerciseHistorySummary,
 ): EditableStrengthSet | null {
   switch (card.kind) {
+    case 'bodyweight':
+      card.bodyweightSets.push({ set: 1, level: 1 })
+      return null
     case 'duration':
       card.durationEntries.push({})
       return null
-    case 'strength':
-      break
-    default:
-      return assertUnreachableKind(card.kind)
+    case 'strength': {
+      const target = seededSetWeight(summary)
+      if (target === null) {
+        card.strengthSets.push({ set: 1 })
+        return null
+      }
+      const row: EditableStrengthSet = { set: 1, weight: target }
+      card.strengthSets.push(row)
+      return row
+    }
   }
-  const target = seededSetWeight(summary)
-  if (target === null) {
-    card.strengthSets.push({ set: 1 })
-    return null
-  }
-  const row: EditableStrengthSet = { set: 1, weight: target }
-  card.strengthSets.push(row)
-  return row
 }
 
 function seededSetWeight(summary: ExerciseHistorySummary | undefined): number | null {
@@ -1965,20 +2580,38 @@ function toEditorWorkoutModel(
 }
 
 export function toEditorExercise(exercise: ExerciseEntry): ExerciseCard {
-  const card: ExerciseCard =
-    exercise.kind === 'strength'
-      ? {
-          name: exercise.exerciseName,
-          kind: exercise.kind,
-          strengthSets: exercise.strengthSets.map(toEditorStrengthSet),
-          durationEntries: [],
-        }
-      : {
-          name: exercise.exerciseName,
-          kind: exercise.kind,
-          strengthSets: [],
-          durationEntries: exercise.durationEntries.map(toEditorDurationEntry),
-        }
+  let card: ExerciseCard
+  switch (exercise.kind) {
+    case 'strength':
+      card = {
+        name: exercise.exerciseName,
+        kind: exercise.kind,
+        strengthSets: exercise.strengthSets.map(toEditorStrengthSet),
+        durationEntries: [],
+        bodyweightSets: [],
+      }
+      break
+    case 'bodyweight':
+      card = {
+        name: exercise.exerciseName,
+        kind: exercise.kind,
+        strengthSets: [],
+        durationEntries: [],
+        bodyweightSets: exercise.bodyweightSets.map(toEditorBodyweightSet),
+      }
+      break
+    case 'duration':
+      card = {
+        name: exercise.exerciseName,
+        kind: exercise.kind,
+        strengthSets: [],
+        durationEntries: exercise.durationEntries.map(toEditorDurationEntry),
+        bodyweightSets: [],
+      }
+      break
+    default:
+      return assertUnreachableKind(exercise)
+  }
   if (exercise.note !== undefined) {
     card.exerciseNotes = exercise.note
   }
@@ -2001,6 +2634,23 @@ function toEditorStrengthSet(set: StrengthSet): EditableStrengthSet {
   }
   if (set.reps !== undefined) {
     editable.reps = set.reps
+  }
+  if (set.note !== undefined) {
+    editable.note = set.note
+  }
+  return editable
+}
+
+function toEditorBodyweightSet(set: BodyweightSet): EditableBodyweightSet {
+  const editable: EditableBodyweightSet = { level: set.level }
+  if (set.set !== undefined) {
+    editable.set = set.set
+  }
+  if (set.reps !== undefined) {
+    editable.reps = set.reps
+  }
+  if (set.load !== undefined) {
+    editable.load = set.load
   }
   if (set.note !== undefined) {
     editable.note = set.note
@@ -2032,6 +2682,27 @@ function toWorkoutNoteModel(model: EditorWorkoutModel): WorkoutNoteModel {
   }
 }
 
+/** Title and message behind the ladder history warning, kept apart from the modal so the words the user reads are unit-testable. */
+export interface LadderChangesWarning {
+  title: string
+  message: string
+}
+
+/** Every affected level with what it means now and what it would come to mean. */
+export function formatLadderChangesWarning(
+  name: string,
+  changes: BodyweightLadderChange[],
+): LadderChangesWarning {
+  const lines = changes.map(
+    (change) =>
+      `Level ${change.level} currently means '${change.from}' and would come to mean '${change.to}'.`,
+  )
+  return {
+    title: `Change what logged levels mean for ${name}?`,
+    message: `This edit changes what some already-logged levels mean. ${lines.join(' ')} Logged sets keep their numbers.`,
+  }
+}
+
 export function toWorkoutExercise(card: ExerciseCard): ExerciseEntry {
   const note = card.exerciseNotes
   const next = card.next
@@ -2052,6 +2723,14 @@ export function toWorkoutExercise(card: ExerciseCard): ExerciseEntry {
       }
       return withNoteAndNext(entry, note, next)
     }
+    case 'bodyweight': {
+      const entry: BodyweightExerciseEntry = {
+        exerciseName: card.name,
+        kind: card.kind,
+        bodyweightSets: card.bodyweightSets.map(toBodyweightSet),
+      }
+      return withNoteAndNext(entry, note, next)
+    }
   }
 }
 
@@ -2069,6 +2748,26 @@ function toStrengthSet(set: EditableStrengthSet, index: number): StrengthSet {
     strengthSet.note = set.note
   }
   return strengthSet
+}
+
+/** A fresh row names no rung yet; the ladder base stands in until the card offers rung picking. */
+function toBodyweightSet(set: EditableBodyweightSet): BodyweightSet {
+  const bodyweightSet: BodyweightSet = {
+    level: set.level ?? 1,
+  }
+  if (set.set !== undefined) {
+    bodyweightSet.set = set.set
+  }
+  if (set.reps !== undefined) {
+    bodyweightSet.reps = set.reps
+  }
+  if (set.load !== undefined) {
+    bodyweightSet.load = set.load
+  }
+  if (set.note !== undefined) {
+    bodyweightSet.note = set.note
+  }
+  return bodyweightSet
 }
 
 function toDurationEntry(entry: EditableDurationEntry): DurationEntry {

@@ -102,6 +102,19 @@ describe('settings migration', () => {
     expect(migrated.exerciseRegistry[0]?.kind).toBe('strength')
   })
 
+  it('preserves a stored ladder and drops a non-string one', () => {
+    const migrated = settingsFromStored({
+      exerciseRegistry: [
+        { name: 'Push-up', kind: 'bodyweight', levels: ['Tuck', 'Advanced tuck'], aliases: [] },
+        { name: 'Dip', kind: 'bodyweight', levels: 'Tuck', aliases: [] },
+      ],
+      schemaVersion: 1,
+    } as unknown as Partial<FitKitSettings>)
+
+    expect(migrated.exerciseRegistry[0]?.levels).toEqual(['Tuck', 'Advanced tuck'])
+    expect(migrated.exerciseRegistry[1]?.levels).toBeUndefined()
+  })
+
   it('preserves stored deleted exercise tombstones', () => {
     expect(
       settingsFromStored({

@@ -98,6 +98,8 @@ export interface ExerciseRenamePlan {
   aliasesToKeep: string[]
   resultKind: ExerciseKind
   resultUnit?: WeightUnit
+  /** Ladder surviving the rename, when either folded-in entry owned one. */
+  resultLevels?: string[]
   workoutNotes: ExerciseRenameWorkoutNotePlan[]
   totalHeadingOccurrences: number
   totalFieldOccurrences: number
@@ -131,6 +133,7 @@ export function buildExerciseRenamePlan(input: ExerciseRenamePlanInput): Exercis
     aliasesToKeep: [],
     resultKind: DEFAULT_RESULT_KIND,
     resultUnit: undefined,
+    resultLevels: undefined,
     workoutNotes: [],
     totalHeadingOccurrences: 0,
     totalFieldOccurrences: 0,
@@ -213,6 +216,8 @@ export function buildExerciseRenamePlan(input: ExerciseRenamePlanInput): Exercis
     sourceNote?.kind ??
     DEFAULT_RESULT_KIND
   const resultUnit = distinctTargetEntry?.unit ?? sourceEntry?.unit
+  const survivingLevels = distinctTargetEntry?.levels ?? sourceEntry?.levels
+  const resultLevels = survivingLevels ? [...survivingLevels] : undefined
 
   const workoutNotes: ExerciseRenameWorkoutNotePlan[] = []
   let totalHeadingOccurrences = 0
@@ -249,6 +254,7 @@ export function buildExerciseRenamePlan(input: ExerciseRenamePlanInput): Exercis
     aliasesToKeep,
     resultKind,
     resultUnit,
+    resultLevels,
     workoutNotes,
     totalHeadingOccurrences,
     totalFieldOccurrences,

@@ -1,11 +1,22 @@
 import { TFile, type MarkdownPostProcessorContext } from 'obsidian'
 
 import { EXERCISE_KIND_LABELS, assertUnreachableKind } from '../domain/exercise-kind'
+import {
+  bodyweightLevelName,
+  formatRungUnit,
+  type BodyweightLadder,
+} from '../domain/bodyweight-levels'
 import { formatDurationInput } from '../domain/duration-input'
 import { formatNextPlanLabel } from '../domain/next-plan'
 import { parseWorkoutNote } from '../domain/workout-note-model'
-import type { DurationEntry, ExerciseEntry, StrengthSet } from '../domain/workout-note-model'
+import type {
+  BodyweightSet,
+  DurationEntry,
+  ExerciseEntry,
+  StrengthSet,
+} from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
+import { bodyweightLevelsFor } from '../vault/exercise-registry-vault'
 
 const WORKOUT_SOURCE_ROW = /^\s*[-*]\s+.*\[exercise::/
 
@@ -40,7 +51,7 @@ export function renderWorkoutReadingModeSection(
     return
   }
 
-  renderExercisePreview(el, exercise)
+  renderExercisePreview(el, exercise, plugin)
 }
 
 export function formatWeight(value: number | undefined): string {
@@ -125,7 +136,11 @@ function hideRecognisedSourceRows(el: HTMLElement, sourceRowCount: number): numb
   return toHide.size
 }
 
-function renderExercisePreview(el: HTMLElement, exercise: ExerciseEntry): void {
+function renderExercisePreview(
+  el: HTMLElement,
+  exercise: ExerciseEntry,
+  plugin: FitKitPlugin,
+): void {
   const wrap = el.createDiv({ cls: 'fitkit-reading-preview' })
   const summary = wrap.createDiv({ cls: 'fitkit-reading-summary' })
   summary.createSpan({
@@ -141,15 +156,20 @@ function renderExercisePreview(el: HTMLElement, exercise: ExerciseEntry): void {
   if (exercise.next) {
     wrap.createDiv({
       cls: 'fitkit-reading-plan',
-      text: `Next time: ${formatNextPlanLabel(exercise.next).toLowerCase()}${
-        exercise.next.step === undefined ? '' : ' kg'
-      }`,
+      text: `Next time: ${formatNextPlanLabel(exercise.next, exercise.kind).toLowerCase()}${formatReadingPlanStepSuffix(exercise)}`,
     })
   }
 
   switch (exercise.kind) {
     case 'strength':
       renderStrengthTable(wrap, exercise.strengthSets)
+      break
+    case 'bodyweight':
+      renderBodyweightTable(
+        wrap,
+        exercise.bodyweightSets,
+        bodyweightLevelsFor(plugin.app, plugin.settings, exercise.exerciseName),
+      )
       break
     case 'duration':
       renderDurationTable(wrap, exercise.durationEntries)
@@ -163,6 +183,10 @@ function exerciseCountText(exercise: ExerciseEntry): string {
   switch (exercise.kind) {
     case 'strength':
       return exercise.strengthSets.length === 1 ? '1 row' : `${exercise.strengthSets.length} rows`
+    case 'bodyweight':
+      return exercise.bodyweightSets.length === 1
+        ? '1 row'
+        : `${exercise.bodyweightSets.length} rows`
     case 'duration':
       return exercise.durationEntries.length === 1
         ? '1 row'
@@ -182,6 +206,31 @@ function renderStrengthTable(container: HTMLElement, sets: StrengthSet[]): void 
     row.createEl('td', { text: formatSet(set.set) })
     row.createEl('td', { text: formatWeight(set.weight) })
     row.createEl('td', { text: formatReps(set.reps) })
+    row.createEl('td', { text: set.note ?? '-' })
+  }
+}
+
+function renderBodyweightTable(
+  container: HTMLElement,
+  sets: BodyweightSet[],
+  levels: BodyweightLadder | undefined,
+): void {
+  if (sets.length === 0) {
+    renderEmpty(container, 'No bodyweight rows recorded.')
+    return
+  }
+  const table = createTable(container, ['Set', 'Level', 'Reps', 'Load', 'Notes'])
+  const body = table.createEl('tbody')
+  for (let index = 0; index < sets.length; index += 1) {
+    const set = sets[index]
+    if (!set) {
+      continue
+    }
+    const row = body.createEl('tr')
+    row.createEl('td', { text: formatSet(set.set ?? index + 1) })
+    row.createEl('td', { text: bodyweightLevelName(levels, set.level) })
+    row.createEl('td', { text: formatReps(set.reps) })
+    row.createEl('td', { text: formatWeight(set.load) })
     row.createEl('td', { text: set.note ?? '-' })
   }
 }
@@ -221,6 +270,18 @@ function renderEmpty(container: HTMLElement, message: string): void {
 
 function formatSet(value: number): string {
   return Number.isFinite(value) && value > 0 ? formatNumber(value) : '-'
+}
+
+/** A bodyweight plan step counts rungs; every other kind keeps kilograms. */
+function formatReadingPlanStepSuffix(exercise: ExerciseEntry): string {
+  const step = exercise.next?.step
+  if (step === undefined) {
+    return ''
+  }
+  if (exercise.kind === 'bodyweight') {
+    return ` ${formatRungUnit(step)}`
+  }
+  return ' kg'
 }
 
 function formatNumber(value: number): string {

@@ -13,6 +13,8 @@ export interface ExerciseCatalogEntry {
   kind: ExerciseKind
   /** Present only when the note frontmatter has an explicit, valid unit. */
   unit?: WeightUnit
+  /** Present only when a bodyweight note declares a usable levels ladder. */
+  levels?: string[]
 }
 
 export interface ExerciseCatalogDiagnostic {
@@ -23,6 +25,25 @@ export interface ExerciseCatalogDiagnostic {
 export interface ExerciseCatalogSnapshot {
   entries: ExerciseCatalogEntry[]
   diagnostics: ExerciseCatalogDiagnostic[]
+}
+
+/**
+ * Path of the exercise note that owns `name`, or null when no note exists.
+ * A catalog hit wins; the folder scan only covers notes whose frontmatter
+ * never reached the cache.
+ */
+export function findExerciseNotePath(
+  app: App,
+  settings: FitKitSettings,
+  name: string,
+): string | null {
+  const key = normalize(name)
+  const catalog = readExerciseCatalog(app, settings)
+  const catalogPath = catalog.entries.find((entry) => normalize(entry.name) === key)?.path
+  if (catalogPath !== undefined) {
+    return catalogPath
+  }
+  return findExerciseNoteFile(app, settings, name)?.path ?? null
 }
 
 /**
@@ -62,12 +83,17 @@ export function readExerciseCatalog(app: App, settings: FitKitSettings): Exercis
       continue
     }
 
+    const ladder = levelsFromFrontmatter(frontmatter, kind)
     entries.push({
       name: file.basename,
       path: file.path,
       kind,
       unit: unitFromFrontmatter(frontmatter, kind),
+      levels: ladder.levels,
     })
+    if (ladder.warning) {
+      diagnostics.push({ path: file.path, warnings: [ladder.warning] })
+    }
   }
 
   entries.sort((left, right) => left.name.localeCompare(right.name))
@@ -89,6 +115,40 @@ function unitFromFrontmatter(
   return kind === 'strength'
     ? (parseWeightUnit(readFrontmatterField(frontmatter, 'unit')) ?? undefined)
     : undefined
+}
+
+/**
+ * Bodyweight-only rule: only bodyweight notes carry a ladder, so other kinds
+ * read as absent without a warning. Frontmatter is user-edited, so anything
+ * that is not a usable rung list warns instead of throwing.
+ */
+function levelsFromFrontmatter(
+  frontmatter: CachedMetadata['frontmatter'] | undefined,
+  kind: ExerciseKind,
+): { levels?: string[]; warning?: string } {
+  if (kind !== 'bodyweight') {
+    return {}
+  }
+  const raw = readFrontmatterField(frontmatter, 'levels')
+  if (raw === undefined || raw === null) {
+    return {}
+  }
+  if (!Array.isArray(raw) && typeof raw !== 'string') {
+    return { warning: 'Exercise note has an invalid levels list.' }
+  }
+  const candidates: unknown[] = Array.isArray(raw) ? raw : [raw]
+  const rungs: string[] = []
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') {
+      return { warning: 'Exercise note has an invalid levels list.' }
+    }
+    rungs.push(candidate)
+  }
+  const levels = rungs.map((rung) => rung.trim()).filter((rung) => rung.length > 0)
+  if (levels.length === 0) {
+    return { warning: 'Exercise note has an invalid levels list.' }
+  }
+  return { levels }
 }
 
 function readFrontmatterField(

@@ -1,3 +1,4 @@
+import { defaultBodyweightLevels } from '../domain/bodyweight-levels'
 import type { ExerciseKind } from '../domain/exercise-registry'
 import { buildNotesBlock, buildRecentSessionsBlock } from '../domain/exercise-note-template'
 import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
@@ -25,6 +26,13 @@ export function composeExerciseNote(
   if (kind === 'strength') {
     lines.push('metric: e1rm')
     lines.push(`unit: ${unit}`)
+  }
+  /** A new bodyweight note starts with a usable ladder instead of an empty menu. */
+  if (kind === 'bodyweight') {
+    lines.push('levels:')
+    for (const rung of defaultBodyweightLevels(exerciseName)) {
+      lines.push(`  - ${rung}`)
+    }
   }
   lines.push('---')
   lines.push('')

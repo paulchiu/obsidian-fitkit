@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   formatNextPlan,
   formatNextPlanLabel,
+  nextPlanTargetLevel,
   nextPlanTargetWeight,
   parseNextPlan,
 } from '../../src/domain/next-plan'
@@ -50,9 +51,14 @@ describe('next plan formatting', () => {
   })
 
   it('labels plans in sentence case', () => {
-    expect(formatNextPlanLabel({ direction: 'up', step: 2.5 })).toBe('Up 2.5')
-    expect(formatNextPlanLabel({ direction: 'down' })).toBe('Down')
-    expect(formatNextPlanLabel({ direction: 'stay' })).toBe('Same weight')
+    expect(formatNextPlanLabel({ direction: 'up', step: 2.5 }, 'strength')).toBe('Up 2.5')
+    expect(formatNextPlanLabel({ direction: 'down' }, 'strength')).toBe('Down')
+    expect(formatNextPlanLabel({ direction: 'stay' }, 'strength')).toBe('Same weight')
+  })
+
+  it('labels a bodyweight hold as the level rather than the weight', () => {
+    expect(formatNextPlanLabel({ direction: 'stay' }, 'bodyweight')).toBe('Same level')
+    expect(formatNextPlanLabel({ direction: 'up', step: 1 }, 'bodyweight')).toBe('Up 1')
   })
 })
 
@@ -72,5 +78,30 @@ describe('next plan targets', () => {
 
   it('never plans a negative weight', () => {
     expect(nextPlanTargetWeight({ direction: 'down', step: 5 }, 2.5)).toBe(0)
+  })
+
+  it('rounds a fractional step to the nearest rung', () => {
+    expect(nextPlanTargetLevel({ direction: 'up', step: 2.5 }, 1, 5)).toBe(4)
+    expect(nextPlanTargetLevel({ direction: 'down', step: 2.5 }, 5, 5)).toBe(3)
+  })
+
+  it('clamps a hold to the ends of the ladder', () => {
+    expect(nextPlanTargetLevel({ direction: 'stay' }, 0, 5)).toBe(1)
+    expect(nextPlanTargetLevel({ direction: 'stay' }, 9, 5)).toBe(5)
+    expect(nextPlanTargetLevel({ direction: 'stay' }, 2.5, 5)).toBe(3)
+  })
+
+  it('moves a bodyweight plan by rungs and clamps to the ends of the ladder', () => {
+    expect(nextPlanTargetLevel({ direction: 'up', step: 1 }, 4, 5)).toBe(5)
+    expect(nextPlanTargetLevel({ direction: 'up', step: 2 }, 5, 5)).toBe(5)
+    expect(nextPlanTargetLevel({ direction: 'down', step: 3 }, 1, 5)).toBe(1)
+    expect(nextPlanTargetLevel({ direction: 'stay' }, 3, 5)).toBe(3)
+    expect(nextPlanTargetLevel({ direction: 'up' }, 3, 5)).toBeNull()
+  })
+
+  it('clamps every direction to a single-rung ladder', () => {
+    expect(nextPlanTargetLevel({ direction: 'up', step: 3 }, 1, 1)).toBe(1)
+    expect(nextPlanTargetLevel({ direction: 'down', step: 3 }, 1, 1)).toBe(1)
+    expect(nextPlanTargetLevel({ direction: 'stay' }, 1, 1)).toBe(1)
   })
 })

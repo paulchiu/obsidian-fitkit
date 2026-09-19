@@ -1,6 +1,7 @@
 import type { App, CachedMetadata, TAbstractFile, TFile } from 'obsidian'
 
-import { assertUnreachableKind, type ExerciseKind } from '../domain/exercise-kind'
+import { formatRungUnit } from '../domain/bodyweight-levels'
+import { type ExerciseKind } from '../domain/exercise-kind'
 import {
   DEFAULT_EXERCISE_METRIC,
   parseExerciseMetric,
@@ -222,21 +223,22 @@ function formatPb(exercise: ExerciseAggregate): string {
   const link = `[[#${exercise.exerciseName}|${exercise.exerciseName}]]`
 
   switch (exercise.kind) {
+    case 'bodyweight': {
+      const sessionLabel = exercise.sessionCount === 1 ? 'session' : 'sessions'
+      return `- **${link}:** total ${exercise.totalSets} sets across ${exercise.sessionCount} ${sessionLabel}`
+    }
     case 'duration': {
       const sessionLabel = exercise.sessionCount === 1 ? 'session' : 'sessions'
       return `- **${link}:** total ${exercise.totalDurationSeconds}s across ${exercise.sessionCount} ${sessionLabel}`
     }
-    case 'strength':
-      break
-    default:
-      return assertUnreachableKind(exercise.kind)
-  }
+    case 'strength': {
+      if (!exercise.pbSet) {
+        return `- **${link}:** no completed sets`
+      }
 
-  if (!exercise.pbSet) {
-    return `- **${link}:** no completed sets`
+      return `- **${link}:** ${formatDashboardSet(exercise.pbSet, exercise.metric, exercise.unit)}`
+    }
   }
-
-  return `- **${link}:** ${formatDashboardSet(exercise.pbSet, exercise.metric, exercise.unit)}`
 }
 
 function formatNextPlanLine(exercise: ExerciseAggregate): string {
@@ -245,9 +247,20 @@ function formatNextPlanLine(exercise: ExerciseAggregate): string {
   if (!plan) {
     return `- **${link}:** no plan`
   }
-  const label = formatNextPlanLabel(plan.value).toLowerCase()
-  const change = plan.value.step === undefined ? label : `${label} ${exercise.unit}`
+  const label = formatNextPlanLabel(plan.value, exercise.kind).toLowerCase()
+  const change =
+    plan.value.step === undefined
+      ? label
+      : `${label} ${formatPlanStepUnit(exercise, plan.value.step)}`
   return `- **${link}:** ${change} (planned ${plan.date})`
+}
+
+/** A bodyweight plan step counts rungs; every other kind keeps the exercise unit. */
+function formatPlanStepUnit(exercise: ExerciseAggregate, step: number): string {
+  if (exercise.kind === 'bodyweight') {
+    return formatRungUnit(step)
+  }
+  return exercise.unit
 }
 
 function isMoreRecentPlan(candidate: PlannedSession, current: PlannedSession): boolean {
@@ -262,6 +275,15 @@ function isMoreRecentPlan(candidate: PlannedSession, current: PlannedSession): b
 
 function dataviewQuery(exercise: ExerciseAggregate, workoutsFolderPath: string): string[] {
   switch (exercise.kind) {
+    case 'bodyweight':
+      return [
+        'table without id file.link as Session, level as Level',
+        `from "${workoutsFolderPath}"`,
+        'flatten file.lists as item',
+        `where contains(item.text, "[exercise:: [[${exercise.exerciseName}]]]") and item.level`,
+        'sort file.name desc',
+        'limit 12',
+      ]
     case 'duration':
       return [
         'table without id file.link as Session, duration + "s" as Duration',
@@ -272,23 +294,19 @@ function dataviewQuery(exercise: ExerciseAggregate, workoutsFolderPath: string):
         'limit 12',
       ]
     case 'strength':
-      break
-    default:
-      return assertUnreachableKind(exercise.kind)
+      return [
+        'TABLE WITHOUT ID',
+        '  file.link AS Workout,',
+        '  L.set AS Set,',
+        '  L.weight AS Weight,',
+        '  L.reps AS Reps',
+        `FROM "${workoutsFolderPath}"`,
+        'FLATTEN file.lists AS L',
+        `WHERE L.exercise = link("${exercise.exerciseName}") AND L.set`,
+        'SORT file.name DESC, L.set ASC',
+        'LIMIT 10',
+      ]
   }
-
-  return [
-    'TABLE WITHOUT ID',
-    '  file.link AS Workout,',
-    '  L.set AS Set,',
-    '  L.weight AS Weight,',
-    '  L.reps AS Reps',
-    `FROM "${workoutsFolderPath}"`,
-    'FLATTEN file.lists AS L',
-    `WHERE L.exercise = link("${exercise.exerciseName}") AND L.set`,
-    'SORT file.name DESC, L.set ASC',
-    'LIMIT 10',
-  ]
 }
 
 function isMarkdownFile(file: TAbstractFile | null): file is TFile {

@@ -1,5 +1,6 @@
 import type { App, TAbstractFile, TFile } from 'obsidian'
 
+import { pickBestBodyweightSet } from '../domain/bodyweight-levels'
 import { pickBestSet, pickHeaviestSet } from '../domain/epley'
 import type { ExerciseIndexRow, FitKitIndex, IndexDiagnostic, IndexEntry } from '../domain/types'
 import {
@@ -101,6 +102,15 @@ function toEntry(file: TFile, model: WorkoutNoteModel): IndexEntry {
 
 function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
   switch (exercise.kind) {
+    case 'bodyweight': {
+      return {
+        exerciseName: exercise.exerciseName,
+        kind: exercise.kind,
+        totalSets: exercise.bodyweightSets.length,
+        maxBodyweightSet: pickBestBodyweightSet(exercise.bodyweightSets) ?? undefined,
+        next: exercise.next,
+      }
+    }
     case 'duration':
       return {
         exerciseName: exercise.exerciseName,

@@ -1,3 +1,4 @@
+import { defaultBodyweightLevels, type BodyweightLadder } from './bodyweight-levels'
 import { EXERCISE_KINDS, parseExerciseKind } from './exercise-kind'
 import {
   kindForName,
@@ -117,12 +118,84 @@ export interface ExerciseNoteKindUpdateResult {
   changed: boolean
 }
 
+export interface ExerciseNoteLevelsUpdateResult {
+  markdown: string
+  changed: boolean
+}
+
+/**
+ * Rewrites the `levels:` ladder in an exercise note's frontmatter, inserting
+ * a block list after `kind:` when the note has none. The writer only emits
+ * block form; a one-line flow list is replaced rather than extended.
+ */
+export function setExerciseNoteLevels(
+  source: string,
+  levels: BodyweightLadder,
+): ExerciseNoteLevelsUpdateResult {
+  const normalizedSource = normalizeMarkdownSource(source)
+  const bounds = findFrontmatterBounds(normalizedSource.markdown)
+  if (bounds.status !== 'found') {
+    return { markdown: source, changed: false }
+  }
+  const lines = normalizedSource.markdown.split('\n')
+  const frontmatterLines = lines.slice(bounds.start + 1, bounds.end)
+  const replacement = ['levels:', ...levels.map((rung) => `  - ${rung}`)]
+  const levelsLineIndex = findFrontmatterKeyLine(frontmatterLines, 'levels')
+  const nextFrontmatterLines =
+    levelsLineIndex < 0
+      ? insertLines(frontmatterLines, levelsInsertIndex(frontmatterLines), replacement)
+      : [
+          ...frontmatterLines.slice(0, levelsLineIndex),
+          ...replacement,
+          ...frontmatterLines.slice(
+            levelsLineIndex + 1 + countListItemLines(frontmatterLines, levelsLineIndex + 1),
+          ),
+        ]
+  const markdown = [
+    ...lines.slice(0, bounds.start + 1),
+    ...nextFrontmatterLines,
+    ...lines.slice(bounds.end),
+  ].join('\n')
+  const restored = restoreMarkdownSource(markdown, normalizedSource)
+  if (restored === source) {
+    return { markdown: source, changed: false }
+  }
+  return { markdown: restored, changed: true }
+}
+
+/** Insertion point for a new ladder: after `kind:`, else after `type:`, else last. */
+function levelsInsertIndex(lines: ReadonlyArray<string>): number {
+  const kindIndex = findFrontmatterKeyLine(lines, 'kind')
+  if (kindIndex >= 0) {
+    return kindIndex + 1
+  }
+  const typeIndex = findFrontmatterKeyLine(lines, 'type')
+  if (typeIndex >= 0) {
+    return typeIndex + 1
+  }
+  return lines.length
+}
+
+/** Contiguous block-sequence items (`  - rung`) from `start`, for ladder replacement. */
+function countListItemLines(lines: ReadonlyArray<string>, start: number): number {
+  let count = 0
+  for (let index = start; index < lines.length; index += 1) {
+    if (!/^\s+-\s/.test(lines[index] ?? '')) {
+      break
+    }
+    count += 1
+  }
+  return count
+}
+
 /**
  * Writes `kind:` directly into an exercise note's frontmatter, without the
  * rest of migrateExerciseNote's repair pass. Used when the user explicitly
  * switches an exercise's kind, so the note (the store that wins on read via
  * buildExerciseRegistrySnapshot) reflects the choice immediately rather than
- * being downgraded back on the next read.
+ * being downgraded back on the next read. Switching to bodyweight also drops
+ * metric:/unit: lines, which only belong to strength notes; the ladder
+ * itself is left for the repair pass, which knows the exercise name.
  */
 export function setExerciseNoteKind(
   source: string,
@@ -141,12 +214,16 @@ export function setExerciseNoteKind(
   }
 
   const kindLineIndex = findFrontmatterKeyLine(frontmatterLines, 'kind')
-  const nextFrontmatterLines =
+  const withKind =
     kindLineIndex < 0
       ? insertLines(frontmatterLines, findFrontmatterKeyLine(frontmatterLines, 'type') + 1, [
           `kind: ${kind}`,
         ])
       : replaceLine(frontmatterLines, kindLineIndex, `kind: ${kind}`)
+  const nextFrontmatterLines =
+    kind === 'bodyweight'
+      ? withKind.filter((line) => !isStrengthOnlyFrontmatterKey(line))
+      : withKind
 
   const markdown = [
     ...lines.slice(0, bounds.start + 1),
@@ -176,7 +253,7 @@ function repairFrontmatter(
   if (bounds.status === 'missing') {
     const fallbackKind = registryKind ?? inferExerciseKindFromContent(source) ?? 'strength'
     return {
-      markdown: `${frontmatterBlock(fallbackKind, registryUnit ?? DEFAULT_WEIGHT_UNIT)}${source}`,
+      markdown: `${frontmatterBlock(fallbackKind, options.name, registryUnit ?? DEFAULT_WEIGHT_UNIT)}${source}`,
       kind: fallbackKind,
       unknownKind: registryKind === null,
       warnings: [],
@@ -263,6 +340,19 @@ function repairFrontmatter(
     nextFrontmatterLines = setStrengthUnitFromRegistry(nextFrontmatterLines, registryUnit)
   }
 
+  if (effectiveKind === 'bodyweight') {
+    nextFrontmatterLines = nextFrontmatterLines.filter(
+      (line) => !isStrengthOnlyFrontmatterKey(line),
+    )
+    if (findFrontmatterKeyLine(nextFrontmatterLines, 'levels') < 0) {
+      kindLineIndex = findFrontmatterKeyLine(nextFrontmatterLines, 'kind')
+      nextFrontmatterLines = insertLines(nextFrontmatterLines, kindLineIndex + 1, [
+        'levels:',
+        ...defaultBodyweightLevels(options.name).map((rung) => `  - ${rung}`),
+      ])
+    }
+  }
+
   const markdown = [
     ...lines.slice(0, bounds.start + 1),
     ...nextFrontmatterLines,
@@ -287,7 +377,8 @@ function strengthUnitForName(registry: ExerciseRegistry, name: string): WeightUn
 
 function frontmatterBlock(
   kind: ExerciseKind | null,
-  unit: WeightUnit = DEFAULT_WEIGHT_UNIT,
+  exerciseName: string,
+  unit: WeightUnit,
 ): string {
   const lines = ['---', 'type: exercise']
   if (kind) {
@@ -296,9 +387,28 @@ function frontmatterBlock(
       lines.push(`metric: ${DEFAULT_EXERCISE_METRIC}`)
       lines.push(`unit: ${unit}`)
     }
+    if (kind === 'bodyweight') {
+      lines.push('levels:')
+      for (const rung of defaultBodyweightLevels(exerciseName)) {
+        lines.push(`  - ${rung}`)
+      }
+    }
   }
   lines.push('---', '')
   return `${lines.join('\n')}\n`
+}
+
+/**
+ * Strength-only frontmatter keys carry no meaning on a bodyweight note, so a
+ * note that becomes bodyweight sheds them instead of keeping stale values.
+ */
+function isStrengthOnlyFrontmatterKey(line: string): boolean {
+  const colon = line.indexOf(':')
+  if (colon < 0) {
+    return false
+  }
+  const key = line.slice(0, colon).trim().toLowerCase()
+  return key === 'metric' || key === 'unit'
 }
 
 function inferExerciseKindFromContent(source: string): ExerciseKind | null {
@@ -321,6 +431,16 @@ function inferExerciseKindFromContent(source: string): ExerciseKind | null {
   const body = document.lines.slice(block.start, block.end + 1).join('\n')
   const hasDurationFields = hasDataviewFields(body, ['duration'])
   const hasStrengthFields = hasDataviewFields(body, ['set', 'weight', 'reps'])
+  const hasLevelFields = hasDataviewFields(body, ['level'])
+  const hasSetOrWeightFields = hasDataviewFields(body, ['set', 'weight'])
+  /**
+   * Level is checked first but narrowly: a bodyweight query also selects
+   * reps, so the level branch must not fire when set, weight, or duration
+   * fields show a note that is really strength or duration.
+   */
+  if (hasLevelFields && !hasDurationFields && !hasSetOrWeightFields) {
+    return 'bodyweight'
+  }
   if (hasDurationFields && !hasStrengthFields) {
     return 'duration'
   }

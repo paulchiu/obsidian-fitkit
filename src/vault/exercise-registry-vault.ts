@@ -1,12 +1,12 @@
 import type { App } from 'obsidian'
 
-import { normalize } from '../domain/exercise-registry'
+import { createRegistry, levelsForName, normalize } from '../domain/exercise-registry'
 import type { ExerciseRegistryEntry } from '../domain/exercise-registry'
 import type { FitKitSettings } from '../settings'
 import { readExerciseCatalog, type ExerciseCatalogSnapshot } from './exercise-catalog'
 
 export interface ExerciseRegistrySnapshotDiagnostic {
-  kind: 'catalog' | 'registry-kind-conflict'
+  kind: 'catalog' | 'registry-kind-conflict' | 'registry-levels-conflict'
   path?: string
   name?: string
   warnings: string[]
@@ -23,6 +23,51 @@ export function exerciseRegistryWithVaultNotes(
   settings: FitKitSettings,
 ): ExerciseRegistryEntry[] {
   return buildExerciseRegistrySnapshot(app, settings).entries
+}
+
+/**
+ * Ladder for rung names and plans, preferring the exercise note via the
+ * merged snapshot. Absent means no ladder on file; callers fall back to a
+ * seeded default where a menu must never be empty.
+ */
+export function bodyweightLevelsFor(
+  app: App,
+  settings: FitKitSettings,
+  name: string,
+): string[] | undefined {
+  return levelsForName(createRegistry(exerciseRegistryWithVaultNotes(app, settings)), name)
+}
+
+/** Order-sensitive ladder equality: rung order is the ladder, so a reorder counts. */
+export function sameLevels(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((rung, index) => rung === right[index])
+}
+
+/**
+ * Snapshot entries with ladders this session wrote overlaid by normalized
+ * name. Entries without an override pass through untouched.
+ */
+export function applyLadderOverrides(
+  entries: readonly ExerciseRegistryEntry[],
+  overrides: ReadonlyMap<string, readonly string[]>,
+): ExerciseRegistryEntry[] {
+  if (overrides.size === 0) {
+    return [...entries]
+  }
+  const byKey = new Map<string, readonly string[]>()
+  for (const [name, levels] of overrides) {
+    const key = normalize(name)
+    if (key.length > 0 && !byKey.has(key)) {
+      byKey.set(key, levels)
+    }
+  }
+  return entries.map((entry) => {
+    const levels = byKey.get(normalize(entry.name))
+    if (levels === undefined) {
+      return entry
+    }
+    return { ...entry, levels: [...levels], aliases: [...entry.aliases] }
+  })
 }
 
 export function buildExerciseRegistrySnapshot(
@@ -62,11 +107,28 @@ export function buildExerciseRegistrySnapshot(
       })
     }
 
+    if (saved?.levels && note.levels && !sameLevels(saved.levels, note.levels)) {
+      diagnostics.push({
+        kind: 'registry-levels-conflict',
+        name: note.name,
+        path: note.path,
+        warnings: [
+          `Saved registry levels '${saved.levels.join(', ')}' differ from note levels '${note.levels.join(', ')}'; using note levels.`,
+        ],
+      })
+    }
+
     /** Frontmatter unit wins when the note has one; the saved registry unit is only a fallback. */
     entriesByKey.set(key, {
       name: note.name,
       kind: note.kind,
       unit: note.unit ?? saved?.unit,
+      levels:
+        note.levels !== undefined
+          ? [...note.levels]
+          : saved?.levels !== undefined
+            ? [...saved.levels]
+            : undefined,
       aliases: saved ? [...saved.aliases] : [],
     })
   }
@@ -80,6 +142,7 @@ export function buildExerciseRegistrySnapshot(
       name: entry.name,
       kind: entry.kind,
       unit: entry.unit,
+      levels: entry.levels !== undefined ? [...entry.levels] : undefined,
       aliases: [...entry.aliases],
     })
   }

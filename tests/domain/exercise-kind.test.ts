@@ -9,15 +9,20 @@ import {
 import type { ExerciseIndexRow } from '../../src/domain/types'
 
 describe('exercise kind', () => {
-  it('declares strength and duration as the only kinds', () => {
-    expect([...EXERCISE_KINDS] satisfies ExerciseKind[]).toEqual(['strength', 'duration'])
+  it('declares strength, duration and bodyweight as the kinds in order', () => {
+    expect([...EXERCISE_KINDS] satisfies ExerciseKind[]).toEqual([
+      'strength',
+      'duration',
+      'bodyweight',
+    ])
   })
 
   it('provides a display label for every kind', () => {
-    // At two kinds a literal table and a derived one produce identical values, so this pins the labels, not their source.
+    // At three kinds a literal table and a derived one produce identical values, so this pins the labels, not their source.
     expect(EXERCISE_KIND_LABELS satisfies Record<ExerciseKind, string>).toEqual({
       strength: 'Strength',
       duration: 'Duration',
+      bodyweight: 'Bodyweight',
     })
   })
 

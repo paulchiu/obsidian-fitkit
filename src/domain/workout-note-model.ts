@@ -14,6 +14,7 @@
  *    `[next::]` only.
  *  - Strength row: has `[set::]`, optional `[weight::]`, optional `[reps::]`, optional `[notes::]`.
  *  - Duration row: has `[duration::]` (seconds), optional `[set::]`, optional `[notes::]`.
+ *  - Bodyweight row: has `[level::]`, optional `[set::]`, optional `[reps::]`, optional `[load::]`, optional `[notes::]`.
  *
  * A round-trip (parse then serialize) is content-preserving for anything the
  * model above does not represent: unrecognised frontmatter keys, fenced code
@@ -30,7 +31,7 @@
  * field-by-field from the model. This is documented in README.md.
  */
 
-import type { ExerciseKind } from './exercise-kind'
+import { assertUnreachableKind, EXERCISE_KINDS, type ExerciseKind } from './exercise-kind'
 import { formatNextPlan, parseNextPlan, type NextPlan } from './next-plan'
 
 export type { ExerciseKind }
@@ -45,6 +46,14 @@ export interface StrengthSet {
 export interface DurationEntry {
   set?: number
   durationSeconds: number
+  note?: string
+}
+
+export interface BodyweightSet {
+  set?: number
+  level: number
+  reps?: number
+  load?: number
   note?: string
 }
 
@@ -65,7 +74,68 @@ export interface DurationExerciseEntry extends ExerciseEntryBase {
   durationEntries: DurationEntry[]
 }
 
-export type ExerciseEntry = StrengthExerciseEntry | DurationExerciseEntry
+export interface BodyweightExerciseEntry extends ExerciseEntryBase {
+  kind: 'bodyweight'
+  bodyweightSets: BodyweightSet[]
+}
+
+export type ExerciseEntry = StrengthExerciseEntry | DurationExerciseEntry | BodyweightExerciseEntry
+
+/**
+ * Set rows an entry holds, whatever its kind. Coercion warnings and the
+ * first-level relabel offer count rows only, since the note and next plan
+ * survive a kind switch untouched.
+ */
+export function setRowCount(exercise: ExerciseEntry): number {
+  switch (exercise.kind) {
+    case 'strength':
+      return exercise.strengthSets.length
+    case 'duration':
+      return exercise.durationEntries.length
+    case 'bodyweight':
+      return exercise.bodyweightSets.length
+  }
+}
+
+/**
+ * Mark an entry's logged rows as the first rung. Reps and notes carry over,
+ * and a logged weight carries as load (added weight is the only weight a
+ * bodyweight row can hold); a duration has no rep count to keep.
+ */
+export function relabelSetsAsFirstLevel(entry: ExerciseEntry): BodyweightSet[] {
+  switch (entry.kind) {
+    case 'strength':
+      return entry.strengthSets.map((set) => {
+        const marked: BodyweightSet = { level: 1 }
+        if (set.set !== undefined) {
+          marked.set = set.set
+        }
+        if (set.reps !== undefined) {
+          marked.reps = set.reps
+        }
+        if (set.weight !== undefined) {
+          marked.load = set.weight
+        }
+        if (set.note !== undefined) {
+          marked.note = set.note
+        }
+        return marked
+      })
+    case 'duration':
+      return entry.durationEntries.map((row) => {
+        const marked: BodyweightSet = { level: 1 }
+        if (row.set !== undefined) {
+          marked.set = row.set
+        }
+        if (row.note !== undefined) {
+          marked.note = row.note
+        }
+        return marked
+      })
+    case 'bodyweight':
+      return entry.bodyweightSets.map((set) => ({ ...set }))
+  }
+}
 
 export function withNoteAndNext<T extends ExerciseEntry>(
   entry: T,
@@ -134,16 +204,32 @@ const INLINE_FIELD = /\[([a-zA-Z][\w-]*)::\s*((?:\[\[[^\]]*\]\]|[^\]])*)\]/g
 const WIKILINK = /^\[\[([^\]]+)\]\]$/
 
 /**
+ * Warning for an exercise coerced from one row shape to another. The pair is
+ * named in `EXERCISE_KINDS` order, which keeps the long-shipped strength and
+ * duration wording byte-identical while giving the new pairs a fixed order.
+ */
+function mixedKindWarning(
+  sourcePath: string,
+  exerciseName: string,
+  dropped: ExerciseKind,
+  adopted: ExerciseKind,
+): string {
+  const [first = dropped, second = adopted] = [dropped, adopted].sort(
+    (left, right) => EXERCISE_KINDS.indexOf(left) - EXERCISE_KINDS.indexOf(right),
+  )
+  return `${sourcePath}: Exercise "${exerciseName}" has both ${first} and ${second} rows; dropping ${dropped} data.`
+}
+
+/**
  * Number of rows a serialized exercise section will have: the optional
- * note/next row, then each strength or duration row. Used on both sides of
+ * note/next row, then each set row. Used on both sides of
  * a `PreserveBlock` anchor, at parse time (to record `afterRowCount`) and
  * at serialize time (to know when to re-insert it and to clamp a stale
  * anchor to a row count the edited exercise still has).
  */
 function rowCountOf(exercise: ExerciseEntry): number {
   return (
-    (exercise.note !== undefined || exercise.next !== undefined ? 1 : 0) +
-    (exercise.kind === 'strength' ? exercise.strengthSets.length : exercise.durationEntries.length)
+    (exercise.note !== undefined || exercise.next !== undefined ? 1 : 0) + setRowCount(exercise)
   )
 }
 
@@ -250,15 +336,19 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
     const hasWeight = fields.has('weight')
     const hasReps = fields.has('reps')
     const hasDuration = fields.has('duration')
+    const hasLevel = fields.has('level')
+    const hasLoad = fields.has('load')
     const note = fields.get('notes')
     if (!current || current.exerciseName !== inlineName) {
       flush()
       current = hasDuration
         ? { exerciseName: inlineName, kind: 'duration', durationEntries: [] }
-        : { exerciseName: inlineName, kind: 'strength', strengthSets: [] }
+        : hasLevel
+          ? { exerciseName: inlineName, kind: 'bodyweight', bodyweightSets: [] }
+          : { exerciseName: inlineName, kind: 'strength', strengthSets: [] }
     }
 
-    if (!hasSet && !hasDuration && !hasWeight && !hasReps) {
+    if (!hasSet && !hasDuration && !hasWeight && !hasReps && !hasLevel) {
       /** Exercise-level note row. */
       if (note !== undefined) {
         current.note = note
@@ -272,10 +362,8 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
 
     if (hasDuration) {
       if (current.kind !== 'duration') {
-        if (current.strengthSets.length > 0) {
-          warnings.push(
-            `${sourcePath}: Exercise "${inlineName}" has both strength and duration rows; dropping strength data.`,
-          )
+        if (setRowCount(current) > 0) {
+          warnings.push(mixedKindWarning(sourcePath, inlineName, current.kind, 'duration'))
         }
         current = withNoteAndNext(
           { exerciseName: current.exerciseName, kind: 'duration', durationEntries: [] },
@@ -295,12 +383,39 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
       continue
     }
 
+    if (hasLevel) {
+      if (current.kind !== 'bodyweight') {
+        if (setRowCount(current) > 0) {
+          warnings.push(mixedKindWarning(sourcePath, inlineName, current.kind, 'bodyweight'))
+        }
+        current = withNoteAndNext(
+          { exerciseName: current.exerciseName, kind: 'bodyweight', bodyweightSets: [] },
+          current.note,
+          current.next,
+        )
+      }
+      const level = Number(fields.get('level'))
+      const entry: BodyweightSet = { level }
+      if (hasSet) {
+        entry.set = Number(fields.get('set'))
+      }
+      if (hasReps) {
+        entry.reps = Number(fields.get('reps'))
+      }
+      if (hasLoad) {
+        entry.load = Number(fields.get('load'))
+      }
+      if (note !== undefined) {
+        entry.note = note
+      }
+      current.bodyweightSets.push(entry)
+      continue
+    }
+
     /** Strength row. We tolerate RPE and drop it; keep set/weight/reps/notes. */
     if (current.kind !== 'strength') {
-      if (current.durationEntries.length > 0) {
-        warnings.push(
-          `${sourcePath}: Exercise "${inlineName}" has both strength and duration rows; dropping duration data.`,
-        )
+      if (setRowCount(current) > 0) {
+        warnings.push(mixedKindWarning(sourcePath, inlineName, current.kind, 'strength'))
       }
       current = withNoteAndNext(
         { exerciseName: current.exerciseName, kind: 'strength', strengthSets: [] },
@@ -479,7 +594,27 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
         rowCount += 1
         insertBucket(`${i}:${rowCount}`)
       }
-    } else {
+    } else if (exercise.kind === 'bodyweight') {
+      for (const set of exercise.bodyweightSets) {
+        const parts = [`[exercise:: [[${exercise.exerciseName}]]]`]
+        if (set.set !== undefined) {
+          parts.push(`[set:: ${set.set}]`)
+        }
+        parts.push(`[level:: ${formatNumber(set.level)}]`)
+        if (set.reps !== undefined) {
+          parts.push(`[reps:: ${set.reps}]`)
+        }
+        if (set.load !== undefined) {
+          parts.push(`[load:: ${formatNumber(set.load)}]`)
+        }
+        if (set.note !== undefined) {
+          parts.push(`[notes:: ${set.note}]`)
+        }
+        bodyLines.push(`- ${parts.join(' ')}`)
+        rowCount += 1
+        insertBucket(`${i}:${rowCount}`)
+      }
+    } else if (exercise.kind === 'duration') {
       for (const entry of exercise.durationEntries) {
         const parts = [`[exercise:: [[${exercise.exerciseName}]]]`]
         if (entry.set !== undefined) {
@@ -493,6 +628,8 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
         rowCount += 1
         insertBucket(`${i}:${rowCount}`)
       }
+    } else {
+      return assertUnreachableKind(exercise)
     }
   }
 
@@ -535,6 +672,16 @@ export function canonicalizeForEquality(model: WorkoutNoteModel): unknown {
               set: entry.set,
               durationSeconds: entry.durationSeconds,
               note: entry.note,
+            }))
+          : undefined,
+      bodyweightSets:
+        ex.kind === 'bodyweight'
+          ? ex.bodyweightSets.map((set) => ({
+              set: set.set,
+              level: set.level,
+              reps: set.reps,
+              load: set.load,
+              note: set.note,
             }))
           : undefined,
     })),

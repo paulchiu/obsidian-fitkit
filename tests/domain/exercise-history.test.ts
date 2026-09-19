@@ -151,6 +151,117 @@ describe('exercise history aggregation', () => {
     expect(formatExerciseHistoryBadges(history.get('Curl'), 'strength')).toEqual([])
   })
 
+  it('prefers a higher rung over more reps for the bodyweight personal best', () => {
+    const levels = ['Wall push-up', 'Incline push-up', 'Knee push-up', 'Push-up', 'Diamond push-up']
+    const history = buildExerciseHistoryMap(
+      fitKitIndex([
+        entry('Fitness/Workouts/2026-04-20.md', '2026-04-20', [
+          {
+            exerciseName: 'Push-up',
+            kind: 'bodyweight',
+            totalSets: 1,
+            maxBodyweightSet: { level: 5, reps: 1, load: 0 },
+          },
+        ]),
+        entry('Fitness/Workouts/2026-04-22.md', '2026-04-22', [
+          {
+            exerciseName: 'Push-up',
+            kind: 'bodyweight',
+            totalSets: 1,
+            maxBodyweightSet: { level: 4, reps: 20, load: 0 },
+          },
+        ]),
+      ]),
+      {
+        sourcePath: 'Fitness/Workouts/2026-04-24.md',
+        date: '2026-04-24',
+      },
+    )
+
+    expect(formatExerciseHistoryBadges(history.get('Push-up'), 'bodyweight', levels)).toEqual([
+      {
+        text: 'PB Diamond push-up x 1',
+        title: 'Highest level reached: Diamond push-up x 1',
+      },
+      {
+        text: 'last Push-up x 20',
+        title: 'Highest level in latest prior session: Push-up x 20 (2026-04-22)',
+      },
+    ])
+  })
+
+  it('breaks a level tie on reps for the bodyweight personal best', () => {
+    const levels = ['Wall push-up', 'Incline push-up', 'Knee push-up', 'Push-up', 'Diamond push-up']
+    const history = buildExerciseHistoryMap(
+      fitKitIndex([
+        entry('Fitness/Workouts/2026-04-20.md', '2026-04-20', [
+          {
+            exerciseName: 'Push-up',
+            kind: 'bodyweight',
+            totalSets: 1,
+            maxBodyweightSet: { level: 3, reps: 8, load: 0 },
+          },
+        ]),
+        entry('Fitness/Workouts/2026-04-22.md', '2026-04-22', [
+          {
+            exerciseName: 'Push-up',
+            kind: 'bodyweight',
+            totalSets: 1,
+            maxBodyweightSet: { level: 3, reps: 12, load: 0 },
+          },
+        ]),
+      ]),
+      {
+        sourcePath: 'Fitness/Workouts/2026-04-24.md',
+        date: '2026-04-24',
+      },
+    )
+
+    expect(formatExerciseHistoryBadges(history.get('Push-up'), 'bodyweight', levels)).toEqual([
+      {
+        text: 'PB Knee push-up x 12',
+        title: 'Highest level reached: Knee push-up x 12',
+      },
+      {
+        text: 'last Knee push-up x 12',
+        title: 'Highest level in latest prior session: Knee push-up x 12 (2026-04-22)',
+      },
+    ])
+  })
+
+  it('breaks a level and reps tie on load for the bodyweight personal best', () => {
+    const history = buildExerciseHistoryMap(
+      fitKitIndex([
+        entry('Fitness/Workouts/2026-04-20.md', '2026-04-20', [
+          {
+            exerciseName: 'Push-up',
+            kind: 'bodyweight',
+            totalSets: 1,
+            maxBodyweightSet: { level: 3, reps: 10, load: 0 },
+          },
+        ]),
+        entry('Fitness/Workouts/2026-04-22.md', '2026-04-22', [
+          {
+            exerciseName: 'Push-up',
+            kind: 'bodyweight',
+            totalSets: 1,
+            maxBodyweightSet: { level: 3, reps: 10, load: 10 },
+          },
+        ]),
+      ]),
+      {
+        sourcePath: 'Fitness/Workouts/2026-04-24.md',
+        date: '2026-04-24',
+      },
+    )
+
+    expect(history.get('Push-up')?.bodyweight?.personalBest).toEqual({
+      level: 3,
+      reps: 10,
+      load: 10,
+    })
+  })
+
   it('renders bodyweight-only strength history as reps', () => {
     const history = buildExerciseHistoryMap(
       fitKitIndex([
@@ -369,6 +480,22 @@ describe('exercise history aggregation', () => {
 
     expect(badge?.text).toBe('Next: up 2.5 kg')
     expect(badge?.title).toBe('Planned for next time: up 2.5 kg')
+  })
+
+  it('plans a bodyweight step as a rung target on the ladder', () => {
+    const levels = ['Wall push-up', 'Incline push-up', 'Knee push-up', 'Push-up', 'Diamond push-up']
+    const summary = {
+      bodyweight: {
+        lastSessionMax: { value: { level: 4, reps: 10, load: 0 }, date: '2026-08-10' },
+      },
+      nextPlan: { value: { direction: 'up' as const, step: 1 }, date: '2026-08-10' },
+    }
+
+    expect(formatNextPlanBadge(summary, 'bodyweight', undefined, levels)).toEqual({
+      text: 'Next: L5 Diamond push-up',
+      title: 'Planned on 2026-08-10: up 1 rung from L4 Push-up',
+      icon: 'arrow-up',
+    })
   })
 
   it('has no plan badge for duration exercises or absent plans', () => {

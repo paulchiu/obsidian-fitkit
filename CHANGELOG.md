@@ -9,9 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Exercises can now be tracked as `bodyweight`, where a set records which rung of a progression you reached rather than how much you lifted. A set row carries `[level:: N]` with optional `[reps:: R]` and `[load:: X]`, and `N` indexes an ordered `levels:` ladder declared on the exercise note, so one note owns its whole progression and a single workout can mix rungs.
+- The workout editor renders a bodyweight exercise as a card with a level stepper and a rung menu on every row, reps and an optional load cell, and an add-set action that carries the previous rung forward. A rung name too long for its cell shortens to a compact form, decided from the name's own width so an arbitrarily long name still fits.
+- A bodyweight card can edit its ladder, writing to the exercise note when one exists and to the exercise registry otherwise. Because a set stores a position rather than a name, an edit that changes what an already-logged level means lists each affected level with its old and new rung, and applies only once confirmed.
+- Switching an exercise to bodyweight seeds a single rung named after the exercise so the card works straight away, and offers to mark the already-logged sets as the first level, stating how many would change.
+- Reading view, history badges and next-time plans all speak in rungs. A bodyweight personal best is the highest rung reached, with ties broken by reps and then by load, and a `[next::]` step counts rungs rather than kilograms.
+
 ### Changed
 
 ### Fixed
+
+- Editing or renaming an exercise registry entry no longer discards its `levels:` ladder. This was only reachable for an exercise with no note of its own, where the registry holds the only copy.
+- A bodyweight card now shows the rung names from a ladder the moment it is written, instead of falling back to bare level numbers until the next reload. This covers switching an exercise to bodyweight, appending a rung, and confirming a ladder edit, which all rendered before the vault index reported the write.
+- The level stepper clamps both steps when no ladder names a rung; an empty ladder previously left the raise step enabled so it could climb past every rung.
+- The first bodyweight row of an exercise now carries its set number and level like every row that Add set appends, so the written note reads the same for row one as for the rest.
+- Choosing Update registry too when switching an exercise kind now records the kind in the registry as well as the exercise note, instead of leaving the saved registry behind the note that wins on read.
+- A rung name shortened for a narrow window restores its full form when the window widens again, without the resize flicker the sticky shortening was added to stop.
 
 ### Removed
 

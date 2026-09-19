@@ -110,8 +110,21 @@ function normalizeStoredExerciseRegistry(
     name: entry.name,
     kind: parseExerciseKind(entry.kind) ?? 'strength',
     unit: parseWeightUnit(entry.unit) ?? undefined,
+    levels: normalizeStoredLevels(entry.levels),
     aliases: [...entry.aliases],
   }))
+}
+
+/**
+ * Stored ladders arrive as unknown JSON, so only a usable string list
+ * survives the load; anything else reads as no ladder rather than throwing.
+ */
+function normalizeStoredLevels(levels: unknown): string[] | undefined {
+  if (!Array.isArray(levels)) {
+    return undefined
+  }
+  const rungs = levels.filter((rung): rung is string => typeof rung === 'string')
+  return rungs.length > 0 ? rungs : undefined
 }
 
 const AUTOSAVE_DEBOUNCE_MIN = 0
@@ -683,7 +696,13 @@ export class FitKitSettingTab extends PluginSettingTab {
           this.plugin,
           {
             kind: 'edit',
-            original: { name: row.name, kind: row.kind, unit: row.unit, aliases: row.aliases },
+            original: {
+              name: row.name,
+              kind: row.kind,
+              unit: row.unit,
+              levels: row.levels ? [...row.levels] : undefined,
+              aliases: row.aliases,
+            },
           },
           rerender,
         ).open()

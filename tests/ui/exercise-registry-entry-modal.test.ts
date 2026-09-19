@@ -97,11 +97,19 @@ describe('ExerciseRegistryEntryModal kind select', () => {
     obsidianMock.notices = []
   })
 
-  it('lists strength then duration with their current labels', () => {
+  it('lists strength, duration then bodyweight with their current labels', () => {
     const select = kindSelectIn(openModalWithKind('strength').modal)
 
-    expect(select.children.map((option) => option.value)).toEqual(['strength', 'duration'])
-    expect(select.children.map((option) => option.textContent)).toEqual(['Strength', 'Duration'])
+    expect(select.children.map((option) => option.value)).toEqual([
+      'strength',
+      'duration',
+      'bodyweight',
+    ])
+    expect(select.children.map((option) => option.textContent)).toEqual([
+      'Strength',
+      'Duration',
+      'Bodyweight',
+    ])
   })
 
   it('keeps the held kind when the select reports an unrecognised value', () => {
@@ -274,5 +282,22 @@ describe('ExerciseRegistryEntryModal unit preservation', () => {
     await modalPrivate.handleSave()
 
     expect(plugin.settings.exerciseRegistry[0]?.unit).toBe('lbs')
+  })
+
+  it('keeps the ladder when an edit changes only the aliases', async () => {
+    const original: ExerciseRegistryEntry = {
+      name: 'Push-up',
+      kind: 'bodyweight',
+      levels: ['Wall push-up', 'Knee push-up'],
+      aliases: [],
+    }
+    const plugin = createPluginStub([original])
+    const modal = new ExerciseRegistryEntryModal(plugin, { kind: 'edit', original }, vi.fn())
+
+    const modalPrivate = modal as unknown as ModalPrivate
+    modalPrivate.aliasesText = 'Pushup'
+    await modalPrivate.handleSave()
+
+    expect(plugin.settings.exerciseRegistry[0]?.levels).toEqual(['Wall push-up', 'Knee push-up'])
   })
 })

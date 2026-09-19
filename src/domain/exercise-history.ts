@@ -1,8 +1,20 @@
 import type { ExerciseKind } from './workout-note-model'
+import {
+  bodyweightLevelName,
+  formatBodyweightLevelShort,
+  formatRungUnit,
+  pickBestBodyweightSet,
+  type BodyweightLadder,
+} from './bodyweight-levels'
 import { formatDurationInput } from './duration-input'
 import { pickHeaviestSet } from './epley'
-import { formatNextPlanLabel, nextPlanTargetWeight, type NextPlan } from './next-plan'
-import type { FitKitIndex, IndexEntry, LastSessionMax, WeightSet } from './types'
+import {
+  formatNextPlanLabel,
+  nextPlanTargetLevel,
+  nextPlanTargetWeight,
+  type NextPlan,
+} from './next-plan'
+import type { BodyweightBestSet, FitKitIndex, IndexEntry, LastSessionMax, WeightSet } from './types'
 
 export interface ExerciseHistoryAnchor {
   sourcePath: string
@@ -20,9 +32,15 @@ export interface DurationExerciseHistory {
   lastSessionMaxSeconds?: LastSessionMax<number>
 }
 
+export interface BodyweightExerciseHistory {
+  personalBest?: BodyweightBestSet
+  lastSessionMax?: LastSessionMax<BodyweightBestSet>
+}
+
 export interface ExerciseHistorySummary {
   strength?: StrengthExerciseHistory
   duration?: DurationExerciseHistory
+  bodyweight?: BodyweightExerciseHistory
   /** Most recent plan the user recorded for this exercise, at any point in the past. */
   nextPlan?: LastSessionMax<NextPlan>
 }
@@ -42,6 +60,7 @@ export type ExerciseHistoryByName = Map<string, ExerciseHistorySummary>
 export interface CurrentExercisePlan {
   plan?: NextPlan
   sessionMax?: WeightSet | null
+  sessionBodyweightMax?: BodyweightBestSet | null
 }
 
 interface SessionMetric<T> {
@@ -56,6 +75,8 @@ interface ExerciseHistoryDraft {
   strengthLastSessionMax?: SessionMetric<WeightSet>
   durationPersonalBestSeconds?: number
   durationLastSessionMaxSeconds?: SessionMetric<number>
+  bodyweightPersonalBest?: BodyweightBestSet
+  bodyweightLastSessionMax?: SessionMetric<BodyweightBestSet>
   nextPlan?: SessionMetric<NextPlan>
 }
 
@@ -91,12 +112,30 @@ export function buildExerciseHistoryMap(
 export function formatExerciseHistoryBadges(
   summary: ExerciseHistorySummary | undefined,
   kind: ExerciseKind,
+  levels?: BodyweightLadder,
 ): ExerciseHistoryBadge[] {
   if (!summary) {
     return []
   }
 
   switch (kind) {
+    case 'bodyweight': {
+      const history = summary.bodyweight
+      return [
+        history?.personalBest
+          ? {
+              text: `PB ${formatBodyweightSet(history.personalBest, levels)}`,
+              title: `Highest level reached: ${formatBodyweightSet(history.personalBest, levels)}`,
+            }
+          : null,
+        history?.lastSessionMax
+          ? {
+              text: `last ${formatBodyweightSet(history.lastSessionMax.value, levels)}`,
+              title: `Highest level in latest prior session: ${formatBodyweightSet(history.lastSessionMax.value, levels)} (${history.lastSessionMax.date})`,
+            }
+          : null,
+      ].filter((badge): badge is ExerciseHistoryBadge => badge !== null)
+    }
     case 'duration': {
       const history = summary.duration
       return [
@@ -146,10 +185,14 @@ export function formatNextPlanBadge(
   summary: ExerciseHistorySummary | undefined,
   kind: ExerciseKind,
   current?: CurrentExercisePlan,
+  levels?: BodyweightLadder,
 ): NextPlanBadge | null {
-  /** Strength-only rule: next-time plans are recorded for strength sets; other kinds have no plan badge. */
-  if (kind !== 'strength') {
+  /** Plans are recorded for strength and bodyweight sets; duration has no plan badge. */
+  if (kind !== 'strength' && kind !== 'bodyweight') {
     return null
+  }
+  if (kind === 'bodyweight') {
+    return formatBodyweightNextPlanBadge(summary, current, levels)
   }
 
   const lastWeight = summary?.strength?.lastSessionMax?.value.weight
@@ -162,12 +205,51 @@ export function formatNextPlanBadge(
   const baseWeight = current?.plan ? (current.sessionMax?.weight ?? lastWeight) : lastWeight
   const base = baseWeight !== undefined && baseWeight > 0 ? baseWeight : null
   const target = base === null ? null : nextPlanTargetWeight(plan, base)
-  const label = formatNextPlanLabel(plan).toLowerCase()
+  const label = formatNextPlanLabel(plan, kind).toLowerCase()
   const change = plan.step === undefined ? label : `${label} kg`
   const from = base !== null && plan.direction !== 'stay' ? ` from ${formatNumber(base)} kg` : ''
 
   return {
     text: target !== null ? `Next: ${formatNumber(target)} kg` : `Next: ${change}`,
+    title: `${planned}: ${change}${from}`,
+    icon: nextPlanIcon(plan),
+  }
+}
+
+/**
+ * Badge for a plan over the ladder. A plan recorded on the open card is
+ * measured against that card's own best rung, else last session's; the step
+ * counts rungs and the target clamps to the ends of the ladder.
+ */
+function formatBodyweightNextPlanBadge(
+  summary: ExerciseHistorySummary | undefined,
+  current: CurrentExercisePlan | undefined,
+  levels: BodyweightLadder | undefined,
+): NextPlanBadge | null {
+  const plan = current?.plan ?? summary?.nextPlan?.value
+  if (!plan) {
+    return null
+  }
+
+  const planned = current?.plan ? 'Planned for next time' : `Planned on ${summary?.nextPlan?.date}`
+  const lastLevel = summary?.bodyweight?.lastSessionMax?.value.level
+  const base = current?.plan ? (current.sessionBodyweightMax?.level ?? lastLevel) : lastLevel
+  const target =
+    base === undefined || levels === undefined
+      ? null
+      : nextPlanTargetLevel(plan, base, levels.length)
+  const label = formatNextPlanLabel(plan, 'bodyweight').toLowerCase()
+  const change = plan.step === undefined ? label : `${label} ${formatRungUnit(plan.step)}`
+  const from =
+    base !== undefined && levels !== undefined && plan.direction !== 'stay'
+      ? ` from ${formatBodyweightLevelShort(base)} ${bodyweightLevelName(levels, base)}`
+      : ''
+
+  return {
+    text:
+      target !== null && levels !== undefined
+        ? `Next: ${formatBodyweightLevelShort(target)} ${bodyweightLevelName(levels, target)}`
+        : `Next: ${change}`,
     title: `${planned}: ${change}${from}`,
     icon: nextPlanIcon(plan),
   }
@@ -260,6 +342,27 @@ function addEntryToDrafts(
       }
     }
 
+    /** Bodyweight-only rule: highest rung wins outright, then reps, then load. */
+    if (row.kind === 'bodyweight' && row.maxBodyweightSet) {
+      hasMetric = true
+      draft.bodyweightPersonalBest = draft.bodyweightPersonalBest
+        ? (pickBestBodyweightSet([draft.bodyweightPersonalBest, row.maxBodyweightSet]) ??
+          row.maxBodyweightSet)
+        : row.maxBodyweightSet
+      const candidate = {
+        date: entryDate,
+        mtime: entry.mtime,
+        path: entry.path,
+        value: row.maxBodyweightSet,
+      }
+      if (
+        !draft.bodyweightLastSessionMax ||
+        isLaterSession(candidate, draft.bodyweightLastSessionMax)
+      ) {
+        draft.bodyweightLastSessionMax = candidate
+      }
+    }
+
     if (hasMetric) {
       drafts.set(row.exerciseName, draft)
     }
@@ -295,6 +398,17 @@ function finalizeDrafts(drafts: Map<string, ExerciseHistoryDraft>): ExerciseHist
           ? {
               value: draft.durationLastSessionMaxSeconds.value,
               date: draft.durationLastSessionMaxSeconds.date,
+            }
+          : undefined,
+      }
+    }
+    if (draft.bodyweightPersonalBest || draft.bodyweightLastSessionMax) {
+      summary.bodyweight = {
+        personalBest: draft.bodyweightPersonalBest,
+        lastSessionMax: draft.bodyweightLastSessionMax
+          ? {
+              value: draft.bodyweightLastSessionMax.value,
+              date: draft.bodyweightLastSessionMax.date,
             }
           : undefined,
       }
@@ -362,6 +476,12 @@ function formatWeightSetShort(set: WeightSet, opts?: { weightOnly?: boolean }): 
 function formatReps(reps: number): string {
   const formatted = formatNumber(reps)
   return `${formatted} rep${formatted === '1' ? '' : 's'}`
+}
+
+/** Badge-sized bodyweight set: rung name and rep count, never a weight. */
+function formatBodyweightSet(set: BodyweightBestSet, levels?: BodyweightLadder): string {
+  const name = bodyweightLevelName(levels, set.level)
+  return set.reps > 0 ? `${name} x ${formatNumber(set.reps)}` : name
 }
 
 function formatNumber(value: number): string {
