@@ -15,6 +15,7 @@ import {
   validateEntryDraft,
 } from '../domain/exercise-registry'
 import { DEFAULT_WEIGHT_UNIT, WEIGHT_UNITS, type WeightUnit } from '../domain/weight-unit'
+import { EXERCISE_KINDS, parseExerciseKind } from '../domain/exercise-kind'
 import type FitKitPlugin from '../main'
 
 export type RegistryEntryModalMode =
@@ -80,11 +81,15 @@ export class ExerciseRegistryEntryModal extends Modal {
     const kindField = contentEl.createDiv({ cls: 'fitkit-registry-field' })
     kindField.createEl('label', { text: 'Kind', cls: 'fitkit-registry-field-label' })
     this.kindSelect = kindField.createEl('select', { cls: 'fitkit-registry-select' })
-    this.kindSelect.createEl('option', { value: 'strength', text: 'Strength' })
-    this.kindSelect.createEl('option', { value: 'duration', text: 'Duration' })
+    for (const kind of EXERCISE_KINDS) {
+      this.kindSelect.createEl('option', {
+        value: kind,
+        text: kind.charAt(0).toUpperCase() + kind.slice(1),
+      })
+    }
     this.kindSelect.value = this.exerciseKind
     this.kindSelect.addEventListener('change', () => {
-      this.exerciseKind = this.kindSelect.value === 'duration' ? 'duration' : 'strength'
+      this.exerciseKind = parseExerciseKind(this.kindSelect.value) ?? this.exerciseKind
       this.refreshUnitVisibility()
     })
 

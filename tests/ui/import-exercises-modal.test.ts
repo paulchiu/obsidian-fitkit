@@ -48,6 +48,7 @@ interface TestElementOptions {
   cls?: string
   text?: string
   attr?: Record<string, string>
+  value?: string
 }
 
 type TestListener = () => void
@@ -61,6 +62,7 @@ class TestElement {
   checked = false
   parent: TestElement | null = null
   textContent = ''
+  value = ''
 
   constructor(readonly tagName: string) {}
 
@@ -72,6 +74,9 @@ class TestElement {
     }
     if (options.text !== undefined) {
       child.textContent = options.text
+    }
+    if (options.value !== undefined) {
+      child.value = options.value
     }
     for (const [name, value] of Object.entries(options.attr ?? {})) {
       child.setAttr(name, value)
@@ -106,6 +111,12 @@ class TestElement {
     this.attributes.set(name, value)
     if (name.startsWith('data-')) {
       this.dataset[name.slice('data-'.length)] = value
+    }
+  }
+
+  fire(type: string): void {
+    for (const listener of this.listeners.get(type) ?? []) {
+      listener()
     }
   }
 }
@@ -146,6 +157,56 @@ function collectText(element: TestElement): string[] {
   const own = element.textContent ? [element.textContent] : []
   return [...own, ...element.children.flatMap((child) => collectText(child))]
 }
+
+function kindSelectFor(target: ExerciseImportPlanRow): TestElement {
+  const modal = new ImportExercisesModal({ app: {} } as never, {})
+  const tr = new TestElement('tr')
+  const renderKindCell = (
+    modal as unknown as {
+      renderKindCell: (tr: HTMLElement, row: ExerciseImportPlanRow) => void
+    }
+  ).renderKindCell.bind(modal)
+
+  renderKindCell(tr as unknown as HTMLElement, target)
+
+  const select = findByTag(tr, 'select')
+  if (!select) {
+    throw new Error('Expected the kind cell to render a select.')
+  }
+  return select
+}
+
+function findByTag(element: TestElement, tagName: string): TestElement | null {
+  if (element.tagName === tagName) {
+    return element
+  }
+  for (const child of element.children) {
+    const found = findByTag(child, tagName)
+    if (found) {
+      return found
+    }
+  }
+  return null
+}
+
+describe('ImportExercisesModal kind select', () => {
+  it('lists strength then duration with their current labels', () => {
+    const select = kindSelectFor(row({ status: 'unknown', registryName: null }))
+
+    expect(select.children.map((option) => option.value)).toEqual(['strength', 'duration'])
+    expect(select.children.map((option) => option.textContent)).toEqual(['Strength', 'Duration'])
+  })
+
+  it('keeps the row kind when the select reports an unrecognised value', () => {
+    const target = row({ kind: 'duration', status: 'unknown', registryName: null })
+    const select = kindSelectFor(target)
+
+    select.value = 'cardio'
+    select.fire('change')
+
+    expect(target.kind).toBe('duration')
+  })
+})
 
 describe('ImportExercisesModal actions', () => {
   it('offers note creation for registry entries without exercise note files', () => {
