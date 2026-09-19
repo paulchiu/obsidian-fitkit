@@ -13,6 +13,17 @@ function resolveMetric(source: string, frontmatter?: ExerciseChartFrontmatter): 
 }
 
 describe('exercise chart block parsing', () => {
+  // Lock: duration ignores any supplied or frontmatter metric and pushes no notes.
+  it('resolves duration to the default metric without reading metrics or notes', () => {
+    const notes: string[] = []
+    const parsed = parseExerciseChartBlock('metric: weight')
+
+    const metric = resolveExerciseChartMetric(parsed, { metric: 'weight' }, 'duration', notes)
+
+    expect(metric).toBe('e1rm')
+    expect(notes).toEqual([])
+  })
+
   it('lets the code-block metric override frontmatter metric', () => {
     expect(resolveMetric('metric: weight', { metric: 'e1rm' })).toBe('weight')
   })

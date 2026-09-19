@@ -8,7 +8,7 @@ import {
   ZERO_DURATION_DISPLAY,
 } from '../domain/duration-input'
 import { formatErrorMessage } from '../domain/error'
-import { EXERCISE_KINDS } from '../domain/exercise-kind'
+import { assertUnreachableKind, EXERCISE_KINDS } from '../domain/exercise-kind'
 import {
   formatExerciseHistoryBadges,
   formatNextPlanBadge,
@@ -107,6 +107,12 @@ interface ExerciseCard {
   next?: NextPlan
   strengthSets: EditableStrengthSet[]
   durationEntries: EditableDurationEntry[]
+}
+
+/** Column label of the cell focused after adding an exercise, per kind. */
+const FOCUS_COLUMN_LABELS: Record<ExerciseKind, string> = {
+  strength: 'Weight',
+  duration: 'Duration',
 }
 
 const NEXT_PLAN_OPTIONS: ReadonlyArray<{
@@ -1529,7 +1535,7 @@ export class WorkoutEditorView extends ItemView {
     this.model.exercises.push(card)
     this.markDirty()
     this.render()
-    const focusLabel = kind === 'strength' ? 'Weight' : 'Duration'
+    const focusLabel = FOCUS_COLUMN_LABELS[kind]
     this.focusRowCell(exerciseIndex, 0, focusLabel)
 
     if (registryKind === null) {
@@ -1895,9 +1901,14 @@ function seedEmptyRow(
   card: ExerciseCard,
   summary?: ExerciseHistorySummary,
 ): EditableStrengthSet | null {
-  if (card.kind !== 'strength') {
-    card.durationEntries.push({})
-    return null
+  switch (card.kind) {
+    case 'duration':
+      card.durationEntries.push({})
+      return null
+    case 'strength':
+      break
+    default:
+      return assertUnreachableKind(card.kind)
   }
   const target = seededSetWeight(summary)
   if (target === null) {

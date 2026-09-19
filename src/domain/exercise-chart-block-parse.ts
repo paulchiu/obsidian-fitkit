@@ -1,4 +1,4 @@
-import { parseExerciseKind } from './exercise-kind'
+import { assertUnreachableKind, parseExerciseKind } from './exercise-kind'
 import {
   DEFAULT_EXERCISE_METRIC,
   parseExerciseMetric,
@@ -76,8 +76,13 @@ export function resolveExerciseChartMetric(
   kind: ExerciseKind,
   notes: string[],
 ): ExerciseMetric {
-  if (kind === 'duration') {
-    return DEFAULT_EXERCISE_METRIC
+  switch (kind) {
+    case 'duration':
+      return DEFAULT_EXERCISE_METRIC
+    case 'strength':
+      break
+    default:
+      return assertUnreachableKind(kind)
   }
   if (parsed.metricSupplied) {
     if (parsed.metric) {
