@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Workout notes now recognise a `bodyweight` exercise kind whose rows carry `[level::]` (with optional `[reps::]` and `[load::]`). Parsing, note round-trip, and the reading view table are in place; the ladder, history badges, and full editor card follow in later changes.
+
 ### Changed
 
 ### Fixed

@@ -78,6 +78,7 @@ export function resolveExerciseChartMetric(
 ): ExerciseMetric {
   switch (kind) {
     case 'duration':
+    case 'bodyweight':
       return DEFAULT_EXERCISE_METRIC
     case 'strength':
       break

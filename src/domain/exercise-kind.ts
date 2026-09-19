@@ -1,10 +1,11 @@
-export const EXERCISE_KINDS = ['strength', 'duration'] as const
+export const EXERCISE_KINDS = ['strength', 'duration', 'bodyweight'] as const
 
 export type ExerciseKind = (typeof EXERCISE_KINDS)[number]
 
 export const EXERCISE_KIND_LABELS: Record<ExerciseKind, string> = {
   strength: 'Strength',
   duration: 'Duration',
+  bodyweight: 'Bodyweight',
 }
 
 /** Exhaustiveness guard: a new `EXERCISE_KINDS` member makes every caller stop compiling. */

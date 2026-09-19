@@ -222,6 +222,10 @@ function formatPb(exercise: ExerciseAggregate): string {
   const link = `[[#${exercise.exerciseName}|${exercise.exerciseName}]]`
 
   switch (exercise.kind) {
+    case 'bodyweight': {
+      const sessionLabel = exercise.sessionCount === 1 ? 'session' : 'sessions'
+      return `- **${link}:** total ${exercise.totalSets} sets across ${exercise.sessionCount} ${sessionLabel}`
+    }
     case 'duration': {
       const sessionLabel = exercise.sessionCount === 1 ? 'session' : 'sessions'
       return `- **${link}:** total ${exercise.totalDurationSeconds}s across ${exercise.sessionCount} ${sessionLabel}`
@@ -262,6 +266,15 @@ function isMoreRecentPlan(candidate: PlannedSession, current: PlannedSession): b
 
 function dataviewQuery(exercise: ExerciseAggregate, workoutsFolderPath: string): string[] {
   switch (exercise.kind) {
+    case 'bodyweight':
+      return [
+        'table without id file.link as Session, level as Level',
+        `from "${workoutsFolderPath}"`,
+        'flatten file.lists as item',
+        `where contains(item.text, "[exercise:: [[${exercise.exerciseName}]]]") and item.level`,
+        'sort file.name desc',
+        'limit 12',
+      ]
     case 'duration':
       return [
         'table without id file.link as Session, duration + "s" as Duration',

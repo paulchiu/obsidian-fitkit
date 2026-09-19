@@ -97,11 +97,19 @@ describe('ExerciseRegistryEntryModal kind select', () => {
     obsidianMock.notices = []
   })
 
-  it('lists strength then duration with their current labels', () => {
+  it('lists strength, duration then bodyweight with their current labels', () => {
     const select = kindSelectIn(openModalWithKind('strength').modal)
 
-    expect(select.children.map((option) => option.value)).toEqual(['strength', 'duration'])
-    expect(select.children.map((option) => option.textContent)).toEqual(['Strength', 'Duration'])
+    expect(select.children.map((option) => option.value)).toEqual([
+      'strength',
+      'duration',
+      'bodyweight',
+    ])
+    expect(select.children.map((option) => option.textContent)).toEqual([
+      'Strength',
+      'Duration',
+      'Bodyweight',
+    ])
   })
 
   it('keeps the held kind when the select reports an unrecognised value', () => {

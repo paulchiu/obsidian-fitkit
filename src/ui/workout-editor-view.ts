@@ -36,6 +36,8 @@ import {
   parseWorkoutNote,
   serializeWorkoutNote,
   withNoteAndNext,
+  type BodyweightExerciseEntry,
+  type BodyweightSet,
   type DurationEntry,
   type DurationExerciseEntry,
   type ExerciseEntry,
@@ -102,6 +104,14 @@ interface EditableDurationEntry {
   note?: string
 }
 
+interface EditableBodyweightSet {
+  set?: number
+  level?: number
+  reps?: number
+  load?: number
+  note?: string
+}
+
 interface ExerciseCard {
   name: string
   kind: ExerciseKind
@@ -109,12 +119,14 @@ interface ExerciseCard {
   next?: NextPlan
   strengthSets: EditableStrengthSet[]
   durationEntries: EditableDurationEntry[]
+  bodyweightSets: EditableBodyweightSet[]
 }
 
 /** Column label of the cell focused after adding an exercise, per kind. */
 const FOCUS_COLUMN_LABELS: Record<ExerciseKind, string> = {
   strength: 'Weight',
   duration: 'Duration',
+  bodyweight: 'Reps',
 }
 
 const NEXT_PLAN_OPTIONS: ReadonlyArray<{
@@ -482,6 +494,9 @@ export class WorkoutEditorView extends ItemView {
       case 'strength':
         this.renderStrengthTable(card, ex, index)
         break
+      case 'bodyweight':
+        this.renderBodyweightTable(card, ex)
+        break
       case 'duration':
         this.renderDurationTable(card, ex, index)
         break
@@ -570,6 +585,72 @@ export class WorkoutEditorView extends ItemView {
       onRenumber: () => {
         ex.strengthSets.forEach((row, index) => {
           row.set = index + 1
+        })
+        this.markDirty()
+        this.render()
+      },
+    })
+  }
+
+  private renderBodyweightTable(card: HTMLElement, ex: ExerciseCard): void {
+    const wrap = card.createDiv({ cls: 'fitkit-set-area' })
+
+    const header = wrap.createDiv({ cls: 'fitkit-set-row fitkit-set-head' })
+    header.createSpan({ cls: 'fitkit-set-label fitkit-set-figure' })
+    header.createSpan({ cls: 'fitkit-set-label', text: 'Level' })
+    header.createSpan({ cls: 'fitkit-set-label', text: 'Reps' })
+    header.createSpan({ cls: 'fitkit-set-label', text: 'Load' })
+
+    for (let i = 0; i < ex.bodyweightSets.length; i++) {
+      this.renderBodyweightRow(wrap, ex, i)
+    }
+
+    const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
+    const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
+    addBtn.addEventListener('click', () => {
+      ex.bodyweightSets.push({})
+      this.markDirty()
+      this.render()
+    })
+  }
+
+  private renderBodyweightRow(wrap: HTMLElement, ex: ExerciseCard, i: number): void {
+    const set = ex.bodyweightSets[i]
+    if (!set) {
+      return
+    }
+    const container = wrap.createDiv({ cls: 'fitkit-row' })
+    const body = container.createDiv({ cls: 'fitkit-row-body' })
+    const row = body.createDiv({ cls: 'fitkit-set-row' })
+
+    const setCell = this.createCell(row, 'Set', 'fitkit-set-figure')
+    setCell.setText(String(set.set ?? i + 1))
+
+    const levelCell = this.createCell(row, 'Level')
+    levelCell.setText(set.level === undefined ? '-' : String(set.level))
+
+    const repsCell = this.createCell(row, 'Reps')
+    repsCell.setText(set.reps === undefined ? '-' : String(set.reps))
+
+    const loadCell = this.createCell(row, 'Load')
+    loadCell.setText(set.load === undefined ? '-' : String(set.load))
+
+    this.renderRowActions(container, body, {
+      label: `bodyweight entry ${i + 1}`,
+      currentNote: set.note,
+      onDelete: () => {
+        ex.bodyweightSets.splice(i, 1)
+        this.markDirty()
+        this.render()
+      },
+      onNoteSave: (next) => {
+        set.note = next
+        this.markDirty()
+        this.render()
+      },
+      onRenumber: () => {
+        ex.bodyweightSets.forEach((entry, index) => {
+          entry.set = index + 1
         })
         this.markDirty()
         this.render()
@@ -1063,6 +1144,7 @@ export class WorkoutEditorView extends ItemView {
     ex.kind = nextKind
     ex.strengthSets = []
     ex.durationEntries = []
+    ex.bodyweightSets = []
     this.markSeededWeight(seedEmptyRow(ex, this.exerciseHistory?.get(ex.name)))
     this.markDirty()
     this.render()
@@ -1537,6 +1619,7 @@ export class WorkoutEditorView extends ItemView {
       kind,
       strengthSets: [],
       durationEntries: [],
+      bodyweightSets: [],
     }
     this.markSeededWeight(seedEmptyRow(card, this.exerciseHistory?.get(trimmed)))
     this.model.exercises.push(card)
@@ -1896,7 +1979,11 @@ function setAriaInvalid(element: HTMLElement, invalid: boolean): void {
 }
 
 function hasRows(card: ExerciseCard): boolean {
-  return card.strengthSets.length > 0 || card.durationEntries.length > 0
+  return (
+    card.strengthSets.length > 0 ||
+    card.durationEntries.length > 0 ||
+    card.bodyweightSets.length > 0
+  )
 }
 
 /**
@@ -1909,6 +1996,9 @@ function seedEmptyRow(
   summary?: ExerciseHistorySummary,
 ): EditableStrengthSet | null {
   switch (card.kind) {
+    case 'bodyweight':
+      card.bodyweightSets.push({})
+      return null
     case 'duration':
       card.durationEntries.push({})
       return null
@@ -1972,13 +2062,23 @@ export function toEditorExercise(exercise: ExerciseEntry): ExerciseCard {
           kind: exercise.kind,
           strengthSets: exercise.strengthSets.map(toEditorStrengthSet),
           durationEntries: [],
+          bodyweightSets: [],
         }
-      : {
-          name: exercise.exerciseName,
-          kind: exercise.kind,
-          strengthSets: [],
-          durationEntries: exercise.durationEntries.map(toEditorDurationEntry),
-        }
+      : exercise.kind === 'bodyweight'
+        ? {
+            name: exercise.exerciseName,
+            kind: exercise.kind,
+            strengthSets: [],
+            durationEntries: [],
+            bodyweightSets: exercise.bodyweightSets.map(toEditorBodyweightSet),
+          }
+        : {
+            name: exercise.exerciseName,
+            kind: exercise.kind,
+            strengthSets: [],
+            durationEntries: exercise.durationEntries.map(toEditorDurationEntry),
+            bodyweightSets: [],
+          }
   if (exercise.note !== undefined) {
     card.exerciseNotes = exercise.note
   }
@@ -2001,6 +2101,23 @@ function toEditorStrengthSet(set: StrengthSet): EditableStrengthSet {
   }
   if (set.reps !== undefined) {
     editable.reps = set.reps
+  }
+  if (set.note !== undefined) {
+    editable.note = set.note
+  }
+  return editable
+}
+
+function toEditorBodyweightSet(set: BodyweightSet): EditableBodyweightSet {
+  const editable: EditableBodyweightSet = { level: set.level }
+  if (set.set !== undefined) {
+    editable.set = set.set
+  }
+  if (set.reps !== undefined) {
+    editable.reps = set.reps
+  }
+  if (set.load !== undefined) {
+    editable.load = set.load
   }
   if (set.note !== undefined) {
     editable.note = set.note
@@ -2052,6 +2169,14 @@ export function toWorkoutExercise(card: ExerciseCard): ExerciseEntry {
       }
       return withNoteAndNext(entry, note, next)
     }
+    case 'bodyweight': {
+      const entry: BodyweightExerciseEntry = {
+        exerciseName: card.name,
+        kind: card.kind,
+        bodyweightSets: card.bodyweightSets.map(toBodyweightSet),
+      }
+      return withNoteAndNext(entry, note, next)
+    }
   }
 }
 
@@ -2069,6 +2194,26 @@ function toStrengthSet(set: EditableStrengthSet, index: number): StrengthSet {
     strengthSet.note = set.note
   }
   return strengthSet
+}
+
+/** A fresh row names no rung yet; the ladder base stands in until the card offers rung picking. */
+function toBodyweightSet(set: EditableBodyweightSet): BodyweightSet {
+  const bodyweightSet: BodyweightSet = {
+    level: set.level ?? 1,
+  }
+  if (set.set !== undefined) {
+    bodyweightSet.set = set.set
+  }
+  if (set.reps !== undefined) {
+    bodyweightSet.reps = set.reps
+  }
+  if (set.load !== undefined) {
+    bodyweightSet.load = set.load
+  }
+  if (set.note !== undefined) {
+    bodyweightSet.note = set.note
+  }
+  return bodyweightSet
 }
 
 function toDurationEntry(entry: EditableDurationEntry): DurationEntry {

@@ -155,7 +155,7 @@ describe('exercise chart block rendering', () => {
     )
 
     expect(renderedNotes()).toEqual([
-      "No 'kind:' supplied; defaulting to strength. Add 'kind: strength' or 'kind: duration' to be explicit.",
+      "No 'kind:' supplied; defaulting to strength. Add 'kind: strength' or 'kind: duration' or 'kind: bodyweight' to be explicit.",
     ])
   })
 
@@ -171,7 +171,7 @@ describe('exercise chart block rendering', () => {
     )
 
     expect(renderedNotes()).toEqual([
-      "Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add 'kind: strength' or 'kind: duration' to be explicit.",
+      "Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add 'kind: strength' or 'kind: duration' or 'kind: bodyweight' to be explicit.",
     ])
   })
 
@@ -190,7 +190,7 @@ describe('exercise chart block rendering', () => {
     )
 
     expect(renderedNotes()).toEqual([
-      "Exercise note frontmatter has unrecognised 'kind: cardio'; defaulting to strength. Use 'kind: strength' or 'kind: duration'.",
+      "Exercise note frontmatter has unrecognised 'kind: cardio'; defaulting to strength. Use 'kind: strength' or 'kind: duration' or 'kind: bodyweight'.",
     ])
   })
 
@@ -250,12 +250,12 @@ describe('exercise chart block rendering', () => {
 
     expect(renderedSeries().kind).toBe('duration')
     expect(renderedNotes()).toEqual([
-      "Exercise note frontmatter has unrecognised 'kind: cardio'; using duration from the exercise registry. Use 'kind: strength' or 'kind: duration'.",
+      "Exercise note frontmatter has unrecognised 'kind: cardio'; using duration from the exercise registry. Use 'kind: strength' or 'kind: duration' or 'kind: bodyweight'.",
     ])
   })
 
   it('accepts and rejects the same kinds as the other frontmatter read paths', async () => {
-    const accepted: unknown[] = ['strength', 'duration', ' Strength ', 'DURATION']
+    const accepted: unknown[] = ['strength', 'duration', 'bodyweight', ' Strength ', 'DURATION']
     for (const kind of accepted) {
       chartSvgMock.renderExerciseChartSvg.mockReset()
       const file = new TFile('Fitness/Exercises/Bench Press.md')
@@ -285,7 +285,7 @@ describe('exercise chart block rendering', () => {
       )
 
       expect(renderedNotes()).toEqual([
-        `Exercise note frontmatter has unrecognised 'kind: ${String(kind).trim()}'; defaulting to strength. Use 'kind: strength' or 'kind: duration'.`,
+        `Exercise note frontmatter has unrecognised 'kind: ${String(kind).trim()}'; defaulting to strength. Use 'kind: strength' or 'kind: duration' or 'kind: bodyweight'.`,
       ])
     }
 
@@ -308,7 +308,7 @@ describe('exercise chart block rendering', () => {
       )
 
       expect(renderedNotes()).toEqual([
-        "Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add 'kind: strength' or 'kind: duration' to be explicit.",
+        "Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add 'kind: strength' or 'kind: duration' or 'kind: bodyweight' to be explicit.",
       ])
     }
   })

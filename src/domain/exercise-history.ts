@@ -97,6 +97,8 @@ export function formatExerciseHistoryBadges(
   }
 
   switch (kind) {
+    case 'bodyweight':
+      return []
     case 'duration': {
       const history = summary.duration
       return [

@@ -219,12 +219,20 @@ function findByTag(element: TestElement, tagName: string): TestElement | null {
 }
 
 describe('ImportExercisesModal kind select', () => {
-  it('lists strength then duration with their current labels', async () => {
+  it('lists strength, duration then bodyweight with their current labels', async () => {
     const { modal } = await openModalWithRows([row({ status: 'unknown', registryName: null })])
     const select = kindSelectForModal(modal)
 
-    expect(select.children.map((option) => option.value)).toEqual(['strength', 'duration'])
-    expect(select.children.map((option) => option.textContent)).toEqual(['Strength', 'Duration'])
+    expect(select.children.map((option) => option.value)).toEqual([
+      'strength',
+      'duration',
+      'bodyweight',
+    ])
+    expect(select.children.map((option) => option.textContent)).toEqual([
+      'Strength',
+      'Duration',
+      'Bodyweight',
+    ])
   })
 
   it('keeps the row kind when the select reports an unrecognised value', async () => {

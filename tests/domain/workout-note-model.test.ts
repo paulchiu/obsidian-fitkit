@@ -458,6 +458,215 @@ describe('workout note model', () => {
     expect(model.exercises[0]?.strengthSets).toEqual([{ set: 1, reps: 20 }])
   })
 
+  it('parses a bodyweight row into a bodyweight entry with its level and reps', () => {
+    const model = expectWorkoutModel(
+      [
+        '---',
+        'type: workout',
+        'date: 2026-09-01',
+        'name: Bodyweight day',
+        '---',
+        '',
+        '## [[Push-up]]',
+        '',
+        '- [exercise:: [[Push-up]]] [level:: 2] [reps:: 8]',
+      ].join('\n'),
+      'bodyweight-row.md',
+    )
+
+    expect(model.exercises).toHaveLength(1)
+    const entry = model.exercises[0]
+    if (entry?.kind !== 'bodyweight') {
+      throw new Error('expected the entry to be bodyweight')
+    }
+    expect(entry.bodyweightSets).toEqual([{ level: 2, reps: 8 }])
+  })
+
+  it('reads an optional load on a bodyweight row and leaves it unset when absent', () => {
+    const model = expectWorkoutModel(
+      [
+        '---',
+        'type: workout',
+        'date: 2026-09-01',
+        'name: Bodyweight day',
+        '---',
+        '',
+        '## [[Dip]]',
+        '',
+        '- [exercise:: [[Dip]]] [level:: 3] [reps:: 6] [load:: 10]',
+        '- [exercise:: [[Dip]]] [level:: 3] [reps:: 6]',
+      ].join('\n'),
+      'bodyweight-load.md',
+    )
+
+    const entry = model.exercises[0]
+    if (entry?.kind !== 'bodyweight') {
+      throw new Error('expected the entry to be bodyweight')
+    }
+    expect(entry.bodyweightSets).toEqual([
+      { level: 3, reps: 6, load: 10 },
+      { level: 3, reps: 6 },
+    ])
+  })
+
+  it('keeps parsing rows with neither level nor duration as strength', () => {
+    const model = expectWorkoutModel(
+      [
+        '---',
+        'type: workout',
+        'date: 2026-09-01',
+        'name: Mixed day',
+        '---',
+        '',
+        '## [[Squat]]',
+        '',
+        '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      ].join('\n'),
+      'strength-fallback.md',
+    )
+
+    expect(model.exercises).toHaveLength(1)
+    const entry = model.exercises[0]
+    if (entry?.kind !== 'strength') {
+      throw new Error('expected the entry to stay strength')
+    }
+    expect(entry.strengthSets).toEqual([{ set: 1, weight: 100, reps: 5 }])
+  })
+
+  it('keeps every rung when a bodyweight exercise mixes levels across rows', () => {
+    const model = expectWorkoutModel(
+      [
+        '---',
+        'type: workout',
+        'date: 2026-09-01',
+        'name: Bodyweight day',
+        '---',
+        '',
+        '## [[Pull-up]]',
+        '',
+        '- [exercise:: [[Pull-up]]] [level:: 4] [reps:: 5]',
+        '- [exercise:: [[Pull-up]]] [level:: 3] [reps:: 6]',
+      ].join('\n'),
+      'bodyweight-rungs.md',
+    )
+
+    const entry = model.exercises[0]
+    if (entry?.kind !== 'bodyweight') {
+      throw new Error('expected the entry to be bodyweight')
+    }
+    expect(entry.bodyweightSets).toEqual([
+      { level: 4, reps: 5 },
+      { level: 3, reps: 6 },
+    ])
+  })
+
+  it('treats a level-only row as a set row rather than an exercise note', () => {
+    const model = expectWorkoutModel(
+      [
+        '---',
+        'type: workout',
+        'date: 2026-09-01',
+        'name: Bodyweight day',
+        '---',
+        '',
+        '## [[Push-up]]',
+        '',
+        '- [exercise:: [[Push-up]]] [level:: 3]',
+      ].join('\n'),
+      'bodyweight-level-only.md',
+    )
+
+    const entry = model.exercises[0]
+    if (entry?.kind !== 'bodyweight') {
+      throw new Error('expected the entry to be bodyweight')
+    }
+    expect(entry.note).toBeUndefined()
+    expect(entry.bodyweightSets).toEqual([{ level: 3 }])
+  })
+
+  it('distinguishes two bodyweight entries that differ only in a set level', () => {
+    const base = {
+      date: '2026-09-01',
+      name: 'Bodyweight day',
+      sourcePath: 'bodyweight-levels.md',
+      preserveBlocks: [],
+      frontmatterExtra: [],
+    } as const
+    const left = {
+      ...base,
+      exercises: [
+        {
+          exerciseName: 'Push-up',
+          kind: 'bodyweight',
+          bodyweightSets: [{ level: 2, reps: 8 }],
+        },
+      ],
+    } as WorkoutNoteModel
+    const right = {
+      ...base,
+      exercises: [
+        {
+          exerciseName: 'Push-up',
+          kind: 'bodyweight',
+          bodyweightSets: [{ level: 3, reps: 8 }],
+        },
+      ],
+    } as WorkoutNoteModel
+
+    expect(semanticEqual(left, right)).toBe(false)
+  })
+
+  it('round-trips bodyweight rows byte for byte, with and without a load', () => {
+    const source = [
+      '---',
+      'type: workout',
+      'date: 2026-09-01',
+      'name: Bodyweight day',
+      '---',
+      '',
+      '## [[Dip]]',
+      '',
+      '- [exercise:: [[Dip]]] [level:: 3] [reps:: 6] [load:: 10]',
+      '- [exercise:: [[Dip]]] [level:: 3] [reps:: 6]',
+      '',
+    ].join('\n')
+
+    const serialized = serializeWorkoutNote(expectWorkoutModel(source, 'bodyweight-roundtrip.md'))
+
+    expect(serialized).toBe(source)
+  })
+
+  it('warns naming both kinds when bodyweight rows coerce to strength', () => {
+    const result = parseWorkoutNote(
+      [
+        '---',
+        'type: workout',
+        'date: 2026-09-01',
+        'name: Mixed Rows',
+        '---',
+        '',
+        '## [[Push-up]]',
+        '',
+        '- [exercise:: [[Push-up]]] [level:: 2] [reps:: 8]',
+        '- [exercise:: [[Push-up]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      ].join('\n'),
+      'mixed-rows-bodyweight.md',
+    )
+
+    expect(result.warnings).toContain(
+      'mixed-rows-bodyweight.md: Exercise "Push-up" has both strength and bodyweight rows; dropping bodyweight data.',
+    )
+    expect(result.model?.exercises).toHaveLength(1)
+    const entry = result.model?.exercises[0]
+    expect(entry?.kind).toBe('strength')
+    expect('bodyweightSets' in (entry as object)).toBe(false)
+    expect(entry).toEqual({
+      exerciseName: 'Push-up',
+      kind: 'strength',
+      strengthSets: [{ set: 1, weight: 100, reps: 5 }],
+    })
+  })
+
   it('round-trips a next-time plan on the exercise bullet', () => {
     const source = [
       '---',

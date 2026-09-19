@@ -101,6 +101,16 @@ function toEntry(file: TFile, model: WorkoutNoteModel): IndexEntry {
 
 function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
   switch (exercise.kind) {
+    case 'bodyweight': {
+      const levels = exercise.bodyweightSets.map((set) => set.level)
+      return {
+        exerciseName: exercise.exerciseName,
+        kind: exercise.kind,
+        totalSets: exercise.bodyweightSets.length,
+        maxLevel: levels.length > 0 ? Math.max(...levels) : undefined,
+        next: exercise.next,
+      }
+    }
     case 'duration':
       return {
         exerciseName: exercise.exerciseName,

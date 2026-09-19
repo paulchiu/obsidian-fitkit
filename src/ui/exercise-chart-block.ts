@@ -103,6 +103,11 @@ async function renderInternal(
   if (parsed.kind === null && sourceIsExerciseNote && frontmatterKind.kind === null) {
     if (frontmatterKind.reason === 'invalid') {
       switch (registryKind) {
+        case 'bodyweight':
+          notes.push(
+            `Exercise note frontmatter has unrecognised 'kind: ${frontmatterKind.raw}'; using bodyweight from the exercise registry. Use ${formatKindOptions()}.`,
+          )
+          break
         case 'duration':
           notes.push(
             `Exercise note frontmatter has unrecognised 'kind: ${frontmatterKind.raw}'; using duration from the exercise registry. Use ${formatKindOptions()}.`,

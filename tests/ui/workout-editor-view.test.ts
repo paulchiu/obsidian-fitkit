@@ -468,6 +468,7 @@ describe('WorkoutEditorView row actions', () => {
       'Plan: decrease',
       'Set plan step...',
       'Switch to duration',
+      'Switch to bodyweight',
       'Move up',
       'Move down',
       'Remove exercise',
