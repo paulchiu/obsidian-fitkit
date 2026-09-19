@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [1.2.5] - 2026-09-19
+
+### Added
+
+### Changed
+
+### Fixed
+
 - An exercise registry entry stored with an unrecognised `kind` (only reachable by hand-editing `data.json`) is now repaired to `strength` on load instead of being trusted.
 
 ### Removed
