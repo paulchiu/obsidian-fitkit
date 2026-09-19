@@ -1,5 +1,6 @@
 import type { App, CachedMetadata, TFile } from 'obsidian'
 
+import { parseExerciseKind } from '../domain/exercise-kind'
 import { normalize, type ExerciseKind } from '../domain/exercise-registry'
 import { parseWeightUnit, type WeightUnit } from '../domain/weight-unit'
 import type { FitKitSettings } from '../settings'
@@ -78,17 +79,6 @@ export function readExerciseCatalog(app: App, settings: FitKitSettings): Exercis
 function isExerciseFrontmatter(frontmatter: CachedMetadata['frontmatter'] | undefined): boolean {
   const type = readFrontmatterField(frontmatter, 'type')
   return typeof type === 'string' && type.trim().toLowerCase() === 'exercise'
-}
-
-function parseExerciseKind(value: unknown): ExerciseKind | null {
-  if (typeof value !== 'string') {
-    return null
-  }
-  const normalized = value.trim().toLowerCase()
-  if (normalized === 'strength' || normalized === 'duration') {
-    return normalized
-  }
-  return null
 }
 
 function unitFromFrontmatter(

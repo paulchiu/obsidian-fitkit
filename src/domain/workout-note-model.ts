@@ -30,9 +30,10 @@
  * field-by-field from the model. This is documented in README.md.
  */
 
+import type { ExerciseKind } from './exercise-kind'
 import { formatNextPlan, parseNextPlan, type NextPlan } from './next-plan'
 
-export type ExerciseKind = 'strength' | 'duration'
+export type { ExerciseKind }
 
 export interface StrengthSet {
   set: number

@@ -1,5 +1,6 @@
 import type { App, CachedMetadata, TAbstractFile, TFile } from 'obsidian'
 
+import type { ExerciseKind } from '../domain/exercise-kind'
 import {
   DEFAULT_EXERCISE_METRIC,
   parseExerciseMetric,
@@ -21,7 +22,7 @@ import { markdownFilesInFolder } from './folder-scan'
 
 interface ExerciseAggregate {
   exerciseName: string
-  kind: 'strength' | 'duration'
+  kind: ExerciseKind
   metric: ExerciseMetric
   unit: WeightUnit
   pbSet?: StrengthPbSet

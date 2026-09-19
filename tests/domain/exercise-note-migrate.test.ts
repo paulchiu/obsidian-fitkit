@@ -229,6 +229,28 @@ kind: duration
     expect(result.unknownKind).toBe(false)
   })
 
+  it('accepts and rejects the same kinds as the other frontmatter read paths', () => {
+    const accepted = ['strength', 'duration', ' Strength  ', 'DURATION']
+    const rejected = ['cardio', '', '   ', '42']
+    for (const value of accepted) {
+      const source = completeDurationNote('Mystery').replace('kind: duration', `kind: ${value}`)
+      const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
+      expect(result.unknownKind).toBe(false)
+    }
+    for (const value of rejected) {
+      const source = completeDurationNote('Mystery').replace('kind: duration', `kind: ${value}`)
+      const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
+      expect(result.unknownKind).toBe(true)
+      expect(result.status).toBe('unknown')
+    }
+    const missing = migrate(completeDurationNote('Mystery').replace('kind: duration\n', ''), {
+      name: 'Mystery',
+      registry: createRegistry([]),
+    })
+    expect(missing.unknownKind).toBe(true)
+    expect(missing.status).toBe('unknown')
+  })
+
   it('adds missing type to existing frontmatter', () => {
     const source = `---
 kind: duration

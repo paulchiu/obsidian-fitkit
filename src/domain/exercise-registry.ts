@@ -3,9 +3,10 @@
  * NFC, lower, trim, strip edge punctuation, collapse internal whitespace.
  */
 
+import type { ExerciseKind } from './exercise-kind'
 import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from './weight-unit'
 
-export type ExerciseKind = 'strength' | 'duration'
+export type { ExerciseKind }
 
 /**
  * `unit` is only present when explicitly recorded (via the registry editor or

@@ -238,4 +238,63 @@ describe('exercise chart block rendering', () => {
       "Exercise note frontmatter has unrecognised 'kind: cardio'; using duration from the exercise registry. Use 'kind: strength' or 'kind: duration'.",
     ])
   })
+
+  it('accepts and rejects the same kinds as the other frontmatter read paths', async () => {
+    const accepted: unknown[] = ['strength', 'duration', ' Strength ', 'DURATION']
+    for (const kind of accepted) {
+      chartSvgMock.renderExerciseChartSvg.mockReset()
+      const file = new TFile('Fitness/Exercises/Bench Press.md')
+      const plugin = createPlugin([file], new Map([[file.path, { type: 'exercise', kind }]]))
+
+      await renderExerciseChartBlock(
+        plugin,
+        '',
+        new TestElement('div') as unknown as HTMLElement,
+        createContext(file.path),
+      )
+
+      expect(renderedNotes()).toEqual([])
+    }
+
+    const invalid: unknown[] = ['cardio']
+    for (const kind of invalid) {
+      chartSvgMock.renderExerciseChartSvg.mockReset()
+      const file = new TFile('Fitness/Exercises/Bench Press.md')
+      const plugin = createPlugin([file], new Map([[file.path, { type: 'exercise', kind }]]))
+
+      await renderExerciseChartBlock(
+        plugin,
+        '',
+        new TestElement('div') as unknown as HTMLElement,
+        createContext(file.path),
+      )
+
+      expect(renderedNotes()).toEqual([
+        `Exercise note frontmatter has unrecognised 'kind: ${String(kind).trim()}'; defaulting to strength. Use 'kind: strength' or 'kind: duration'.`,
+      ])
+    }
+
+    const missing: Frontmatter[] = [
+      { type: 'exercise' },
+      { type: 'exercise', kind: '' },
+      { type: 'exercise', kind: '   ' },
+      { type: 'exercise', kind: 42 },
+    ]
+    for (const frontmatter of missing) {
+      chartSvgMock.renderExerciseChartSvg.mockReset()
+      const file = new TFile('Fitness/Exercises/Bench Press.md')
+      const plugin = createPlugin([file], new Map([[file.path, frontmatter]]))
+
+      await renderExerciseChartBlock(
+        plugin,
+        '',
+        new TestElement('div') as unknown as HTMLElement,
+        createContext(file.path),
+      )
+
+      expect(renderedNotes()).toEqual([
+        "Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add 'kind: strength' or 'kind: duration' to be explicit.",
+      ])
+    }
+  })
 })

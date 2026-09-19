@@ -1,3 +1,4 @@
+import type { ExerciseKind } from './exercise-kind'
 import type { NextPlan } from './next-plan'
 
 export interface BestSet {
@@ -18,7 +19,7 @@ export interface LastSessionMax<T> {
 
 export interface ExerciseIndexRow {
   exerciseName: string
-  kind: 'strength' | 'duration'
+  kind: ExerciseKind
   bestSet?: BestSet
   maxWeightSet?: WeightSet
   totalSets?: number

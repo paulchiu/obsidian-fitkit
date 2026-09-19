@@ -11,6 +11,7 @@ import {
   resolveExerciseChartMetric,
 } from '../domain/exercise-chart-block-parse'
 import { buildExerciseChartSeries } from '../domain/exercise-chart'
+import { parseExerciseKind } from '../domain/exercise-kind'
 import {
   createRegistry,
   kindForName,
@@ -181,21 +182,14 @@ function kindFromFrontmatter(
   frontmatter: CachedMetadata['frontmatter'] | undefined,
 ): KindFrontmatterResult {
   const value = readFrontmatterField(frontmatter, 'kind')
-  if (value === undefined || value === null) {
+  const kind = parseExerciseKind(value)
+  if (kind) {
+    return { kind }
+  }
+  if (typeof value !== 'string' || value.trim().length === 0) {
     return { kind: null, reason: 'missing' }
   }
-  if (typeof value !== 'string') {
-    return { kind: null, reason: 'missing' }
-  }
-  const raw = value.trim()
-  if (raw.length === 0) {
-    return { kind: null, reason: 'missing' }
-  }
-  const lowered = raw.toLowerCase()
-  if (lowered === 'strength' || lowered === 'duration') {
-    return { kind: lowered }
-  }
-  return { kind: null, reason: 'invalid', raw }
+  return { kind: null, reason: 'invalid', raw: value.trim() }
 }
 
 function resolveExerciseWeightUnit(

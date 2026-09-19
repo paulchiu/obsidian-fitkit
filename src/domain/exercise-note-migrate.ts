@@ -1,3 +1,4 @@
+import { parseExerciseKind } from './exercise-kind'
 import {
   kindForName,
   unitForName,
@@ -376,11 +377,7 @@ function frontmatterKind(lines: ReadonlyArray<string>): ExerciseKind | null {
   if (kindLineIndex < 0) {
     return null
   }
-  const value = scalarValue(lines[kindLineIndex] ?? '')
-  if (value === 'strength' || value === 'duration') {
-    return value
-  }
-  return null
+  return parseExerciseKind(scalarValue(lines[kindLineIndex] ?? ''))
 }
 
 function frontmatterMetric(line: string): ExerciseMetric | null {
