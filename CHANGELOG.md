@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [1.3.0] - 2026-09-19
+
+### Added
+
 - Exercises can now be tracked as `bodyweight`, where a set records which rung of a progression you reached rather than how much you lifted. A set row carries `[level:: N]` with optional `[reps:: R]` and `[load:: X]`, and `N` indexes an ordered `levels:` ladder declared on the exercise note, so one note owns its whole progression and a single workout can mix rungs.
 - The workout editor renders a bodyweight exercise as a card with a level stepper and a rung menu on every row, reps and an optional load cell, and an add-set action that carries the previous rung forward. A rung name too long for its cell shortens to a compact form, decided from the name's own width so an arbitrarily long name still fits.
 - A bodyweight card can edit its ladder, writing to the exercise note when one exists and to the exercise registry otherwise. Because a set stores a position rather than a name, an edit that changes what an already-logged level means lists each affected level with its old and new rung, and applies only once confirmed.
