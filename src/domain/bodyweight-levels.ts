@@ -1,16 +1,17 @@
 import type { BodyweightBestSet } from './types'
 
 /**
- * Human-readable labels for a bodyweight ladder rung. Levels are 1-based
- * while the ladder is a plain array, so every lookup is `levels[level - 1]`.
+ * Ordered rung names of a bodyweight ladder. Levels are 1-based indexes
+ * into this array, so every lookup is `ladder[level - 1]`.
  */
+export type BodyweightLadder = readonly string[]
 
 /**
  * Rung name for a table cell, falling back to a bare number when the ladder
  * is missing or no longer names this level (a ladder can shrink after sets
  * were logged against its longer self).
  */
-export function bodyweightLevelName(levels: readonly string[] | undefined, level: number): string {
+export function bodyweightLevelName(levels: BodyweightLadder | undefined, level: number): string {
   return levels?.[level - 1] ?? `Level ${level}`
 }
 
@@ -18,7 +19,7 @@ export function bodyweightLevelName(levels: readonly string[] | undefined, level
  * Numbered rung label for the level menu and the current-level badge.
  */
 export function formatBodyweightLevelLabel(
-  levels: readonly string[] | undefined,
+  levels: BodyweightLadder | undefined,
   level: number,
 ): string {
   return `${level} · ${bodyweightLevelName(levels, level)}`
@@ -27,6 +28,14 @@ export function formatBodyweightLevelLabel(
 /** Compact rung label for where the name will not fit. */
 export function formatBodyweightLevelShort(level: number): string {
   return `L${level}`
+}
+
+/**
+ * Count word for a bodyweight plan step: the step counts rungs, so only a
+ * step of one reads singular.
+ */
+export function formatRungUnit(step: number): string {
+  return step === 1 ? 'rung' : 'rungs'
 }
 
 /** A logged position whose rung name an edit would change, with both meanings. */
@@ -42,8 +51,8 @@ export interface BodyweightLadderChange {
  * levels some logged set occupies can appear.
  */
 export function describeBodyweightLadderChanges(
-  oldLevels: readonly string[],
-  newLevels: readonly string[],
+  oldLevels: BodyweightLadder,
+  newLevels: BodyweightLadder,
   occupiedLevels: readonly number[],
 ): BodyweightLadderChange[] {
   const seen = new Set<number>()
@@ -60,6 +69,14 @@ export function describeBodyweightLadderChanges(
     }
   }
   return changes
+}
+
+/**
+ * Usable starting ladder for a bodyweight exercise with no rungs yet: one
+ * rung named after the exercise, so the level menu is never empty.
+ */
+export function defaultBodyweightLevels(exerciseName: string): string[] {
+  return [exerciseName]
 }
 
 /**

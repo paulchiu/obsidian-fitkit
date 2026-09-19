@@ -1,14 +1,7 @@
+import { defaultBodyweightLevels } from '../domain/bodyweight-levels'
 import type { ExerciseKind } from '../domain/exercise-registry'
 import { buildNotesBlock, buildRecentSessionsBlock } from '../domain/exercise-note-template'
 import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
-
-/**
- * Usable starting ladder for a bodyweight exercise with no rungs yet: one
- * rung named after the exercise, so the level menu is never empty.
- */
-export function defaultBodyweightLevels(exerciseName: string): string[] {
-  return [exerciseName]
-}
 
 /**
  * Pure: build the seeded markdown body for a freshly-created exercise note.
@@ -24,7 +17,6 @@ export function composeExerciseNote(
   kind: ExerciseKind,
   workoutsFolderPath: string,
   unit: WeightUnit = DEFAULT_WEIGHT_UNIT,
-  levels: string[] = defaultBodyweightLevels(exerciseName),
 ): string {
   const lines: string[] = []
   lines.push('---')
@@ -38,7 +30,7 @@ export function composeExerciseNote(
   /** A new bodyweight note starts with a usable ladder instead of an empty menu. */
   if (kind === 'bodyweight') {
     lines.push('levels:')
-    for (const rung of levels) {
+    for (const rung of defaultBodyweightLevels(exerciseName)) {
       lines.push(`  - ${rung}`)
     }
   }

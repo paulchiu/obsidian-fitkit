@@ -42,7 +42,7 @@ export function formatNextPlan(plan: NextPlan): string {
 }
 
 /** Sentence-case description for badges and previews, without the unit. */
-export function formatNextPlanLabel(plan: NextPlan, kind: ExerciseKind = 'strength'): string {
+export function formatNextPlanLabel(plan: NextPlan, kind: ExerciseKind): string {
   if (plan.direction === 'stay') {
     return kind === 'bodyweight' ? 'Same level' : 'Same weight'
   }
@@ -54,14 +54,15 @@ export function formatNextPlanLabel(plan: NextPlan, kind: ExerciseKind = 'streng
  * Apply the plan to the rung it was recorded against. The step counts rungs,
  * so a fractional step lands on the nearest rung and the target clamps to
  * the ends of the ladder. Returns null when the plan carries no step or
- * names no usable ladder.
+ * names no usable base. The caller always passes a real ladder length, so a
+ * missing ladder never reaches here as an empty one.
  */
 export function nextPlanTargetLevel(
   plan: NextPlan,
   baseLevel: number,
   levelCount: number,
 ): number | null {
-  if (!Number.isFinite(baseLevel) || !Number.isFinite(levelCount) || levelCount < 1) {
+  if (!Number.isFinite(baseLevel)) {
     return null
   }
   const count = Math.floor(levelCount)

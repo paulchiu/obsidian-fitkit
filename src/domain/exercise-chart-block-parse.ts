@@ -1,4 +1,4 @@
-import { assertUnreachableKind, parseExerciseKind } from './exercise-kind'
+import { parseExerciseKind } from './exercise-kind'
 import {
   DEFAULT_EXERCISE_METRIC,
   parseExerciseMetric,
@@ -80,29 +80,27 @@ export function resolveExerciseChartMetric(
     case 'duration':
     case 'bodyweight':
       return DEFAULT_EXERCISE_METRIC
-    case 'strength':
-      break
-    default:
-      return assertUnreachableKind(kind)
-  }
-  if (parsed.metricSupplied) {
-    if (parsed.metric) {
-      return parsed.metric
+    case 'strength': {
+      if (parsed.metricSupplied) {
+        if (parsed.metric) {
+          return parsed.metric
+        }
+        notes.push(`Ignored invalid metric value '${parsed.invalidMetricValue ?? ''}'; using e1rm.`)
+        return DEFAULT_EXERCISE_METRIC
+      }
+
+      const metric = metricFromFrontmatter(frontmatter)
+      if (metric) {
+        return metric
+      }
+
+      const raw = readFrontmatterField(frontmatter, 'metric')
+      if (raw !== undefined) {
+        notes.push(`Ignored invalid metric value '${formatFrontmatterValue(raw)}'; using e1rm.`)
+      }
+      return DEFAULT_EXERCISE_METRIC
     }
-    notes.push(`Ignored invalid metric value '${parsed.invalidMetricValue ?? ''}'; using e1rm.`)
-    return DEFAULT_EXERCISE_METRIC
   }
-
-  const metric = metricFromFrontmatter(frontmatter)
-  if (metric) {
-    return metric
-  }
-
-  const raw = readFrontmatterField(frontmatter, 'metric')
-  if (raw !== undefined) {
-    notes.push(`Ignored invalid metric value '${formatFrontmatterValue(raw)}'; using e1rm.`)
-  }
-  return DEFAULT_EXERCISE_METRIC
 }
 
 function metricFromFrontmatter(frontmatter: ExerciseChartFrontmatter): ExerciseMetric | null {

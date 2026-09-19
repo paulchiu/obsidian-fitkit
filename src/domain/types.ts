@@ -31,8 +31,6 @@ export interface ExerciseIndexRow {
   maxWeightSet?: WeightSet
   totalSets?: number
   totalDurationSeconds?: number
-  /** Highest rung index logged for a bodyweight exercise; the rung names land with the ladder. */
-  maxLevel?: number
   /** Best bodyweight set of the session: highest level, then reps, then load. */
   maxBodyweightSet?: BodyweightBestSet
   next?: NextPlan

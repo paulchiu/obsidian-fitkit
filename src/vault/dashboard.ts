@@ -1,6 +1,7 @@
 import type { App, CachedMetadata, TAbstractFile, TFile } from 'obsidian'
 
-import { assertUnreachableKind, type ExerciseKind } from '../domain/exercise-kind'
+import { formatRungUnit } from '../domain/bodyweight-levels'
+import { type ExerciseKind } from '../domain/exercise-kind'
 import {
   DEFAULT_EXERCISE_METRIC,
   parseExerciseMetric,
@@ -230,17 +231,14 @@ function formatPb(exercise: ExerciseAggregate): string {
       const sessionLabel = exercise.sessionCount === 1 ? 'session' : 'sessions'
       return `- **${link}:** total ${exercise.totalDurationSeconds}s across ${exercise.sessionCount} ${sessionLabel}`
     }
-    case 'strength':
-      break
-    default:
-      return assertUnreachableKind(exercise.kind)
-  }
+    case 'strength': {
+      if (!exercise.pbSet) {
+        return `- **${link}:** no completed sets`
+      }
 
-  if (!exercise.pbSet) {
-    return `- **${link}:** no completed sets`
+      return `- **${link}:** ${formatDashboardSet(exercise.pbSet, exercise.metric, exercise.unit)}`
+    }
   }
-
-  return `- **${link}:** ${formatDashboardSet(exercise.pbSet, exercise.metric, exercise.unit)}`
 }
 
 function formatNextPlanLine(exercise: ExerciseAggregate): string {
@@ -260,7 +258,7 @@ function formatNextPlanLine(exercise: ExerciseAggregate): string {
 /** A bodyweight plan step counts rungs; every other kind keeps the exercise unit. */
 function formatPlanStepUnit(exercise: ExerciseAggregate, step: number): string {
   if (exercise.kind === 'bodyweight') {
-    return step === 1 ? 'rung' : 'rungs'
+    return formatRungUnit(step)
   }
   return exercise.unit
 }
@@ -296,23 +294,19 @@ function dataviewQuery(exercise: ExerciseAggregate, workoutsFolderPath: string):
         'limit 12',
       ]
     case 'strength':
-      break
-    default:
-      return assertUnreachableKind(exercise.kind)
+      return [
+        'TABLE WITHOUT ID',
+        '  file.link AS Workout,',
+        '  L.set AS Set,',
+        '  L.weight AS Weight,',
+        '  L.reps AS Reps',
+        `FROM "${workoutsFolderPath}"`,
+        'FLATTEN file.lists AS L',
+        `WHERE L.exercise = link("${exercise.exerciseName}") AND L.set`,
+        'SORT file.name DESC, L.set ASC',
+        'LIMIT 10',
+      ]
   }
-
-  return [
-    'TABLE WITHOUT ID',
-    '  file.link AS Workout,',
-    '  L.set AS Set,',
-    '  L.weight AS Weight,',
-    '  L.reps AS Reps',
-    `FROM "${workoutsFolderPath}"`,
-    'FLATTEN file.lists AS L',
-    `WHERE L.exercise = link("${exercise.exerciseName}") AND L.set`,
-    'SORT file.name DESC, L.set ASC',
-    'LIMIT 10',
-  ]
 }
 
 function isMarkdownFile(file: TAbstractFile | null): file is TFile {

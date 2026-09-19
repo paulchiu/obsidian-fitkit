@@ -2,7 +2,9 @@ import type { ExerciseKind } from './workout-note-model'
 import {
   bodyweightLevelName,
   formatBodyweightLevelShort,
+  formatRungUnit,
   pickBestBodyweightSet,
+  type BodyweightLadder,
 } from './bodyweight-levels'
 import { formatDurationInput } from './duration-input'
 import { pickHeaviestSet } from './epley'
@@ -110,7 +112,7 @@ export function buildExerciseHistoryMap(
 export function formatExerciseHistoryBadges(
   summary: ExerciseHistorySummary | undefined,
   kind: ExerciseKind,
-  levels?: readonly string[],
+  levels?: BodyweightLadder,
 ): ExerciseHistoryBadge[] {
   if (!summary) {
     return []
@@ -183,7 +185,7 @@ export function formatNextPlanBadge(
   summary: ExerciseHistorySummary | undefined,
   kind: ExerciseKind,
   current?: CurrentExercisePlan,
-  levels?: readonly string[],
+  levels?: BodyweightLadder,
 ): NextPlanBadge | null {
   /** Plans are recorded for strength and bodyweight sets; duration has no plan badge. */
   if (kind !== 'strength' && kind !== 'bodyweight') {
@@ -203,7 +205,7 @@ export function formatNextPlanBadge(
   const baseWeight = current?.plan ? (current.sessionMax?.weight ?? lastWeight) : lastWeight
   const base = baseWeight !== undefined && baseWeight > 0 ? baseWeight : null
   const target = base === null ? null : nextPlanTargetWeight(plan, base)
-  const label = formatNextPlanLabel(plan).toLowerCase()
+  const label = formatNextPlanLabel(plan, kind).toLowerCase()
   const change = plan.step === undefined ? label : `${label} kg`
   const from = base !== null && plan.direction !== 'stay' ? ` from ${formatNumber(base)} kg` : ''
 
@@ -222,7 +224,7 @@ export function formatNextPlanBadge(
 function formatBodyweightNextPlanBadge(
   summary: ExerciseHistorySummary | undefined,
   current: CurrentExercisePlan | undefined,
-  levels: readonly string[] | undefined,
+  levels: BodyweightLadder | undefined,
 ): NextPlanBadge | null {
   const plan = current?.plan ?? summary?.nextPlan?.value
   if (!plan) {
@@ -237,7 +239,7 @@ function formatBodyweightNextPlanBadge(
       ? null
       : nextPlanTargetLevel(plan, base, levels.length)
   const label = formatNextPlanLabel(plan, 'bodyweight').toLowerCase()
-  const change = plan.step === undefined ? label : `${label} ${plan.step === 1 ? 'rung' : 'rungs'}`
+  const change = plan.step === undefined ? label : `${label} ${formatRungUnit(plan.step)}`
   const from =
     base !== undefined && levels !== undefined && plan.direction !== 'stay'
       ? ` from ${formatBodyweightLevelShort(base)} ${bodyweightLevelName(levels, base)}`
@@ -477,7 +479,7 @@ function formatReps(reps: number): string {
 }
 
 /** Badge-sized bodyweight set: rung name and rep count, never a weight. */
-function formatBodyweightSet(set: BodyweightBestSet, levels?: readonly string[]): string {
+function formatBodyweightSet(set: BodyweightBestSet, levels?: BodyweightLadder): string {
   const name = bodyweightLevelName(levels, set.level)
   return set.reps > 0 ? `${name} x ${formatNumber(set.reps)}` : name
 }

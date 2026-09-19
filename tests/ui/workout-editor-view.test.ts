@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EXERCISE_KINDS } from '../../src/domain/exercise-kind'
 import { createRegistry, type ExerciseRegistryEntry } from '../../src/domain/exercise-registry'
+import type { FitKitSettings } from '../../src/settings'
 import type {
   DurationExerciseEntry,
   ExerciseEntry,
@@ -167,11 +168,22 @@ vi.mock('../../src/vault/vault-utils', () => ({
   ensureParentFolder: vaultUtilsMock.ensureParentFolder,
 }))
 
-vi.mock('../../src/vault/exercise-registry-vault', () => ({
-  exerciseRegistryWithVaultNotes: registryVaultMock.exerciseRegistryWithVaultNotes,
-}))
+vi.mock('../../src/vault/exercise-registry-vault', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/vault/exercise-registry-vault')>()
+  const registry = await import('../../src/domain/exercise-registry')
+  return {
+    ...actual,
+    exerciseRegistryWithVaultNotes: registryVaultMock.exerciseRegistryWithVaultNotes,
+    /** Same composition as the real helper, but reading the mocked snapshot. */
+    bodyweightLevelsFor: (app: App, settings: FitKitSettings, name: string) =>
+      registry.levelsForName(
+        registry.createRegistry(registryVaultMock.exerciseRegistryWithVaultNotes(app, settings)),
+        name,
+      ),
+  }
+})
 
-import { TFile } from 'obsidian'
+import { TFile, type App } from 'obsidian'
 import {
   formatLadderChangesWarning,
   shouldShortenLevelLabel,
@@ -1437,9 +1449,9 @@ describe('WorkoutEditorView row actions', () => {
   })
 
   it('shortens a rung name only when its own width overruns the cell', () => {
-    expect(shouldShortenLevelLabel(100, 120)).toBe(true)
+    expect(shouldShortenLevelLabel(120, 100)).toBe(true)
     expect(shouldShortenLevelLabel(100, 100)).toBe(false)
-    expect(shouldShortenLevelLabel(200, 120)).toBe(false)
+    expect(shouldShortenLevelLabel(120, 200)).toBe(false)
   })
 
   it('shortens through the measuring path when the text overruns its own slot', () => {

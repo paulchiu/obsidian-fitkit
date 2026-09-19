@@ -51,9 +51,9 @@ describe('next plan formatting', () => {
   })
 
   it('labels plans in sentence case', () => {
-    expect(formatNextPlanLabel({ direction: 'up', step: 2.5 })).toBe('Up 2.5')
-    expect(formatNextPlanLabel({ direction: 'down' })).toBe('Down')
-    expect(formatNextPlanLabel({ direction: 'stay' })).toBe('Same weight')
+    expect(formatNextPlanLabel({ direction: 'up', step: 2.5 }, 'strength')).toBe('Up 2.5')
+    expect(formatNextPlanLabel({ direction: 'down' }, 'strength')).toBe('Down')
+    expect(formatNextPlanLabel({ direction: 'stay' }, 'strength')).toBe('Same weight')
   })
 
   it('labels a bodyweight hold as the level rather than the weight', () => {
@@ -97,5 +97,11 @@ describe('next plan targets', () => {
     expect(nextPlanTargetLevel({ direction: 'down', step: 3 }, 1, 5)).toBe(1)
     expect(nextPlanTargetLevel({ direction: 'stay' }, 3, 5)).toBe(3)
     expect(nextPlanTargetLevel({ direction: 'up' }, 3, 5)).toBeNull()
+  })
+
+  it('clamps every direction to a single-rung ladder', () => {
+    expect(nextPlanTargetLevel({ direction: 'up', step: 3 }, 1, 1)).toBe(1)
+    expect(nextPlanTargetLevel({ direction: 'down', step: 3 }, 1, 1)).toBe(1)
+    expect(nextPlanTargetLevel({ direction: 'stay' }, 1, 1)).toBe(1)
   })
 })

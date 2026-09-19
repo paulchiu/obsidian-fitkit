@@ -31,7 +31,7 @@
  * field-by-field from the model. This is documented in README.md.
  */
 
-import { EXERCISE_KINDS, type ExerciseKind } from './exercise-kind'
+import { assertUnreachableKind, EXERCISE_KINDS, type ExerciseKind } from './exercise-kind'
 import { formatNextPlan, parseNextPlan, type NextPlan } from './next-plan'
 
 export type { ExerciseKind }
@@ -82,18 +82,18 @@ export interface BodyweightExerciseEntry extends ExerciseEntryBase {
 export type ExerciseEntry = StrengthExerciseEntry | DurationExerciseEntry | BodyweightExerciseEntry
 
 /**
- * Rows a switch to bodyweight could mark as the first level: every logged
- * strength or duration row. Bodyweight rows already name a rung, so a
- * bodyweight entry offers nothing.
+ * Set rows an entry holds, whatever its kind. Coercion warnings and the
+ * first-level relabel offer count rows only, since the note and next plan
+ * survive a kind switch untouched.
  */
-export function countFirstLevelRelabelSets(entry: ExerciseEntry): number {
-  switch (entry.kind) {
+export function setRowCount(exercise: ExerciseEntry): number {
+  switch (exercise.kind) {
     case 'strength':
-      return entry.strengthSets.length
+      return exercise.strengthSets.length
     case 'duration':
-      return entry.durationEntries.length
+      return exercise.durationEntries.length
     case 'bodyweight':
-      return 0
+      return exercise.bodyweightSets.length
   }
 }
 
@@ -204,21 +204,6 @@ const INLINE_FIELD = /\[([a-zA-Z][\w-]*)::\s*((?:\[\[[^\]]*\]\]|[^\]])*)\]/g
 const WIKILINK = /^\[\[([^\]]+)\]\]$/
 
 /**
- * Set rows an entry holds, whatever its kind. Coercion warnings count rows
- * only, since the note and next plan survive a kind switch untouched.
- */
-function setRowCount(exercise: ExerciseEntry): number {
-  switch (exercise.kind) {
-    case 'strength':
-      return exercise.strengthSets.length
-    case 'duration':
-      return exercise.durationEntries.length
-    case 'bodyweight':
-      return exercise.bodyweightSets.length
-  }
-}
-
-/**
  * Warning for an exercise coerced from one row shape to another. The pair is
  * named in `EXERCISE_KINDS` order, which keeps the long-shipped strength and
  * duration wording byte-identical while giving the new pairs a fixed order.
@@ -244,12 +229,7 @@ function mixedKindWarning(
  */
 function rowCountOf(exercise: ExerciseEntry): number {
   return (
-    (exercise.note !== undefined || exercise.next !== undefined ? 1 : 0) +
-    (exercise.kind === 'strength'
-      ? exercise.strengthSets.length
-      : exercise.kind === 'bodyweight'
-        ? exercise.bodyweightSets.length
-        : exercise.durationEntries.length)
+    (exercise.note !== undefined || exercise.next !== undefined ? 1 : 0) + setRowCount(exercise)
   )
 }
 
@@ -634,7 +614,7 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
         rowCount += 1
         insertBucket(`${i}:${rowCount}`)
       }
-    } else {
+    } else if (exercise.kind === 'duration') {
       for (const entry of exercise.durationEntries) {
         const parts = [`[exercise:: [[${exercise.exerciseName}]]]`]
         if (entry.set !== undefined) {
@@ -648,6 +628,8 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
         rowCount += 1
         insertBucket(`${i}:${rowCount}`)
       }
+    } else {
+      return assertUnreachableKind(exercise)
     }
   }
 

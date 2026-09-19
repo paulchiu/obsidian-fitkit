@@ -1,3 +1,4 @@
+import { defaultBodyweightLevels, type BodyweightLadder } from './bodyweight-levels'
 import { EXERCISE_KINDS, parseExerciseKind } from './exercise-kind'
 import {
   kindForName,
@@ -129,7 +130,7 @@ export interface ExerciseNoteLevelsUpdateResult {
  */
 export function setExerciseNoteLevels(
   source: string,
-  levels: readonly string[],
+  levels: BodyweightLadder,
 ): ExerciseNoteLevelsUpdateResult {
   const normalizedSource = normalizeMarkdownSource(source)
   const bounds = findFrontmatterBounds(normalizedSource.markdown)
@@ -252,7 +253,7 @@ function repairFrontmatter(
   if (bounds.status === 'missing') {
     const fallbackKind = registryKind ?? inferExerciseKindFromContent(source) ?? 'strength'
     return {
-      markdown: `${frontmatterBlock(fallbackKind, registryUnit ?? DEFAULT_WEIGHT_UNIT, options.name)}${source}`,
+      markdown: `${frontmatterBlock(fallbackKind, options.name, registryUnit ?? DEFAULT_WEIGHT_UNIT)}${source}`,
       kind: fallbackKind,
       unknownKind: registryKind === null,
       warnings: [],
@@ -347,7 +348,7 @@ function repairFrontmatter(
       kindLineIndex = findFrontmatterKeyLine(nextFrontmatterLines, 'kind')
       nextFrontmatterLines = insertLines(nextFrontmatterLines, kindLineIndex + 1, [
         'levels:',
-        `  - ${options.name}`,
+        ...defaultBodyweightLevels(options.name).map((rung) => `  - ${rung}`),
       ])
     }
   }
@@ -376,8 +377,8 @@ function strengthUnitForName(registry: ExerciseRegistry, name: string): WeightUn
 
 function frontmatterBlock(
   kind: ExerciseKind | null,
-  unit: WeightUnit = DEFAULT_WEIGHT_UNIT,
   exerciseName: string,
+  unit: WeightUnit,
 ): string {
   const lines = ['---', 'type: exercise']
   if (kind) {
@@ -388,7 +389,9 @@ function frontmatterBlock(
     }
     if (kind === 'bodyweight') {
       lines.push('levels:')
-      lines.push(`  - ${exerciseName}`)
+      for (const rung of defaultBodyweightLevels(exerciseName)) {
+        lines.push(`  - ${rung}`)
+      }
     }
   }
   lines.push('---', '')

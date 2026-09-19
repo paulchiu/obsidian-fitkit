@@ -10,11 +10,11 @@ import type {
   WorkoutNoteModel,
 } from '../../src/domain/workout-note-model'
 import {
-  countFirstLevelRelabelSets,
   parseWorkoutNote,
   relabelSetsAsFirstLevel,
   semanticEqual,
   serializeWorkoutNote,
+  setRowCount,
 } from '../../src/domain/workout-note-model'
 import type { CanonicalWorkout } from '../../src/domain/workout-note-serializer'
 import { serializeWorkout } from '../../src/domain/workout-note-serializer'
@@ -1237,10 +1237,10 @@ describe('workout note model', () => {
   })
 })
 
-describe('relabelSetsAsFirstLevel', () => {
-  it('counts the strength rows a switch to bodyweight could mark as level 1', () => {
+describe('setRowCount', () => {
+  it('counts the logged rows of an entry whatever its kind', () => {
     expect(
-      countFirstLevelRelabelSets({
+      setRowCount({
         exerciseName: 'Push-up',
         kind: 'strength',
         strengthSets: [
@@ -1250,8 +1250,27 @@ describe('relabelSetsAsFirstLevel', () => {
         ],
       }),
     ).toBe(3)
+    expect(
+      setRowCount({
+        exerciseName: 'Plank',
+        kind: 'duration',
+        durationEntries: [
+          { set: 1, durationSeconds: 60 },
+          { set: 2, durationSeconds: 45 },
+        ],
+      }),
+    ).toBe(2)
+    expect(
+      setRowCount({
+        exerciseName: 'Push-up',
+        kind: 'bodyweight',
+        bodyweightSets: [{ level: 2, reps: 8 }],
+      }),
+    ).toBe(1)
   })
+})
 
+describe('relabelSetsAsFirstLevel', () => {
   it('marks strength rows as level 1, carrying weight as load', () => {
     expect(
       relabelSetsAsFirstLevel({
@@ -1277,7 +1296,6 @@ describe('relabelSetsAsFirstLevel', () => {
         { set: 2, durationSeconds: 45 },
       ],
     }
-    expect(countFirstLevelRelabelSets(entry)).toBe(2)
     expect(relabelSetsAsFirstLevel(entry)).toEqual([
       { level: 1, set: 1, note: 'Hard' },
       { level: 1, set: 2 },
@@ -1290,7 +1308,6 @@ describe('relabelSetsAsFirstLevel', () => {
       kind: 'bodyweight',
       bodyweightSets: [{ level: 2, reps: 8 }],
     }
-    expect(countFirstLevelRelabelSets(entry)).toBe(0)
     expect(relabelSetsAsFirstLevel(entry)).toEqual([{ level: 2, reps: 8 }])
   })
 })

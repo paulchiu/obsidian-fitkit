@@ -1,6 +1,6 @@
 import type { App } from 'obsidian'
 
-import { normalize } from '../domain/exercise-registry'
+import { createRegistry, levelsForName, normalize } from '../domain/exercise-registry'
 import type { ExerciseRegistryEntry } from '../domain/exercise-registry'
 import type { FitKitSettings } from '../settings'
 import { readExerciseCatalog, type ExerciseCatalogSnapshot } from './exercise-catalog'
@@ -23,6 +23,19 @@ export function exerciseRegistryWithVaultNotes(
   settings: FitKitSettings,
 ): ExerciseRegistryEntry[] {
   return buildExerciseRegistrySnapshot(app, settings).entries
+}
+
+/**
+ * Ladder for rung names and plans, preferring the exercise note via the
+ * merged snapshot. Absent means no ladder on file; callers fall back to a
+ * seeded default where a menu must never be empty.
+ */
+export function bodyweightLevelsFor(
+  app: App,
+  settings: FitKitSettings,
+  name: string,
+): string[] | undefined {
+  return levelsForName(createRegistry(exerciseRegistryWithVaultNotes(app, settings)), name)
 }
 
 /** Order-sensitive ladder equality: rung order is the ladder, so a reorder counts. */

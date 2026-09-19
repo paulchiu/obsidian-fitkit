@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { FitKitSettings } from '../../src/settings'
 import {
+  bodyweightLevelsFor,
   buildExerciseRegistrySnapshot,
   exerciseRegistryWithVaultNotes,
 } from '../../src/vault/exercise-registry-vault'
@@ -262,5 +263,21 @@ describe('exercise registry vault merge', () => {
       { name: 'Push-up', kind: 'bodyweight', levels: ['Tuck'], aliases: [] },
     ])
     expect(snapshot.diagnostics).toEqual([])
+  })
+
+  it('reads a ladder through the merged snapshot, preferring the note', () => {
+    const app = mockApp([
+      {
+        path: 'Fitness/Exercises/Push-up.md',
+        basename: 'Push-up',
+        frontmatter: { type: 'exercise', kind: 'bodyweight', levels: ['Wall', 'Knee'] },
+      },
+    ])
+    const settings = settingsWithRegistry([
+      { name: 'Push-up', kind: 'bodyweight', levels: ['Stale'], aliases: [] },
+    ])
+
+    expect(bodyweightLevelsFor(app, settings, 'Push-up')).toEqual(['Wall', 'Knee'])
+    expect(bodyweightLevelsFor(app, settings, 'Unknown')).toBeUndefined()
   })
 })

@@ -1,9 +1,12 @@
 import { TFile, type MarkdownPostProcessorContext } from 'obsidian'
 
 import { EXERCISE_KIND_LABELS, assertUnreachableKind } from '../domain/exercise-kind'
-import { bodyweightLevelName } from '../domain/bodyweight-levels'
+import {
+  bodyweightLevelName,
+  formatRungUnit,
+  type BodyweightLadder,
+} from '../domain/bodyweight-levels'
 import { formatDurationInput } from '../domain/duration-input'
-import { createRegistry, levelsForName } from '../domain/exercise-registry'
 import { formatNextPlanLabel } from '../domain/next-plan'
 import { parseWorkoutNote } from '../domain/workout-note-model'
 import type {
@@ -13,7 +16,7 @@ import type {
   StrengthSet,
 } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
-import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
+import { bodyweightLevelsFor } from '../vault/exercise-registry-vault'
 
 const WORKOUT_SOURCE_ROW = /^\s*[-*]\s+.*\[exercise::/
 
@@ -165,7 +168,7 @@ function renderExercisePreview(
       renderBodyweightTable(
         wrap,
         exercise.bodyweightSets,
-        levelsForExercise(plugin, exercise.exerciseName),
+        bodyweightLevelsFor(plugin.app, plugin.settings, exercise.exerciseName),
       )
       break
     case 'duration':
@@ -207,18 +210,10 @@ function renderStrengthTable(container: HTMLElement, sets: StrengthSet[]): void 
   }
 }
 
-/** Note-backed ladder wins via the merged snapshot; absent means no ladder on file. */
-function levelsForExercise(plugin: FitKitPlugin, name: string): string[] | undefined {
-  return levelsForName(
-    createRegistry(exerciseRegistryWithVaultNotes(plugin.app, plugin.settings)),
-    name,
-  )
-}
-
 function renderBodyweightTable(
   container: HTMLElement,
   sets: BodyweightSet[],
-  levels: readonly string[] | undefined,
+  levels: BodyweightLadder | undefined,
 ): void {
   if (sets.length === 0) {
     renderEmpty(container, 'No bodyweight rows recorded.')
@@ -284,7 +279,7 @@ function formatReadingPlanStepSuffix(exercise: ExerciseEntry): string {
     return ''
   }
   if (exercise.kind === 'bodyweight') {
-    return step === 1 ? ' rung' : ' rungs'
+    return ` ${formatRungUnit(step)}`
   }
   return ' kg'
 }

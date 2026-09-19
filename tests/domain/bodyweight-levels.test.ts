@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
   bodyweightLevelName,
+  defaultBodyweightLevels,
   describeBodyweightLadderChanges,
   formatBodyweightLevelLabel,
   formatBodyweightLevelShort,
+  formatRungUnit,
   parseBodyweightLadderText,
 } from '../../src/domain/bodyweight-levels'
 
@@ -21,6 +23,16 @@ describe('bodyweight level labels', () => {
 
   it('shortens the rung to its level number', () => {
     expect(formatBodyweightLevelShort(3)).toBe('L3')
+  })
+
+  it('names the singular rung only for a step of one', () => {
+    expect(formatRungUnit(1)).toBe('rung')
+    expect(formatRungUnit(2)).toBe('rungs')
+    expect(formatRungUnit(0)).toBe('rungs')
+  })
+
+  it('seeds a one-rung ladder named after the exercise', () => {
+    expect(defaultBodyweightLevels('Push-up')).toEqual(['Push-up'])
   })
 
   it('falls back to a bare level when the ladder does not name it', () => {

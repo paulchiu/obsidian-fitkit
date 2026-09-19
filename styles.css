@@ -185,11 +185,6 @@ body.is-mobile .fitkit-editor-root {
   cursor: grabbing;
 }
 
-.fitkit-card-top-spacer {
-  flex: 0 0 auto;
-  width: var(--fitkit-card-control-size, 32px);
-}
-
 .fitkit-drop-indicator {
   height: 2px;
   margin: 2px 0;
@@ -591,14 +586,11 @@ body.is-mobile .fitkit-editor-root {
   color: var(--text-on-accent);
 }
 
-.fitkit-btn-danger,
 .fitkit-destructive-button {
   border-color: var(--text-error);
   color: var(--text-error);
 }
 
-.fitkit-btn-danger:hover:not(:disabled),
-.fitkit-btn-danger:focus-visible:not(:disabled),
 .fitkit-destructive-button:hover:not(:disabled),
 .fitkit-destructive-button:focus-visible:not(:disabled) {
   background: var(--text-error);

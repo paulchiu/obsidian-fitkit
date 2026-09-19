@@ -5,7 +5,7 @@ import { DEFAULT_WEIGHT_UNIT } from '../domain/weight-unit'
 
 export interface PlanStepModalOptions {
   exerciseName: string
-  kind?: ExerciseKind
+  kind: ExerciseKind
   initial: string
   onSave: (next: number | undefined) => void
 }
@@ -88,13 +88,13 @@ export class PlanStepModal extends Modal {
 }
 
 /** Modal heading naming the plan step for this exercise. */
-function planStepTitle(exerciseName: string, kind: ExerciseKind | undefined): string {
+function planStepTitle(exerciseName: string, kind: ExerciseKind): string {
   return kind === 'bodyweight'
     ? `Rung change for ${exerciseName}`
     : `Weight change for ${exerciseName}`
 }
 
 /** Field label naming the plan step unit. */
-function planStepLabel(kind: ExerciseKind | undefined): string {
+function planStepLabel(kind: ExerciseKind): string {
   return kind === 'bodyweight' ? 'Rung change' : 'Weight change'
 }

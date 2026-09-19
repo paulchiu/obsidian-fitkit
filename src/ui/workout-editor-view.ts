@@ -3,10 +3,12 @@ import { ItemView, Menu, Modal, Notice, TFile, normalizePath, setIcon } from 'ob
 
 import { reorderArray } from '../domain/array-utils'
 import {
+  defaultBodyweightLevels,
   describeBodyweightLadderChanges,
   formatBodyweightLevelLabel,
   formatBodyweightLevelShort,
   pickBestBodyweightSet,
+  type BodyweightLadder,
   type BodyweightLadderChange,
 } from '../domain/bodyweight-levels'
 import {
@@ -29,6 +31,7 @@ import {
   levelsForName,
   normalize,
   upsertEntry,
+  type ExerciseRegistry,
   type ExerciseRegistryEntry,
 } from '../domain/exercise-registry'
 import type {
@@ -44,10 +47,10 @@ import {
   type NextPlanDirection,
 } from '../domain/next-plan'
 import {
-  countFirstLevelRelabelSets,
   parseWorkoutNote,
   relabelSetsAsFirstLevel,
   serializeWorkoutNote,
+  setRowCount,
   withNoteAndNext,
   type BodyweightExerciseEntry,
   type BodyweightSet,
@@ -63,10 +66,13 @@ import {
 import type FitKitPlugin from '../main'
 import { exercisesFolder, workoutsFolder } from '../settings-paths'
 import { findExerciseNotePath } from '../vault/exercise-catalog'
-import { composeExerciseNote, defaultBodyweightLevels } from '../vault/exercise-note'
+import { composeExerciseNote } from '../vault/exercise-note'
 import { planExerciseFileOpen } from '../vault/exercise-file-plan'
 import { exerciseHistoryFromVault } from '../vault/exercise-history-vault'
-import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
+import {
+  bodyweightLevelsFor,
+  exerciseRegistryWithVaultNotes,
+} from '../vault/exercise-registry-vault'
 import { FileSession } from '../vault/file-session'
 import { markdownFilesInFolder } from '../vault/folder-scan'
 import { ensureParentFolder } from '../vault/vault-utils'
@@ -400,8 +406,10 @@ export class WorkoutEditorView extends ItemView {
     }
 
     const list = container.createDiv({ cls: 'fitkit-exercise-list' })
+    /** One merged snapshot per render: every card reads its ladder from this instead of rebuilding it. */
+    const registry = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
     for (let i = 0; i < this.model.exercises.length; i++) {
-      this.renderExerciseCard(list, i)
+      this.renderExerciseCard(list, i, registry)
     }
 
     const footer = container.createDiv({ cls: 'fitkit-footer' })
@@ -474,7 +482,7 @@ export class WorkoutEditorView extends ItemView {
     meta.createSpan({ cls: 'fitkit-meta-line', text: this.metaLineText() })
   }
 
-  private renderExerciseCard(list: HTMLElement, index: number): void {
+  private renderExerciseCard(list: HTMLElement, index: number, registry?: ExerciseRegistry): void {
     if (!this.model) {
       return
     }
@@ -482,6 +490,9 @@ export class WorkoutEditorView extends ItemView {
     if (!ex) {
       return
     }
+    /** Direct card renders (and tests) build their own snapshot; full renders share one. */
+    const snapshot =
+      registry ?? createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
 
     const card = list.createDiv({ cls: 'fitkit-card' })
     card.dataset.exerciseIndex = String(index)
@@ -518,7 +529,7 @@ export class WorkoutEditorView extends ItemView {
     setIcon(gearBtn, 'settings')
     gearBtn.addEventListener('click', (evt) => this.openCardMenu(evt, index))
 
-    this.renderExerciseHistoryBadges(card, ex)
+    this.renderExerciseHistoryBadges(card, ex, snapshot)
 
     if (ex.exerciseNotes && ex.exerciseNotes.length > 0) {
       const line = card.createDiv({
@@ -541,7 +552,7 @@ export class WorkoutEditorView extends ItemView {
         this.renderStrengthTable(card, ex, index)
         break
       case 'bodyweight':
-        this.renderBodyweightTable(card, ex, index)
+        this.renderBodyweightTable(card, ex, index, snapshot)
         break
       case 'duration':
         this.renderDurationTable(card, ex, index)
@@ -638,9 +649,14 @@ export class WorkoutEditorView extends ItemView {
     })
   }
 
-  private renderBodyweightTable(card: HTMLElement, ex: ExerciseCard, exerciseIndex: number): void {
+  private renderBodyweightTable(
+    card: HTMLElement,
+    ex: ExerciseCard,
+    exerciseIndex: number,
+    registry: ExerciseRegistry,
+  ): void {
     card.addClass('fitkit-bodyweight-card')
-    const levels = this.levelsFor(ex.name)
+    const levels = levelsForName(registry, ex.name)
     const showLoad = ex.bodyweightSets.some((entry) => entry.load !== undefined)
     const wrap = card.createDiv({ cls: 'fitkit-set-area' })
 
@@ -676,7 +692,7 @@ export class WorkoutEditorView extends ItemView {
     wrap: HTMLElement,
     ex: ExerciseCard,
     i: number,
-    levels: readonly string[] | undefined,
+    levels: BodyweightLadder | undefined,
     showLoad: boolean,
   ): void {
     const set = ex.bodyweightSets[i]
@@ -759,7 +775,7 @@ export class WorkoutEditorView extends ItemView {
     row: HTMLElement,
     ex: ExerciseCard,
     rowIndex: number,
-    levels: readonly string[] | undefined,
+    levels: BodyweightLadder | undefined,
     level: number,
   ): void {
     const rungCount = levels?.length ?? 0
@@ -852,7 +868,7 @@ export class WorkoutEditorView extends ItemView {
     if (label.hasClass('is-label-short')) {
       return
     }
-    if (shouldShortenLevelLabel(widths.available, widths.content)) {
+    if (shouldShortenLevelLabel(widths.content, widths.available)) {
       label.addClass('is-label-short')
     } else {
       label.removeClass('is-label-short')
@@ -1012,7 +1028,9 @@ export class WorkoutEditorView extends ItemView {
   private openEditLevelsModal(ex: ExerciseCard): void {
     new EditLevelsModal(this.app, {
       exerciseName: ex.name,
-      initial: this.levelsFor(ex.name) ?? defaultBodyweightLevels(ex.name),
+      initial:
+        bodyweightLevelsFor(this.app, this.plugin.settings, ex.name) ??
+        defaultBodyweightLevels(ex.name),
       onSave: (levels) => {
         void this.confirmLadderEdit(ex, levels)
       },
@@ -1025,7 +1043,7 @@ export class WorkoutEditorView extends ItemView {
    * proceeds on confirmation. Logged sets keep their numbers throughout.
    */
   private async confirmLadderEdit(ex: ExerciseCard, levels: string[]): Promise<void> {
-    const previous = this.levelsFor(ex.name) ?? []
+    const previous = bodyweightLevelsFor(this.app, this.plugin.settings, ex.name) ?? []
     const changes = describeBodyweightLadderChanges(previous, levels, [
       ...(await this.occupiedBodyweightLevels(ex)),
     ])
@@ -1391,7 +1409,7 @@ export class WorkoutEditorView extends ItemView {
    * menu is usable immediately. An existing ladder is left alone.
    */
   private async seedBodyweightLadder(ex: ExerciseCard): Promise<void> {
-    if ((this.levelsFor(ex.name) ?? []).length > 0) {
+    if ((bodyweightLevelsFor(this.app, this.plugin.settings, ex.name) ?? []).length > 0) {
       return
     }
     await this.persistLadder(ex.name, defaultBodyweightLevels(ex.name))
@@ -1406,7 +1424,7 @@ export class WorkoutEditorView extends ItemView {
     if (!this.model) {
       return
     }
-    const count = countFirstLevelRelabelSets(previous)
+    const count = setRowCount(previous)
     if (count === 0) {
       return
     }
@@ -1766,17 +1784,15 @@ export class WorkoutEditorView extends ItemView {
     }
   }
 
-  /** Ladder for rung names and plans, preferring the exercise note via the merged snapshot. */
-  private levelsFor(name: string): string[] | undefined {
-    return levelsForName(
-      createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings)),
-      name,
-    )
-  }
-
-  private renderExerciseHistoryBadges(card: HTMLElement, ex: ExerciseCard): void {
+  private renderExerciseHistoryBadges(
+    card: HTMLElement,
+    ex: ExerciseCard,
+    registry: ExerciseRegistry,
+  ): void {
     const summary = this.exerciseHistory?.get(ex.name)
-    const badges = formatExerciseHistoryBadges(summary, ex.kind, this.levelsFor(ex.name))
+    /** One lookup per card: both badge kinds read the same ladder. */
+    const levels = levelsForName(registry, ex.name)
+    const badges = formatExerciseHistoryBadges(summary, ex.kind, levels)
     const planBadge = formatNextPlanBadge(
       summary,
       ex.kind,
@@ -1785,7 +1801,7 @@ export class WorkoutEditorView extends ItemView {
         sessionMax: pickMaxWeightSet(ex.strengthSets),
         sessionBodyweightMax: pickBestBodyweightSet(ex.bodyweightSets),
       },
-      this.levelsFor(ex.name),
+      levels,
     )
     if (badges.length === 0 && !planBadge) {
       return
@@ -2409,7 +2425,7 @@ export function measureLevelLabelWidths(full: HTMLElement): LevelLabelWidths {
  * its own rendered width overruns the space the cell offers, so an
  * arbitrarily long ladder name still fits on a wide window.
  */
-export function shouldShortenLevelLabel(availableWidth: number, labelWidth: number): boolean {
+export function shouldShortenLevelLabel(labelWidth: number, availableWidth: number): boolean {
   return labelWidth > availableWidth
 }
 
@@ -2457,19 +2473,17 @@ function seedEmptyRow(
     case 'duration':
       card.durationEntries.push({})
       return null
-    case 'strength':
-      break
-    default:
-      return assertUnreachableKind(card.kind)
+    case 'strength': {
+      const target = seededSetWeight(summary)
+      if (target === null) {
+        card.strengthSets.push({ set: 1 })
+        return null
+      }
+      const row: EditableStrengthSet = { set: 1, weight: target }
+      card.strengthSets.push(row)
+      return row
+    }
   }
-  const target = seededSetWeight(summary)
-  if (target === null) {
-    card.strengthSets.push({ set: 1 })
-    return null
-  }
-  const row: EditableStrengthSet = { set: 1, weight: target }
-  card.strengthSets.push(row)
-  return row
 }
 
 function seededSetWeight(summary: ExerciseHistorySummary | undefined): number | null {
@@ -2510,30 +2524,38 @@ function toEditorWorkoutModel(
 }
 
 export function toEditorExercise(exercise: ExerciseEntry): ExerciseCard {
-  const card: ExerciseCard =
-    exercise.kind === 'strength'
-      ? {
-          name: exercise.exerciseName,
-          kind: exercise.kind,
-          strengthSets: exercise.strengthSets.map(toEditorStrengthSet),
-          durationEntries: [],
-          bodyweightSets: [],
-        }
-      : exercise.kind === 'bodyweight'
-        ? {
-            name: exercise.exerciseName,
-            kind: exercise.kind,
-            strengthSets: [],
-            durationEntries: [],
-            bodyweightSets: exercise.bodyweightSets.map(toEditorBodyweightSet),
-          }
-        : {
-            name: exercise.exerciseName,
-            kind: exercise.kind,
-            strengthSets: [],
-            durationEntries: exercise.durationEntries.map(toEditorDurationEntry),
-            bodyweightSets: [],
-          }
+  let card: ExerciseCard
+  switch (exercise.kind) {
+    case 'strength':
+      card = {
+        name: exercise.exerciseName,
+        kind: exercise.kind,
+        strengthSets: exercise.strengthSets.map(toEditorStrengthSet),
+        durationEntries: [],
+        bodyweightSets: [],
+      }
+      break
+    case 'bodyweight':
+      card = {
+        name: exercise.exerciseName,
+        kind: exercise.kind,
+        strengthSets: [],
+        durationEntries: [],
+        bodyweightSets: exercise.bodyweightSets.map(toEditorBodyweightSet),
+      }
+      break
+    case 'duration':
+      card = {
+        name: exercise.exerciseName,
+        kind: exercise.kind,
+        strengthSets: [],
+        durationEntries: exercise.durationEntries.map(toEditorDurationEntry),
+        bodyweightSets: [],
+      }
+      break
+    default:
+      return assertUnreachableKind(exercise)
+  }
   if (exercise.note !== undefined) {
     card.exerciseNotes = exercise.note
   }
