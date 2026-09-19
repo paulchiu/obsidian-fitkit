@@ -1,5 +1,9 @@
 import { epleyE1rm } from './epley'
-import { DEFAULT_EXERCISE_METRIC, type ExerciseMetric } from './exercise-metric'
+import {
+  DEFAULT_EXERCISE_METRIC,
+  assertUnreachableMetric,
+  type ExerciseMetric,
+} from './exercise-metric'
 import {
   normalize,
   resolve,
@@ -10,7 +14,7 @@ import {
 import type { FitKitIndex } from './types'
 import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from './weight-unit'
 
-export type ChartSeriesMetric = ExerciseMetric | 'duration' | 'reps'
+export type ChartSeriesMetric = ExerciseMetric | 'duration'
 
 export interface ChartPoint {
   date: string
@@ -22,7 +26,7 @@ export interface ChartSeries {
   exerciseName: string
   kind: ExerciseKind
   metric: ChartSeriesMetric
-  unit: WeightUnit | 's' | 'reps'
+  unit: WeightUnit | 's' | 'reps' | 'level'
   points: ChartPoint[]
   windowRequested: number
   totalDates: number
@@ -73,8 +77,18 @@ export function buildExerciseChartSeries(
 function defaultSeriesMetric(kind: ExerciseKind, metric: ExerciseMetric): ChartSeriesMetric {
   switch (kind) {
     case 'duration':
-    case 'bodyweight':
       return 'duration'
+    case 'bodyweight':
+      switch (metric) {
+        case 'level':
+        case 'reps':
+          return metric
+        case 'weight':
+        case 'e1rm':
+          return 'level'
+        default:
+          return assertUnreachableMetric(metric)
+      }
     case 'strength':
       return metric
   }
@@ -115,13 +129,19 @@ function collectPoints(
 }
 
 function unitForMetric(metric: ChartSeriesMetric, weightUnit: WeightUnit): ChartSeries['unit'] {
-  if (metric === 'duration') {
-    return 's'
+  switch (metric) {
+    case 'duration':
+      return 's'
+    case 'level':
+      return 'level'
+    case 'reps':
+      return 'reps'
+    case 'weight':
+    case 'e1rm':
+      return weightUnit
+    default:
+      return assertUnreachableMetric(metric)
   }
-  if (metric === 'reps') {
-    return 'reps'
-  }
-  return weightUnit
 }
 
 function buildMatchKeys(registry: ExerciseRegistry, exerciseName: string): Set<string> {
@@ -153,8 +173,9 @@ function pickMetric(
 ): number | null {
   switch (kind) {
     case 'duration':
-    case 'bodyweight':
       return pickDurationMetric(row)
+    case 'bodyweight':
+      return pickBodyweightMetric(row, metric)
     case 'strength':
       return pickStrengthMetric(row, metric)
   }
@@ -168,6 +189,26 @@ function pickDurationMetric(
     return null
   }
   return value
+}
+
+/**
+ * Level or reps from the session best set; sessions without one contribute nothing.
+ */
+function pickBodyweightMetric(
+  row: FitKitIndex['entries'][number]['exercises'][number],
+  metric: ChartSeriesMetric,
+): number | null {
+  const set = row.maxBodyweightSet
+  if (!set || !Number.isFinite(set.level) || set.level < 1) {
+    return null
+  }
+  if (metric === 'reps') {
+    if (!Number.isFinite(set.reps) || set.reps <= 0) {
+      return null
+    }
+    return set.reps
+  }
+  return set.level
 }
 
 function pickStrengthMetric(

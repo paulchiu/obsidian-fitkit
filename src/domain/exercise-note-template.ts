@@ -50,7 +50,7 @@ const RECENT_SESSIONS_QUERIES: Record<ExerciseKind, RecentSessionsQuery> = {
     `FROM "${workouts}"`,
     'FLATTEN file.lists AS L',
     `WHERE L.exercise = link("${name}") AND L.level`,
-    'SORT file.name DESC, L.level ASC',
+    'SORT file.name DESC, L.set ASC',
     'LIMIT 10',
   ],
 }

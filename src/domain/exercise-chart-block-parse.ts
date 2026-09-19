@@ -1,6 +1,8 @@
 import { parseExerciseKind } from './exercise-kind'
 import {
+  DEFAULT_BODYWEIGHT_EXERCISE_METRIC,
   DEFAULT_EXERCISE_METRIC,
+  VALID_EXERCISE_METRICS,
   parseExerciseMetric,
   type ExerciseMetric,
 } from './exercise-metric'
@@ -53,7 +55,8 @@ export function parseExerciseChartBlock(source: string): ParsedExerciseChartBloc
       }
       result.metricSupplied = true
       result.metric = parseExerciseMetric(metricValue)
-      result.invalidMetricValue = result.metric ? null : metricValue
+      /** The rejection note echoes the supplied value, so it keeps the user's casing. */
+      result.invalidMetricValue = metricValue
     } else if (key === 'window') {
       if (!/^\d+$/.test(value)) {
         result.windowFallback = true
@@ -78,37 +81,46 @@ export function resolveExerciseChartMetric(
 ): ExerciseMetric {
   switch (kind) {
     case 'duration':
+      return DEFAULT_EXERCISE_METRIC
     case 'bodyweight':
-      return DEFAULT_EXERCISE_METRIC
+      return resolveKindMetric(parsed, frontmatter, kind, DEFAULT_BODYWEIGHT_EXERCISE_METRIC, notes)
     case 'strength': {
-      if (parsed.metricSupplied) {
-        if (parsed.metric) {
-          return parsed.metric
-        }
-        notes.push(`Ignored invalid metric value '${parsed.invalidMetricValue ?? ''}'; using e1rm.`)
-        return DEFAULT_EXERCISE_METRIC
-      }
-
-      const metric = metricFromFrontmatter(frontmatter)
-      if (metric) {
-        return metric
-      }
-
-      const raw = readFrontmatterField(frontmatter, 'metric')
-      if (raw !== undefined) {
-        notes.push(`Ignored invalid metric value '${formatFrontmatterValue(raw)}'; using e1rm.`)
-      }
-      return DEFAULT_EXERCISE_METRIC
+      return resolveKindMetric(parsed, frontmatter, kind, DEFAULT_EXERCISE_METRIC, notes)
     }
   }
 }
 
-function metricFromFrontmatter(frontmatter: ExerciseChartFrontmatter): ExerciseMetric | null {
-  return parseExerciseMetric(readFrontmatterField(frontmatter, 'metric'))
+/**
+ * Block metric wins when valid for the kind, frontmatter is the fallback, and anything else warns like a bad metric.
+ */
+function resolveKindMetric(
+  parsed: ParsedExerciseChartBlock,
+  frontmatter: ExerciseChartFrontmatter,
+  kind: ExerciseKind,
+  fallback: ExerciseMetric,
+  notes: string[],
+): ExerciseMetric {
+  if (parsed.metricSupplied) {
+    if (parsed.metric && VALID_EXERCISE_METRICS[kind].includes(parsed.metric)) {
+      return parsed.metric
+    }
+    notes.push(
+      `Ignored invalid metric value '${parsed.invalidMetricValue ?? parsed.metric ?? ''}'; using ${fallback}.`,
+    )
+    return fallback
+  }
+
+  const metric = metricFromFrontmatter(frontmatter)
+  if (metric && VALID_EXERCISE_METRICS[kind].includes(metric)) {
+    return metric
+  }
+
+  /** A frontmatter metric for another kind falls back quietly: only the block warns. */
+  return fallback
 }
 
-function formatFrontmatterValue(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : String(value)
+function metricFromFrontmatter(frontmatter: ExerciseChartFrontmatter): ExerciseMetric | null {
+  return parseExerciseMetric(readFrontmatterField(frontmatter, 'metric'))
 }
 
 function readFrontmatterField(frontmatter: ExerciseChartFrontmatter, key: string): unknown {

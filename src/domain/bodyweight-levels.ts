@@ -130,16 +130,24 @@ function toBodyweightSetCandidate(set: {
   ]
 }
 
+/** Rank two bodyweight sets: positive when the left set wins, negative when the right does, zero on an exact tie. Level outranks reps, reps outrank load. */
+export function compareBodyweightSets(left: BodyweightBestSet, right: BodyweightBestSet): number {
+  if (left.level !== right.level) {
+    return left.level > right.level ? 1 : -1
+  }
+  if (left.reps !== right.reps) {
+    return left.reps > right.reps ? 1 : -1
+  }
+  if (left.load !== right.load) {
+    return left.load > right.load ? 1 : -1
+  }
+  return 0
+}
+
 /** Higher level wins outright; reps break level ties, then load. Earlier sets hold exact ties. */
 function pickHigherBodyweightSet(
   left: BodyweightBestSet,
   right: BodyweightBestSet,
 ): BodyweightBestSet {
-  if (right.level !== left.level) {
-    return right.level > left.level ? right : left
-  }
-  if (right.reps !== left.reps) {
-    return right.reps > left.reps ? right : left
-  }
-  return right.load > left.load ? right : left
+  return compareBodyweightSets(right, left) > 0 ? right : left
 }

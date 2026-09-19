@@ -1,21 +1,35 @@
 import type { App, CachedMetadata, TAbstractFile, TFile } from 'obsidian'
 
-import { formatRungUnit } from '../domain/bodyweight-levels'
+import {
+  bodyweightLevelName,
+  compareBodyweightSets,
+  formatRungUnit,
+  type BodyweightLadder,
+} from '../domain/bodyweight-levels'
 import { type ExerciseKind } from '../domain/exercise-kind'
 import {
   DEFAULT_EXERCISE_METRIC,
+  VALID_EXERCISE_METRICS,
   parseExerciseMetric,
   type ExerciseMetric,
 } from '../domain/exercise-metric'
 import {
   createRegistry,
+  levelsForName,
   normalize,
   resolve,
   type ExerciseRegistry,
 } from '../domain/exercise-registry'
 import { formatNextPlanLabel, type NextPlan } from '../domain/next-plan'
 import { DEFAULT_WEIGHT_UNIT, parseWeightUnit, type WeightUnit } from '../domain/weight-unit'
-import type { BestSet, ExerciseIndexRow, FitKitIndex, IndexEntry, WeightSet } from '../domain/types'
+import type {
+  BestSet,
+  BodyweightBestSet,
+  ExerciseIndexRow,
+  FitKitIndex,
+  IndexEntry,
+  WeightSet,
+} from '../domain/types'
 import type { FitKitSettings } from '../settings'
 import { dashboardPath, exercisesFolder, normalizeFolder, workoutsFolder } from '../settings-paths'
 import { exerciseRegistryWithVaultNotes } from './exercise-registry-vault'
@@ -27,6 +41,8 @@ interface ExerciseAggregate {
   metric: ExerciseMetric
   unit: WeightUnit
   pbSet?: StrengthPbSet
+  pbBodyweightSet?: BodyweightBestSet
+  ladder?: BodyweightLadder
   totalSets: number
   totalDurationSeconds: number
   sessionCount: number
@@ -42,6 +58,13 @@ interface PlannedSession {
 
 type StrengthPbSet = WeightSet & { e1rm?: number }
 
+/** Per-exercise dashboard lookups: chart metric, weight unit and rung ladder. */
+export interface ExerciseDashboardMaps {
+  metrics?: ReadonlyMap<string, ExerciseMetric>
+  units?: ReadonlyMap<string, WeightUnit>
+  ladders?: ReadonlyMap<string, BodyweightLadder>
+}
+
 /**
  * Pure: build full dashboard markdown from index.
  * @param index - The FitKit index.
@@ -54,10 +77,9 @@ export function composeDashboard(
   workoutsFolderPath: string,
   exercisesFolderPath: string,
   hiddenKeys: ReadonlySet<string>,
-  exerciseMetrics: ReadonlyMap<string, ExerciseMetric> = new Map(),
-  exerciseUnits: ReadonlyMap<string, WeightUnit> = new Map(),
+  maps: ExerciseDashboardMaps = {},
 ): string {
-  const exercises = visibleExerciseAggregates(index, hiddenKeys, exerciseMetrics, exerciseUnits)
+  const exercises = visibleExerciseAggregates(index, hiddenKeys, maps)
   return composeDashboardFromAggregates(index, workoutsFolderPath, exercisesFolderPath, exercises)
 }
 
@@ -70,9 +92,8 @@ export async function regenerateDashboard(
   const hiddenKeys = new Set(settings.hiddenDashboardSectionsByPath[path] ?? [])
   const folder = workoutsFolder(settings)
   const exercisesPath = exercisesFolder(settings)
-  const exerciseMetrics = buildExerciseMetricMap(app, settings, index)
-  const exerciseUnits = buildExerciseUnitMap(app, settings, index)
-  const exercises = visibleExerciseAggregates(index, hiddenKeys, exerciseMetrics, exerciseUnits)
+  const maps = buildExerciseDashboardMaps(app, settings, index)
+  const exercises = visibleExerciseAggregates(index, hiddenKeys, maps)
   const markdown = composeDashboardFromAggregates(index, folder, exercisesPath, exercises)
   const existing = app.vault.getAbstractFileByPath(path)
 
@@ -149,25 +170,20 @@ function composeDashboardFromAggregates(
 function visibleExerciseAggregates(
   index: FitKitIndex,
   hiddenKeys: ReadonlySet<string>,
-  exerciseMetrics: ReadonlyMap<string, ExerciseMetric>,
-  exerciseUnits: ReadonlyMap<string, WeightUnit>,
+  maps: ExerciseDashboardMaps,
 ): ExerciseAggregate[] {
-  return aggregateExercises(index, exerciseMetrics, exerciseUnits)
+  return aggregateExercises(index, maps)
     .filter((exercise) => !hiddenKeys.has(`exercise:${exercise.exerciseName}`))
     .sort((left, right) => left.exerciseName.localeCompare(right.exerciseName))
 }
 
-function aggregateExercises(
-  index: FitKitIndex,
-  exerciseMetrics: ReadonlyMap<string, ExerciseMetric>,
-  exerciseUnits: ReadonlyMap<string, WeightUnit>,
-): ExerciseAggregate[] {
+function aggregateExercises(index: FitKitIndex, maps: ExerciseDashboardMaps): ExerciseAggregate[] {
   const exercises = new Map<string, ExerciseAggregate>()
 
   for (const entry of index.entries) {
     const sessionExercises = new Set<string>()
     for (const row of entry.exercises) {
-      const aggregate = getAggregate(exercises, row, exerciseMetrics, exerciseUnits)
+      const aggregate = getAggregate(exercises, row, maps)
       aggregate.totalSets += row.totalSets ?? 0
       aggregate.totalDurationSeconds += row.totalDurationSeconds ?? 0
       if (!sessionExercises.has(row.exerciseName)) {
@@ -177,6 +193,13 @@ function aggregateExercises(
       const candidate = pickDashboardSet(row, aggregate.metric)
       if (candidate && isBetterDashboardSet(candidate, aggregate.pbSet, aggregate.metric)) {
         aggregate.pbSet = candidate
+      }
+      const bodyweightCandidate = pickBodyweightDashboardSet(row)
+      if (
+        bodyweightCandidate &&
+        isBetterBodyweightDashboardSet(bodyweightCandidate, aggregate.pbBodyweightSet)
+      ) {
+        aggregate.pbBodyweightSet = bodyweightCandidate
       }
       if (row.next) {
         const planned: PlannedSession = {
@@ -198,8 +221,7 @@ function aggregateExercises(
 function getAggregate(
   exercises: Map<string, ExerciseAggregate>,
   row: ExerciseIndexRow,
-  exerciseMetrics: ReadonlyMap<string, ExerciseMetric>,
-  exerciseUnits: ReadonlyMap<string, WeightUnit>,
+  maps: ExerciseDashboardMaps,
 ): ExerciseAggregate {
   const existing = exercises.get(row.exerciseName)
   if (existing) {
@@ -209,8 +231,9 @@ function getAggregate(
   const created: ExerciseAggregate = {
     exerciseName: row.exerciseName,
     kind: row.kind,
-    metric: exerciseMetrics.get(row.exerciseName) ?? DEFAULT_EXERCISE_METRIC,
-    unit: exerciseUnits.get(row.exerciseName) ?? DEFAULT_WEIGHT_UNIT,
+    metric: maps.metrics?.get(row.exerciseName) ?? DEFAULT_EXERCISE_METRIC,
+    unit: maps.units?.get(row.exerciseName) ?? DEFAULT_WEIGHT_UNIT,
+    ladder: maps.ladders?.get(row.exerciseName),
     totalSets: 0,
     totalDurationSeconds: 0,
     sessionCount: 0,
@@ -224,8 +247,10 @@ function formatPb(exercise: ExerciseAggregate): string {
 
   switch (exercise.kind) {
     case 'bodyweight': {
-      const sessionLabel = exercise.sessionCount === 1 ? 'session' : 'sessions'
-      return `- **${link}:** total ${exercise.totalSets} sets across ${exercise.sessionCount} ${sessionLabel}`
+      if (!exercise.pbBodyweightSet) {
+        return `- **${link}:** no completed sets`
+      }
+      return `- **${link}:** ${formatBodyweightDashboardSet(exercise.pbBodyweightSet, exercise.ladder)}`
     }
     case 'duration': {
       const sessionLabel = exercise.sessionCount === 1 ? 'session' : 'sessions'
@@ -277,12 +302,16 @@ function dataviewQuery(exercise: ExerciseAggregate, workoutsFolderPath: string):
   switch (exercise.kind) {
     case 'bodyweight':
       return [
-        'table without id file.link as Session, level as Level',
-        `from "${workoutsFolderPath}"`,
-        'flatten file.lists as item',
-        `where contains(item.text, "[exercise:: [[${exercise.exerciseName}]]]") and item.level`,
-        'sort file.name desc',
-        'limit 12',
+        'TABLE WITHOUT ID',
+        '  file.link AS Workout,',
+        '  L.level AS Level,',
+        '  L.reps AS Reps,',
+        '  L.load AS Load',
+        `FROM "${workoutsFolderPath}"`,
+        'FLATTEN file.lists AS L',
+        `WHERE L.exercise = link("${exercise.exerciseName}") AND L.level`,
+        'SORT file.name DESC, L.set ASC',
+        'LIMIT 10',
       ]
     case 'duration':
       return [
@@ -341,6 +370,25 @@ function isBetterDashboardSet(
   return (candidate.e1rm ?? 0) > (current.e1rm ?? 0)
 }
 
+/** Bodyweight best of a session row; other kinds contribute nothing here. */
+function pickBodyweightDashboardSet(row: ExerciseIndexRow): BodyweightBestSet | null {
+  if (row.kind !== 'bodyweight') {
+    return null
+  }
+  return row.maxBodyweightSet ?? null
+}
+
+/** Better bodyweight set under the shared best-set ordering; exact ties keep the current. */
+function isBetterBodyweightDashboardSet(
+  candidate: BodyweightBestSet,
+  current: BodyweightBestSet | undefined,
+): boolean {
+  if (!current) {
+    return true
+  }
+  return compareBodyweightSets(candidate, current) > 0
+}
+
 function validWeightSet(set: WeightSet | undefined): set is WeightSet {
   return (
     set !== undefined &&
@@ -353,6 +401,15 @@ function validWeightSet(set: WeightSet | undefined): set is WeightSet {
 
 function validBestSet(set: BestSet | undefined): set is BestSet {
   return validWeightSet(set) && Number.isFinite(set.e1rm) && set.e1rm > 0
+}
+
+/** Sibling of the strength line: rung name where strength names weight, then reps. */
+function formatBodyweightDashboardSet(
+  set: BodyweightBestSet,
+  ladder: BodyweightLadder | undefined,
+): string {
+  const name = bodyweightLevelName(ladder, set.level)
+  return set.reps > 0 ? `${name} x ${set.reps}` : name
 }
 
 function formatDashboardSet(set: StrengthPbSet, metric: ExerciseMetric, unit: WeightUnit): string {
@@ -374,26 +431,45 @@ function formatReps(reps: number): string {
   return `${reps} rep${reps === 1 ? '' : 's'}`
 }
 
-function buildExerciseMetricMap(
+/**
+ * Per-exercise dashboard lookups from one index walk over one registry, so a
+ * regenerate pays the vault-backed registry build once. Ladders let the
+ * dashboard name rungs the same way the chart does.
+ */
+function buildExerciseDashboardMaps(
   app: App,
   settings: FitKitSettings,
   index: FitKitIndex,
-): Map<string, ExerciseMetric> {
-  const noteMetrics = readExerciseNoteMetrics(app, settings)
+): ExerciseDashboardMaps {
   const registry = createRegistry(exerciseRegistryWithVaultNotes(app, settings))
+  const noteMetrics = readExerciseNoteMetrics(app, settings)
+  const noteUnits = readExerciseNoteUnits(app, settings)
   const metrics = new Map<string, ExerciseMetric>()
+  const units = new Map<string, WeightUnit>()
+  const ladders = new Map<string, BodyweightLadder>()
 
   for (const entry of index.entries) {
     for (const row of entry.exercises) {
-      /** Strength-only statistic: other kinds contribute nothing until they define their own. */
-      if (row.kind !== 'strength' || metrics.has(row.exerciseName)) {
-        continue
+      if (row.kind === 'strength') {
+        /** Strength-only statistics: other kinds contribute nothing until they define their own. */
+        if (!metrics.has(row.exerciseName)) {
+          metrics.set(row.exerciseName, getExerciseMetric(row.exerciseName, noteMetrics, registry))
+        }
+        if (!units.has(row.exerciseName)) {
+          units.set(row.exerciseName, getExerciseUnit(row.exerciseName, noteUnits, registry))
+        }
+      } else if (row.kind === 'bodyweight') {
+        if (!ladders.has(row.exerciseName)) {
+          const ladder = levelsForName(registry, row.exerciseName)
+          if (ladder) {
+            ladders.set(row.exerciseName, ladder)
+          }
+        }
       }
-      metrics.set(row.exerciseName, getExerciseMetric(row.exerciseName, noteMetrics, registry))
     }
   }
 
-  return metrics
+  return { metrics, units, ladders }
 }
 
 function readExerciseNoteMetrics(app: App, settings: FitKitSettings): Map<string, ExerciseMetric> {
@@ -413,8 +489,13 @@ function readExerciseNoteMetrics(app: App, settings: FitKitSettings): Map<string
       continue
     }
 
+    /**
+     * Strength-only statistic read from frontmatter; a metric naming another
+     * kind reads as the default rather than changing the ranking.
+     */
+    const parsed = parseExerciseMetric(readFrontmatterField(frontmatter, 'metric'))
     const metric =
-      parseExerciseMetric(readFrontmatterField(frontmatter, 'metric')) ?? DEFAULT_EXERCISE_METRIC
+      parsed && VALID_EXERCISE_METRICS.strength.includes(parsed) ? parsed : DEFAULT_EXERCISE_METRIC
     metrics.set(normalize(file.basename), metric)
   }
 
@@ -437,28 +518,6 @@ function getExerciseMetric(
   }
 
   return noteMetrics.get(normalize(resolved.entry.name)) ?? DEFAULT_EXERCISE_METRIC
-}
-
-function buildExerciseUnitMap(
-  app: App,
-  settings: FitKitSettings,
-  index: FitKitIndex,
-): Map<string, WeightUnit> {
-  const noteUnits = readExerciseNoteUnits(app, settings)
-  const registry = createRegistry(exerciseRegistryWithVaultNotes(app, settings))
-  const units = new Map<string, WeightUnit>()
-
-  for (const entry of index.entries) {
-    for (const row of entry.exercises) {
-      /** Strength-only statistic: other kinds contribute nothing until they define their own. */
-      if (row.kind !== 'strength' || units.has(row.exerciseName)) {
-        continue
-      }
-      units.set(row.exerciseName, getExerciseUnit(row.exerciseName, noteUnits, registry))
-    }
-  }
-
-  return units
 }
 
 function readExerciseNoteUnits(app: App, settings: FitKitSettings): Map<string, WeightUnit> {

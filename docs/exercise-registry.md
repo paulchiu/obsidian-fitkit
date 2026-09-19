@@ -64,11 +64,13 @@ Splitting one exercise into two is not implemented. Consolidation has unambiguou
 
 ## Kinds and units
 
-Every exercise is either `strength` (weight and reps) or `duration` (seconds). New cards in the workout editor default their kind from the registry.
+Every exercise is `strength` (weight and reps), `duration` (seconds), or `bodyweight` (a rung on a progression ladder, with reps and optional added weight). New cards in the workout editor default their kind from the registry.
 
 The kind switch in the editor's card menu writes the store that wins on read, so a note-backed exercise has its note frontmatter updated rather than a registry entry that would be discarded on the next read. If the note's frontmatter cannot be parsed, the notice tells you so and the file is left byte-for-byte as it was.
 
 Strength exercises can carry a weight unit of `kg` or `lbs`. Precedence is frontmatter first, then the registry entry, then `kg`. The unit only changes labels; there is no numeric conversion. A registry entry can also record 'no unit chosen', which is distinct from an explicit `kg`, so opening an entry to add an alias does not stamp a unit onto it.
+
+A bodyweight exercise climbs a `levels:` ladder, named rung by rung in the author's order. The ladder normally lives on the exercise note, see [Note format](note-format.md#exercise-notes); an exercise with no note of its own carries it on its registry entry instead. Where both exist and disagree, the note wins and the disagreement is reported under [Diagnostics](#diagnostics).
 
 ## Deleting
 
@@ -80,6 +82,6 @@ Adding a tombstoned exercise back through the editor's `Add exercise` prompt cle
 
 ## Diagnostics
 
-`Show exercise registry diagnostics` reports two inconsistencies from the current vault state: an exercise note missing a valid `kind:`, and a registry entry whose kind disagrees with its note (where the note wins). It says nothing when both are clean.
+`Show exercise registry diagnostics` reports inconsistencies from the current vault state: an exercise note missing a valid `kind:` or carrying an unusable `levels:` list, and a registry entry whose kind or ladder disagrees with its note (where the note wins). It says nothing when all are clean.
 
-`Sync and repair exercise notes` is the fixer for the note side, refreshing frontmatter, chart blocks, `Recent sessions`, and headings in existing notes without overwriting a unit you set by hand.
+`Sync and repair exercise notes` is the fixer for the note side, refreshing frontmatter, chart blocks, `Recent sessions`, and headings in existing notes without overwriting a unit you set by hand. On a bodyweight note that means seeding a missing `levels:` ladder and dropping `metric:` and `unit:` lines, which only belong to strength notes.

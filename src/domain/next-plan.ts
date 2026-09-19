@@ -18,8 +18,8 @@ const DIRECTIONS: ReadonlySet<string> = new Set<NextPlanDirection>(['up', 'down'
 
 /**
  * Read a `[next:: ...]` value. Anything that does not start with a known
- * direction is ignored rather than reported, so hand-written notes with other
- * wording pass through untouched.
+ * direction is ignored rather than reported, which means it is also dropped
+ * the next time the note is saved.
  */
 export function parseNextPlan(value: string | undefined): NextPlan | null {
   if (value === undefined) {

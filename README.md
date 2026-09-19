@@ -1,6 +1,6 @@
 # FitKit
 
-FitKit is a workout tracker for Obsidian. Your sets, reps, weight, and durations are stored as plain Markdown in your vault, edited through a form built for use during workouts, with a rolled-up dashboard and per-exercise progression charts when you need it.
+FitKit is a workout tracker for Obsidian. Your sets, reps, weight, durations, and bodyweight rungs are stored as plain Markdown in your vault, edited through a form built for use during workouts, with a rolled-up dashboard and per-exercise progression charts when you need it.
 
 Every workout is a normal note with Dataview inline fields. If you uninstall FitKit tomorrow, your training history is still plain text in your vault. You choose where to store the notes and how you use your data.
 
@@ -26,7 +26,7 @@ The defaults are designed so you can log a workout the moment FitKit is enabled.
 
 1. Run `Open today's workout` from the command palette. FitKit creates today's note under `Fitness/Workouts/` and opens it in the editor.
 2. Add an exercise. Type the name, for example `Squat`. If it is new, FitKit asks whether to create an exercise note for it; say yes for anything you want to chart and revisit later.
-3. Log your sets: weight and reps for a strength exercise, or a duration for a time-based one. Tap the rest timer between sets if you want it.
+3. Log your sets: weight and reps for a strength exercise, a duration for a time-based one, or a rung and reps for a bodyweight one. Tap the rest timer between sets if you want it.
 4. Before you move on, open the card menu and set a plan for next session: increase, keep, or decrease, with an optional weight step. It shows up as a badge on the card, and prefills the weight the next time that exercise comes around.
 
 That is it. The editor autosaves as you go, and the underlying Markdown stays readable:
@@ -42,6 +42,11 @@ name: Squat Day
 
 - [exercise:: [[Squat]]] [set:: 1] [weight:: 50] [reps:: 5]
 - [exercise:: [[Squat]]] [set:: 2] [weight:: 55] [reps:: 5]
+
+## [[Push Up]]
+
+- [exercise:: [[Push Up]]] [set:: 1] [level:: 2] [reps:: 8]
+- [exercise:: [[Push Up]]] [set:: 2] [level:: 2] [reps:: 6] [load:: 10]
 ```
 
 ## After a few sessions

@@ -45,11 +45,13 @@ type Frontmatter = Record<string, unknown>
 interface TestElementOptions {
   cls?: string
   text?: string
+  attr?: Record<string, string | number>
 }
 
 class TestElement {
   readonly children: TestElement[] = []
   readonly classes = new Set<string>()
+  attrs: Record<string, string | number> = {}
   textContent = ''
 
   constructor(readonly tagName: string) {}
@@ -64,12 +66,23 @@ class TestElement {
   }
 
   createDiv(options: TestElementOptions = {}): TestElement {
-    const child = new TestElement('div')
+    return this.append('div', options)
+  }
+
+  createSvg(tag: string, options: TestElementOptions = {}): TestElement {
+    return this.append(tag, options)
+  }
+
+  private append(tag: string, options: TestElementOptions): TestElement {
+    const child = new TestElement(tag)
     if (options.cls) {
       child.addClass(options.cls)
     }
     if (options.text !== undefined) {
       child.textContent = options.text
+    }
+    if (options.attr) {
+      child.attrs = { ...options.attr }
     }
     this.children.push(child)
     return child
@@ -137,6 +150,11 @@ function renderedSeries(): ChartSeries {
     throw new Error('Expected chart renderer to be called.')
   }
   return call[1] as ChartSeries
+}
+
+function renderedTexts(root: TestElement): string[] {
+  const own = root.textContent.length > 0 ? [root.textContent] : []
+  return [...own, ...root.children.flatMap((child) => renderedTexts(child))]
 }
 
 describe('exercise chart block rendering', () => {
@@ -311,5 +329,64 @@ describe('exercise chart block rendering', () => {
         "Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add 'kind: strength' or 'kind: duration' or 'kind: bodyweight' to be explicit.",
       ])
     }
+  })
+
+  it('renders the registry rung names on a bodyweight chart', async () => {
+    const actual = await vi.importActual<typeof import('../../src/ui/exercise-chart-svg')>(
+      '../../src/ui/exercise-chart-svg',
+    )
+    chartSvgMock.renderExerciseChartSvg.mockImplementationOnce(
+      (container: unknown, series: unknown, options: unknown) =>
+        actual.renderExerciseChartSvg(
+          container as HTMLElement,
+          series as ChartSeries,
+          options as { notes?: string[] },
+        ),
+    )
+    const plugin = createPlugin(
+      [],
+      new Map(),
+      createSettings({
+        exerciseRegistry: [
+          {
+            name: 'Push-Up',
+            kind: 'bodyweight',
+            aliases: [],
+            levels: ['Wall push-up', 'Knee push-up'],
+          },
+        ],
+      }),
+    )
+    plugin.cachedIndex = {
+      schemaVersion: 1,
+      builtAt: 0,
+      diagnostics: [],
+      entries: [
+        {
+          path: 'Fitness/Workouts/2026-04-01.md',
+          mtime: 1,
+          date: '2026-04-01',
+          name: 'Workout',
+          exercises: [
+            {
+              exerciseName: 'Push-Up',
+              kind: 'bodyweight',
+              maxBodyweightSet: { level: 2, reps: 8, load: 0 },
+              totalSets: 1,
+            },
+          ],
+        },
+      ],
+    }
+    const el = new TestElement('div')
+
+    await renderExerciseChartBlock(
+      plugin,
+      'exercise: Push-Up\nkind: bodyweight',
+      el as unknown as HTMLElement,
+      createContext('Fitness/Dashboard.md'),
+    )
+
+    expect(renderedTexts(el)).toContain('Knee push-up')
   })
 })

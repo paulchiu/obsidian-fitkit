@@ -1,3 +1,4 @@
+import { bodyweightLevelName, type BodyweightLadder } from '../domain/bodyweight-levels'
 import { niceRange, pickXTickIndices, type ChartSeries } from '../domain/exercise-chart'
 
 const VIEW_WIDTH = 800
@@ -6,12 +7,36 @@ const MARGIN_LEFT = 56
 const MARGIN_RIGHT = 16
 const MARGIN_TOP = 16
 const MARGIN_BOTTOM = 44
-const PLOT_WIDTH = VIEW_WIDTH - MARGIN_LEFT - MARGIN_RIGHT
 const PLOT_HEIGHT = VIEW_HEIGHT - MARGIN_TOP - MARGIN_BOTTOM
 const Y_TICKS = 4
+/** Level labels are words, so their axis takes a wider margin than a numeric one; the plot narrows to pay for it. */
+const LEVEL_MARGIN_LEFT = 140
+/** Level axes reuse the numeric axis label budget, so long ladders thin to the same count. */
+const MAX_LEVEL_TICKS = Y_TICKS + 1
+/** Rung-name characters a level label shows before shortening. SVG has no measuring path, so a fixed budget stands in for the widened margin. */
+const LEVEL_LABEL_MAX_CHARS = 20
+
+/** Shorten a rung name past the axis budget, keeping the distinguishing start and marking the cut. */
+function shortenLevelLabel(name: string): string {
+  if (name.length <= LEVEL_LABEL_MAX_CHARS) {
+    return name
+  }
+  return `${name.slice(0, LEVEL_LABEL_MAX_CHARS - 1)}…`
+}
+
+/** Left margin for a series: rung names need words of room, numbers do not. */
+function marginLeft(series: ChartSeries): number {
+  return series.metric === 'level' ? LEVEL_MARGIN_LEFT : MARGIN_LEFT
+}
+
+/** Plot width for a series, narrowing as its left margin widens. */
+function plotWidth(series: ChartSeries): number {
+  return VIEW_WIDTH - marginLeft(series) - MARGIN_RIGHT
+}
 
 export interface RenderChartOptions {
   notes?: string[]
+  ladder?: BodyweightLadder
 }
 
 export function renderExerciseChartSvg(
@@ -48,12 +73,12 @@ export function renderExerciseChartSvg(
 
   const values = series.points.map((point) => point.value)
   const range = niceRange(values)
-  drawGrid(svg, range)
-  drawAxes(svg)
+  drawGrid(svg, range, series)
+  drawAxes(svg, series)
   drawMetricLabel(svg, series)
-  drawYLabels(svg, range, series)
+  drawYLabels(svg, range, series, options.ladder)
   drawXLabels(svg, series)
-  drawSeries(svg, series, range)
+  drawSeries(svg, series, range, options.ladder)
 }
 
 function buildTitle(series: ChartSeries): string {
@@ -71,29 +96,48 @@ function emptyMessage(series: ChartSeries): string {
   return `No ${series.kind} sessions found for this exercise yet.`
 }
 
-function drawGrid(svg: SVGSVGElement, range: { min: number; max: number }): void {
+/** Gridlines sit on the labelled ticks: whole rungs for a level axis, even fractions otherwise. */
+function drawGrid(
+  svg: SVGSVGElement,
+  range: { min: number; max: number },
+  series: ChartSeries,
+): void {
+  if (series.metric === 'level') {
+    for (const level of pickLevelTickLevels(range, series)) {
+      const y = computeY(level, range)
+      svg.createSvg('line', {
+        cls: 'fitkit-chart-grid',
+        attr: {
+          x1: marginLeft(series),
+          x2: marginLeft(series) + plotWidth(series),
+          y1: y,
+          y2: y,
+        },
+      })
+    }
+    return
+  }
   for (let tick = 0; tick <= Y_TICKS; tick++) {
     const ratio = tick / Y_TICKS
     const y = MARGIN_TOP + (1 - ratio) * PLOT_HEIGHT
     svg.createSvg('line', {
       cls: 'fitkit-chart-grid',
       attr: {
-        x1: MARGIN_LEFT,
-        x2: MARGIN_LEFT + PLOT_WIDTH,
+        x1: marginLeft(series),
+        x2: marginLeft(series) + plotWidth(series),
         y1: y,
         y2: y,
       },
     })
   }
-  void range
 }
 
-function drawAxes(svg: SVGSVGElement): void {
+function drawAxes(svg: SVGSVGElement, series: ChartSeries): void {
   svg.createSvg('line', {
     cls: 'fitkit-chart-axis',
     attr: {
-      x1: MARGIN_LEFT,
-      x2: MARGIN_LEFT,
+      x1: marginLeft(series),
+      x2: marginLeft(series),
       y1: MARGIN_TOP,
       y2: MARGIN_TOP + PLOT_HEIGHT,
     },
@@ -101,8 +145,8 @@ function drawAxes(svg: SVGSVGElement): void {
   svg.createSvg('line', {
     cls: 'fitkit-chart-axis',
     attr: {
-      x1: MARGIN_LEFT,
-      x2: MARGIN_LEFT + PLOT_WIDTH,
+      x1: marginLeft(series),
+      x2: marginLeft(series) + plotWidth(series),
       y1: MARGIN_TOP + PLOT_HEIGHT,
       y2: MARGIN_TOP + PLOT_HEIGHT,
     },
@@ -113,7 +157,12 @@ function drawYLabels(
   svg: SVGSVGElement,
   range: { min: number; max: number },
   series: ChartSeries,
+  ladder: BodyweightLadder | undefined,
 ): void {
+  if (series.metric === 'level') {
+    drawLevelYLabels(svg, range, series, ladder)
+    return
+  }
   for (let tick = 0; tick <= Y_TICKS; tick++) {
     const ratio = tick / Y_TICKS
     const value = range.min + (range.max - range.min) * ratio
@@ -121,13 +170,85 @@ function drawYLabels(
     const label = svg.createSvg('text', {
       cls: 'fitkit-chart-axis-label',
       attr: {
-        x: MARGIN_LEFT - 8,
+        x: marginLeft(series) - 8,
         y: y + 4,
         'text-anchor': 'end',
       },
     })
-    label.textContent = formatChartValue(value, series)
+    label.textContent = formatChartValue(value, series, undefined)
   }
+}
+
+/**
+ * Integer rung ticks for a level axis. Rungs are 1-based, so the axis never
+ * labels a rung zero; a span longer than the label budget keeps its ends
+ * and the rungs the series visits, thinned evenly.
+ */
+function drawLevelYLabels(
+  svg: SVGSVGElement,
+  range: { min: number; max: number },
+  series: ChartSeries,
+  ladder: BodyweightLadder | undefined,
+): void {
+  for (const level of pickLevelTickLevels(range, series)) {
+    const y = computeY(level, range)
+    const fullName = bodyweightLevelName(ladder, level)
+    const label = svg.createSvg('text', {
+      cls: 'fitkit-chart-axis-label',
+      attr: {
+        x: marginLeft(series) - 8,
+        y: y + 4,
+        'text-anchor': 'end',
+      },
+    })
+    label.textContent = shortenLevelLabel(fullName)
+    if (label.textContent !== fullName) {
+      label.createSvg('title').textContent = fullName
+    }
+  }
+}
+
+/**
+ * Rungs a level axis labels: every rung spanned while the span fits the
+ * budget, otherwise the span ends plus the rungs the series visits.
+ */
+function pickLevelTickLevels(range: { min: number; max: number }, series: ChartSeries): number[] {
+  const low = Math.max(1, Math.ceil(range.min))
+  const high = Math.floor(range.max)
+  if (high <= low) {
+    return [low]
+  }
+  const spanned: number[] = []
+  for (let level = low; level <= high; level++) {
+    spanned.push(level)
+  }
+  if (spanned.length <= MAX_LEVEL_TICKS) {
+    return spanned
+  }
+  const visited = new Set<number>([low, high])
+  for (const point of series.points) {
+    if (Number.isInteger(point.value) && point.value >= low && point.value <= high) {
+      visited.add(point.value)
+    }
+  }
+  return thinTicksToBudget([...visited].sort((left, right) => left - right))
+}
+
+/**
+ * Evenly thin an ordered tick list to the label budget, keeping the first
+ * and last tick so the axis still spans its band.
+ */
+function thinTicksToBudget(ordered: number[]): number[] {
+  if (ordered.length <= MAX_LEVEL_TICKS) {
+    return ordered
+  }
+  const stride = Math.max(1, Math.ceil((ordered.length - 1) / (MAX_LEVEL_TICKS - 1)))
+  const thinned = ordered.filter((_level, index) => index % stride === 0)
+  const last = ordered[ordered.length - 1] as number
+  if (thinned[thinned.length - 1] !== last) {
+    thinned.push(last)
+  }
+  return thinned
 }
 
 function drawMetricLabel(svg: SVGSVGElement, series: ChartSeries): void {
@@ -138,7 +259,7 @@ function drawMetricLabel(svg: SVGSVGElement, series: ChartSeries): void {
   const title = svg.createSvg('text', {
     cls: 'fitkit-chart-axis-label',
     attr: {
-      x: MARGIN_LEFT,
+      x: marginLeft(series),
       y: MARGIN_TOP - 4,
       'text-anchor': 'start',
     },
@@ -154,7 +275,7 @@ function drawXLabels(svg: SVGSVGElement, series: ChartSeries): void {
     if (!point) {
       continue
     }
-    const x = computeX(index, series.points.length)
+    const x = computeX(index, series.points.length, series)
     const label = svg.createSvg('text', {
       cls: 'fitkit-chart-axis-label',
       attr: {
@@ -171,20 +292,22 @@ function drawSeries(
   svg: SVGSVGElement,
   series: ChartSeries,
   range: { min: number; max: number },
+  ladder: BodyweightLadder | undefined,
 ): void {
   const points = series.points
   const coords = points.map((point, index) => {
-    const x = computeX(index, points.length)
+    const x = computeX(index, points.length, series)
     const y = computeY(point.value, range)
     return { x, y, point }
   })
 
   if (coords.length > 1) {
-    const polylinePoints = coords.map(({ x, y }) => `${x},${y}`).join(' ')
+    const linePoints =
+      series.metric === 'level' ? stepLinePoints(coords) : coords.map(({ x, y }) => `${x},${y}`)
     svg.createSvg('polyline', {
       cls: 'fitkit-chart-line',
       attr: {
-        points: polylinePoints,
+        points: linePoints.join(' '),
         fill: 'none',
       },
     })
@@ -200,16 +323,36 @@ function drawSeries(
       },
     })
     const titleEl = dot.createSvg('title')
-    titleEl.textContent = formatChartTooltip(point.date, point.value, series)
+    titleEl.textContent = formatChartTooltip(point.date, point.value, series, ladder)
   }
 }
 
-function computeX(index: number, count: number): number {
+/**
+ * Step path for a level series: a rung holds until the next session, so the
+ * line runs horizontally to the next date before changing vertically.
+ */
+function stepLinePoints(coords: ReadonlyArray<{ x: number; y: number }>): string[] {
+  const first = coords[0]
+  if (!first) {
+    return []
+  }
+  const stepped = [`${first.x},${first.y}`]
+  for (let index = 1; index < coords.length; index++) {
+    const previous = coords[index - 1] as { x: number; y: number }
+    const current = coords[index] as { x: number; y: number }
+    stepped.push(`${current.x},${previous.y}`, `${current.x},${current.y}`)
+  }
+  return stepped
+}
+
+function computeX(index: number, count: number, series: ChartSeries): number {
+  const left = marginLeft(series)
+  const width = plotWidth(series)
   if (count <= 1) {
-    return MARGIN_LEFT + PLOT_WIDTH / 2
+    return left + width / 2
   }
   const ratio = index / (count - 1)
-  return MARGIN_LEFT + ratio * PLOT_WIDTH
+  return left + ratio * width
 }
 
 function computeY(value: number, range: { min: number; max: number }): number {
@@ -219,11 +362,17 @@ function computeY(value: number, range: { min: number; max: number }): number {
   return MARGIN_TOP + (1 - ratio) * PLOT_HEIGHT
 }
 
-export function formatChartTooltip(date: string, value: number, series: ChartSeries): string {
+/** Tooltip for a dot: a level names its rung, every other metric formats its value. */
+export function formatChartTooltip(
+  date: string,
+  value: number,
+  series: ChartSeries,
+  ladder: BodyweightLadder | undefined,
+): string {
   if (series.metric === 'e1rm') {
-    return `${date}: e1rm ${formatChartValue(value, series)}`
+    return `${date}: e1rm ${formatChartValue(value, series, ladder)}`
   }
-  return `${date}: ${formatChartValue(value, series)}`
+  return `${date}: ${formatChartValue(value, series, ladder)}`
 }
 
 export function chartYAxisTitle(series: ChartSeries): string | null {
@@ -236,10 +385,24 @@ export function chartYAxisTitle(series: ChartSeries): string | null {
   if (series.metric === 'reps') {
     return 'reps'
   }
+  if (series.metric === 'level') {
+    return 'level'
+  }
   return null
 }
 
-export function formatChartValue(value: number, series: ChartSeries): string {
+/**
+ * Value text for axes and tooltips. A level names its rung (the axis point
+ * is the rung name, so the tooltip matches it) rather than a duration.
+ */
+export function formatChartValue(
+  value: number,
+  series: ChartSeries,
+  ladder: BodyweightLadder | undefined,
+): string {
+  if (series.metric === 'level') {
+    return bodyweightLevelName(ladder, value)
+  }
   if (series.metric === 'e1rm') {
     return `${value.toFixed(1)}${series.unit}`
   }

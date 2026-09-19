@@ -31,6 +31,8 @@ For a strength exercise, FitKit picks the best set in three tiers:
 
 Estimates use Epley, `weight * (1 + reps / 30)`. Sets with zero or blank reps are ignored, and a blank weight with completed reps counts as bodyweight.
 
+For a bodyweight exercise, the PB line is the rung reached and the reps at it (`Push-up x 8`), or the bare rung name when no reps were logged. Rungs outrank everything, then reps, then added load, so a higher rung always wins and load only breaks ties; load itself is not shown.
+
 The PB line shows the actual set, with the estimate in brackets when the exercise's metric is `e1rm`: `50kg x 5 (e1rm 58.3kg)`. The `PB` badge in the workout editor is a plainer measure, the heaviest weight lifted, and never an estimate.
 
 ## Chart blocks
@@ -45,21 +47,29 @@ window: 30
 
 Recognised keys:
 
-| Key                | Values                 | Default                                       |
-| ------------------ | ---------------------- | --------------------------------------------- |
-| `exercise`, `name` | Exercise name          | Taken from the note's filename                |
-| `kind`             | `strength`, `duration` | Taken from the exercise's registered kind     |
-| `metric`           | `e1rm`, `weight`       | The note's `metric:` frontmatter, then `e1rm` |
-| `window`           | 1 to 365               | The `Chart sessions` setting, default 30      |
+| Key                | Values                               | Default                                                                       |
+| ------------------ | ------------------------------------ | ----------------------------------------------------------------------------- |
+| `exercise`, `name` | Exercise name                        | Taken from the note's filename                                                |
+| `kind`             | `strength`, `duration`, `bodyweight` | Taken from the exercise's registered kind                                     |
+| `metric`           | `e1rm`, `weight`, `level`, `reps`    | Strength: the note's `metric:` frontmatter, then `e1rm`. Bodyweight: `level`. |
+| `window`           | 1 to 365                             | The `Chart sessions` setting, default 30                                      |
 
 Blank lines and `#` comment lines are skipped. An unreadable `metric` or `window` value falls back to the default and says so under the chart rather than failing.
 
-`metric` applies to strength exercises only. Duration exercises always plot total seconds. Setting `metric: e1rm` plots the Epley estimate, which smooths out a session where you went heavier for fewer reps; `metric: weight` plots the top-set weight, which is what you lifted.
+`metric` is per kind. Strength accepts `e1rm` or `weight`. Bodyweight accepts `level` or `reps` and defaults to `level`. Duration exercises always plot total seconds and take no metric. On a strength or bodyweight chart, a metric belonging to another kind is ignored with a note under the chart, and the default is plotted instead. Setting `metric: e1rm` plots the Epley estimate, which smooths out a session where you went heavier for fewer reps; `metric: weight` plots the top-set weight, which is what you lifted. On a bodyweight chart, `metric: reps` plots the reps at the session's highest rung, not the most reps at any rung.
+
+```fitkit-chart
+exercise: Push Up
+metric: level
+window: 30
+```
+
+A level series draws as a step line, holding each rung until the next session, with rung names on the vertical axis. A rung the ladder no longer names is labelled `Level N`.
 
 ## Recent sessions
 
 ![Exercise note with a progression chart and a Recent sessions table](images/exercise-note.png)
 
-Under `## Recent sessions`, FitKit writes a Dataview query that pulls that exercise's rows out of your workout notes: the last ten sets for a strength exercise, or the last twelve entries for a duration one. There is a matching query behind `## Notes` that collects the per-set notes you wrote.
+Under `## Recent sessions`, FitKit writes a Dataview query that pulls that exercise's rows out of your workout notes: the last ten sets for a strength or bodyweight exercise (Level, Reps, and Load columns for bodyweight), or the last twelve entries for a duration one. There is a matching query behind `## Notes` that collects the per-set notes you wrote.
 
 Both are ordinary Dataview blocks. Customise one and `Sync and repair exercise notes` leaves your version in place and reports it rather than overwriting, unless it still points at a name the exercise no longer uses.
