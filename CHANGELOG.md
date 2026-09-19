@@ -9,9 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Progress charts can now plot a bodyweight exercise. `metric: level` charts the rung reached each session and `metric: reps` charts the reps at it, with `level` the default. A level series is drawn as a step line, since a rung holds until it changes rather than sliding between rungs, and its vertical axis is labelled with rung names taken from the ladder rather than bare numbers.
+- The dashboard reports a bodyweight personal best as the rung reached and the reps at it, ranked by rung, then reps, then load, and its recent-sessions query lists level, reps and load alongside the queries for the other two kinds.
+- The documentation covers the bodyweight kind: its set fields, its `levels:` ladder, where that ladder lives, and how the editor, the charts and the dashboard present it.
+
 ### Changed
 
 ### Fixed
+
+- A chart metric belonging to another kind is now rejected and reported, rather than being trusted on an exercise it does not suit. A rung a ladder no longer names falls back to `Level N`, so renaming or shortening a ladder leaves earlier sessions plotting.
 
 ### Removed
 
