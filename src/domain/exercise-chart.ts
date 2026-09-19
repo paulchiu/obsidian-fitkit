@@ -1,5 +1,4 @@
 import { epleyE1rm } from './epley'
-import { assertUnreachableKind } from './exercise-kind'
 import { DEFAULT_EXERCISE_METRIC, type ExerciseMetric } from './exercise-metric'
 import {
   normalize,
@@ -77,8 +76,6 @@ function defaultSeriesMetric(kind: ExerciseKind, metric: ExerciseMetric): ChartS
       return 'duration'
     case 'strength':
       return metric
-    default:
-      return assertUnreachableKind(kind)
   }
 }
 
@@ -158,8 +155,6 @@ function pickMetric(
       return pickDurationMetric(row)
     case 'strength':
       return pickStrengthMetric(row, metric)
-    default:
-      return assertUnreachableKind(kind)
   }
 }
 

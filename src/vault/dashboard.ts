@@ -296,7 +296,7 @@ function isMarkdownFile(file: TAbstractFile | null): file is TFile {
 }
 
 function pickDashboardSet(row: ExerciseIndexRow, metric: ExerciseMetric): StrengthPbSet | null {
-  // Strength-only statistic: other kinds contribute nothing until they define their own.
+  /** Strength-only statistic: other kinds contribute nothing until they define their own. */
   if (row.kind !== 'strength') {
     return null
   }
@@ -367,7 +367,7 @@ function buildExerciseMetricMap(
 
   for (const entry of index.entries) {
     for (const row of entry.exercises) {
-      // Strength-only statistic: other kinds contribute nothing until they define their own.
+      /** Strength-only statistic: other kinds contribute nothing until they define their own. */
       if (row.kind !== 'strength' || metrics.has(row.exerciseName)) {
         continue
       }
@@ -385,7 +385,7 @@ function readExerciseNoteMetrics(app: App, settings: FitKitSettings): Map<string
     const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter
     const type = readFrontmatterField(frontmatter, 'type')
     const kind = readFrontmatterField(frontmatter, 'kind')
-    // Strength-only statistic read from frontmatter; other kinds contribute nothing.
+    /** Strength-only statistic read from frontmatter; other kinds contribute nothing. */
     if (
       typeof type !== 'string' ||
       type.toLowerCase().trim() !== 'exercise' ||
@@ -432,7 +432,7 @@ function buildExerciseUnitMap(
 
   for (const entry of index.entries) {
     for (const row of entry.exercises) {
-      // Strength-only statistic: other kinds contribute nothing until they define their own.
+      /** Strength-only statistic: other kinds contribute nothing until they define their own. */
       if (row.kind !== 'strength' || units.has(row.exerciseName)) {
         continue
       }
@@ -450,7 +450,7 @@ function readExerciseNoteUnits(app: App, settings: FitKitSettings): Map<string, 
     const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter
     const type = readFrontmatterField(frontmatter, 'type')
     const kind = readFrontmatterField(frontmatter, 'kind')
-    // Strength-only statistic read from frontmatter; other kinds contribute nothing.
+    /** Strength-only statistic read from frontmatter; other kinds contribute nothing. */
     if (
       typeof type !== 'string' ||
       type.toLowerCase().trim() !== 'exercise' ||

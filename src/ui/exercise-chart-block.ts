@@ -190,19 +190,9 @@ function isExerciseSourceFile(file: TFile | null, plugin: FitKitPlugin): boolean
   return typeof typeValue === 'string' && typeValue.toLowerCase() === 'exercise'
 }
 
-/**
- * Advice fragment naming every known kind, so the note text cannot drift from
- * `EXERCISE_KINDS`. Reads `'kind: strength' or 'kind: duration'` at two kinds
- * and takes the Oxford comma at three and beyond.
- */
+/** Advice fragment naming every known kind, so the note text cannot drift from `EXERCISE_KINDS`. */
 function formatKindOptions(): string {
-  const options = EXERCISE_KINDS.map((kind) => `'kind: ${kind}'`)
-  if (options.length <= 2) {
-    return options.join(' or ')
-  }
-  const leading = options.slice(0, -1).join(', ')
-  const trailing = options.slice(-1).join('')
-  return `${leading}, or ${trailing}`
+  return EXERCISE_KINDS.map((kind) => `'kind: ${kind}'`).join(' or ')
 }
 
 function kindFromFrontmatter(

@@ -81,6 +81,7 @@ function isExerciseFrontmatter(frontmatter: CachedMetadata['frontmatter'] | unde
   return typeof type === 'string' && type.trim().toLowerCase() === 'exercise'
 }
 
+/** Strength-only rule: only strength notes carry a unit; other kinds have none. */
 function unitFromFrontmatter(
   frontmatter: CachedMetadata['frontmatter'] | undefined,
   kind: ExerciseKind,

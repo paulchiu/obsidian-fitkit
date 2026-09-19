@@ -72,13 +72,14 @@ export function withNoteAndNext<T extends ExerciseEntry>(
   note: string | undefined,
   next: NextPlan | undefined,
 ): T {
+  const result: T = { ...entry }
   if (note !== undefined) {
-    entry.note = note
+    result.note = note
   }
   if (next !== undefined) {
-    entry.next = next
+    result.next = next
   }
-  return entry
+  return result
 }
 
 export interface PreserveBlock {

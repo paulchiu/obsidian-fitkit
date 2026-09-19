@@ -167,8 +167,6 @@ function exerciseCountText(exercise: ExerciseEntry): string {
       return exercise.durationEntries.length === 1
         ? '1 row'
         : `${exercise.durationEntries.length} rows`
-    default:
-      return assertUnreachableKind(exercise)
   }
 }
 

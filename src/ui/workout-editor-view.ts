@@ -1965,40 +1965,27 @@ function toEditorWorkoutModel(
 }
 
 export function toEditorExercise(exercise: ExerciseEntry): ExerciseCard {
-  switch (exercise.kind) {
-    case 'strength': {
-      const card: ExerciseCard = {
-        name: exercise.exerciseName,
-        kind: exercise.kind,
-        strengthSets: exercise.strengthSets.map(toEditorStrengthSet),
-        durationEntries: [],
-      }
-      if (exercise.note !== undefined) {
-        card.exerciseNotes = exercise.note
-      }
-      if (exercise.next !== undefined) {
-        card.next = exercise.next
-      }
-      return card
-    }
-    case 'duration': {
-      const card: ExerciseCard = {
-        name: exercise.exerciseName,
-        kind: exercise.kind,
-        strengthSets: [],
-        durationEntries: exercise.durationEntries.map(toEditorDurationEntry),
-      }
-      if (exercise.note !== undefined) {
-        card.exerciseNotes = exercise.note
-      }
-      if (exercise.next !== undefined) {
-        card.next = exercise.next
-      }
-      return card
-    }
-    default:
-      return assertUnreachableKind(exercise)
+  const card: ExerciseCard =
+    exercise.kind === 'strength'
+      ? {
+          name: exercise.exerciseName,
+          kind: exercise.kind,
+          strengthSets: exercise.strengthSets.map(toEditorStrengthSet),
+          durationEntries: [],
+        }
+      : {
+          name: exercise.exerciseName,
+          kind: exercise.kind,
+          strengthSets: [],
+          durationEntries: exercise.durationEntries.map(toEditorDurationEntry),
+        }
+  if (exercise.note !== undefined) {
+    card.exerciseNotes = exercise.note
   }
+  if (exercise.next !== undefined) {
+    card.next = exercise.next
+  }
+  return card
 }
 
 function buildNextPlan(direction: NextPlanDirection, step: number | undefined): NextPlan {
@@ -2065,8 +2052,6 @@ export function toWorkoutExercise(card: ExerciseCard): ExerciseEntry {
       }
       return withNoteAndNext(entry, note, next)
     }
-    default:
-      return assertUnreachableKind(card.kind)
   }
 }
 

@@ -1,5 +1,4 @@
 import type { ExerciseKind } from './workout-note-model'
-import { assertUnreachableKind } from './exercise-kind'
 import { formatDurationInput } from './duration-input'
 import { pickHeaviestSet } from './epley'
 import { formatNextPlanLabel, nextPlanTargetWeight, type NextPlan } from './next-plan'
@@ -132,8 +131,6 @@ export function formatExerciseHistoryBadges(
           : null,
       ].filter((badge): badge is ExerciseHistoryBadge => badge !== null)
     }
-    default:
-      return assertUnreachableKind(kind)
   }
 }
 

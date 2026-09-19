@@ -1,7 +1,6 @@
 import type { App, TAbstractFile, TFile } from 'obsidian'
 
 import { pickBestSet, pickHeaviestSet } from '../domain/epley'
-import { assertUnreachableKind } from '../domain/exercise-kind'
 import type { ExerciseIndexRow, FitKitIndex, IndexDiagnostic, IndexEntry } from '../domain/types'
 import {
   parseWorkoutNote,
@@ -122,8 +121,6 @@ function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
         totalSets: exercise.strengthSets.length,
         next: exercise.next,
       }
-    default:
-      return assertUnreachableKind(exercise)
   }
 }
 

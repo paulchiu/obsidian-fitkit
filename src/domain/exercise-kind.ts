@@ -8,8 +8,16 @@ export const EXERCISE_KIND_LABELS: Record<ExerciseKind, string> = {
 }
 
 /** Exhaustiveness guard: a new `EXERCISE_KINDS` member makes every caller stop compiling. */
-export function assertUnreachableKind(kind: never): never {
-  throw new Error(`Unhandled exercise kind: ${String(kind)}`)
+export function assertUnreachableKind(value: never): never {
+  throw new Error(`Unhandled exercise kind: ${describeUnreachableKind(value)}`)
+}
+
+/** Best-effort runtime description: callers pass either the kind or the entry carrying it. */
+function describeUnreachableKind(value: never): string {
+  if (typeof value === 'object' && value !== null && 'kind' in value) {
+    return String((value as { kind: unknown }).kind)
+  }
+  return String(value)
 }
 
 export function parseExerciseKind(value: unknown): ExerciseKind | null {
