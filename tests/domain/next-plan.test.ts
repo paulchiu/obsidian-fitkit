@@ -80,6 +80,17 @@ describe('next plan targets', () => {
     expect(nextPlanTargetWeight({ direction: 'down', step: 5 }, 2.5)).toBe(0)
   })
 
+  it('rounds a fractional step to the nearest rung', () => {
+    expect(nextPlanTargetLevel({ direction: 'up', step: 2.5 }, 1, 5)).toBe(4)
+    expect(nextPlanTargetLevel({ direction: 'down', step: 2.5 }, 5, 5)).toBe(3)
+  })
+
+  it('clamps a hold to the ends of the ladder', () => {
+    expect(nextPlanTargetLevel({ direction: 'stay' }, 0, 5)).toBe(1)
+    expect(nextPlanTargetLevel({ direction: 'stay' }, 9, 5)).toBe(5)
+    expect(nextPlanTargetLevel({ direction: 'stay' }, 2.5, 5)).toBe(3)
+  })
+
   it('moves a bodyweight plan by rungs and clamps to the ends of the ladder', () => {
     expect(nextPlanTargetLevel({ direction: 'up', step: 1 }, 4, 5)).toBe(5)
     expect(nextPlanTargetLevel({ direction: 'up', step: 2 }, 5, 5)).toBe(5)

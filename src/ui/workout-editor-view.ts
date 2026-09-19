@@ -258,9 +258,22 @@ export class WorkoutEditorView extends ItemView {
   }
 
   private updateNarrowState(): void {
-    this.contentEl.classList.toggle('is-narrow', this.contentEl.clientWidth < 600)
-    this.contentEl.classList.toggle('is-compact', this.contentEl.clientWidth < 360)
+    this.setNarrowState(this.contentEl.clientWidth < 600, this.contentEl.clientWidth < 360)
     this.refreshLevelLabels()
+  }
+
+  /** Narrow state through the Obsidian class helpers so the test realm can observe it. */
+  private setNarrowState(narrow: boolean, compact: boolean): void {
+    if (narrow) {
+      this.contentEl.addClass('is-narrow')
+    } else {
+      this.contentEl.removeClass('is-narrow')
+    }
+    if (compact) {
+      this.contentEl.addClass('is-compact')
+    } else {
+      this.contentEl.removeClass('is-compact')
+    }
   }
 
   /**
@@ -827,11 +840,19 @@ export class WorkoutEditorView extends ItemView {
   }
 
   /**
-   * Shorten a rung name that overflows its level cell. Only the width
-   * comparison is unit-tested; measured widths are zero in the test realm.
+   * Shorten a rung name that overflows its own text slot. An applied
+   * shortening hides the measured span, so refitting never re-measures a
+   * shortened label; otherwise every resize tick would flip it back.
    */
-  private fitLevelLabel(label: HTMLElement, full: HTMLElement): void {
-    if (shouldShortenLevelLabel(label.clientWidth, full.scrollWidth)) {
+  private fitLevelLabel(
+    label: HTMLElement,
+    full: HTMLElement,
+    widths: LevelLabelWidths = measureLevelLabelWidths(full),
+  ): void {
+    if (label.hasClass('is-label-short')) {
+      return
+    }
+    if (shouldShortenLevelLabel(widths.available, widths.content)) {
       label.addClass('is-label-short')
     } else {
       label.removeClass('is-label-short')
@@ -1018,16 +1039,13 @@ export class WorkoutEditorView extends ItemView {
   }
 
   private confirmLadderChanges(name: string, changes: BodyweightLadderChange[]): Promise<boolean> {
-    const lines = changes.map(
-      (change) =>
-        `Level ${change.level} currently means '${change.from}' and would come to mean '${change.to}'.`,
-    )
+    const warning = formatLadderChangesWarning(name, changes)
     return new Promise((resolve) => {
       new ConfirmModal(
         this.app,
         {
-          title: `Change what logged levels mean for ${name}?`,
-          message: `This edit changes what some already-logged levels mean. ${lines.join(' ')} Logged sets keep their numbers.`,
+          title: warning.title,
+          message: warning.message,
           confirmText: 'Apply edit',
           cancelText: 'Cancel',
         },
@@ -1092,6 +1110,7 @@ export class WorkoutEditorView extends ItemView {
       if (result?.changed) {
         new Notice(`Exercise note now records levels for ${trimmed}.`)
       }
+      this.render()
       return
     }
     const settings = this.plugin.settings
@@ -1358,7 +1377,10 @@ export class WorkoutEditorView extends ItemView {
       await this.persistKindChange(ex.name, nextKind)
     }
     if (nextKind === 'bodyweight' && relabelSource) {
-      await this.seedBodyweightLadder(ex)
+      /** Workout-only leaves durable stores alone: a ladder seeded into a note whose kind was not switched would be unreadable, and a registry entry would leak past the chosen scope. */
+      if (choice === 'workout-and-registry') {
+        await this.seedBodyweightLadder(ex)
+      }
       await this.offerFirstLevelRelabel(index, relabelSource)
     }
   }
@@ -2164,8 +2186,17 @@ export class WorkoutEditorView extends ItemView {
       if (!confirmed) {
         return
       }
+      /** Captured before the switch clears the card, mirroring the card menu path. */
+      const relabelSource = nextKind === 'bodyweight' ? toWorkoutExercise(target) : null
       target.name = trimmed
       this.applyKindSwitch(index, nextKind, hadRows)
+      if (nextKind === 'bodyweight' && relabelSource) {
+        const switched = this.model.exercises[index]
+        if (switched) {
+          await this.seedBodyweightLadder(switched)
+        }
+        await this.offerFirstLevelRelabel(index, relabelSource)
+      }
       return
     }
     target.name = trimmed
@@ -2356,6 +2387,21 @@ class UnknownExerciseModal extends Modal {
     this.contentEl.empty()
     this.onChoice(this.choice)
   }
+}
+
+/**
+ * Widths behind a rung label decision: the text slot against its content.
+ * A separate function so tests can observe the measuring path; element
+ * widths read zero in the test realm unless the test sets them.
+ */
+export interface LevelLabelWidths {
+  available: number
+  content: number
+}
+
+/** The text span against its own slot, never the padded button around it. */
+export function measureLevelLabelWidths(full: HTMLElement): LevelLabelWidths {
+  return { available: full.clientWidth, content: full.scrollWidth }
 }
 
 /**
@@ -2555,6 +2601,27 @@ function toWorkoutNoteModel(model: EditorWorkoutModel): WorkoutNoteModel {
     exercises: model.exercises.map(toWorkoutExercise),
     preserveBlocks: [...model.preserveBlocks],
     frontmatterExtra: [...model.frontmatterExtra],
+  }
+}
+
+/** Title and message behind the ladder history warning, kept apart from the modal so the words the user reads are unit-testable. */
+export interface LadderChangesWarning {
+  title: string
+  message: string
+}
+
+/** Every affected level with what it means now and what it would come to mean. */
+export function formatLadderChangesWarning(
+  name: string,
+  changes: BodyweightLadderChange[],
+): LadderChangesWarning {
+  const lines = changes.map(
+    (change) =>
+      `Level ${change.level} currently means '${change.from}' and would come to mean '${change.to}'.`,
+  )
+  return {
+    title: `Change what logged levels mean for ${name}?`,
+    message: `This edit changes what some already-logged levels mean. ${lines.join(' ')} Logged sets keep their numbers.`,
   }
 }
 

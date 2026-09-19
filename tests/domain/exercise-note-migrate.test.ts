@@ -126,6 +126,22 @@ function extractDataviewBlockAfter(markdown: string, heading: string): string {
   return markdown.slice(blockStart, blockEnd + '\n```'.length)
 }
 
+/** Canonical bodyweight Recent sessions block, written out so the query it carries is verified literally rather than recomputed by the code under test. */
+const BODYWEIGHT_RECENT_SESSIONS_BLOCK = [
+  '```dataview',
+  'TABLE WITHOUT ID',
+  '  file.link AS Workout,',
+  '  L.level AS Level,',
+  '  L.reps AS Reps,',
+  '  L.load AS Load',
+  'FROM "Fitness/Workouts"',
+  'FLATTEN file.lists AS L',
+  'WHERE L.exercise = link("Mystery") AND L.level',
+  'SORT file.name DESC, L.level ASC',
+  'LIMIT 10',
+  '```',
+].join('\n')
+
 function frontmatterMarkerCount(markdown: string): number {
   return markdown.split(/\r?\n/).filter((line) => line === '---' || line === '\ufeff---').length
 }
@@ -200,6 +216,7 @@ unit: kg
   it('infers invalid no-registry kind from an existing bodyweight Recent sessions block', () => {
     const source = completeBodyweightNote('Mystery').replace('kind: bodyweight', 'kind: cardio')
     const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
+    const second = migrate(result.markdown, { name: 'Mystery', registry: createRegistry([]) })
 
     expect(result.status).toBe('unknown')
     expect(result.unknownKind).toBe(true)
@@ -207,7 +224,13 @@ unit: kg
     expect(result.markdown).not.toContain('kind: cardio')
     expect(result.markdown).not.toContain('metric:')
     expect(result.markdown).toContain('levels:')
-    expect(result.markdown).toContain(buildRecentSessionsBlock('Mystery', 'bodyweight', 'Fitness'))
+    expect(extractDataviewBlockAfter(result.markdown, 'Recent sessions')).toBe(
+      BODYWEIGHT_RECENT_SESSIONS_BLOCK,
+    )
+    expect(second.markdown).toBe(result.markdown)
+    expect(extractDataviewBlockAfter(second.markdown, 'Recent sessions')).toBe(
+      BODYWEIGHT_RECENT_SESSIONS_BLOCK,
+    )
   })
 
   it('leaves a level query mentioning set to strength instead of stealing it', () => {
@@ -393,6 +416,9 @@ kind: bodyweight
 levels:
   - Mystery
 ---`)
+    expect(extractDataviewBlockAfter(result.markdown, 'Recent sessions')).toBe(
+      BODYWEIGHT_RECENT_SESSIONS_BLOCK,
+    )
     expect(second.markdown).toBe(result.markdown)
   })
 
@@ -403,6 +429,9 @@ levels:
     expect(result.status).toBe('already')
     expect(result.changed).toBe(false)
     expect(result.markdown).toBe(source)
+    expect(extractDataviewBlockAfter(result.markdown, 'Recent sessions')).toBe(
+      BODYWEIGHT_RECENT_SESSIONS_BLOCK,
+    )
   })
 
   it('drops stray metric and unit lines from a bodyweight note', () => {
@@ -416,6 +445,9 @@ levels:
     expect(result.markdown).not.toContain('metric:')
     expect(result.markdown).not.toContain('unit:')
     expect(result.markdown).toContain('levels:\n  - Mystery\n')
+    expect(extractDataviewBlockAfter(result.markdown, 'Recent sessions')).toBe(
+      BODYWEIGHT_RECENT_SESSIONS_BLOCK,
+    )
     expect(second.markdown).toBe(result.markdown)
   })
 

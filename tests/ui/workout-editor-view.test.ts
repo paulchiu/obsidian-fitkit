@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EXERCISE_KINDS } from '../../src/domain/exercise-kind'
-import type { ExerciseRegistryEntry } from '../../src/domain/exercise-registry'
+import { createRegistry, type ExerciseRegistryEntry } from '../../src/domain/exercise-registry'
 import type {
   DurationExerciseEntry,
   ExerciseEntry,
@@ -173,6 +173,7 @@ vi.mock('../../src/vault/exercise-registry-vault', () => ({
 
 import { TFile } from 'obsidian'
 import {
+  formatLadderChangesWarning,
   shouldShortenLevelLabel,
   toEditorExercise,
   toWorkoutExercise,
@@ -200,6 +201,8 @@ class TestElement {
   readonly listeners = new Map<string, TestListener[]>()
   parent: TestElement | null = null
   textContent = ''
+  clientWidth = 0
+  scrollWidth = 0
 
   constructor(readonly tagName: string) {}
 
@@ -238,6 +241,22 @@ class TestElement {
 
   addClass(cls: string): void {
     this.classes.add(cls)
+  }
+
+  hasClass(cls: string): boolean {
+    return this.classes.has(cls)
+  }
+
+  instanceOf(type: new (...args: never[]) => unknown): boolean {
+    return this instanceof type
+  }
+
+  querySelector(selector: string): TestElement | null {
+    return selector.startsWith('.') ? this.findByClass(selector.slice(1)) : null
+  }
+
+  querySelectorAll(selector: string): TestElement[] {
+    return selector.startsWith('.') ? this.findAllByClass(selector.slice(1)) : []
   }
 
   removeClass(cls: string): void {
@@ -401,6 +420,33 @@ beforeEach(() => {
   registryVaultMock.exerciseRegistryWithVaultNotes.mockReset()
   registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([])
 })
+
+interface LabelFitView {
+  contentEl: TestElement
+  fitLevelLabel(label: HTMLElement, full: HTMLElement): void
+  refreshLevelLabels(): void
+  updateNarrowState(): void
+}
+
+const createLabelFitView = (): LabelFitView => {
+  const view = Object.create(WorkoutEditorView.prototype) as LabelFitView
+  view.contentEl = new TestElement('div')
+  return view
+}
+
+/** A label whose button is wide but whose text slot overruns its content. */
+const overflowingLabel = (): { label: TestElement; full: TestElement } => {
+  const label = new TestElement('button')
+  label.addClass('fitkit-bodyweight-level-label')
+  label.clientWidth = 500
+  const full = label.createSpan({
+    cls: 'fitkit-bodyweight-level-full',
+    text: 'Elevated one-arm incline push-up off the kitchen bench',
+  })
+  full.clientWidth = 50
+  full.scrollWidth = 120
+  return { label, full }
+}
 
 describe('WorkoutEditorView row actions', () => {
   afterEach(() => {
@@ -1195,6 +1241,41 @@ describe('WorkoutEditorView row actions', () => {
     expect(stubbed.render).toHaveBeenCalled()
   })
 
+  it('keeps a logged rung past a shrunken ladder selectable in the level menu', () => {
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      {
+        name: 'Push-up',
+        kind: 'bodyweight',
+        levels: ['Wall push-up', 'Incline push-up', 'Knee push-up'],
+        aliases: [],
+      },
+    ])
+    const ex = {
+      name: 'Push-up',
+      kind: 'bodyweight',
+      strengthSets: [],
+      durationEntries: [],
+      bodyweightSets: [{ set: 1, level: 5, reps: 8 }],
+    }
+    const view = createExerciseCardRenderView()
+    view.model = { exercises: [ex] }
+    view.exerciseHistory = new Map()
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    list.findAllByClass('fitkit-bodyweight-level-label')[0]?.listenersFor('click')[0]?.({})
+
+    const menu = obsidianMock.menus[obsidianMock.menus.length - 1]
+    expect(menu?.items.map((item) => item.title)).toEqual([
+      '1 · Wall push-up',
+      '2 · Incline push-up',
+      '3 · Knee push-up',
+      '4 · Level 4',
+      '5 · Level 5',
+    ])
+    expect(menu?.items.map((item) => item.checked)).toEqual([false, false, false, false, true])
+  })
+
   it('copies the previous row level when a set is added and focuses reps', () => {
     registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
       {
@@ -1359,6 +1440,76 @@ describe('WorkoutEditorView row actions', () => {
     expect(shouldShortenLevelLabel(100, 120)).toBe(true)
     expect(shouldShortenLevelLabel(100, 100)).toBe(false)
     expect(shouldShortenLevelLabel(200, 120)).toBe(false)
+  })
+
+  it('shortens through the measuring path when the text overruns its own slot', () => {
+    const view = createLabelFitView()
+    const { label, full } = overflowingLabel()
+
+    view.fitLevelLabel(label as unknown as HTMLElement, full as unknown as HTMLElement)
+
+    expect(label.hasClass('is-label-short')).toBe(true)
+  })
+
+  it('leaves a fitting name alone through the measuring path', () => {
+    const view = createLabelFitView()
+    const label = new TestElement('button')
+    label.clientWidth = 500
+    const full = label.createSpan({ cls: 'fitkit-bodyweight-level-full', text: 'Knee push-up' })
+    full.clientWidth = 200
+    full.scrollWidth = 120
+
+    view.fitLevelLabel(label as unknown as HTMLElement, full as unknown as HTMLElement)
+
+    expect(label.hasClass('is-label-short')).toBe(false)
+  })
+
+  it('leaves an already-shortened label shortened on refit', () => {
+    const view = createLabelFitView()
+    const { label, full } = overflowingLabel()
+    label.addClass('is-label-short')
+    full.clientWidth = 0
+    full.scrollWidth = 0
+
+    view.fitLevelLabel(label as unknown as HTMLElement, full as unknown as HTMLElement)
+
+    expect(label.hasClass('is-label-short')).toBe(true)
+  })
+
+  it('refits every rung label after a resize', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
+    try {
+      const view = createLabelFitView()
+      const { label } = overflowingLabel()
+      view.contentEl.children.push(label)
+      label.parent = view.contentEl
+
+      view.refreshLevelLabels()
+
+      expect(label.hasClass('is-label-short')).toBe(true)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('marks narrow content compact so the stepper shrinks', () => {
+    const view = createLabelFitView()
+    view.contentEl.clientWidth = 300
+
+    view.updateNarrowState()
+
+    expect(view.contentEl.hasClass('is-compact')).toBe(true)
+    expect(view.contentEl.hasClass('is-narrow')).toBe(true)
+  })
+
+  it('clears the compact marker once the content is wide again', () => {
+    const view = createLabelFitView()
+    view.contentEl.clientWidth = 800
+
+    view.updateNarrowState()
+
+    expect(view.contentEl.hasClass('is-compact')).toBe(false)
+    expect(view.contentEl.hasClass('is-narrow')).toBe(false)
   })
 })
 
@@ -1726,6 +1877,25 @@ describe('WorkoutEditorView kind switch persistence', () => {
       expect(obsidianMock.notices).toEqual(['Exercise note now records levels for Push-up.'])
     })
 
+    it('re-renders after writing the ladder into the exercise note', async () => {
+      const { view, contents } = createPersistLadderView([
+        {
+          path: 'Fitness/Exercises/Push-up.md',
+          basename: 'Push-up',
+          frontmatter: { type: 'exercise', kind: 'bodyweight' },
+        },
+      ])
+      contents.set(
+        'Fitness/Exercises/Push-up.md',
+        '---\ntype: exercise\nkind: bodyweight\nlevels:\n  - Wall push-up\n---\n',
+      )
+
+      await view.persistLadder('Push-up', ['Incline push-up', 'Knee push-up'])
+
+      expect(contents.get('Fitness/Exercises/Push-up.md')).toContain('  - Incline push-up\n')
+      expect(view.render).toHaveBeenCalledTimes(1)
+    })
+
     it('writes the ladder to the registry when no exercise note exists', async () => {
       const { view } = createPersistLadderView([])
 
@@ -1794,6 +1964,22 @@ describe('WorkoutEditorView kind switch persistence', () => {
     afterEach(() => {
       obsidianMock.menus = []
       vi.unstubAllGlobals()
+    })
+
+    it('names each affected level with its old and new meaning', () => {
+      expect(
+        formatLadderChangesWarning('Push-up', [
+          { level: 2, from: 'Knee push-up', to: 'Full push-up' },
+          { level: 3, from: 'Incline push-up', to: 'Knee push-up' },
+        ]),
+      ).toEqual({
+        title: 'Change what logged levels mean for Push-up?',
+        message:
+          'This edit changes what some already-logged levels mean. ' +
+          "Level 2 currently means 'Knee push-up' and would come to mean 'Full push-up'. " +
+          "Level 3 currently means 'Incline push-up' and would come to mean 'Knee push-up'. " +
+          'Logged sets keep their numbers.',
+      })
     })
 
     it('applies an appended rung without prompting', async () => {
@@ -1965,6 +2151,20 @@ describe('WorkoutEditorView kind switch persistence', () => {
       expect(view.markDirty).not.toHaveBeenCalled()
     })
 
+    it('states a single set in the singular', async () => {
+      const { view, confirm } = createRelabelView([], true)
+
+      await view.offerFirstLevelRelabel(0, {
+        exerciseName: 'Push-up',
+        kind: 'strength',
+        strengthSets: [{ set: 1, weight: 10, reps: 8 }],
+      })
+
+      const message = confirm.mock.calls[0]?.[0] as unknown
+      expect(message).toContain('1 already-logged set')
+      expect(message).not.toContain('already-logged sets')
+    })
+
     it('stays silent when there is nothing to mark', async () => {
       const { view, confirm } = createRelabelView([], true)
 
@@ -2024,6 +2224,107 @@ describe('WorkoutEditorView kind switch persistence', () => {
       ])
       expect(confirm).toHaveBeenCalledTimes(1)
       expect(confirm.mock.calls[0]?.[0]).toContain('2 already-logged sets')
+      expect(view.plugin.settings.exerciseRegistry).toMatchObject([
+        { name: 'Push-up', kind: 'bodyweight', levels: ['Push-up'] },
+      ])
+    })
+
+    it('writes no ladder anywhere on the workout-only choice', async () => {
+      const original = '---\ntype: exercise\nkind: strength\n---\n'
+      const { view, contents } = createPersistKindChangeView(
+        [
+          {
+            path: 'Fitness/Exercises/Push-up.md',
+            basename: 'Push-up',
+            frontmatter: { type: 'exercise', kind: 'strength' },
+          },
+        ],
+        [],
+      )
+      contents.set('Fitness/Exercises/Push-up.md', original)
+      const switchView = view as unknown as RelabelView & {
+        model: {
+          exercises: {
+            name: string
+            kind: 'strength' | 'bodyweight'
+            strengthSets: { set?: number; weight?: number; reps?: number }[]
+            durationEntries: { set?: number; durationSeconds?: number }[]
+            bodyweightSets: { set?: number; level?: number; reps?: number; load?: number }[]
+          }[]
+        }
+        chooseKindSwitch: () => Promise<string>
+        switchKind: (index: number, nextKind: 'bodyweight') => Promise<void>
+      }
+      switchView.render = vi.fn()
+      switchView.markDirty = vi.fn()
+      switchView.model = {
+        exercises: [
+          {
+            name: 'Push-up',
+            kind: 'strength',
+            strengthSets: [{ set: 1, weight: 10, reps: 8 }],
+            durationEntries: [],
+            bodyweightSets: [],
+          },
+        ],
+      }
+      switchView.chooseKindSwitch = async () => 'workout'
+      switchView.confirmFirstLevelRelabel = vi.fn(async () => false)
+      registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([])
+
+      await switchView.switchKind(0, 'bodyweight')
+
+      const card = switchView.model.exercises[0]
+      expect(card?.kind).toBe('bodyweight')
+      expect(contents.get('Fitness/Exercises/Push-up.md')).toBe(original)
+      expect(view.plugin.settings.exerciseRegistry).toEqual([])
+      expect(view.plugin.saveSettings).not.toHaveBeenCalled()
+      expect(view.app.vault.process).not.toHaveBeenCalled()
+      expect(obsidianMock.notices.join('\n')).not.toContain('records levels')
+    })
+
+    it('seeds a ladder and offers the relabel when renaming onto a bodyweight exercise', async () => {
+      const { view } = createPersistKindChangeView([], [])
+      const renameView = view as unknown as RelabelView & {
+        model: {
+          exercises: {
+            name: string
+            kind: 'strength' | 'bodyweight'
+            strengthSets: { set?: number; weight?: number; reps?: number }[]
+            durationEntries: { set?: number; durationSeconds?: number }[]
+            bodyweightSets: { set?: number; level?: number; reps?: number; load?: number }[]
+          }[]
+        }
+        confirmKindSwitch: () => Promise<boolean>
+        applyRename: (index: number, name: string, registry: unknown) => Promise<void>
+      }
+      renameView.render = vi.fn()
+      renameView.markDirty = vi.fn()
+      renameView.model = {
+        exercises: [
+          {
+            name: 'Squat',
+            kind: 'strength',
+            strengthSets: [{ set: 1, weight: 10, reps: 8 }],
+            durationEntries: [],
+            bodyweightSets: [],
+          },
+        ],
+      }
+      renameView.confirmKindSwitch = async () => true
+      const confirm = vi.fn(async () => true)
+      renameView.confirmFirstLevelRelabel = confirm
+      registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([])
+      const registry = createRegistry([{ name: 'Push-up', kind: 'bodyweight', aliases: [] }])
+
+      await renameView.applyRename(0, 'Push-up', registry)
+
+      const card = renameView.model.exercises[0]
+      expect(card?.name).toBe('Push-up')
+      expect(card?.kind).toBe('bodyweight')
+      expect(card?.bodyweightSets).toEqual([{ level: 1, set: 1, reps: 8, load: 10 }])
+      expect(confirm).toHaveBeenCalledTimes(1)
+      expect(confirm.mock.calls[0]?.[0]).toContain('1 already-logged set')
       expect(view.plugin.settings.exerciseRegistry).toMatchObject([
         { name: 'Push-up', kind: 'bodyweight', levels: ['Push-up'] },
       ])
