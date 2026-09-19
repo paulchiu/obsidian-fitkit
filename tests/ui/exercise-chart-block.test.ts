@@ -139,6 +139,15 @@ function renderedSeries(): ChartSeries {
   return call[1] as ChartSeries
 }
 
+function renderedLadder(): string[] | undefined {
+  const call = chartSvgMock.renderExerciseChartSvg.mock.calls[0]
+  if (!call) {
+    throw new Error('Expected chart renderer to be called.')
+  }
+  const options = call[2] as { ladder?: string[] } | undefined
+  return options?.ladder
+}
+
 describe('exercise chart block rendering', () => {
   beforeEach(() => {
     chartSvgMock.renderExerciseChartSvg.mockReset()
@@ -311,5 +320,31 @@ describe('exercise chart block rendering', () => {
         "Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add 'kind: strength' or 'kind: duration' or 'kind: bodyweight' to be explicit.",
       ])
     }
+  })
+
+  it('threads the exercise ladder through to the chart renderer', async () => {
+    const plugin = createPlugin(
+      [],
+      new Map(),
+      createSettings({
+        exerciseRegistry: [
+          {
+            name: 'Push-Up',
+            kind: 'bodyweight',
+            aliases: [],
+            levels: ['Wall push-up', 'Knee push-up'],
+          },
+        ],
+      }),
+    )
+
+    await renderExerciseChartBlock(
+      plugin,
+      'exercise: Push-Up\nkind: bodyweight',
+      new TestElement('div') as unknown as HTMLElement,
+      createContext('Fitness/Dashboard.md'),
+    )
+
+    expect(renderedLadder()).toEqual(['Wall push-up', 'Knee push-up'])
   })
 })

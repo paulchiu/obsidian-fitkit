@@ -15,6 +15,7 @@ import { EXERCISE_KINDS, assertUnreachableKind, parseExerciseKind } from '../dom
 import {
   createRegistry,
   kindForName,
+  levelsForName,
   resolve,
   type ExerciseKind,
 } from '../domain/exercise-registry'
@@ -155,7 +156,7 @@ async function renderInternal(
     metric,
     weightUnit,
   )
-  renderExerciseChartSvg(el, series, { notes })
+  renderExerciseChartSvg(el, series, { notes, ladder: levelsForName(registry, exerciseName) })
 }
 
 function resolveSourceFile(plugin: FitKitPlugin, ctx: MarkdownPostProcessorContext): TFile | null {
