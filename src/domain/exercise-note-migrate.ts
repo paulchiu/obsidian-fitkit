@@ -1,4 +1,4 @@
-import { parseExerciseKind } from './exercise-kind'
+import { EXERCISE_KINDS, parseExerciseKind } from './exercise-kind'
 import {
   kindForName,
   unitForName,
@@ -448,12 +448,15 @@ function repairRecentSessions(
   if (currentBlock === canonicalBlock) {
     return { markdown: source, warnings: [] }
   }
-  const alternateCanonicalBlock = buildRecentSessionsBlock(
-    options.name,
-    alternateExerciseKind(kind),
-    options.fitnessRoot,
+  const matchesAnotherKind = EXERCISE_KINDS.some(
+    (otherKind) =>
+      otherKind !== kind &&
+      !isCustomDataviewBlock(
+        currentBlock,
+        buildRecentSessionsBlock(options.name, otherKind, options.fitnessRoot),
+      ),
   )
-  if (!isCustomDataviewBlock(currentBlock, alternateCanonicalBlock)) {
+  if (matchesAnotherKind) {
     const next = [
       ...document.lines.slice(0, block.start),
       ...canonicalLines,
@@ -477,10 +480,6 @@ function repairRecentSessions(
     ...document.lines.slice(block.end + 1),
   ]
   return { markdown: joinMarkdown({ ...document, lines: next }), warnings: [] }
-}
-
-function alternateExerciseKind(kind: ExerciseKind): ExerciseKind {
-  return kind === 'strength' ? 'duration' : 'strength'
 }
 
 /**

@@ -8,6 +8,7 @@ import {
   ZERO_DURATION_DISPLAY,
 } from '../domain/duration-input'
 import { formatErrorMessage } from '../domain/error'
+import { EXERCISE_KINDS } from '../domain/exercise-kind'
 import {
   formatExerciseHistoryBadges,
   formatNextPlanBadge,
@@ -1193,8 +1194,6 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     const lastIndex = this.model.exercises.length - 1
-    const otherKind: ExerciseKind = ex.kind === 'strength' ? 'duration' : 'strength'
-    const switchLabel = otherKind === 'strength' ? 'Switch to strength' : 'Switch to duration'
 
     const menu = new Menu()
     menu.addItem((item) =>
@@ -1221,12 +1220,17 @@ export class WorkoutEditorView extends ItemView {
       this.addNextPlanMenuItems(menu, ex)
     }
     menu.addSeparator()
-    menu.addItem((item) =>
-      item
-        .setTitle(switchLabel)
-        .setIcon('repeat')
-        .onClick(() => void this.switchKind(index, otherKind)),
-    )
+    for (const nextKind of EXERCISE_KINDS) {
+      if (nextKind === ex.kind) {
+        continue
+      }
+      menu.addItem((item) =>
+        item
+          .setTitle(`Switch to ${nextKind}`)
+          .setIcon('repeat')
+          .onClick(() => void this.switchKind(index, nextKind)),
+      )
+    }
     menu.addSeparator()
     menu.addItem((item) =>
       item

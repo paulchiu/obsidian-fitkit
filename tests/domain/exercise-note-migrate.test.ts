@@ -1021,6 +1021,26 @@ LIMIT 10
     expect(result.warnings).toEqual([{ kind: 'custom-recent-sessions' }])
   })
 
+  it('rewrites a Recent sessions block left over from a kind switch without warning', () => {
+    const staleRecent = buildRecentSessionsBlock('Squat', 'duration', 'Fitness')
+    const source = completeStrengthNote(staleRecent)
+    const result = migrate(source)
+
+    expect(result.markdown).toContain(buildRecentSessionsBlock('Squat', 'strength', 'Fitness'))
+    expect(result.markdown).not.toContain(staleRecent)
+    expect(result.warnings).toEqual([])
+  })
+
+  it('rewrites a strength-shaped Recent sessions block on a duration note without warning', () => {
+    const staleRecent = buildRecentSessionsBlock('Plank', 'strength', 'Fitness')
+    const source = completeDurationNote('Plank', staleRecent)
+    const result = migrate(source, { name: 'Plank' })
+
+    expect(result.markdown).toContain(buildRecentSessionsBlock('Plank', 'duration', 'Fitness'))
+    expect(result.markdown).not.toContain(staleRecent)
+    expect(result.warnings).toEqual([])
+  })
+
   it('is idempotent on a repaired note', () => {
     const source = `---
 type: exercise

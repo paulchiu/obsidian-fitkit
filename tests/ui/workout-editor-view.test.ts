@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { EXERCISE_KINDS } from '../../src/domain/exercise-kind'
 import type { ExerciseRegistryEntry } from '../../src/domain/exercise-registry'
 
 interface MockMenuItemState {
@@ -463,6 +464,31 @@ describe('WorkoutEditorView row actions', () => {
       'Move down',
       'Remove exercise',
     ])
+  })
+
+  it('offers a switch item for every kind other than the current one, never the current kind', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
+    for (const kind of EXERCISE_KINDS) {
+      const view = createCardMenuView()
+      view.model = {
+        exercises: [{ name: 'Squat', kind, strengthSets: [], durationEntries: [] }],
+      }
+
+      view.openCardMenu({ currentTarget: new TestElement('button') } as unknown as MouseEvent, 0)
+
+      const items = obsidianMock.menus[obsidianMock.menus.length - 1]?.items ?? []
+      const titles = items.map((item) => item.title)
+      const switchItems = items.filter((item) => item.title?.startsWith('Switch to ') === true)
+      const expected = EXERCISE_KINDS.filter((other) => other !== kind).map(
+        (other) => `Switch to ${other}`,
+      )
+      expect(switchItems.map((item) => item.title)).toEqual(expected)
+      expect(switchItems.map((item) => item.icon)).toEqual(expected.map(() => 'repeat'))
+      for (const item of switchItems) {
+        expect(titles.indexOf(item.title)).toBeGreaterThan(titles.indexOf('Add exercise note'))
+        expect(titles.indexOf(item.title)).toBeLessThan(titles.indexOf('Move up'))
+      }
+    }
   })
 
   it('routes the card menu Open exercise file item through the shared handler', () => {
