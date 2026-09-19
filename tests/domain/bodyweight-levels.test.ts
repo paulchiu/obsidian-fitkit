@@ -8,6 +8,7 @@ import {
   formatBodyweightLevelShort,
   formatRungUnit,
   parseBodyweightLadderText,
+  pickBestBodyweightSet,
 } from '../../src/domain/bodyweight-levels'
 
 describe('bodyweight level labels', () => {
@@ -38,6 +39,17 @@ describe('bodyweight level labels', () => {
   it('falls back to a bare level when the ladder does not name it', () => {
     expect(bodyweightLevelName(['Wall push-up'], 4)).toBe('Level 4')
     expect(bodyweightLevelName(undefined, 2)).toBe('Level 2')
+  })
+})
+
+describe('pickBestBodyweightSet', () => {
+  it('breaks a level and reps tie by load', () => {
+    expect(
+      pickBestBodyweightSet([
+        { level: 2, reps: 8, load: 0 },
+        { level: 2, reps: 8, load: 10 },
+      ]),
+    ).toEqual({ level: 2, reps: 8, load: 10 })
   })
 })
 

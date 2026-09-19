@@ -137,6 +137,8 @@ describe('buildExerciseChartSeries', () => {
       { date: '2026-04-01', value: 3, workoutPath: 'w/2026-04-01.md' },
       { date: '2026-04-03', value: 4, workoutPath: 'w/2026-04-03.md' },
     ])
+    expect(series.metric).toBe('level')
+    expect(series.unit).toBe('level')
   })
 
   it('plots reps for a bodyweight reps series from the same best sets', () => {
@@ -276,6 +278,45 @@ describe('buildExerciseChartSeries', () => {
     expect(series.points).toEqual([])
     expect(series.totalDates).toBe(0)
     expect(series.metric).toBe('level')
+  })
+
+  it('skips bodyweight rows where the level is missing, zero, or not finite', () => {
+    const bodyweightRegistry = createRegistry([
+      { name: 'Push-Up', kind: 'bodyweight', aliases: [] },
+    ])
+    const series = buildExerciseChartSeries(
+      fitKitIndex([
+        entry('w/2026-04-01.md', '2026-04-01', [
+          {
+            exerciseName: 'Push-Up',
+            kind: 'bodyweight',
+            maxBodyweightSet: { level: 0, reps: 8, load: 0 },
+          },
+        ]),
+        entry('w/2026-04-02.md', '2026-04-02', [
+          {
+            exerciseName: 'Push-Up',
+            kind: 'bodyweight',
+            maxBodyweightSet: { level: Number.NaN, reps: 8, load: 0 },
+          },
+        ]),
+        entry('w/2026-04-03.md', '2026-04-03', [
+          {
+            exerciseName: 'Push-Up',
+            kind: 'bodyweight',
+            maxBodyweightSet: { level: 3, reps: 8, load: 0 },
+          },
+        ]),
+      ]),
+      bodyweightRegistry,
+      'Push-Up',
+      'bodyweight',
+      30,
+      'level',
+    )
+    expect(series.points).toEqual([
+      { date: '2026-04-03', value: 3, workoutPath: 'w/2026-04-03.md' },
+    ])
   })
 
   it('filters by kind: duration rows ignored when querying strength', () => {

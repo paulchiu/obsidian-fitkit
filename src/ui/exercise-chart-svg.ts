@@ -154,7 +154,7 @@ function drawYLabels(
         'text-anchor': 'end',
       },
     })
-    label.textContent = formatChartValue(value, series)
+    label.textContent = formatChartValue(value, series, undefined)
   }
 }
 
@@ -340,7 +340,7 @@ export function formatChartTooltip(
   date: string,
   value: number,
   series: ChartSeries,
-  ladder?: BodyweightLadder,
+  ladder: BodyweightLadder | undefined,
 ): string {
   if (series.metric === 'e1rm') {
     return `${date}: e1rm ${formatChartValue(value, series, ladder)}`
@@ -371,7 +371,7 @@ export function chartYAxisTitle(series: ChartSeries): string | null {
 export function formatChartValue(
   value: number,
   series: ChartSeries,
-  ladder?: BodyweightLadder,
+  ladder: BodyweightLadder | undefined,
 ): string {
   if (series.metric === 'level') {
     return bodyweightLevelName(ladder, value)

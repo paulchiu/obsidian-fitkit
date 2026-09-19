@@ -117,9 +117,15 @@ describe('exercise chart svg', () => {
   it('draws a level series as a step line that holds each rung until the next session', () => {
     const pairs = polylinePairs(render(levelSeries([2, 3])))
 
-    expect(pairs).toHaveLength(3)
-    expect(pairs[1]?.x).toBe(pairs[2]?.x)
-    expect(pairs[0]?.y).toBe(pairs[1]?.y)
+    /**
+     * Known plot area pins the corner and the rise: rung 2 sits at the
+     * bottom edge and rung 3 at the top, so a held line must rise there.
+     */
+    expect(pairs).toEqual([
+      { x: 56, y: 276 },
+      { x: 784, y: 276 },
+      { x: 784, y: 16 },
+    ])
   })
 
   it('draws a strength series straight from point to point', () => {
@@ -142,6 +148,15 @@ describe('exercise chart svg', () => {
 
     expect(nodes.some((node) => node.tag === 'svg')).toBe(false)
     expect(nodes.some((node) => node.classes.has('fitkit-chart-empty'))).toBe(true)
+  })
+
+  it('names the rung in each level dot tooltip from the ladder', () => {
+    const root = render(levelSeries([2]), { ladder: ['Wall push-up', 'Knee push-up'] })
+    const titles = descendants(root)
+      .filter((node) => node.tag === 'title')
+      .map((node) => node.textContent)
+
+    expect(titles).toEqual(['2026-04-01: Knee push-up'])
   })
 
   it('labels a level axis with rung names from the ladder', () => {
