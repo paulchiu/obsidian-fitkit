@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - Editing or renaming an exercise registry entry no longer discards its `levels:` ladder. This was only reachable for an exercise with no note of its own, where the registry holds the only copy.
+- A bodyweight card now shows the rung names from a ladder the moment it is written, instead of falling back to bare level numbers until the next reload. This covers switching an exercise to bodyweight, appending a rung, and confirming a ladder edit, which all rendered before the vault index reported the write.
+- The level stepper clamps both steps when no ladder names a rung; an empty ladder previously left the raise step enabled so it could climb past every rung.
+- The first bodyweight row of an exercise now carries its set number and level like every row that Add set appends, so the written note reads the same for row one as for the rest.
+- Choosing Update registry too when switching an exercise kind now records the kind in the registry as well as the exercise note, instead of leaving the saved registry behind the note that wins on read.
+- A rung name shortened for a narrow window restores its full form when the window widens again, without the resize flicker the sticky shortening was added to stop.
 
 ### Removed
 

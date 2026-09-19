@@ -70,8 +70,10 @@ import { composeExerciseNote } from '../vault/exercise-note'
 import { planExerciseFileOpen } from '../vault/exercise-file-plan'
 import { exerciseHistoryFromVault } from '../vault/exercise-history-vault'
 import {
+  applyLadderOverrides,
   bodyweightLevelsFor,
   exerciseRegistryWithVaultNotes,
+  sameLevels,
 } from '../vault/exercise-registry-vault'
 import { FileSession } from '../vault/file-session'
 import { markdownFilesInFolder } from '../vault/folder-scan'
@@ -183,7 +185,18 @@ export class WorkoutEditorView extends ItemView {
   private activeTimer: ActiveTimer | null = null
   private activeRestTimer: ActiveRestTimer | null = null
   private seededWeightsStore?: WeakSet<EditableStrengthSet>
+  private ladderOverridesStore?: Map<string, string[]>
   private lastRestSeconds: number | null = null
+  /**
+   * Ladders this session wrote that the metadata cache may not report yet.
+   * Renders overlay them until the snapshot catches up, so a card never
+   * shows the rungs from before its own write. Lazily created because
+   * prototype-built views never run field initializers.
+   */
+  private get ladderOverrides(): Map<string, string[]> {
+    this.ladderOverridesStore ??= new Map<string, string[]>()
+    return this.ladderOverridesStore
+  }
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -284,7 +297,9 @@ export class WorkoutEditorView extends ItemView {
 
   /**
    * Refit every rung label after a resize. Labels fit themselves on first
-   * render; only a width change afterwards can overflow a new one.
+   * render; only a width change afterwards can overflow a new one. Each
+   * label unshortens before measuring, so the measure always reads live
+   * widths and every tick converges instead of oscillating.
    */
   private refreshLevelLabels(): void {
     for (const label of this.contentEl.querySelectorAll('.fitkit-bodyweight-level-label')) {
@@ -295,6 +310,7 @@ export class WorkoutEditorView extends ItemView {
       if (!full?.instanceOf(HTMLElement)) {
         continue
       }
+      label.removeClass('is-label-short')
       this.fitLevelLabel(label, full)
     }
   }
@@ -407,7 +423,7 @@ export class WorkoutEditorView extends ItemView {
 
     const list = container.createDiv({ cls: 'fitkit-exercise-list' })
     /** One merged snapshot per render: every card reads its ladder from this instead of rebuilding it. */
-    const registry = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
+    const registry = this.registryForRender()
     for (let i = 0; i < this.model.exercises.length; i++) {
       this.renderExerciseCard(list, i, registry)
     }
@@ -491,8 +507,7 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     /** Direct card renders (and tests) build their own snapshot; full renders share one. */
-    const snapshot =
-      registry ?? createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
+    const snapshot = registry ?? this.registryForRender()
 
     const card = list.createDiv({ cls: 'fitkit-card' })
     card.dataset.exerciseIndex = String(index)
@@ -836,9 +851,9 @@ export class WorkoutEditorView extends ItemView {
       attr: { type: 'button', 'aria-label': `Raise level for set ${rowIndex + 1}` },
     })
     setIcon(plus, 'plus')
-    plus.disabled = rungCount > 0 && level >= rungCount
+    plus.disabled = rungCount === 0 || level >= rungCount
     plus.addEventListener('click', () => {
-      if (rungCount === 0 || level < rungCount) {
+      if (rungCount > 0 && level < rungCount) {
         this.setBodyweightLevel(ex, rowIndex, level + 1)
       }
     })
@@ -856,9 +871,9 @@ export class WorkoutEditorView extends ItemView {
   }
 
   /**
-   * Shorten a rung name that overflows its own text slot. An applied
-   * shortening hides the measured span, so refitting never re-measures a
-   * shortened label; otherwise every resize tick would flip it back.
+   * Shorten a rung name that overflows its own text slot. A shortened label
+   * hides its measured span, so fitting one directly keeps it short; resize
+   * refits unshorten first so the measure below always reads live widths.
    */
   private fitLevelLabel(
     label: HTMLElement,
@@ -1028,9 +1043,7 @@ export class WorkoutEditorView extends ItemView {
   private openEditLevelsModal(ex: ExerciseCard): void {
     new EditLevelsModal(this.app, {
       exerciseName: ex.name,
-      initial:
-        bodyweightLevelsFor(this.app, this.plugin.settings, ex.name) ??
-        defaultBodyweightLevels(ex.name),
+      initial: this.currentBodyweightLevels(ex.name) ?? defaultBodyweightLevels(ex.name),
       onSave: (levels) => {
         void this.confirmLadderEdit(ex, levels)
       },
@@ -1043,7 +1056,7 @@ export class WorkoutEditorView extends ItemView {
    * proceeds on confirmation. Logged sets keep their numbers throughout.
    */
   private async confirmLadderEdit(ex: ExerciseCard, levels: string[]): Promise<void> {
-    const previous = bodyweightLevelsFor(this.app, this.plugin.settings, ex.name) ?? []
+    const previous = this.currentBodyweightLevels(ex.name) ?? []
     const changes = describeBodyweightLadderChanges(previous, levels, [
       ...(await this.occupiedBodyweightLevels(ex)),
     ])
@@ -1109,6 +1122,41 @@ export class WorkoutEditorView extends ItemView {
   }
 
   /**
+   * Snapshot for rendering, with ladders this session wrote overlaid.
+   * Vault writes land on disk before the metadata cache reports them, so
+   * the render straight after a ladder write would otherwise show stale rungs.
+   */
+  private registryForRender(): ExerciseRegistry {
+    const snapshot = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
+    this.pruneLadderOverrides(snapshot)
+    return createRegistry(applyLadderOverrides(snapshot.entries, this.ladderOverrides))
+  }
+
+  /**
+   * Freshest ladder for decisions and menus: a value this session wrote
+   * wins until the snapshot reports it, so later reads never shadow it.
+   */
+  private currentBodyweightLevels(name: string): string[] | undefined {
+    const override = this.ladderOverrides.get(normalize(name))
+    if (override !== undefined) {
+      return [...override]
+    }
+    return bodyweightLevelsFor(this.app, this.plugin.settings, name)
+  }
+
+  /**
+   * Drops overrides the snapshot has caught up with. Without this a later
+   * outside edit to the same ladder would stay hidden behind the override.
+   */
+  private pruneLadderOverrides(snapshot: ExerciseRegistry): void {
+    for (const [key, levels] of this.ladderOverrides) {
+      if (sameLevels(levelsForName(snapshot, key) ?? [], levels)) {
+        this.ladderOverrides.delete(key)
+      }
+    }
+  }
+
+  /**
    * Writes an edited ladder to whichever store wins on read: the exercise
    * note when one exists, else the registry entry (created when missing).
    */
@@ -1126,6 +1174,7 @@ export class WorkoutEditorView extends ItemView {
         return result.markdown
       })
       if (result?.changed) {
+        this.ladderOverrides.set(normalize(trimmed), [...levels])
         new Notice(`Exercise note now records levels for ${trimmed}.`)
       }
       this.render()
@@ -1140,6 +1189,7 @@ export class WorkoutEditorView extends ItemView {
       : { name: trimmed, kind: 'bodyweight', aliases: [], levels: [...levels] }
     settings.exerciseRegistry = upsertEntry(current, nextEntry).entries
     await this.plugin.saveSettings()
+    this.ladderOverrides.set(key, [...levels])
     new Notice(`Registry now records levels for ${trimmed}.`)
     this.render()
   }
@@ -1409,7 +1459,7 @@ export class WorkoutEditorView extends ItemView {
    * menu is usable immediately. An existing ladder is left alone.
    */
   private async seedBodyweightLadder(ex: ExerciseCard): Promise<void> {
-    if ((bodyweightLevelsFor(this.app, this.plugin.settings, ex.name) ?? []).length > 0) {
+    if ((this.currentBodyweightLevels(ex.name) ?? []).length > 0) {
       return
     }
     await this.persistLadder(ex.name, defaultBodyweightLevels(ex.name))
@@ -1460,10 +1510,10 @@ export class WorkoutEditorView extends ItemView {
   }
 
   /**
-   * Writes the kind switch to whichever store wins on read. An exercise note
-   * always beats the registry overlay (see buildExerciseRegistrySnapshot), so
-   * the note is updated when one exists; the registry is only the fallback
-   * for no-note exercises.
+   * Writes the kind switch to the exercise note when one exists, and to the
+   * registry either way. An exercise note always beats the registry overlay
+   * (see buildExerciseRegistrySnapshot), so the note decides behaviour; the
+   * registry copy keeps the settings table and its readers truthful.
    */
   private async persistKindChange(name: string, nextKind: ExerciseKind): Promise<void> {
     const trimmed = name.trim()
@@ -1480,6 +1530,12 @@ export class WorkoutEditorView extends ItemView {
       })
       if (result?.changed) {
         new Notice(`Exercise note now records ${trimmed} as ${nextKind}.`)
+        /**
+         * The registry is read on its own by the settings table, so leaving
+         * it behind would mislead the next reader and raise a conflict
+         * against the note that just won. The note still wins on read.
+         */
+        await this.persistRegistryKind(trimmed, nextKind)
       } else {
         new Notice(
           `Could not update the exercise note for ${trimmed}; its frontmatter was left unchanged.`,
@@ -2468,7 +2524,7 @@ function seedEmptyRow(
 ): EditableStrengthSet | null {
   switch (card.kind) {
     case 'bodyweight':
-      card.bodyweightSets.push({})
+      card.bodyweightSets.push({ set: 1, level: 1 })
       return null
     case 'duration':
       card.durationEntries.push({})

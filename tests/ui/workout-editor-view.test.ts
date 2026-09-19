@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EXERCISE_KINDS } from '../../src/domain/exercise-kind'
-import { createRegistry, type ExerciseRegistryEntry } from '../../src/domain/exercise-registry'
+import {
+  createRegistry,
+  type ExerciseKind,
+  type ExerciseRegistryEntry,
+} from '../../src/domain/exercise-registry'
 import type { FitKitSettings } from '../../src/settings'
 import type {
   DurationExerciseEntry,
@@ -1206,6 +1210,64 @@ describe('WorkoutEditorView row actions', () => {
     expect((steps?.[2] as TestElement & { disabled?: boolean }).disabled).toBe(true)
   })
 
+  it('clamps the stepper on an empty ladder instead of freeing the raise step', () => {
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      { name: 'Push-up', kind: 'bodyweight', levels: [], aliases: [] },
+    ])
+    const view = createExerciseCardRenderView()
+    view.model = {
+      exercises: [
+        {
+          name: 'Push-up',
+          kind: 'bodyweight',
+          strengthSets: [],
+          durationEntries: [],
+          bodyweightSets: [{ set: 1, level: 1, reps: 10 }],
+        },
+      ],
+    }
+    view.exerciseHistory = new Map()
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    const stepper = list.findByClass('fitkit-bodyweight-stepper')
+    const steps = stepper?.children
+    expect(steps).toHaveLength(3)
+    expect((steps?.[0] as TestElement & { disabled?: boolean }).disabled).toBe(true)
+    expect((steps?.[2] as TestElement & { disabled?: boolean }).disabled).toBe(true)
+  })
+
+  it('ignores the raise step on an empty ladder', () => {
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      { name: 'Push-up', kind: 'bodyweight', levels: [], aliases: [] },
+    ])
+    const ex = {
+      name: 'Push-up',
+      kind: 'bodyweight',
+      strengthSets: [],
+      durationEntries: [],
+      bodyweightSets: [{ set: 1, level: 1, reps: 10 }],
+    }
+    const view = createExerciseCardRenderView()
+    view.model = { exercises: [ex] }
+    view.exerciseHistory = new Map()
+    const stubbed = Object.assign(view, {
+      markDirty: vi.fn(),
+      render: vi.fn(),
+      focusRowCell: vi.fn(),
+    })
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    const steps = list.findByClass('fitkit-bodyweight-stepper')?.children
+    steps?.[2]?.listenersFor('click')[0]?.({})
+
+    expect(ex.bodyweightSets[0]?.level).toBe(1)
+    expect(stubbed.markDirty).not.toHaveBeenCalled()
+    expect(stubbed.render).not.toHaveBeenCalled()
+  })
+
   it('lists every rung in the level menu and sets only the chosen row', () => {
     registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
       {
@@ -1504,6 +1566,25 @@ describe('WorkoutEditorView row actions', () => {
     }
   })
 
+  it('restores the full rung name when a resize leaves room for it', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
+    try {
+      const view = createLabelFitView()
+      const { label, full } = overflowingLabel()
+      label.addClass('is-label-short')
+      full.clientWidth = 200
+      full.scrollWidth = 120
+      view.contentEl.children.push(label)
+      label.parent = view.contentEl
+
+      view.refreshLevelLabels()
+
+      expect(label.hasClass('is-label-short')).toBe(false)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('marks narrow content compact so the stepper shrinks', () => {
     const view = createLabelFitView()
     view.contentEl.clientWidth = 300
@@ -1730,7 +1811,7 @@ interface PersistKindChangeView {
     }
     saveSettings: ReturnType<typeof vi.fn>
   }
-  persistKindChange(name: string, nextKind: 'strength' | 'duration'): Promise<void>
+  persistKindChange(name: string, nextKind: ExerciseKind): Promise<void>
 }
 
 describe('WorkoutEditorView kind switch persistence', () => {
@@ -1776,7 +1857,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
     obsidianMock.notices = []
   })
 
-  it('writes the switched kind into the exercise note and leaves the registry untouched', async () => {
+  it('writes the switched kind into the exercise note and records it in the registry', async () => {
     const { view, contents } = createPersistKindChangeView([
       {
         path: 'Fitness/Exercises/Squat.md',
@@ -1789,9 +1870,58 @@ describe('WorkoutEditorView kind switch persistence', () => {
 
     expect(view.app.vault.process).toHaveBeenCalledTimes(1)
     expect(contents.get('Fitness/Exercises/Squat.md')).toContain('kind: strength')
-    expect(view.plugin.settings.exerciseRegistry).toEqual([])
-    expect(view.plugin.saveSettings).not.toHaveBeenCalled()
-    expect(obsidianMock.notices).toEqual(['Exercise note now records Squat as strength.'])
+    expect(view.plugin.settings.exerciseRegistry).toMatchObject([
+      { name: 'Squat', kind: 'strength', aliases: [] },
+    ])
+    expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
+    expect(obsidianMock.notices).toEqual([
+      'Exercise note now records Squat as strength.',
+      'Registry now records Squat as strength.',
+    ])
+  })
+
+  it('also updates the registry on the note path, so the option keeps its promise', async () => {
+    const { view, contents } = createPersistKindChangeView(
+      [
+        {
+          path: 'Fitness/Exercises/Squat.md',
+          basename: 'Squat',
+          frontmatter: { type: 'exercise', kind: 'duration' },
+        },
+      ],
+      [{ name: 'Squat', kind: 'duration', aliases: [] }],
+    )
+
+    await view.persistKindChange('Squat', 'strength')
+
+    expect(contents.get('Fitness/Exercises/Squat.md')).toContain('kind: strength')
+    expect(view.plugin.settings.exerciseRegistry).toMatchObject([
+      { name: 'Squat', kind: 'strength' },
+    ])
+    expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
+    expect(obsidianMock.notices).toEqual([
+      'Exercise note now records Squat as strength.',
+      'Registry now records Squat as strength.',
+    ])
+  })
+
+  it('keeps the registry ladder when the note path records a kind switch', async () => {
+    const { view } = createPersistKindChangeView(
+      [
+        {
+          path: 'Fitness/Exercises/Push-up.md',
+          basename: 'Push-up',
+          frontmatter: { type: 'exercise', kind: 'strength' },
+        },
+      ],
+      [{ name: 'Push-up', kind: 'strength', levels: ['Wall push-up'], aliases: [] }],
+    )
+
+    await view.persistKindChange('Push-up', 'bodyweight')
+
+    expect(view.plugin.settings.exerciseRegistry).toMatchObject([
+      { name: 'Push-up', kind: 'bodyweight', levels: ['Wall push-up'] },
+    ])
   })
 
   it('matches the note case-insensitively', async () => {
@@ -1921,6 +2051,57 @@ describe('WorkoutEditorView kind switch persistence', () => {
       expect(obsidianMock.notices).toEqual(['Registry now records levels for Push-up.'])
       expect(view.render).toHaveBeenCalledTimes(1)
     })
+
+    it('renders the ladder it just wrote while the snapshot still reports the old one', async () => {
+      registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+        { name: 'Push-up', kind: 'bodyweight', levels: ['Wall push-up'], aliases: [] },
+      ])
+      const { view, contents } = createPersistLadderView([
+        {
+          path: 'Fitness/Exercises/Push-up.md',
+          basename: 'Push-up',
+          frontmatter: { type: 'exercise', kind: 'bodyweight' },
+        },
+      ])
+      contents.set(
+        'Fitness/Exercises/Push-up.md',
+        '---\ntype: exercise\nkind: bodyweight\nlevels:\n  - Wall push-up\n---\n',
+      )
+      const cardView = view as unknown as PersistLadderView & {
+        model: {
+          exercises: {
+            name: string
+            kind: 'bodyweight'
+            strengthSets: { set?: number; weight?: number; reps?: number }[]
+            durationEntries: { set?: number; durationSeconds?: number }[]
+            bodyweightSets: { set?: number; level?: number; reps?: number }[]
+          }[]
+        }
+        exerciseHistory: Map<string, unknown>
+        renderExerciseCard(list: HTMLElement, index: number): void
+      }
+      cardView.model = {
+        exercises: [
+          {
+            name: 'Push-up',
+            kind: 'bodyweight',
+            strengthSets: [],
+            durationEntries: [],
+            bodyweightSets: [{ set: 1, level: 1, reps: 8 }],
+          },
+        ],
+      }
+      cardView.exerciseHistory = new Map()
+
+      await cardView.persistLadder('Push-up', ['Incline push-up', 'Knee push-up'])
+
+      expect(contents.get('Fitness/Exercises/Push-up.md')).toContain('  - Incline push-up\n')
+      const list = new TestElement('div')
+      cardView.renderExerciseCard(list as unknown as HTMLElement, 0)
+      expect(list.findByClass('fitkit-bodyweight-level-full')?.textContent).toBe(
+        '1 · Incline push-up',
+      )
+    })
   })
 
   interface LadderGateCard {
@@ -2008,6 +2189,47 @@ describe('WorkoutEditorView kind switch persistence', () => {
         { name: 'Push-up', levels: ['Wall push-up', 'Knee push-up', 'Full push-up'] },
       ])
       expect(obsidianMock.notices).toEqual(['Registry now records levels for Push-up.'])
+    })
+
+    it('lists the appended rung in the level menu while the snapshot still reports the old ladder', async () => {
+      const { view, confirm } = createGateView(
+        [
+          {
+            path: 'Fitness/Exercises/Push-up.md',
+            basename: 'Push-up',
+            frontmatter: { type: 'exercise', kind: 'bodyweight' },
+          },
+        ],
+        ['Wall push-up', 'Knee push-up'],
+        true,
+      )
+      const cardView = view as unknown as LadderGateView & {
+        model: { exercises: LadderGateCard[] }
+        exerciseHistory: Map<string, unknown>
+        renderExerciseCard(list: HTMLElement, index: number): void
+      }
+      const ex: LadderGateCard = {
+        name: 'Push-up',
+        kind: 'bodyweight',
+        strengthSets: [],
+        durationEntries: [],
+        bodyweightSets: [{ level: 1 }],
+      }
+      cardView.model = { exercises: [ex] }
+      cardView.exerciseHistory = new Map()
+
+      await cardView.confirmLadderEdit(ex, ['Wall push-up', 'Knee push-up', 'Full push-up'])
+
+      expect(confirm).not.toHaveBeenCalled()
+      const list = new TestElement('div')
+      cardView.renderExerciseCard(list as unknown as HTMLElement, 0)
+      list.findAllByClass('fitkit-bodyweight-level-label')[0]?.listenersFor('click')[0]?.({})
+      const menu = obsidianMock.menus[obsidianMock.menus.length - 1]
+      expect(menu?.items.map((item) => item.title)).toEqual([
+        '1 · Wall push-up',
+        '2 · Knee push-up',
+        '3 · Full push-up',
+      ])
     })
 
     it('applies a renamed occupied rung on confirm', async () => {
@@ -2239,6 +2461,62 @@ describe('WorkoutEditorView kind switch persistence', () => {
       expect(view.plugin.settings.exerciseRegistry).toMatchObject([
         { name: 'Push-up', kind: 'bodyweight', levels: ['Push-up'] },
       ])
+    })
+
+    it('shows the seeded rung name on the card straight after the switch', async () => {
+      registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+        { name: 'Push-up', kind: 'strength', aliases: [] },
+      ])
+      const noteText = '---\ntype: exercise\nkind: strength\n---\n'
+      const { view, contents } = createPersistKindChangeView(
+        [
+          {
+            path: 'Fitness/Exercises/Push-up.md',
+            basename: 'Push-up',
+            frontmatter: { type: 'exercise', kind: 'strength' },
+          },
+        ],
+        [],
+      )
+      contents.set('Fitness/Exercises/Push-up.md', noteText)
+      const switchView = view as unknown as RelabelView & {
+        model: {
+          exercises: {
+            name: string
+            kind: 'strength' | 'bodyweight'
+            strengthSets: { set?: number; weight?: number; reps?: number }[]
+            durationEntries: { set?: number; durationSeconds?: number }[]
+            bodyweightSets: { set?: number; level?: number; reps?: number; load?: number }[]
+          }[]
+        }
+        exerciseHistory: Map<string, unknown>
+        chooseKindSwitch: () => Promise<string>
+        switchKind: (index: number, nextKind: 'bodyweight') => Promise<void>
+        renderExerciseCard(list: HTMLElement, index: number): void
+      }
+      switchView.render = vi.fn()
+      switchView.markDirty = vi.fn()
+      switchView.model = {
+        exercises: [
+          {
+            name: 'Push-up',
+            kind: 'strength',
+            strengthSets: [{ set: 1, weight: 10, reps: 8 }],
+            durationEntries: [],
+            bodyweightSets: [],
+          },
+        ],
+      }
+      switchView.exerciseHistory = new Map()
+      switchView.chooseKindSwitch = async () => 'workout-and-registry'
+      switchView.confirmFirstLevelRelabel = vi.fn(async () => false)
+
+      await switchView.switchKind(0, 'bodyweight')
+
+      expect(contents.get('Fitness/Exercises/Push-up.md')).toContain('levels:\n  - Push-up\n')
+      const list = new TestElement('div')
+      switchView.renderExerciseCard(list as unknown as HTMLElement, 0)
+      expect(list.findByClass('fitkit-bodyweight-level-full')?.textContent).toBe('1 · Push-up')
     })
 
     it('writes no ladder anywhere on the workout-only choice', async () => {
@@ -3446,6 +3724,44 @@ describe('WorkoutEditorView set seeding', () => {
       .findAllByClass('fitkit-cell')
       .find((cell) => cell.dataset.label === 'Weight')?.children[0]
     expect(again?.classes.has('fitkit-input--unconfirmed')).toBe(false)
+  })
+
+  it('seeds a bodyweight row shaped like the rows Add set appends', () => {
+    const view = Object.create(WorkoutEditorView.prototype) as unknown as {
+      model: {
+        exercises: {
+          name: string
+          kind: 'strength' | 'bodyweight'
+          strengthSets: { set?: number; weight?: number; reps?: number }[]
+          durationEntries: { set?: number; durationSeconds?: number }[]
+          bodyweightSets: { set?: number; level?: number; reps?: number }[]
+        }[]
+      }
+      exerciseHistory: unknown
+      activeTimer: unknown
+      markDirty: ReturnType<typeof vi.fn>
+      render: ReturnType<typeof vi.fn>
+      applyKindSwitch(index: number, nextKind: 'bodyweight', clearedRows: boolean): void
+    }
+    view.model = {
+      exercises: [
+        {
+          name: 'Push-up',
+          kind: 'strength',
+          strengthSets: [{ set: 1, weight: 10, reps: 8 }],
+          durationEntries: [],
+          bodyweightSets: [],
+        },
+      ],
+    }
+    view.exerciseHistory = null
+    view.activeTimer = null
+    view.markDirty = vi.fn()
+    view.render = vi.fn()
+
+    view.applyKindSwitch(0, 'bodyweight', true)
+
+    expect(view.model.exercises[0]?.bodyweightSets).toEqual([{ set: 1, level: 1 }])
   })
 })
 

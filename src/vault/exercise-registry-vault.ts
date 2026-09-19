@@ -39,8 +39,35 @@ export function bodyweightLevelsFor(
 }
 
 /** Order-sensitive ladder equality: rung order is the ladder, so a reorder counts. */
-function sameLevels(left: readonly string[], right: readonly string[]): boolean {
+export function sameLevels(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((rung, index) => rung === right[index])
+}
+
+/**
+ * Snapshot entries with ladders this session wrote overlaid by normalized
+ * name. Entries without an override pass through untouched.
+ */
+export function applyLadderOverrides(
+  entries: readonly ExerciseRegistryEntry[],
+  overrides: ReadonlyMap<string, readonly string[]>,
+): ExerciseRegistryEntry[] {
+  if (overrides.size === 0) {
+    return [...entries]
+  }
+  const byKey = new Map<string, readonly string[]>()
+  for (const [name, levels] of overrides) {
+    const key = normalize(name)
+    if (key.length > 0 && !byKey.has(key)) {
+      byKey.set(key, levels)
+    }
+  }
+  return entries.map((entry) => {
+    const levels = byKey.get(normalize(entry.name))
+    if (levels === undefined) {
+      return entry
+    }
+    return { ...entry, levels: [...levels], aliases: [...entry.aliases] }
+  })
 }
 
 export function buildExerciseRegistrySnapshot(

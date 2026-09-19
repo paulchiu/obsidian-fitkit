@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import type { FitKitSettings } from '../../src/settings'
 import {
+  applyLadderOverrides,
   bodyweightLevelsFor,
   buildExerciseRegistrySnapshot,
   exerciseRegistryWithVaultNotes,
@@ -279,5 +280,30 @@ describe('exercise registry vault merge', () => {
 
     expect(bodyweightLevelsFor(app, settings, 'Push-up')).toEqual(['Wall', 'Knee'])
     expect(bodyweightLevelsFor(app, settings, 'Unknown')).toBeUndefined()
+  })
+
+  it('overlays a just-written ladder onto its snapshot entry by normalized name', () => {
+    const result = applyLadderOverrides(
+      [
+        { name: 'Push-up', kind: 'bodyweight', levels: ['Wall push-up'], aliases: [] },
+        { name: 'Squat', kind: 'strength', aliases: [] },
+      ],
+      new Map([['  PUSH-UP  ', ['Incline push-up', 'Knee push-up']]]),
+    )
+
+    expect(result.find((entry) => entry.name === 'Push-up')?.levels).toEqual([
+      'Incline push-up',
+      'Knee push-up',
+    ])
+    expect(result.find((entry) => entry.name === 'Squat')?.levels).toBeUndefined()
+  })
+
+  it('ignores overrides with no snapshot entry instead of inventing one', () => {
+    const result = applyLadderOverrides(
+      [{ name: 'Squat', kind: 'strength', aliases: [] }],
+      new Map([['Push-up', ['Push-up']]]),
+    )
+
+    expect(result).toEqual([{ name: 'Squat', kind: 'strength', aliases: [] }])
   })
 })
