@@ -34,17 +34,17 @@ tags:
 
 Dataview inline fields are the canonical format. The recognised ones are:
 
-| Field      | Meaning                                                                 |
-| ---------- | ----------------------------------------------------------------------- |
-| `exercise` | Wikilink to the exercise. Required on every row.                        |
-| `set`      | Set number within the exercise.                                         |
-| `weight`   | Weight lifted, in the exercise's unit.                                  |
-| `reps`     | Repetitions.                                                            |
-| `duration` | Seconds. Always seconds, whatever you typed into the editor.            |
-| `level`    | Rung reached, as a 1-based position in the exercise's `levels:` ladder. |
-| `load`     | Added weight on a bodyweight set, such as a vest.                       |
-| `notes`    | Free text, on an exercise header row or on an individual set.           |
-| `next`     | `up`, `down`, or `stay`, with an optional weight change (`up 2.5`).     |
+| Field      | Meaning                                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------------------------- |
+| `exercise` | Wikilink to the exercise. Required on every row.                                                                      |
+| `set`      | Set number within the exercise.                                                                                       |
+| `weight`   | Weight lifted, in the exercise's unit.                                                                                |
+| `reps`     | Repetitions.                                                                                                          |
+| `duration` | Seconds. Always seconds, whatever you typed into the editor.                                                          |
+| `level`    | Rung reached, as a 1-based position in the exercise's `levels:` ladder.                                               |
+| `load`     | Added weight on a bodyweight set, such as a vest.                                                                     |
+| `notes`    | Free text, on an exercise header row or on an individual set.                                                         |
+| `next`     | `up`, `down`, or `stay`, with an optional step (`up 2.5`): a weight change for strength, a rung count for bodyweight. |
 
 An `## [[Name]]` heading groups the rows beneath it. FitKit treats an H2 as an exercise heading only when the section it introduces contains at least one logged exercise row, which is what lets a `## Session notes` heading sit in a workout note without being mistaken for an exercise.
 

@@ -25,15 +25,15 @@ Leave `Create exercise note` ticked for anything you want to chart and revisit; 
 
 Each exercise gets a card. The header holds the name and the card menu, plus a drag handle on the left that appears when you hover the card or reach it with the keyboard. On a touch device or a narrow pane the handle is always visible.
 
-The card menu covers `Open exercise file`, `Rename exercise`, `Add exercise note` / `Edit exercise note`, the plan items described under [Planning your next session](#planning-your-next-session), `Switch to strength` / `Switch to duration`, `Move up`, `Move down`, and `Remove exercise`.
+The card menu covers `Open exercise file`, `Rename exercise`, `Add exercise note` / `Edit exercise note`, the plan items described under [Planning your next session](#planning-your-next-session), `Switch to ...` for the other two kinds, `Move up`, `Move down`, and `Remove exercise`.
 
 `Rename exercise` is scoped to this workout: it points the card at a different exercise. It suggests names already in your exercises folder or workout history, and if the name you pick is a different kind it asks before switching the card over. To rename an exercise everywhere, use the registry instead, see [Exercise registry](exercise-registry.md#renaming-an-exercise).
 
 Under the header sit the history badges:
 
-- `PB` is the heaviest weight lifted for a strength exercise, or the longest session total for a duration one. It is a real lift, not an estimated 1RM.
+- `PB` is the heaviest weight lifted for a strength exercise, the longest session total for a duration one, or the highest rung reached for a bodyweight one. It is a real lift, not an estimated 1RM.
 - `last` is the same measure taken from the most recent prior session.
-- `Next` shows the plan in force, and resolves the weight where it can (`Next: 22.5 kg`). A plan you set on this card wins over the one carried in from last session, so the badge reflects your choice as soon as you make it.
+- `Next` shows the plan in force, and resolves the weight where it can (`Next: 22.5 kg`, or the rung for a bodyweight exercise). A plan you set on this card wins over the one carried in from last session, so the badge reflects your choice as soon as you make it.
 
 Badges are terse so several fit one line on a phone; hover one for the full sentence and its date. `PB` and `last` only appear once there is history to draw on, so a brand new exercise starts bare.
 
@@ -55,11 +55,19 @@ Duration cards work the same way, swapping weight and reps for a single `Duratio
 
 Whatever you type is normalised to the unit form on blur, and stored in the note as seconds.
 
+Bodyweight cards show `Set`, `Level` and `Reps` per set, with a `Load` cell that appears only while some row in that exercise carries a load. The kebab on each row adds load to that row or removes it again.
+
+Each row carries a level stepper: minus and plus move one rung, stopping at the first and last rung of the ladder. The level label between them opens a menu of every rung, marking the current one. `Add set` copies the previous row's rung and puts the cursor in `Reps`.
+
+The card menu holds `Edit levels`, which edits the ladder one rung per line. An edit that changes what an already-logged level means lists each affected level with its old and new rung, and applies only once confirmed. Appending a rung at the end changes nothing logged and does not prompt.
+
+A rung name too long for its cell shortens to a compact form (`L2`), and grows back into the full name when the cell has room again.
+
 ## Planning your next session
 
-The card menu records how you want to load the exercise next session: `Plan: increase`, `Plan: keep`, or `Plan: decrease`. Choosing the direction that is already set clears it. With increase or decrease chosen, `Set plan step...` takes the weight change; it stays greyed out until there is a direction to attach a step to.
+The card menu records how you want to load the exercise next session: `Plan: increase`, `Plan: keep`, or `Plan: decrease`. Choosing the direction that is already set clears it. With increase or decrease chosen, `Set plan step...` takes the step; it stays greyed out until there is a direction to attach a step to.
 
-This is a note to yourself, not an instruction the plugin acts on. It is written as `[next:: up 2.5]`, surfaces as the `Next` badge on the card straight away and again the next time that exercise comes up, and is listed under `Next session plans` on the dashboard. A `[next:: ...]` value that does not start with `up`, `down`, or `stay` is ignored rather than reported, so hand-written wording passes through untouched.
+This is a note to yourself, not an instruction the plugin acts on. It is written as `[next:: up 2.5]`, surfaces as the `Next` badge on the card straight away and again the next time that exercise comes up, and is listed under `Next session plans` on the dashboard. The step is a weight change for a strength exercise and a rung count for a bodyweight one. A `[next:: ...]` value that does not start with `up`, `down`, or `stay` is ignored rather than reported, so hand-written wording passes through untouched.
 
 ## Rest timer
 
@@ -67,11 +75,13 @@ The footer holds a rest timer that counts up from zero and shows `Last rest 90s`
 
 The timer on a duration card is a separate thing, and that one does write into the duration field.
 
-## Switching an exercise between strength and duration
+## Switching an exercise between kinds
 
 Switching kind from the card menu asks what you want it to apply to, because the two stores can disagree. `Just this workout` changes the card and its rows here. `Update registry too` also writes the exercise note's `kind:` frontmatter (or the registry entry when there is no note), so new cards for that exercise default to the new kind.
 
 Existing rows of the old kind are cleared by the switch, and the dialog says so before you commit.
+
+Switching to bodyweight seeds a single rung named after the exercise when the switch updates the registry, so the level menu works straight away. It then offers to mark the already-logged sets as the first level, saying how many would change. Declining leaves the cleared card alone. A logged strength weight carries across as load, and reps carry too.
 
 ## Saving
 
