@@ -1,6 +1,8 @@
 import { parseExerciseKind } from './exercise-kind'
 import {
+  DEFAULT_BODYWEIGHT_EXERCISE_METRIC,
   DEFAULT_EXERCISE_METRIC,
+  VALID_EXERCISE_METRICS,
   parseExerciseMetric,
   type ExerciseMetric,
 } from './exercise-metric'
@@ -78,29 +80,45 @@ export function resolveExerciseChartMetric(
 ): ExerciseMetric {
   switch (kind) {
     case 'duration':
+      return DEFAULT_EXERCISE_METRIC
     case 'bodyweight':
-      return DEFAULT_EXERCISE_METRIC
+      return resolveKindMetric(parsed, frontmatter, kind, DEFAULT_BODYWEIGHT_EXERCISE_METRIC, notes)
     case 'strength': {
-      if (parsed.metricSupplied) {
-        if (parsed.metric) {
-          return parsed.metric
-        }
-        notes.push(`Ignored invalid metric value '${parsed.invalidMetricValue ?? ''}'; using e1rm.`)
-        return DEFAULT_EXERCISE_METRIC
-      }
-
-      const metric = metricFromFrontmatter(frontmatter)
-      if (metric) {
-        return metric
-      }
-
-      const raw = readFrontmatterField(frontmatter, 'metric')
-      if (raw !== undefined) {
-        notes.push(`Ignored invalid metric value '${formatFrontmatterValue(raw)}'; using e1rm.`)
-      }
-      return DEFAULT_EXERCISE_METRIC
+      return resolveKindMetric(parsed, frontmatter, kind, DEFAULT_EXERCISE_METRIC, notes)
     }
   }
+}
+
+/**
+ * Block metric wins when valid for the kind, frontmatter is the fallback, and anything else warns like a bad metric.
+ */
+function resolveKindMetric(
+  parsed: ParsedExerciseChartBlock,
+  frontmatter: ExerciseChartFrontmatter,
+  kind: ExerciseKind,
+  fallback: ExerciseMetric,
+  notes: string[],
+): ExerciseMetric {
+  if (parsed.metricSupplied) {
+    if (parsed.metric && VALID_EXERCISE_METRICS[kind].includes(parsed.metric)) {
+      return parsed.metric
+    }
+    notes.push(
+      `Ignored invalid metric value '${parsed.invalidMetricValue ?? parsed.metric ?? ''}'; using ${fallback}.`,
+    )
+    return fallback
+  }
+
+  const metric = metricFromFrontmatter(frontmatter)
+  if (metric && VALID_EXERCISE_METRICS[kind].includes(metric)) {
+    return metric
+  }
+
+  const raw = readFrontmatterField(frontmatter, 'metric')
+  if (raw !== undefined) {
+    notes.push(`Ignored invalid metric value '${formatFrontmatterValue(raw)}'; using ${fallback}.`)
+  }
+  return fallback
 }
 
 function metricFromFrontmatter(frontmatter: ExerciseChartFrontmatter): ExerciseMetric | null {

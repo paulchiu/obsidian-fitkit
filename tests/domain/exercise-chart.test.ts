@@ -105,6 +105,149 @@ describe('buildExerciseChartSeries', () => {
     expect(series.unit).toBe('s')
   })
 
+  it('plots one point per session for bodyweight using the best set level', () => {
+    const bodyweightRegistry = createRegistry([
+      { name: 'Push-Up', kind: 'bodyweight', aliases: [] },
+    ])
+    const series = buildExerciseChartSeries(
+      fitKitIndex([
+        entry('w/2026-04-01.md', '2026-04-01', [
+          {
+            exerciseName: 'Push-Up',
+            kind: 'bodyweight',
+            maxBodyweightSet: { level: 3, reps: 8, load: 0 },
+          },
+        ]),
+        entry('w/2026-04-03.md', '2026-04-03', [
+          {
+            exerciseName: 'Push-Up',
+            kind: 'bodyweight',
+            maxBodyweightSet: { level: 4, reps: 5, load: 0 },
+          },
+        ]),
+      ]),
+      bodyweightRegistry,
+      'Push-Up',
+      'bodyweight',
+      30,
+      'level',
+    )
+    expect(series.points).toEqual([
+      { date: '2026-04-01', value: 3, workoutPath: 'w/2026-04-01.md' },
+      { date: '2026-04-03', value: 4, workoutPath: 'w/2026-04-03.md' },
+    ])
+  })
+
+  it('plots reps for a bodyweight reps series from the same best sets', () => {
+    const bodyweightRegistry = createRegistry([
+      { name: 'Push-Up', kind: 'bodyweight', aliases: [] },
+    ])
+    const series = buildExerciseChartSeries(
+      fitKitIndex([
+        entry('w/2026-04-01.md', '2026-04-01', [
+          {
+            exerciseName: 'Push-Up',
+            kind: 'bodyweight',
+            maxBodyweightSet: { level: 3, reps: 8, load: 0 },
+          },
+        ]),
+        entry('w/2026-04-03.md', '2026-04-03', [
+          {
+            exerciseName: 'Push-Up',
+            kind: 'bodyweight',
+            maxBodyweightSet: { level: 4, reps: 5, load: 0 },
+          },
+        ]),
+      ]),
+      bodyweightRegistry,
+      'Push-Up',
+      'bodyweight',
+      30,
+      'reps',
+    )
+    expect(series.metric).toBe('reps')
+    expect(series.unit).toBe('reps')
+    expect(series.points).toEqual([
+      { date: '2026-04-01', value: 8, workoutPath: 'w/2026-04-01.md' },
+      { date: '2026-04-03', value: 5, workoutPath: 'w/2026-04-03.md' },
+    ])
+  })
+
+  it('skips a bodyweight reps point when the best set has no reps instead of plotting zero', () => {
+    const bodyweightRegistry = createRegistry([
+      { name: 'Push-Up', kind: 'bodyweight', aliases: [] },
+    ])
+    const series = buildExerciseChartSeries(
+      fitKitIndex([
+        entry('w/2026-04-01.md', '2026-04-01', [
+          {
+            exerciseName: 'Push-Up',
+            kind: 'bodyweight',
+            maxBodyweightSet: { level: 3, reps: 0, load: 0 },
+          },
+        ]),
+        entry('w/2026-04-03.md', '2026-04-03', [
+          {
+            exerciseName: 'Push-Up',
+            kind: 'bodyweight',
+            maxBodyweightSet: { level: 4, reps: 6, load: 0 },
+          },
+        ]),
+      ]),
+      bodyweightRegistry,
+      'Push-Up',
+      'bodyweight',
+      30,
+      'reps',
+    )
+    expect(series.points).toEqual([
+      { date: '2026-04-03', value: 6, workoutPath: 'w/2026-04-03.md' },
+    ])
+  })
+
+  it('never takes the strength e1rm to reps fallback for a bodyweight series', () => {
+    const bodyweightRegistry = createRegistry([
+      { name: 'Push-Up', kind: 'bodyweight', aliases: [] },
+    ])
+    const series = buildExerciseChartSeries(
+      fitKitIndex([
+        entry('w/2026-04-01.md', '2026-04-01', [
+          {
+            exerciseName: 'Push-Up',
+            kind: 'bodyweight',
+            maxBodyweightSet: { level: 3, reps: 8, load: 0 },
+          },
+        ]),
+      ]),
+      bodyweightRegistry,
+      'Push-Up',
+      'bodyweight',
+      30,
+      'e1rm',
+    )
+    expect(series.metric).toBe('level')
+    expect(series.points).toEqual([
+      { date: '2026-04-01', value: 3, workoutPath: 'w/2026-04-01.md' },
+    ])
+  })
+
+  it('returns an empty bodyweight series when there are no sessions so the renderer shows its empty state', () => {
+    const bodyweightRegistry = createRegistry([
+      { name: 'Push-Up', kind: 'bodyweight', aliases: [] },
+    ])
+    const series = buildExerciseChartSeries(
+      fitKitIndex([]),
+      bodyweightRegistry,
+      'Push-Up',
+      'bodyweight',
+      30,
+      'level',
+    )
+    expect(series.points).toEqual([])
+    expect(series.totalDates).toBe(0)
+    expect(series.metric).toBe('level')
+  })
+
   it('filters by kind: duration rows ignored when querying strength', () => {
     const series = buildExerciseChartSeries(
       fitKitIndex([

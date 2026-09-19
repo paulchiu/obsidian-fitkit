@@ -10,7 +10,7 @@ import {
 import type { FitKitIndex } from './types'
 import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from './weight-unit'
 
-export type ChartSeriesMetric = ExerciseMetric | 'duration' | 'reps'
+export type ChartSeriesMetric = ExerciseMetric | 'duration'
 
 export interface ChartPoint {
   date: string
@@ -22,7 +22,7 @@ export interface ChartSeries {
   exerciseName: string
   kind: ExerciseKind
   metric: ChartSeriesMetric
-  unit: WeightUnit | 's' | 'reps'
+  unit: WeightUnit | 's' | 'reps' | 'level'
   points: ChartPoint[]
   windowRequested: number
   totalDates: number
@@ -73,8 +73,9 @@ export function buildExerciseChartSeries(
 function defaultSeriesMetric(kind: ExerciseKind, metric: ExerciseMetric): ChartSeriesMetric {
   switch (kind) {
     case 'duration':
-    case 'bodyweight':
       return 'duration'
+    case 'bodyweight':
+      return metric === 'reps' ? metric : 'level'
     case 'strength':
       return metric
   }
@@ -118,6 +119,9 @@ function unitForMetric(metric: ChartSeriesMetric, weightUnit: WeightUnit): Chart
   if (metric === 'duration') {
     return 's'
   }
+  if (metric === 'level') {
+    return 'level'
+  }
   if (metric === 'reps') {
     return 'reps'
   }
@@ -153,8 +157,9 @@ function pickMetric(
 ): number | null {
   switch (kind) {
     case 'duration':
-    case 'bodyweight':
       return pickDurationMetric(row)
+    case 'bodyweight':
+      return pickBodyweightMetric(row, metric)
     case 'strength':
       return pickStrengthMetric(row, metric)
   }
@@ -168,6 +173,26 @@ function pickDurationMetric(
     return null
   }
   return value
+}
+
+/**
+ * Level or reps from the session best set; sessions without one contribute nothing.
+ */
+function pickBodyweightMetric(
+  row: FitKitIndex['entries'][number]['exercises'][number],
+  metric: ChartSeriesMetric,
+): number | null {
+  const set = row.maxBodyweightSet
+  if (!set || !Number.isFinite(set.level) || set.level < 1) {
+    return null
+  }
+  if (metric === 'reps') {
+    if (!Number.isFinite(set.reps) || set.reps <= 0) {
+      return null
+    }
+    return set.reps
+  }
+  return set.level
 }
 
 function pickStrengthMetric(
