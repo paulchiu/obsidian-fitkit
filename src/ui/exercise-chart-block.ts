@@ -11,7 +11,7 @@ import {
   resolveExerciseChartMetric,
 } from '../domain/exercise-chart-block-parse'
 import { buildExerciseChartSeries } from '../domain/exercise-chart'
-import { parseExerciseKind } from '../domain/exercise-kind'
+import { EXERCISE_KINDS, assertUnreachableKind, parseExerciseKind } from '../domain/exercise-kind'
 import {
   createRegistry,
   kindForName,
@@ -97,29 +97,41 @@ async function renderInternal(
   }
   if (parsed.kind === null && !sourceIsExerciseNote) {
     notes.push(
-      `No 'kind:' supplied; defaulting to ${kind}. Add 'kind: strength' or 'kind: duration' to be explicit.`,
+      `No 'kind:' supplied; defaulting to ${kind}. Add ${formatKindOptions()} to be explicit.`,
     )
   }
   if (parsed.kind === null && sourceIsExerciseNote && frontmatterKind.kind === null) {
     if (frontmatterKind.reason === 'invalid') {
-      if (registryKind === 'duration') {
-        notes.push(
-          `Exercise note frontmatter has unrecognised 'kind: ${frontmatterKind.raw}'; using duration from the exercise registry. Use 'kind: strength' or 'kind: duration'.`,
-        )
-      } else {
-        notes.push(
-          `Exercise note frontmatter has unrecognised 'kind: ${frontmatterKind.raw}'; defaulting to strength. Use 'kind: strength' or 'kind: duration'.`,
-        )
+      switch (registryKind) {
+        case 'duration':
+          notes.push(
+            `Exercise note frontmatter has unrecognised 'kind: ${frontmatterKind.raw}'; using duration from the exercise registry. Use ${formatKindOptions()}.`,
+          )
+          break
+        case 'strength':
+        case null:
+          /** A silent registry joins strength here: neither supplied a kind, so the strength default applies. */
+          notes.push(
+            `Exercise note frontmatter has unrecognised 'kind: ${frontmatterKind.raw}'; defaulting to strength. Use ${formatKindOptions()}.`,
+          )
+          break
+        default:
+          assertUnreachableKind(registryKind)
       }
     } else if (kind === 'strength') {
+      /**
+       * Strength-only rule: this note describes the strength default, so a kind
+       * resolved from the registry stays silent (nothing was defaulted).
+       */
       notes.push(
-        "Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add 'kind: strength' or 'kind: duration' to be explicit.",
+        `Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add ${formatKindOptions()} to be explicit.`,
       )
     }
   }
 
   const metric = resolveExerciseChartMetric(parsed, exerciseFrontmatter, kind, notes)
 
+  /** Strength-only rule: weight units are a strength concern; other kinds chart without one. */
   const weightUnit =
     kind === 'strength'
       ? resolveExerciseWeightUnit(exerciseFrontmatter, registry, exerciseName)
@@ -176,6 +188,21 @@ function isExerciseSourceFile(file: TFile | null, plugin: FitKitPlugin): boolean
   const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter
   const typeValue = readFrontmatterField(frontmatter, 'type')
   return typeof typeValue === 'string' && typeValue.toLowerCase() === 'exercise'
+}
+
+/**
+ * Advice fragment naming every known kind, so the note text cannot drift from
+ * `EXERCISE_KINDS`. Reads `'kind: strength' or 'kind: duration'` at two kinds
+ * and takes the Oxford comma at three and beyond.
+ */
+function formatKindOptions(): string {
+  const options = EXERCISE_KINDS.map((kind) => `'kind: ${kind}'`)
+  if (options.length <= 2) {
+    return options.join(' or ')
+  }
+  const leading = options.slice(0, -1).join(', ')
+  const trailing = options.slice(-1).join('')
+  return `${leading}, or ${trailing}`
 }
 
 function kindFromFrontmatter(

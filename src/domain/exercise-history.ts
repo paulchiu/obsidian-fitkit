@@ -1,4 +1,5 @@
 import type { ExerciseKind } from './workout-note-model'
+import { assertUnreachableKind } from './exercise-kind'
 import { formatDurationInput } from './duration-input'
 import { pickHeaviestSet } from './epley'
 import { formatNextPlanLabel, nextPlanTargetWeight, type NextPlan } from './next-plan'
@@ -96,39 +97,44 @@ export function formatExerciseHistoryBadges(
     return []
   }
 
-  if (kind === 'duration') {
-    const history = summary.duration
-    return [
-      history?.personalBestSeconds !== undefined
-        ? {
-            text: `PB ${formatDurationInput(history.personalBestSeconds)}`,
-            title: `Longest session total duration: ${formatDurationInput(history.personalBestSeconds)}`,
-          }
-        : null,
-      history?.lastSessionMaxSeconds !== undefined
-        ? {
-            text: `last ${formatDurationInput(history.lastSessionMaxSeconds.value)}`,
-            title: `Latest prior session total duration: ${formatDurationInput(history.lastSessionMaxSeconds.value)} (${history.lastSessionMaxSeconds.date})`,
-          }
-        : null,
-    ].filter((badge): badge is ExerciseHistoryBadge => badge !== null)
+  switch (kind) {
+    case 'duration': {
+      const history = summary.duration
+      return [
+        history?.personalBestSeconds !== undefined
+          ? {
+              text: `PB ${formatDurationInput(history.personalBestSeconds)}`,
+              title: `Longest session total duration: ${formatDurationInput(history.personalBestSeconds)}`,
+            }
+          : null,
+        history?.lastSessionMaxSeconds !== undefined
+          ? {
+              text: `last ${formatDurationInput(history.lastSessionMaxSeconds.value)}`,
+              title: `Latest prior session total duration: ${formatDurationInput(history.lastSessionMaxSeconds.value)} (${history.lastSessionMaxSeconds.date})`,
+            }
+          : null,
+      ].filter((badge): badge is ExerciseHistoryBadge => badge !== null)
+    }
+    case 'strength': {
+      const history = summary.strength
+      return [
+        history?.personalBest
+          ? {
+              text: `PB ${formatWeightSetShort(history.personalBest, { weightOnly: true })}`,
+              title: `Heaviest weight lifted (not 1RM): ${formatWeightSet(history.personalBest)}`,
+            }
+          : null,
+        history?.lastSessionMax
+          ? {
+              text: `last ${formatWeightSetShort(history.lastSessionMax.value)}`,
+              title: `Heaviest weight in latest prior session: ${formatWeightSet(history.lastSessionMax.value)} (${history.lastSessionMax.date})`,
+            }
+          : null,
+      ].filter((badge): badge is ExerciseHistoryBadge => badge !== null)
+    }
+    default:
+      return assertUnreachableKind(kind)
   }
-
-  const history = summary.strength
-  return [
-    history?.personalBest
-      ? {
-          text: `PB ${formatWeightSetShort(history.personalBest, { weightOnly: true })}`,
-          title: `Heaviest weight lifted (not 1RM): ${formatWeightSet(history.personalBest)}`,
-        }
-      : null,
-    history?.lastSessionMax
-      ? {
-          text: `last ${formatWeightSetShort(history.lastSessionMax.value)}`,
-          title: `Heaviest weight in latest prior session: ${formatWeightSet(history.lastSessionMax.value)} (${history.lastSessionMax.date})`,
-        }
-      : null,
-  ].filter((badge): badge is ExerciseHistoryBadge => badge !== null)
 }
 
 /**
@@ -144,6 +150,7 @@ export function formatNextPlanBadge(
   kind: ExerciseKind,
   current?: CurrentExercisePlan,
 ): NextPlanBadge | null {
+  /** Strength-only rule: next-time plans are recorded for strength sets; other kinds have no plan badge. */
   if (kind !== 'strength') {
     return null
   }
@@ -211,6 +218,7 @@ function addEntryToDrafts(
       }
     }
 
+    /** Strength-only rule: strength rows feed the weight statistics; other kinds contribute nothing here. */
     if (row.kind === 'strength' && row.maxWeightSet) {
       hasMetric = true
       draft.strengthPersonalBest = draft.strengthPersonalBest
@@ -230,6 +238,7 @@ function addEntryToDrafts(
       }
     }
 
+    /** Duration-only rule: duration rows feed the time statistics; other kinds contribute nothing here. */
     if (
       row.kind === 'duration' &&
       row.totalDurationSeconds !== undefined &&

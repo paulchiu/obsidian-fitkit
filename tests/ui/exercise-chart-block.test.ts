@@ -144,6 +144,21 @@ describe('exercise chart block rendering', () => {
     chartSvgMock.renderExerciseChartSvg.mockReset()
   })
 
+  it('names every known kind in the missing kind note for non-exercise notes', async () => {
+    const plugin = createPlugin([], new Map())
+
+    await renderExerciseChartBlock(
+      plugin,
+      'exercise: Bench Press',
+      new TestElement('div') as unknown as HTMLElement,
+      createContext('Fitness/Dashboard.md'),
+    )
+
+    expect(renderedNotes()).toEqual([
+      "No 'kind:' supplied; defaulting to strength. Add 'kind: strength' or 'kind: duration' to be explicit.",
+    ])
+  })
+
   it('shows a missing kind frontmatter note for exercise notes that fall back to strength', async () => {
     const file = new TFile('Fitness/Exercises/Bench Press.md')
     const plugin = createPlugin([file], new Map([[file.path, { type: 'exercise' }]]))

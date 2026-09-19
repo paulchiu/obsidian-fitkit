@@ -1,4 +1,5 @@
 import { epleyE1rm } from './epley'
+import { assertUnreachableKind } from './exercise-kind'
 import { DEFAULT_EXERCISE_METRIC, type ExerciseMetric } from './exercise-metric'
 import {
   normalize,
@@ -39,10 +40,14 @@ export function buildExerciseChartSeries(
 ): ChartSeries {
   const matchKeys = buildMatchKeys(registry, exerciseName)
   const activeWeightUnit = weightUnit ?? unitForName(registry, exerciseName) ?? DEFAULT_WEIGHT_UNIT
-  let seriesMetric: ChartSeriesMetric = kind === 'duration' ? 'duration' : metric
+  let seriesMetric: ChartSeriesMetric = defaultSeriesMetric(kind, metric)
   let ordered = collectPoints(index, matchKeys, kind, seriesMetric)
 
-  /** Reps fallback only fires with no weighted points; mixed-history bodyweight days are skipped. */
+  /**
+   * Strength-only rule: e1RM is a strength metric, so only strength series fall
+   * back to reps, and only with no weighted points (mixed-history bodyweight
+   * days are skipped). Other kinds correctly never enter here.
+   */
   if (kind === 'strength' && metric === 'e1rm' && ordered.length === 0) {
     const repsPoints = collectPoints(index, matchKeys, kind, 'reps')
     if (repsPoints.length > 0) {
@@ -63,6 +68,17 @@ export function buildExerciseChartSeries(
     points: sliced,
     windowRequested: safeWindow,
     totalDates,
+  }
+}
+
+function defaultSeriesMetric(kind: ExerciseKind, metric: ExerciseMetric): ChartSeriesMetric {
+  switch (kind) {
+    case 'duration':
+      return 'duration'
+    case 'strength':
+      return metric
+    default:
+      return assertUnreachableKind(kind)
   }
 }
 
@@ -137,13 +153,30 @@ function pickMetric(
   kind: ExerciseKind,
   metric: ChartSeriesMetric,
 ): number | null {
-  if (kind === 'duration') {
-    const value = row.totalDurationSeconds
-    if (value === undefined || !Number.isFinite(value) || value <= 0) {
-      return null
-    }
-    return value
+  switch (kind) {
+    case 'duration':
+      return pickDurationMetric(row)
+    case 'strength':
+      return pickStrengthMetric(row, metric)
+    default:
+      return assertUnreachableKind(kind)
   }
+}
+
+function pickDurationMetric(
+  row: FitKitIndex['entries'][number]['exercises'][number],
+): number | null {
+  const value = row.totalDurationSeconds
+  if (value === undefined || !Number.isFinite(value) || value <= 0) {
+    return null
+  }
+  return value
+}
+
+function pickStrengthMetric(
+  row: FitKitIndex['entries'][number]['exercises'][number],
+  metric: ChartSeriesMetric,
+): number | null {
   if (metric === 'reps') {
     const set = row.bestSet ?? row.maxWeightSet
     if (
