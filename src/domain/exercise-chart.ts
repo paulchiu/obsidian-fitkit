@@ -1,5 +1,9 @@
 import { epleyE1rm } from './epley'
-import { DEFAULT_EXERCISE_METRIC, type ExerciseMetric } from './exercise-metric'
+import {
+  DEFAULT_EXERCISE_METRIC,
+  assertUnreachableMetric,
+  type ExerciseMetric,
+} from './exercise-metric'
 import {
   normalize,
   resolve,
@@ -75,7 +79,16 @@ function defaultSeriesMetric(kind: ExerciseKind, metric: ExerciseMetric): ChartS
     case 'duration':
       return 'duration'
     case 'bodyweight':
-      return metric === 'reps' ? metric : 'level'
+      switch (metric) {
+        case 'level':
+        case 'reps':
+          return metric
+        case 'weight':
+        case 'e1rm':
+          return 'level'
+        default:
+          return assertUnreachableMetric(metric)
+      }
     case 'strength':
       return metric
   }
@@ -116,16 +129,19 @@ function collectPoints(
 }
 
 function unitForMetric(metric: ChartSeriesMetric, weightUnit: WeightUnit): ChartSeries['unit'] {
-  if (metric === 'duration') {
-    return 's'
+  switch (metric) {
+    case 'duration':
+      return 's'
+    case 'level':
+      return 'level'
+    case 'reps':
+      return 'reps'
+    case 'weight':
+    case 'e1rm':
+      return weightUnit
+    default:
+      return assertUnreachableMetric(metric)
   }
-  if (metric === 'level') {
-    return 'level'
-  }
-  if (metric === 'reps') {
-    return 'reps'
-  }
-  return weightUnit
 }
 
 function buildMatchKeys(registry: ExerciseRegistry, exerciseName: string): Set<string> {

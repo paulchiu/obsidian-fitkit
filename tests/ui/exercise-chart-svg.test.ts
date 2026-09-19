@@ -3,14 +3,14 @@ import { describe, expect, it } from 'vitest'
 import type { ChartSeries } from '../../src/domain/exercise-chart'
 import { renderExerciseChartSvg } from '../../src/ui/exercise-chart-svg'
 
-interface FakeElementOptions {
+interface TestElementOptions {
   cls?: string
   text?: string
   attr?: Record<string, string | number>
 }
 
-class FakeNode {
-  readonly children: FakeNode[] = []
+class TestElement {
+  readonly children: TestElement[] = []
   readonly classes = new Set<string>()
   attrs: Record<string, string | number> = {}
   textContent = ''
@@ -26,16 +26,16 @@ class FakeNode {
     this.classes.add(className)
   }
 
-  createDiv(options: FakeElementOptions = {}): FakeNode {
+  createDiv(options: TestElementOptions = {}): TestElement {
     return this.append('div', options)
   }
 
-  createSvg(tag: string, options: FakeElementOptions = {}): FakeNode {
+  createSvg(tag: string, options: TestElementOptions = {}): TestElement {
     return this.append(tag, options)
   }
 
-  private append(tag: string, options: FakeElementOptions): FakeNode {
-    const child = new FakeNode(tag)
+  private append(tag: string, options: TestElementOptions): TestElement {
+    const child = new TestElement(tag)
     if (options.cls) {
       child.addClass(options.cls)
     }
@@ -50,8 +50,8 @@ class FakeNode {
   }
 }
 
-function render(series: ChartSeries, options: { ladder?: readonly string[] } = {}): FakeNode {
-  const root = new FakeNode('div')
+function render(series: ChartSeries, options: { ladder?: readonly string[] } = {}): TestElement {
+  const root = new TestElement('div')
   renderExerciseChartSvg(root as unknown as HTMLElement, series, options)
   return root
 }
@@ -88,17 +88,17 @@ function strengthSeries(values: number[]): ChartSeries {
   }
 }
 
-function descendants(root: FakeNode): FakeNode[] {
+function descendants(root: TestElement): TestElement[] {
   return root.children.flatMap((child) => [child, ...descendants(child)])
 }
 
-function yLabelTexts(root: FakeNode): string[] {
+function yLabelTexts(root: TestElement): string[] {
   return descendants(root)
     .filter((node) => node.tag === 'text' && node.attrs['text-anchor'] === 'end')
     .map((node) => node.textContent)
 }
 
-function polylinePairs(root: FakeNode): Array<{ x: number; y: number }> {
+function polylinePairs(root: TestElement): Array<{ x: number; y: number }> {
   const line = descendants(root).find((node) => node.tag === 'polyline')
   if (!line) {
     return []

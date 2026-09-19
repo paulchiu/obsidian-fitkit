@@ -15,6 +15,11 @@ export const VALID_EXERCISE_METRICS: Record<ExerciseKind, readonly ExerciseMetri
   bodyweight: ['level', 'reps'],
 }
 
+/** Exhaustiveness guard: a new `ExerciseMetric` member makes every caller stop compiling. */
+export function assertUnreachableMetric(value: never): never {
+  throw new Error(`Unhandled exercise metric: ${String(value)}`)
+}
+
 export function parseExerciseMetric(value: unknown): ExerciseMetric | null {
   if (typeof value !== 'string') {
     return null

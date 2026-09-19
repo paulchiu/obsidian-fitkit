@@ -396,7 +396,7 @@ describe('dashboard composer', () => {
       'Fitness/Workouts',
       'Fitness/Exercises',
       new Set(),
-      new Map([['Bench Press', 'weight'] as const]),
+      { metrics: new Map([['Bench Press', 'weight'] as const]) },
     )
 
     expect(markdown).toContain('- **[[#Bench Press|Bench Press]]:** 105kg x 3')
@@ -428,8 +428,10 @@ describe('dashboard composer', () => {
       'Fitness/Workouts',
       'Fitness/Exercises',
       new Set(),
-      new Map([['Bench Press', 'e1rm'] as const]),
-      new Map([['Bench Press', 'lbs'] as const]),
+      {
+        metrics: new Map([['Bench Press', 'e1rm'] as const]),
+        units: new Map([['Bench Press', 'lbs'] as const]),
+      },
     )
 
     expect(markdown).toContain('- **[[#Bench Press|Bench Press]]:** 200lbs x 5 (e1rm 233.3lbs)')
@@ -606,7 +608,7 @@ describe('dashboard composer', () => {
       'Fitness/Workouts',
       'Fitness/Exercises',
       new Set(),
-      new Map([['Push-up', 'weight'] as const]),
+      { metrics: new Map([['Push-up', 'weight'] as const]) },
     )
 
     expect(markdown).toContain('- **[[#Push-up|Push-up]]:** 12 reps')
@@ -651,7 +653,7 @@ describe('dashboard composer', () => {
       'Fitness/Workouts',
       'Fitness/Exercises',
       new Set(),
-      new Map([['Push-up', 'weight'] as const]),
+      { metrics: new Map([['Push-up', 'weight'] as const]) },
     )
 
     expect(markdown).toContain('- **[[#Push-up|Push-up]]:** 12 reps')
