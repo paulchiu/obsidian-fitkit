@@ -9,18 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Workout notes now recognise a `bodyweight` exercise kind whose rows carry `[level::]` (with optional `[reps::]` and `[load::]`). Parsing, note round-trip, and the reading view table are in place; the ladder, history badges, and full editor card follow in later changes.
-- Bodyweight exercise notes now declare the ordered `levels:` ladder the `[level::]` index points at. The note ladder wins over a saved registry ladder (with a diagnostic on disagreement), repairs and new notes seed a one-rung ladder, and switching a note to bodyweight sheds strength-only `metric:`/`unit:` lines.
-- Reading view and history badges now show bodyweight rung names instead of bare level numbers, with a `Level N` fallback when no ladder names the rung. The bodyweight personal best is the highest rung reached, ties broken by reps then load, and `[next::]` plans work over the ladder (`Same level` holds, steps count rungs and clamp to the ladder ends).
-- The workout editor now renders bodyweight exercises as a full card: a level stepper and rung menu per row, reps and optional load inputs, a load column that appears only while a row carries load, and an add-set action that copies the previous rung and focuses reps. A rung name shortens to its compact form only when the name itself overruns its cell.
-- Next-time plans on bodyweight exercises now read as counts of rungs wherever they appear: the reading view, the dashboard, and the plan step prompt, which asks for a rung change instead of a weight change.
-- A bodyweight card menu can now edit its ladder (one rung per line), writing to the exercise note when one exists and to the registry otherwise. An edit that changes what an already-logged level means lists each affected level with its old and new rung and applies only on confirmation, and switching an exercise to bodyweight seeds a one-rung ladder and offers to mark its already-logged sets as level 1.
+- Exercises can now be tracked as `bodyweight`, where a set records which rung of a progression you reached rather than how much you lifted. A set row carries `[level:: N]` with optional `[reps:: R]` and `[load:: X]`, and `N` indexes an ordered `levels:` ladder declared on the exercise note, so one note owns its whole progression and a single workout can mix rungs.
+- The workout editor renders a bodyweight exercise as a card with a level stepper and a rung menu on every row, reps and an optional load cell, and an add-set action that carries the previous rung forward. A rung name too long for its cell shortens to a compact form, decided from the name's own width so an arbitrarily long name still fits.
+- A bodyweight card can edit its ladder, writing to the exercise note when one exists and to the exercise registry otherwise. Because a set stores a position rather than a name, an edit that changes what an already-logged level means lists each affected level with its old and new rung, and applies only once confirmed.
+- Switching an exercise to bodyweight seeds a single rung named after the exercise so the card works straight away, and offers to mark the already-logged sets as the first level, stating how many would change.
+- Reading view, history badges and next-time plans all speak in rungs. A bodyweight personal best is the highest rung reached, with ties broken by reps and then by load, and a `[next::]` step counts rungs rather than kilograms.
 
 ### Changed
 
 ### Fixed
 
-- Editing or renaming a no-note bodyweight registry entry no longer drops its `levels:` ladder.
+- Editing or renaming an exercise registry entry no longer discards its `levels:` ladder. This was only reachable for an exercise with no note of its own, where the registry holds the only copy.
 
 ### Removed
 
