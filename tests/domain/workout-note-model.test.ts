@@ -298,6 +298,62 @@ describe('workout note model', () => {
     })
   })
 
+  it('keeps the exercise note and next plan when strength rows coerce to duration', () => {
+    const model = expectWorkoutModel(
+      [
+        '---',
+        'type: workout',
+        'date: 2026-04-24',
+        'name: Mixed Rows',
+        '---',
+        '',
+        '## [[Squat]]',
+        '',
+        '- [exercise:: [[Squat]]] [notes:: felt easy] [next:: up 2.5]',
+        '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+        '- [exercise:: [[Squat]]] [duration:: 60]',
+      ].join('\n'),
+      'mixed-rows-note.md',
+    )
+
+    expect(model.exercises).toHaveLength(1)
+    const entry = model.exercises[0]
+    if (entry?.kind !== 'duration') {
+      throw new Error('expected the coerced entry to be duration')
+    }
+    expect(entry.note).toBe('felt easy')
+    expect(entry.next).toEqual({ direction: 'up', step: 2.5 })
+    expect(entry.durationEntries).toEqual([{ durationSeconds: 60 }])
+  })
+
+  it('keeps the exercise note and next plan when duration rows coerce to strength', () => {
+    const model = expectWorkoutModel(
+      [
+        '---',
+        'type: workout',
+        'date: 2026-04-24',
+        'name: Mixed Rows',
+        '---',
+        '',
+        '## [[Plank]]',
+        '',
+        '- [exercise:: [[Plank]]] [notes:: cold gym] [next:: down 1]',
+        '- [exercise:: [[Plank]]] [duration:: 60]',
+        '- [exercise:: [[Plank]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      ].join('\n'),
+      'mixed-rows-mirror-note.md',
+    )
+
+    expect(model.exercises).toHaveLength(1)
+    const entry = model.exercises[0]
+    if (entry?.kind !== 'strength') {
+      throw new Error('expected the coerced entry to be strength')
+    }
+    expect(entry.note).toBe('cold gym')
+    expect(entry.next).toEqual({ direction: 'down', step: 1 })
+    expect(entry.strengthSets).toEqual([{ set: 1, weight: 100, reps: 5 }])
+  })
+
   it('preserves fenced blocks in serialized output', () => {
     const model = expectWorkoutModel(fixture('workouts/fence-block.md'), 'workouts/fence-block.md')
     const serialized = serializeWorkoutNote(model)
@@ -764,8 +820,8 @@ describe('workout note model', () => {
       throw new Error('hand-edited.md first exercise did not parse as strength')
     }
     const benchSets = bench.strengthSets
-    expect(benchSets?.[1]).toBeDefined()
-    if (benchSets?.[1]) {
+    expect(benchSets[1]).toBeDefined()
+    if (benchSets[1]) {
       benchSets[1].weight = 70
     }
     const editedSerialized = serializeWorkoutNote(edited)
@@ -793,7 +849,7 @@ describe('workout note model', () => {
     if (first?.kind !== 'strength') {
       throw new Error('hand-edited.md first exercise did not parse as strength')
     }
-    expect(first.strengthSets?.[0]).toEqual({ set: 1, weight: 60, reps: 8 })
+    expect(first.strengthSets[0]).toEqual({ set: 1, weight: 60, reps: 8 })
     const serialized = serializeWorkoutNote(model)
     expect(serialized).not.toContain('rpe')
   })

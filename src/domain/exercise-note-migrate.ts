@@ -483,8 +483,7 @@ function repairRecentSessions(
 }
 
 /**
- * Mirrors `repairRecentSessions` (minus the strength/duration kind
- * alternation, which the Notes query has no equivalent of): a block that
+ * Mirrors `repairRecentSessions` for the name-targeted Notes query: a block that
  * only differs from canonical by which exercise name it targets is treated
  * as stale, not customised, and is rewritten silently so a rename actually
  * follows through instead of leaving the survivor's per-session notes table

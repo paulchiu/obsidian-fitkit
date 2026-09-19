@@ -67,6 +67,20 @@ export interface DurationExerciseEntry extends ExerciseEntryBase {
 
 export type ExerciseEntry = StrengthExerciseEntry | DurationExerciseEntry
 
+export function withNoteAndNext<T extends ExerciseEntry>(
+  entry: T,
+  note: string | undefined,
+  next: NextPlan | undefined,
+): T {
+  if (note !== undefined) {
+    entry.note = note
+  }
+  if (next !== undefined) {
+    entry.next = next
+  }
+  return entry
+}
+
 export interface PreserveBlock {
   /**
    * 0-based index into `exercises` of the section this block appeared
@@ -262,16 +276,11 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
             `${sourcePath}: Exercise "${inlineName}" has both strength and duration rows; dropping strength data.`,
           )
         }
-        const exerciseName: string = current.exerciseName
-        const carriedNote: string | undefined = current.note
-        const carriedNext: NextPlan | undefined = current.next
-        current = { exerciseName, kind: 'duration', durationEntries: [] }
-        if (carriedNote !== undefined) {
-          current.note = carriedNote
-        }
-        if (carriedNext !== undefined) {
-          current.next = carriedNext
-        }
+        current = withNoteAndNext(
+          { exerciseName: current.exerciseName, kind: 'duration', durationEntries: [] },
+          current.note,
+          current.next,
+        )
       }
       const durationSeconds = Number(fields.get('duration'))
       const entry: DurationEntry = { durationSeconds }
@@ -292,16 +301,11 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
           `${sourcePath}: Exercise "${inlineName}" has both strength and duration rows; dropping duration data.`,
         )
       }
-      const exerciseName: string = current.exerciseName
-      const carriedNote: string | undefined = current.note
-      const carriedNext: NextPlan | undefined = current.next
-      current = { exerciseName, kind: 'strength', strengthSets: [] }
-      if (carriedNote !== undefined) {
-        current.note = carriedNote
-      }
-      if (carriedNext !== undefined) {
-        current.next = carriedNext
-      }
+      current = withNoteAndNext(
+        { exerciseName: current.exerciseName, kind: 'strength', strengthSets: [] },
+        current.note,
+        current.next,
+      )
     }
     const setNum = Number(fields.get('set') ?? '0')
     const set: StrengthSet = { set: setNum }

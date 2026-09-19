@@ -99,4 +99,14 @@ window: 12
       windowFallback: false,
     })
   })
+
+  it('accepts kinds case-insensitively through the shared parser', () => {
+    expect(parseExerciseChartBlock('kind: DURATION').kind).toBe('duration')
+    expect(parseExerciseChartBlock('kind:   Strength  ').kind).toBe('strength')
+  })
+
+  it('leaves kind untouched on an unrecognised value', () => {
+    expect(parseExerciseChartBlock('kind: cardio').kind).toBeNull()
+    expect(parseExerciseChartBlock('kind: strength\nkind: cardio').kind).toBe('strength')
+  })
 })

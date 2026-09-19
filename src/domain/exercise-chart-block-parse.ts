@@ -1,3 +1,4 @@
+import { parseExerciseKind } from './exercise-kind'
 import {
   DEFAULT_EXERCISE_METRIC,
   parseExerciseMetric,
@@ -44,10 +45,7 @@ export function parseExerciseChartBlock(source: string): ParsedExerciseChartBloc
     if (key === 'exercise' || key === 'name') {
       result.exerciseName = value
     } else if (key === 'kind') {
-      const lowered = value.toLowerCase()
-      if (lowered === 'strength' || lowered === 'duration') {
-        result.kind = lowered
-      }
+      result.kind = parseExerciseKind(value) ?? result.kind
     } else if (key === 'metric') {
       const metricValue = normalizeMetricValue(value)
       if (metricValue === null) {

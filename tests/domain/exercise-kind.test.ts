@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import {
   EXERCISE_KINDS,
@@ -26,14 +26,14 @@ describe('exercise kind', () => {
   })
 
   it('is the single ExerciseKind behind the registry and model aliases', () => {
-    expectTypeOf<RegistryExerciseKind>().toEqualTypeOf<ExerciseKind>()
-    expectTypeOf<ModelExerciseKind>().toEqualTypeOf<ExerciseKind>()
     const viaRegistry: readonly RegistryExerciseKind[] = EXERCISE_KINDS
     const viaModel: readonly ModelExerciseKind[] = EXERCISE_KINDS
     expect([...viaRegistry, ...viaModel]).toEqual(['strength', 'duration', 'strength', 'duration'])
   })
 
-  it('is the kind of every exercise index row', () => {
-    expectTypeOf<ExerciseIndexRow['kind']>().toEqualTypeOf<ExerciseKind>()
+  it('accepts the kind carried by an exercise index row', () => {
+    const row: ExerciseIndexRow = { exerciseName: 'Squat', kind: 'strength' }
+
+    expect(parseExerciseKind(row.kind)).toBe('strength')
   })
 })

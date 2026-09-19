@@ -35,12 +35,11 @@ import {
 import {
   parseWorkoutNote,
   serializeWorkoutNote,
+  withNoteAndNext,
   type DurationEntry,
-  type DurationExerciseEntry,
   type ExerciseEntry,
   type ExerciseKind,
   type PreserveBlock,
-  type StrengthExerciseEntry,
   type StrengthSet,
   type WorkoutNoteModel,
 } from '../domain/workout-note-model'
@@ -2013,31 +2012,25 @@ function toWorkoutExercise(card: ExerciseCard): ExerciseEntry {
   const note = card.exerciseNotes
   const next = card.next
   if (card.kind === 'strength') {
-    const exercise: StrengthExerciseEntry = {
+    return withNoteAndNext(
+      {
+        exerciseName: card.name,
+        kind: card.kind,
+        strengthSets: card.strengthSets.map(toStrengthSet),
+      },
+      note,
+      next,
+    )
+  }
+  return withNoteAndNext(
+    {
       exerciseName: card.name,
       kind: card.kind,
-      strengthSets: card.strengthSets.map(toStrengthSet),
-    }
-    if (note !== undefined) {
-      exercise.note = note
-    }
-    if (next !== undefined) {
-      exercise.next = next
-    }
-    return exercise
-  }
-  const exercise: DurationExerciseEntry = {
-    exerciseName: card.name,
-    kind: card.kind,
-    durationEntries: card.durationEntries.map(toDurationEntry),
-  }
-  if (note !== undefined) {
-    exercise.note = note
-  }
-  if (next !== undefined) {
-    exercise.next = next
-  }
-  return exercise
+      durationEntries: card.durationEntries.map(toDurationEntry),
+    },
+    note,
+    next,
+  )
 }
 
 function toStrengthSet(set: EditableStrengthSet, index: number): StrengthSet {
