@@ -37,9 +37,11 @@ import {
   serializeWorkoutNote,
   withNoteAndNext,
   type DurationEntry,
+  type DurationExerciseEntry,
   type ExerciseEntry,
   type ExerciseKind,
   type PreserveBlock,
+  type StrengthExerciseEntry,
   type StrengthSet,
   type WorkoutNoteModel,
 } from '../domain/workout-note-model'
@@ -476,10 +478,15 @@ export class WorkoutEditorView extends ItemView {
       })
     }
 
-    if (ex.kind === 'strength') {
-      this.renderStrengthTable(card, ex, index)
-    } else {
-      this.renderDurationTable(card, ex, index)
+    switch (ex.kind) {
+      case 'strength':
+        this.renderStrengthTable(card, ex, index)
+        break
+      case 'duration':
+        this.renderDurationTable(card, ex, index)
+        break
+      default:
+        assertUnreachableKind(ex.kind)
     }
   }
 
@@ -1957,22 +1964,41 @@ function toEditorWorkoutModel(
   }
 }
 
-function toEditorExercise(exercise: ExerciseEntry): ExerciseCard {
-  const card: ExerciseCard = {
-    name: exercise.exerciseName,
-    kind: exercise.kind,
-    strengthSets:
-      exercise.kind === 'strength' ? exercise.strengthSets.map(toEditorStrengthSet) : [],
-    durationEntries:
-      exercise.kind === 'duration' ? exercise.durationEntries.map(toEditorDurationEntry) : [],
+export function toEditorExercise(exercise: ExerciseEntry): ExerciseCard {
+  switch (exercise.kind) {
+    case 'strength': {
+      const card: ExerciseCard = {
+        name: exercise.exerciseName,
+        kind: exercise.kind,
+        strengthSets: exercise.strengthSets.map(toEditorStrengthSet),
+        durationEntries: [],
+      }
+      if (exercise.note !== undefined) {
+        card.exerciseNotes = exercise.note
+      }
+      if (exercise.next !== undefined) {
+        card.next = exercise.next
+      }
+      return card
+    }
+    case 'duration': {
+      const card: ExerciseCard = {
+        name: exercise.exerciseName,
+        kind: exercise.kind,
+        strengthSets: [],
+        durationEntries: exercise.durationEntries.map(toEditorDurationEntry),
+      }
+      if (exercise.note !== undefined) {
+        card.exerciseNotes = exercise.note
+      }
+      if (exercise.next !== undefined) {
+        card.next = exercise.next
+      }
+      return card
+    }
+    default:
+      return assertUnreachableKind(exercise)
   }
-  if (exercise.note !== undefined) {
-    card.exerciseNotes = exercise.note
-  }
-  if (exercise.next !== undefined) {
-    card.next = exercise.next
-  }
-  return card
 }
 
 function buildNextPlan(direction: NextPlanDirection, step: number | undefined): NextPlan {
@@ -2019,29 +2045,29 @@ function toWorkoutNoteModel(model: EditorWorkoutModel): WorkoutNoteModel {
   }
 }
 
-function toWorkoutExercise(card: ExerciseCard): ExerciseEntry {
+export function toWorkoutExercise(card: ExerciseCard): ExerciseEntry {
   const note = card.exerciseNotes
   const next = card.next
-  if (card.kind === 'strength') {
-    return withNoteAndNext(
-      {
+  switch (card.kind) {
+    case 'strength': {
+      const entry: StrengthExerciseEntry = {
         exerciseName: card.name,
         kind: card.kind,
         strengthSets: card.strengthSets.map(toStrengthSet),
-      },
-      note,
-      next,
-    )
+      }
+      return withNoteAndNext(entry, note, next)
+    }
+    case 'duration': {
+      const entry: DurationExerciseEntry = {
+        exerciseName: card.name,
+        kind: card.kind,
+        durationEntries: card.durationEntries.map(toDurationEntry),
+      }
+      return withNoteAndNext(entry, note, next)
+    }
+    default:
+      return assertUnreachableKind(card.kind)
   }
-  return withNoteAndNext(
-    {
-      exerciseName: card.name,
-      kind: card.kind,
-      durationEntries: card.durationEntries.map(toDurationEntry),
-    },
-    note,
-    next,
-  )
 }
 
 function toStrengthSet(set: EditableStrengthSet, index: number): StrengthSet {

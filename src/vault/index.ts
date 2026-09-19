@@ -1,6 +1,7 @@
 import type { App, TAbstractFile, TFile } from 'obsidian'
 
 import { pickBestSet, pickHeaviestSet } from '../domain/epley'
+import { assertUnreachableKind } from '../domain/exercise-kind'
 import type { ExerciseIndexRow, FitKitIndex, IndexDiagnostic, IndexEntry } from '../domain/types'
 import {
   parseWorkoutNote,
@@ -100,26 +101,29 @@ function toEntry(file: TFile, model: WorkoutNoteModel): IndexEntry {
 }
 
 function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
-  if (exercise.kind === 'duration') {
-    return {
-      exerciseName: exercise.exerciseName,
-      kind: exercise.kind,
-      totalSets: exercise.durationEntries.length,
-      totalDurationSeconds: exercise.durationEntries.reduce(
-        (total, entry) => total + entry.durationSeconds,
-        0,
-      ),
-      next: exercise.next,
-    }
-  }
-
-  return {
-    exerciseName: exercise.exerciseName,
-    kind: exercise.kind,
-    bestSet: pickBestSet(exercise.strengthSets) ?? undefined,
-    maxWeightSet: pickHeaviestSet(exercise.strengthSets) ?? undefined,
-    totalSets: exercise.strengthSets.length,
-    next: exercise.next,
+  switch (exercise.kind) {
+    case 'duration':
+      return {
+        exerciseName: exercise.exerciseName,
+        kind: exercise.kind,
+        totalSets: exercise.durationEntries.length,
+        totalDurationSeconds: exercise.durationEntries.reduce(
+          (total, entry) => total + entry.durationSeconds,
+          0,
+        ),
+        next: exercise.next,
+      }
+    case 'strength':
+      return {
+        exerciseName: exercise.exerciseName,
+        kind: exercise.kind,
+        bestSet: pickBestSet(exercise.strengthSets) ?? undefined,
+        maxWeightSet: pickHeaviestSet(exercise.strengthSets) ?? undefined,
+        totalSets: exercise.strengthSets.length,
+        next: exercise.next,
+      }
+    default:
+      return assertUnreachableKind(exercise)
   }
 }
 

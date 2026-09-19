@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EXERCISE_KINDS } from '../../src/domain/exercise-kind'
 import type { ExerciseRegistryEntry } from '../../src/domain/exercise-registry'
+import type {
+  DurationExerciseEntry,
+  StrengthExerciseEntry,
+} from '../../src/domain/workout-note-model'
 
 interface MockMenuItemState {
   title?: string
@@ -167,7 +171,11 @@ vi.mock('../../src/vault/exercise-registry-vault', () => ({
 }))
 
 import { TFile } from 'obsidian'
-import { WorkoutEditorView } from '../../src/ui/workout-editor-view'
+import {
+  toEditorExercise,
+  toWorkoutExercise,
+  WorkoutEditorView,
+} from '../../src/ui/workout-editor-view'
 import { buildMockVaultFolderTree, type MockVaultFolder } from '../fixtures/mock-vault-folder-tree'
 
 interface TestElementOptions {
@@ -2487,5 +2495,39 @@ describe('WorkoutEditorView next-time plan', () => {
       'arrow-up',
     )
     expect(badge?.children.map((child) => child.textContent).join('')).toContain('Next: 102.5 kg')
+  })
+})
+
+describe('WorkoutEditorView editor round-trip', () => {
+  // Lock: loading an entry into the editor and saving it straight back preserves every field.
+  it('round-trips a strength entry through the editor conversions unchanged', () => {
+    const entry: StrengthExerciseEntry = {
+      exerciseName: 'Bench Press',
+      kind: 'strength',
+      strengthSets: [
+        { set: 1, weight: 60, reps: 8 },
+        { set: 2, weight: 60, reps: 6, note: 'grindy' },
+      ],
+      note: 'paused reps',
+      next: { direction: 'up', step: 2.5 },
+    }
+
+    expect(toWorkoutExercise(toEditorExercise(entry))).toEqual(entry)
+  })
+
+  // Lock: loading an entry into the editor and saving it straight back preserves every field.
+  it('round-trips a duration entry through the editor conversions unchanged', () => {
+    const entry: DurationExerciseEntry = {
+      exerciseName: 'Plank',
+      kind: 'duration',
+      durationEntries: [
+        { set: 1, durationSeconds: 60 },
+        { set: 2, durationSeconds: 45, note: 'shaky' },
+      ],
+      note: 'knees off',
+      next: { direction: 'stay' },
+    }
+
+    expect(toWorkoutExercise(toEditorExercise(entry))).toEqual(entry)
   })
 })
