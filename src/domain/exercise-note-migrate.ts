@@ -429,7 +429,14 @@ function inferExerciseKindFromContent(source: string): ExerciseKind | null {
     return null
   }
 
-  const body = document.lines.slice(block.start, block.end + 1).join('\n')
+  /**
+   * Sort lines select nothing: a bodyweight query sorts by performed
+   * order, so the `L.set` there must not read as a strength field.
+   */
+  const body = document.lines
+    .slice(block.start, block.end + 1)
+    .filter((line) => !/^\s*sort\b/i.test(line))
+    .join('\n')
   const hasDurationFields = hasDataviewFields(body, ['duration'])
   const hasStrengthFields = hasDataviewFields(body, ['set', 'weight', 'reps'])
   const hasLevelFields = hasDataviewFields(body, ['level'])

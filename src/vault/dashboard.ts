@@ -334,7 +334,7 @@ function dataviewQuery(exercise: ExerciseAggregate, workoutsFolderPath: string):
         `FROM "${workoutsFolderPath}"`,
         'FLATTEN file.lists AS L',
         `WHERE L.exercise = link("${exercise.exerciseName}") AND L.level`,
-        'SORT file.name DESC, L.level ASC',
+        'SORT file.name DESC, L.set ASC',
         'LIMIT 10',
       ]
     case 'duration':

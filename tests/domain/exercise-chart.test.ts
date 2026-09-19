@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { pickBestBodyweightSet } from '../../src/domain/bodyweight-levels'
 import {
   buildExerciseChartSeries,
   niceRange,
@@ -170,6 +171,35 @@ describe('buildExerciseChartSeries', () => {
     expect(series.points).toEqual([
       { date: '2026-04-01', value: 8, workoutPath: 'w/2026-04-01.md' },
       { date: '2026-04-03', value: 5, workoutPath: 'w/2026-04-03.md' },
+    ])
+  })
+
+  it('plots bodyweight reps at the best rung rather than the most reps in the session', () => {
+    const bodyweightRegistry = createRegistry([
+      { name: 'Push-Up', kind: 'bodyweight', aliases: [] },
+    ])
+    const best = pickBestBodyweightSet([
+      { level: 2, reps: 20, load: 0 },
+      { level: 3, reps: 1, load: 0 },
+    ])
+    if (!best) {
+      throw new Error('Expected a best set')
+    }
+    const series = buildExerciseChartSeries(
+      fitKitIndex([
+        entry('w/2026-04-01.md', '2026-04-01', [
+          { exerciseName: 'Push-Up', kind: 'bodyweight', maxBodyweightSet: best },
+        ]),
+      ]),
+      bodyweightRegistry,
+      'Push-Up',
+      'bodyweight',
+      30,
+      'reps',
+    )
+
+    expect(series.points).toEqual([
+      { date: '2026-04-01', value: 1, workoutPath: 'w/2026-04-01.md' },
     ])
   })
 
@@ -696,6 +726,20 @@ describe('buildExerciseChartSeries', () => {
     expect(chartYAxisTitle(series)).toBe('reps')
     expect(formatChartValue(12, series)).toBe('12 reps')
     expect(formatChartTooltip('2026-04-03', 12, series)).toBe('2026-04-03: 12 reps')
+  })
+
+  it('labels a level series axis so it is not the only kind without a title', () => {
+    const series: ChartSeries = {
+      exerciseName: 'Push-Up',
+      kind: 'bodyweight',
+      metric: 'level',
+      unit: 'level',
+      points: [],
+      windowRequested: 30,
+      totalDates: 0,
+    }
+
+    expect(chartYAxisTitle(series)).toBe('level')
   })
 
   it('skips strength rows where weight is NaN or non-finite', () => {

@@ -52,7 +52,7 @@ export function renderExerciseChartSvg(
 
   const values = series.points.map((point) => point.value)
   const range = niceRange(values)
-  drawGrid(svg, range)
+  drawGrid(svg, range, series)
   drawAxes(svg)
   drawMetricLabel(svg, series)
   drawYLabels(svg, range, series, options.ladder)
@@ -75,7 +75,27 @@ function emptyMessage(series: ChartSeries): string {
   return `No ${series.kind} sessions found for this exercise yet.`
 }
 
-function drawGrid(svg: SVGSVGElement, range: { min: number; max: number }): void {
+/** Gridlines sit on the labelled ticks: whole rungs for a level axis, even fractions otherwise. */
+function drawGrid(
+  svg: SVGSVGElement,
+  range: { min: number; max: number },
+  series: ChartSeries,
+): void {
+  if (series.metric === 'level') {
+    for (const level of pickLevelTickLevels(range, series)) {
+      const y = computeY(level, range)
+      svg.createSvg('line', {
+        cls: 'fitkit-chart-grid',
+        attr: {
+          x1: MARGIN_LEFT,
+          x2: MARGIN_LEFT + PLOT_WIDTH,
+          y1: y,
+          y2: y,
+        },
+      })
+    }
+    return
+  }
   for (let tick = 0; tick <= Y_TICKS; tick++) {
     const ratio = tick / Y_TICKS
     const y = MARGIN_TOP + (1 - ratio) * PLOT_HEIGHT
@@ -89,7 +109,6 @@ function drawGrid(svg: SVGSVGElement, range: { min: number; max: number }): void
       },
     })
   }
-  void range
 }
 
 function drawAxes(svg: SVGSVGElement): void {
@@ -338,6 +357,9 @@ export function chartYAxisTitle(series: ChartSeries): string | null {
   }
   if (series.metric === 'reps') {
     return 'reps'
+  }
+  if (series.metric === 'level') {
+    return 'level'
   }
   return null
 }

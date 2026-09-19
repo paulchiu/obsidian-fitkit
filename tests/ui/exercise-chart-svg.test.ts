@@ -177,4 +177,17 @@ describe('exercise chart svg', () => {
 
     expect(yLabelTexts(root)).toEqual(['Wall push-up', 'Knee push-up'])
   })
+
+  it('draws level gridlines where the rung labels sit', () => {
+    const root = render(levelSeries([2, 5]))
+    const nodes = descendants(root)
+    const gridYs = nodes
+      .filter((node) => node.tag === 'line' && node.classes.has('fitkit-chart-grid'))
+      .map((node) => Number(node.attrs['y1']))
+    const labelYs = nodes
+      .filter((node) => node.tag === 'text' && node.attrs['text-anchor'] === 'end')
+      .map((node) => Number(node.attrs['y']) - 4)
+
+    expect(gridYs).toEqual(labelYs)
+  })
 })

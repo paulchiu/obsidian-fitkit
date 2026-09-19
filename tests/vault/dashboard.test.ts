@@ -743,10 +743,40 @@ describe('dashboard composer', () => {
         'FROM "Fitness/Workouts"',
         'FLATTEN file.lists AS L',
         'WHERE L.exercise = link("Push-up") AND L.level',
-        'SORT file.name DESC, L.level ASC',
+        'SORT file.name DESC, L.set ASC',
         'LIMIT 10',
       ].join('\n'),
     )
+  })
+
+  it('sorts bodyweight recent sessions by performed order like the strength query', () => {
+    const markdown = composeDashboard(
+      {
+        ...emptyIndex,
+        entries: [
+          {
+            path: 'Fitness/Workouts/2026-04-24.md',
+            mtime: 1,
+            date: '2026-04-24',
+            name: 'Workout',
+            exercises: [
+              {
+                exerciseName: 'Push-up',
+                kind: 'bodyweight',
+                maxBodyweightSet: { level: 2, reps: 8, load: 0 },
+                totalSets: 1,
+              },
+            ],
+          },
+        ],
+      },
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+    )
+
+    expect(markdown).toContain('SORT file.name DESC, L.set ASC')
+    expect(markdown).not.toContain('L.level ASC')
   })
 
   it('reports a bodyweight personal best as rung and reps', () => {

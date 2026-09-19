@@ -56,7 +56,7 @@ Recognised keys:
 
 Blank lines and `#` comment lines are skipped. An unreadable `metric` or `window` value falls back to the default and says so under the chart rather than failing.
 
-`metric` is per kind. Strength accepts `e1rm` or `weight`. Bodyweight accepts `level` or `reps` and defaults to `level`. Duration exercises always plot total seconds and take no metric. On a strength or bodyweight chart, a metric belonging to another kind is ignored with a note under the chart, and the default is plotted instead. Setting `metric: e1rm` plots the Epley estimate, which smooths out a session where you went heavier for fewer reps; `metric: weight` plots the top-set weight, which is what you lifted.
+`metric` is per kind. Strength accepts `e1rm` or `weight`. Bodyweight accepts `level` or `reps` and defaults to `level`. Duration exercises always plot total seconds and take no metric. On a strength or bodyweight chart, a metric belonging to another kind is ignored with a note under the chart, and the default is plotted instead. Setting `metric: e1rm` plots the Epley estimate, which smooths out a session where you went heavier for fewer reps; `metric: weight` plots the top-set weight, which is what you lifted. On a bodyweight chart, `metric: reps` plots the reps at the session's highest rung, not the most reps at any rung.
 
 ```fitkit-chart
 exercise: Push Up

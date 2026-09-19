@@ -137,7 +137,7 @@ const BODYWEIGHT_RECENT_SESSIONS_BLOCK = [
   'FROM "Fitness/Workouts"',
   'FLATTEN file.lists AS L',
   'WHERE L.exercise = link("Mystery") AND L.level',
-  'SORT file.name DESC, L.level ASC',
+  'SORT file.name DESC, L.set ASC',
   'LIMIT 10',
   '```',
 ].join('\n')
@@ -211,6 +211,13 @@ unit: kg
     expect(result.markdown).toContain(buildRecentSessionsBlock('Mystery', 'strength', 'Fitness'))
     expect(result.markdown).toContain('## Progress chart')
     expect(result.markdown).toContain('## Notes')
+  })
+
+  it('sorts a bodyweight recent sessions block by performed order like the strength query', () => {
+    const block = buildRecentSessionsBlock('Mystery', 'bodyweight', 'Fitness')
+
+    expect(block).toContain('SORT file.name DESC, L.set ASC')
+    expect(block).not.toContain('L.level ASC')
   })
 
   it('infers invalid no-registry kind from an existing bodyweight Recent sessions block', () => {

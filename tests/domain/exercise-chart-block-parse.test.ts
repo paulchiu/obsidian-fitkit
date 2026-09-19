@@ -138,6 +138,16 @@ window: 12
     expect(resolveBodyweightMetric('metric: reps')).toBe('reps')
   })
 
+  it('echoes the supplied metric value as written when rejecting it', () => {
+    const notes: string[] = []
+    const parsed = parseExerciseChartBlock('metric: WEIGHT')
+
+    const metric = resolveExerciseChartMetric(parsed, undefined, 'bodyweight', notes)
+
+    expect(metric).toBe('level')
+    expect(notes).toEqual(["Ignored invalid metric value 'WEIGHT'; using level."])
+  })
+
   it('rejects a strength metric on a bodyweight block the way a bad metric is reported', () => {
     const notes: string[] = []
     const parsed = parseExerciseChartBlock('metric: weight')
@@ -172,13 +182,23 @@ window: 12
     expect(resolveBodyweightMetric('exercise: Push-Up', { metric: 'reps' })).toBe('reps')
   })
 
-  it('warns and uses level for an invalid bodyweight frontmatter metric', () => {
+  it('ignores a leftover frontmatter metric quietly when the block supplies none', () => {
+    const notes: string[] = []
+    const parsed = parseExerciseChartBlock('exercise: Push-Up')
+
+    const metric = resolveExerciseChartMetric(parsed, { metric: 'e1rm' }, 'bodyweight', notes)
+
+    expect(metric).toBe('level')
+    expect(notes).toEqual([])
+  })
+
+  it('falls back quietly for a frontmatter metric of another kind', () => {
     const notes: string[] = []
     const parsed = parseExerciseChartBlock('exercise: Push-Up')
 
     const metric = resolveExerciseChartMetric(parsed, { metric: 'weight' }, 'bodyweight', notes)
 
     expect(metric).toBe('level')
-    expect(notes).toEqual(["Ignored invalid metric value 'weight'; using level."])
+    expect(notes).toEqual([])
   })
 })
