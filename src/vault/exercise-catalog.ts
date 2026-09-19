@@ -13,6 +13,8 @@ export interface ExerciseCatalogEntry {
   kind: ExerciseKind
   /** Present only when the note frontmatter has an explicit, valid unit. */
   unit?: WeightUnit
+  /** Present only when a bodyweight note declares a usable levels ladder. */
+  levels?: string[]
 }
 
 export interface ExerciseCatalogDiagnostic {
@@ -62,12 +64,17 @@ export function readExerciseCatalog(app: App, settings: FitKitSettings): Exercis
       continue
     }
 
+    const ladder = levelsFromFrontmatter(frontmatter, kind)
     entries.push({
       name: file.basename,
       path: file.path,
       kind,
       unit: unitFromFrontmatter(frontmatter, kind),
+      levels: ladder.levels,
     })
+    if (ladder.warning) {
+      diagnostics.push({ path: file.path, warnings: [ladder.warning] })
+    }
   }
 
   entries.sort((left, right) => left.name.localeCompare(right.name))
@@ -89,6 +96,40 @@ function unitFromFrontmatter(
   return kind === 'strength'
     ? (parseWeightUnit(readFrontmatterField(frontmatter, 'unit')) ?? undefined)
     : undefined
+}
+
+/**
+ * Bodyweight-only rule: only bodyweight notes carry a ladder, so other kinds
+ * read as absent without a warning. Frontmatter is user-edited, so anything
+ * that is not a usable rung list warns instead of throwing.
+ */
+function levelsFromFrontmatter(
+  frontmatter: CachedMetadata['frontmatter'] | undefined,
+  kind: ExerciseKind,
+): { levels?: string[]; warning?: string } {
+  if (kind !== 'bodyweight') {
+    return {}
+  }
+  const raw = readFrontmatterField(frontmatter, 'levels')
+  if (raw === undefined || raw === null) {
+    return {}
+  }
+  if (!Array.isArray(raw) && typeof raw !== 'string') {
+    return { warning: 'Exercise note has an invalid levels list.' }
+  }
+  const candidates: unknown[] = Array.isArray(raw) ? raw : [raw]
+  const rungs: string[] = []
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') {
+      return { warning: 'Exercise note has an invalid levels list.' }
+    }
+    rungs.push(candidate)
+  }
+  const levels = rungs.map((rung) => rung.trim()).filter((rung) => rung.length > 0)
+  if (levels.length === 0) {
+    return { warning: 'Exercise note has an invalid levels list.' }
+  }
+  return { levels }
 }
 
 function readFrontmatterField(

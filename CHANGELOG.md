@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - Workout notes now recognise a `bodyweight` exercise kind whose rows carry `[level::]` (with optional `[reps::]` and `[load::]`). Parsing, note round-trip, and the reading view table are in place; the ladder, history badges, and full editor card follow in later changes.
+- Bodyweight exercise notes now declare the ordered `levels:` ladder the `[level::]` index points at. The note ladder wins over a saved registry ladder (with a diagnostic on disagreement), repairs and new notes seed a one-rung ladder, and switching a note to bodyweight sheds strength-only `metric:`/`unit:` lines.
 
 ### Changed
 

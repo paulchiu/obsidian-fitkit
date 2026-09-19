@@ -78,6 +78,33 @@ ${notes}
 `
 }
 
+function completeBodyweightNote(
+  name = 'Mystery',
+  recent = buildRecentSessionsBlock(name, 'bodyweight', 'Fitness'),
+  notes = buildNotesBlock(name, 'Fitness'),
+): string {
+  return `---
+type: exercise
+kind: bodyweight
+levels:
+  - ${name}
+---
+
+## Progress chart
+
+\`\`\`fitkit-chart
+\`\`\`
+
+## Recent sessions
+
+${recent}
+
+## Notes
+
+${notes}
+`
+}
+
 function withLineEnding(markdown: string, lineEnding: '\n' | '\r\n'): string {
   return lineEnding === '\n' ? markdown : markdown.replace(/\n/g, '\r\n')
 }
@@ -164,6 +191,43 @@ unit: kg
     expect(result.markdown).toContain(buildRecentSessionsBlock('Mystery', 'strength', 'Fitness'))
     expect(result.markdown).toContain('## Progress chart')
     expect(result.markdown).toContain('## Notes')
+  })
+
+  it('infers invalid no-registry kind from an existing bodyweight Recent sessions block', () => {
+    const source = completeBodyweightNote('Mystery').replace('kind: bodyweight', 'kind: cardio')
+    const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
+
+    expect(result.status).toBe('unknown')
+    expect(result.unknownKind).toBe(true)
+    expect(result.markdown).toContain('kind: bodyweight')
+    expect(result.markdown).not.toContain('kind: cardio')
+    expect(result.markdown).not.toContain('metric:')
+    expect(result.markdown).toContain('levels:')
+    expect(result.markdown).toContain(buildRecentSessionsBlock('Mystery', 'bodyweight', 'Fitness'))
+  })
+
+  it('leaves a level query mentioning set to strength instead of stealing it', () => {
+    const source = `---
+type: exercise
+kind: cardio
+---
+
+## Recent sessions
+
+\`\`\`dataview
+TABLE L.level, L.set
+FROM "Fitness/Workouts"
+FLATTEN file.lists AS L
+WHERE L.exercise = link("Mystery")
+\`\`\`
+
+## Notes
+`
+    const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
+
+    expect(result.unknownKind).toBe(true)
+    expect(result.markdown).toContain('kind: strength')
+    expect(result.markdown).not.toContain('kind: bodyweight')
   })
 
   it('infers invalid no-registry kind from an existing duration Recent sessions block', () => {
@@ -312,6 +376,64 @@ kind: strength
 metric: e1rm
 unit: kg
 ---`)
+  })
+
+  it('adds a one-rung ladder to existing bodyweight frontmatter when missing', () => {
+    const source = completeBodyweightNote('Mystery').replace('levels:\n  - Mystery\n', '')
+    const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
+    const second = migrate(result.markdown, { name: 'Mystery', registry: createRegistry([]) })
+
+    expect(result.status).toBe('updated')
+    expect(result.markdown).toContain(`type: exercise
+kind: bodyweight
+levels:
+  - Mystery
+---`)
+    expect(second.markdown).toBe(result.markdown)
+  })
+
+  it('leaves a note carrying a good ladder byte-identical', () => {
+    const source = completeBodyweightNote('Mystery')
+    const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
+
+    expect(result.status).toBe('already')
+    expect(result.changed).toBe(false)
+    expect(result.markdown).toBe(source)
+  })
+
+  it('drops stray metric and unit lines from a bodyweight note', () => {
+    const source = completeBodyweightNote('Mystery').replace(
+      'kind: bodyweight\n',
+      'kind: bodyweight\nmetric: e1rm\nunit: kg\n',
+    )
+    const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
+    const second = migrate(result.markdown, { name: 'Mystery', registry: createRegistry([]) })
+
+    expect(result.markdown).not.toContain('metric:')
+    expect(result.markdown).not.toContain('unit:')
+    expect(result.markdown).toContain('levels:\n  - Mystery\n')
+    expect(second.markdown).toBe(result.markdown)
+  })
+
+  it('seeds missing frontmatter with a named ladder for a bodyweight registry entry', () => {
+    const source = `Existing prose.
+
+## Notes
+
+Keep this.
+`
+    const bodyweightRegistry = createRegistry([
+      { name: 'Push-up', kind: 'bodyweight', aliases: [] },
+    ])
+    const result = migrate(source, { name: 'Push-up', registry: bodyweightRegistry })
+
+    expect(result.markdown).toContain(`type: exercise
+kind: bodyweight
+levels:
+  - Push-up
+---`)
+    expect(result.markdown).not.toContain('metric:')
+    expect(result.markdown).not.toContain('unit:')
   })
 
   it('repairs invalid kind frontmatter from the registry', () => {
@@ -1229,6 +1351,43 @@ Existing notes.
 })
 
 describe('setExerciseNoteKind', () => {
+  it('drops metric and unit lines when switching to bodyweight', () => {
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
+unit: kg
+---
+
+Body.
+`
+
+    const result = setExerciseNoteKind(source, 'bodyweight')
+
+    expect(result.changed).toBe(true)
+    expect(result.markdown).toContain('kind: bodyweight')
+    expect(result.markdown).not.toContain('metric:')
+    expect(result.markdown).not.toContain('unit:')
+  })
+
+  it('keeps an existing ladder when switching to bodyweight', () => {
+    const source = `---
+type: exercise
+kind: duration
+levels:
+  - Tuck
+---
+
+Body.
+`
+
+    const result = setExerciseNoteKind(source, 'bodyweight')
+
+    expect(result.changed).toBe(true)
+    expect(result.markdown).toContain('kind: bodyweight')
+    expect(result.markdown).toContain('levels:')
+    expect(result.markdown).toContain('  - Tuck')
+  })
   it('replaces an existing kind line', () => {
     const source = `---
 type: exercise

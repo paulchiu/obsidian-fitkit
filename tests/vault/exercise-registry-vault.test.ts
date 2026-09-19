@@ -189,4 +189,78 @@ describe('exercise registry vault merge', () => {
       { name: 'Restored', kind: 'duration', unit: 'kg', aliases: ['again'] },
     ])
   })
+
+  it('prefers the note ladder over a differing saved ladder and emits a diagnostic', () => {
+    const snapshot = buildExerciseRegistrySnapshot(
+      mockApp([
+        {
+          path: 'Fitness/Exercises/Push-up.md',
+          basename: 'Push-up',
+          frontmatter: { type: 'exercise', kind: 'bodyweight', levels: ['Tuck'] },
+        },
+      ]),
+      settingsWithRegistry([
+        {
+          name: 'Push-up',
+          kind: 'bodyweight',
+          levels: ['Support hold', 'Tuck'],
+          aliases: ['pushup'],
+        },
+      ]),
+    )
+
+    expect(snapshot.entries).toEqual([
+      { name: 'Push-up', kind: 'bodyweight', levels: ['Tuck'], aliases: ['pushup'] },
+    ])
+    expect(snapshot.diagnostics).toEqual([
+      {
+        kind: 'registry-levels-conflict',
+        name: 'Push-up',
+        path: 'Fitness/Exercises/Push-up.md',
+        warnings: [
+          "Saved registry levels 'Support hold, Tuck' differ from note levels 'Tuck'; using note levels.",
+        ],
+      },
+    ])
+  })
+
+  it('stays silent when the note and saved ladders match', () => {
+    const snapshot = buildExerciseRegistrySnapshot(
+      mockApp([
+        {
+          path: 'Fitness/Exercises/Push-up.md',
+          basename: 'Push-up',
+          frontmatter: { type: 'exercise', kind: 'bodyweight', levels: ['Tuck'] },
+        },
+      ]),
+      settingsWithRegistry([
+        { name: 'Push-up', kind: 'bodyweight', levels: ['Tuck'], aliases: [] },
+      ]),
+    )
+
+    expect(snapshot.entries).toEqual([
+      { name: 'Push-up', kind: 'bodyweight', levels: ['Tuck'], aliases: [] },
+    ])
+    expect(snapshot.diagnostics).toEqual([])
+  })
+
+  it('keeps a saved ladder when the note declares none', () => {
+    const snapshot = buildExerciseRegistrySnapshot(
+      mockApp([
+        {
+          path: 'Fitness/Exercises/Push-up.md',
+          basename: 'Push-up',
+          frontmatter: { type: 'exercise', kind: 'bodyweight' },
+        },
+      ]),
+      settingsWithRegistry([
+        { name: 'Push-up', kind: 'bodyweight', levels: ['Tuck'], aliases: [] },
+      ]),
+    )
+
+    expect(snapshot.entries).toEqual([
+      { name: 'Push-up', kind: 'bodyweight', levels: ['Tuck'], aliases: [] },
+    ])
+    expect(snapshot.diagnostics).toEqual([])
+  })
 })

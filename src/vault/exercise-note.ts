@@ -16,6 +16,7 @@ export function composeExerciseNote(
   kind: ExerciseKind,
   workoutsFolderPath: string,
   unit: WeightUnit = DEFAULT_WEIGHT_UNIT,
+  levels: string[] = [exerciseName],
 ): string {
   const lines: string[] = []
   lines.push('---')
@@ -25,6 +26,13 @@ export function composeExerciseNote(
   if (kind === 'strength') {
     lines.push('metric: e1rm')
     lines.push(`unit: ${unit}`)
+  }
+  /** A new bodyweight note starts with a usable ladder instead of an empty menu. */
+  if (kind === 'bodyweight') {
+    lines.push('levels:')
+    for (const rung of levels) {
+      lines.push(`  - ${rung}`)
+    }
   }
   lines.push('---')
   lines.push('')

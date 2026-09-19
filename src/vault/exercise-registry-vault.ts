@@ -6,7 +6,7 @@ import type { FitKitSettings } from '../settings'
 import { readExerciseCatalog, type ExerciseCatalogSnapshot } from './exercise-catalog'
 
 export interface ExerciseRegistrySnapshotDiagnostic {
-  kind: 'catalog' | 'registry-kind-conflict'
+  kind: 'catalog' | 'registry-kind-conflict' | 'registry-levels-conflict'
   path?: string
   name?: string
   warnings: string[]
@@ -23,6 +23,11 @@ export function exerciseRegistryWithVaultNotes(
   settings: FitKitSettings,
 ): ExerciseRegistryEntry[] {
   return buildExerciseRegistrySnapshot(app, settings).entries
+}
+
+/** Order-sensitive ladder equality: rung order is the ladder, so a reorder counts. */
+function sameLevels(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((rung, index) => rung === right[index])
 }
 
 export function buildExerciseRegistrySnapshot(
@@ -62,11 +67,28 @@ export function buildExerciseRegistrySnapshot(
       })
     }
 
+    if (saved?.levels && note.levels && !sameLevels(saved.levels, note.levels)) {
+      diagnostics.push({
+        kind: 'registry-levels-conflict',
+        name: note.name,
+        path: note.path,
+        warnings: [
+          `Saved registry levels '${saved.levels.join(', ')}' differ from note levels '${note.levels.join(', ')}'; using note levels.`,
+        ],
+      })
+    }
+
     /** Frontmatter unit wins when the note has one; the saved registry unit is only a fallback. */
     entriesByKey.set(key, {
       name: note.name,
       kind: note.kind,
       unit: note.unit ?? saved?.unit,
+      levels:
+        note.levels !== undefined
+          ? [...note.levels]
+          : saved?.levels !== undefined
+            ? [...saved.levels]
+            : undefined,
       aliases: saved ? [...saved.aliases] : [],
     })
   }
@@ -80,6 +102,7 @@ export function buildExerciseRegistrySnapshot(
       name: entry.name,
       kind: entry.kind,
       unit: entry.unit,
+      levels: entry.levels !== undefined ? [...entry.levels] : undefined,
       aliases: [...entry.aliases],
     })
   }

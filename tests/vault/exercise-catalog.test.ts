@@ -171,4 +171,150 @@ describe('exercise catalog', () => {
       },
     ])
   })
+
+  it('keeps a bodyweight ladder in author order', () => {
+    const snapshot = readExerciseCatalog(
+      mockApp([
+        {
+          path: 'Fitness/Exercises/Push-up.md',
+          basename: 'Push-up',
+          frontmatter: {
+            type: 'exercise',
+            kind: 'bodyweight',
+            levels: ['Support hold', 'Tuck', 'Advanced tuck'],
+          },
+        },
+      ]),
+      settings(),
+    )
+
+    expect(snapshot.entries).toEqual([
+      {
+        name: 'Push-up',
+        path: 'Fitness/Exercises/Push-up.md',
+        kind: 'bodyweight',
+        levels: ['Support hold', 'Tuck', 'Advanced tuck'],
+      },
+    ])
+    expect(snapshot.diagnostics).toEqual([])
+  })
+
+  it('trims rungs and drops blank entries', () => {
+    const snapshot = readExerciseCatalog(
+      mockApp([
+        {
+          path: 'Fitness/Exercises/Push-up.md',
+          basename: 'Push-up',
+          frontmatter: {
+            type: 'exercise',
+            kind: 'bodyweight',
+            levels: ['  Tuck  ', '', '   ', 'Advanced tuck '],
+          },
+        },
+      ]),
+      settings(),
+    )
+
+    expect(snapshot.entries).toEqual([
+      {
+        name: 'Push-up',
+        path: 'Fitness/Exercises/Push-up.md',
+        kind: 'bodyweight',
+        levels: ['Tuck', 'Advanced tuck'],
+      },
+    ])
+    expect(snapshot.diagnostics).toEqual([])
+  })
+
+  it('reads a bare string as a one-rung ladder', () => {
+    const snapshot = readExerciseCatalog(
+      mockApp([
+        {
+          path: 'Fitness/Exercises/Push-up.md',
+          basename: 'Push-up',
+          frontmatter: { type: 'exercise', kind: 'bodyweight', levels: '  Tuck  ' },
+        },
+      ]),
+      settings(),
+    )
+
+    expect(snapshot.entries).toEqual([
+      {
+        name: 'Push-up',
+        path: 'Fitness/Exercises/Push-up.md',
+        kind: 'bodyweight',
+        levels: ['Tuck'],
+      },
+    ])
+    expect(snapshot.diagnostics).toEqual([])
+  })
+
+  it('leaves levels absent and warns when the ladder is not a string list', () => {
+    const snapshot = readExerciseCatalog(
+      mockApp([
+        {
+          path: 'Fitness/Exercises/Push-up.md',
+          basename: 'Push-up',
+          frontmatter: { type: 'exercise', kind: 'bodyweight', levels: 42 },
+        },
+      ]),
+      settings(),
+    )
+
+    expect(snapshot.entries).toEqual([
+      { name: 'Push-up', path: 'Fitness/Exercises/Push-up.md', kind: 'bodyweight' },
+    ])
+    expect(snapshot.entries[0]?.levels).toBeUndefined()
+    expect(snapshot.diagnostics).toEqual([
+      {
+        path: 'Fitness/Exercises/Push-up.md',
+        warnings: ['Exercise note has an invalid levels list.'],
+      },
+    ])
+  })
+
+  it('leaves levels absent and warns when every rung is blank', () => {
+    const snapshot = readExerciseCatalog(
+      mockApp([
+        {
+          path: 'Fitness/Exercises/Push-up.md',
+          basename: 'Push-up',
+          frontmatter: { type: 'exercise', kind: 'bodyweight', levels: ['', '   '] },
+        },
+      ]),
+      settings(),
+    )
+
+    expect(snapshot.entries[0]?.levels).toBeUndefined()
+    expect(snapshot.diagnostics).toEqual([
+      {
+        path: 'Fitness/Exercises/Push-up.md',
+        warnings: ['Exercise note has an invalid levels list.'],
+      },
+    ])
+  })
+
+  it('ignores a ladder on a note whose kind is not bodyweight', () => {
+    const snapshot = readExerciseCatalog(
+      mockApp([
+        {
+          path: 'Fitness/Exercises/Squat.md',
+          basename: 'Squat',
+          frontmatter: {
+            type: 'exercise',
+            kind: 'strength',
+            unit: 'kg',
+            levels: ['Tuck', 'Advanced tuck'],
+          },
+        },
+      ]),
+      settings(),
+    )
+
+    expect(snapshot.entries).toEqual([
+      { name: 'Squat', path: 'Fitness/Exercises/Squat.md', kind: 'strength', unit: 'kg' },
+    ])
+    expect(snapshot.entries[0]?.levels).toBeUndefined()
+    expect(snapshot.diagnostics).toEqual([])
+  })
 })

@@ -104,6 +104,15 @@ describe('exercise-note composer', () => {
     )
   })
 
+  it('seeds a bodyweight note with a one-rung ladder and no metric or unit', () => {
+    const markdown = composeExerciseNote('Push-up', 'bodyweight', 'Fitness/Workouts')
+
+    expect(markdown).toContain('kind: bodyweight')
+    expect(markdown).toContain('levels:\n  - Push-up\n')
+    expect(markdown).not.toContain('metric:')
+    expect(markdown).not.toContain('unit:')
+  })
+
   it('respects the configured workouts folder', () => {
     const markdown = composeExerciseNote('Bench', 'strength', 'Custom/Path/Workouts')
 

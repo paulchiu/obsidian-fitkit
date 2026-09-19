@@ -122,7 +122,9 @@ export interface ExerciseNoteKindUpdateResult {
  * rest of migrateExerciseNote's repair pass. Used when the user explicitly
  * switches an exercise's kind, so the note (the store that wins on read via
  * buildExerciseRegistrySnapshot) reflects the choice immediately rather than
- * being downgraded back on the next read.
+ * being downgraded back on the next read. Switching to bodyweight also drops
+ * metric:/unit: lines, which only belong to strength notes; the ladder
+ * itself is left for the repair pass, which knows the exercise name.
  */
 export function setExerciseNoteKind(
   source: string,
@@ -141,12 +143,16 @@ export function setExerciseNoteKind(
   }
 
   const kindLineIndex = findFrontmatterKeyLine(frontmatterLines, 'kind')
-  const nextFrontmatterLines =
+  const withKind =
     kindLineIndex < 0
       ? insertLines(frontmatterLines, findFrontmatterKeyLine(frontmatterLines, 'type') + 1, [
           `kind: ${kind}`,
         ])
       : replaceLine(frontmatterLines, kindLineIndex, `kind: ${kind}`)
+  const nextFrontmatterLines =
+    kind === 'bodyweight'
+      ? withKind.filter((line) => !isStrengthOnlyFrontmatterKey(line))
+      : withKind
 
   const markdown = [
     ...lines.slice(0, bounds.start + 1),
@@ -176,7 +182,7 @@ function repairFrontmatter(
   if (bounds.status === 'missing') {
     const fallbackKind = registryKind ?? inferExerciseKindFromContent(source) ?? 'strength'
     return {
-      markdown: `${frontmatterBlock(fallbackKind, registryUnit ?? DEFAULT_WEIGHT_UNIT)}${source}`,
+      markdown: `${frontmatterBlock(fallbackKind, registryUnit ?? DEFAULT_WEIGHT_UNIT, options.name)}${source}`,
       kind: fallbackKind,
       unknownKind: registryKind === null,
       warnings: [],
@@ -263,6 +269,19 @@ function repairFrontmatter(
     nextFrontmatterLines = setStrengthUnitFromRegistry(nextFrontmatterLines, registryUnit)
   }
 
+  if (effectiveKind === 'bodyweight') {
+    nextFrontmatterLines = nextFrontmatterLines.filter(
+      (line) => !isStrengthOnlyFrontmatterKey(line),
+    )
+    if (findFrontmatterKeyLine(nextFrontmatterLines, 'levels') < 0) {
+      kindLineIndex = findFrontmatterKeyLine(nextFrontmatterLines, 'kind')
+      nextFrontmatterLines = insertLines(nextFrontmatterLines, kindLineIndex + 1, [
+        'levels:',
+        `  - ${options.name}`,
+      ])
+    }
+  }
+
   const markdown = [
     ...lines.slice(0, bounds.start + 1),
     ...nextFrontmatterLines,
@@ -288,6 +307,7 @@ function strengthUnitForName(registry: ExerciseRegistry, name: string): WeightUn
 function frontmatterBlock(
   kind: ExerciseKind | null,
   unit: WeightUnit = DEFAULT_WEIGHT_UNIT,
+  exerciseName: string,
 ): string {
   const lines = ['---', 'type: exercise']
   if (kind) {
@@ -296,9 +316,26 @@ function frontmatterBlock(
       lines.push(`metric: ${DEFAULT_EXERCISE_METRIC}`)
       lines.push(`unit: ${unit}`)
     }
+    if (kind === 'bodyweight') {
+      lines.push('levels:')
+      lines.push(`  - ${exerciseName}`)
+    }
   }
   lines.push('---', '')
   return `${lines.join('\n')}\n`
+}
+
+/**
+ * Strength-only frontmatter keys carry no meaning on a bodyweight note, so a
+ * note that becomes bodyweight sheds them instead of keeping stale values.
+ */
+function isStrengthOnlyFrontmatterKey(line: string): boolean {
+  const colon = line.indexOf(':')
+  if (colon < 0) {
+    return false
+  }
+  const key = line.slice(0, colon).trim().toLowerCase()
+  return key === 'metric' || key === 'unit'
 }
 
 function inferExerciseKindFromContent(source: string): ExerciseKind | null {
@@ -321,6 +358,16 @@ function inferExerciseKindFromContent(source: string): ExerciseKind | null {
   const body = document.lines.slice(block.start, block.end + 1).join('\n')
   const hasDurationFields = hasDataviewFields(body, ['duration'])
   const hasStrengthFields = hasDataviewFields(body, ['set', 'weight', 'reps'])
+  const hasLevelFields = hasDataviewFields(body, ['level'])
+  const hasSetOrWeightFields = hasDataviewFields(body, ['set', 'weight'])
+  /**
+   * Level is checked first but narrowly: a bodyweight query also selects
+   * reps, so the level branch must not fire when set, weight, or duration
+   * fields show a note that is really strength or duration.
+   */
+  if (hasLevelFields && !hasDurationFields && !hasSetOrWeightFields) {
+    return 'bodyweight'
+  }
   if (hasDurationFields && !hasStrengthFields) {
     return 'duration'
   }
