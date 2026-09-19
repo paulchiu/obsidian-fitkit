@@ -30,9 +30,10 @@
  * field-by-field from the model. This is documented in README.md.
  */
 
+import type { ExerciseKind } from './exercise-kind'
 import { formatNextPlan, parseNextPlan, type NextPlan } from './next-plan'
 
-export type ExerciseKind = 'strength' | 'duration'
+export type { ExerciseKind }
 
 export interface StrengthSet {
   set: number
@@ -47,13 +48,38 @@ export interface DurationEntry {
   note?: string
 }
 
-export interface ExerciseEntry {
+interface ExerciseEntryBase {
   exerciseName: string
   kind: ExerciseKind
   note?: string
   next?: NextPlan
-  strengthSets?: StrengthSet[]
-  durationEntries?: DurationEntry[]
+}
+
+export interface StrengthExerciseEntry extends ExerciseEntryBase {
+  kind: 'strength'
+  strengthSets: StrengthSet[]
+}
+
+export interface DurationExerciseEntry extends ExerciseEntryBase {
+  kind: 'duration'
+  durationEntries: DurationEntry[]
+}
+
+export type ExerciseEntry = StrengthExerciseEntry | DurationExerciseEntry
+
+export function withNoteAndNext<T extends ExerciseEntry>(
+  entry: T,
+  note: string | undefined,
+  next: NextPlan | undefined,
+): T {
+  const result: T = { ...entry }
+  if (note !== undefined) {
+    result.note = note
+  }
+  if (next !== undefined) {
+    result.next = next
+  }
+  return result
 }
 
 export interface PreserveBlock {
@@ -114,13 +140,10 @@ const WIKILINK = /^\[\[([^\]]+)\]\]$/
  * at serialize time (to know when to re-insert it and to clamp a stale
  * anchor to a row count the edited exercise still has).
  */
-function rowCountOf(
-  exercise: Pick<ExerciseEntry, 'note' | 'next' | 'strengthSets' | 'durationEntries'>,
-): number {
+function rowCountOf(exercise: ExerciseEntry): number {
   return (
     (exercise.note !== undefined || exercise.next !== undefined ? 1 : 0) +
-    (exercise.strengthSets?.length ?? 0) +
-    (exercise.durationEntries?.length ?? 0)
+    (exercise.kind === 'strength' ? exercise.strengthSets.length : exercise.durationEntries.length)
   )
 }
 
@@ -230,13 +253,9 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
     const note = fields.get('notes')
     if (!current || current.exerciseName !== inlineName) {
       flush()
-      const kind: ExerciseKind = hasDuration ? 'duration' : 'strength'
-      current = {
-        exerciseName: inlineName,
-        kind,
-        strengthSets: kind === 'strength' ? [] : undefined,
-        durationEntries: kind === 'duration' ? [] : undefined,
-      }
+      current = hasDuration
+        ? { exerciseName: inlineName, kind: 'duration', durationEntries: [] }
+        : { exerciseName: inlineName, kind: 'strength', strengthSets: [] }
     }
 
     if (!hasSet && !hasDuration && !hasWeight && !hasReps) {
@@ -253,14 +272,16 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
 
     if (hasDuration) {
       if (current.kind !== 'duration') {
-        current.kind = 'duration'
-        current.durationEntries = current.durationEntries ?? []
-        if ((current.strengthSets ?? []).length > 0) {
+        if (current.strengthSets.length > 0) {
           warnings.push(
             `${sourcePath}: Exercise "${inlineName}" has both strength and duration rows; dropping strength data.`,
           )
         }
-        current.strengthSets = undefined
+        current = withNoteAndNext(
+          { exerciseName: current.exerciseName, kind: 'duration', durationEntries: [] },
+          current.note,
+          current.next,
+        )
       }
       const durationSeconds = Number(fields.get('duration'))
       const entry: DurationEntry = { durationSeconds }
@@ -270,21 +291,22 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
       if (note !== undefined) {
         entry.note = note
       }
-      current.durationEntries = current.durationEntries ?? []
       current.durationEntries.push(entry)
       continue
     }
 
     /** Strength row. We tolerate RPE and drop it; keep set/weight/reps/notes. */
     if (current.kind !== 'strength') {
-      current.kind = 'strength'
-      current.strengthSets = current.strengthSets ?? []
-      if ((current.durationEntries ?? []).length > 0) {
+      if (current.durationEntries.length > 0) {
         warnings.push(
           `${sourcePath}: Exercise "${inlineName}" has both strength and duration rows; dropping duration data.`,
         )
       }
-      current.durationEntries = undefined
+      current = withNoteAndNext(
+        { exerciseName: current.exerciseName, kind: 'strength', strengthSets: [] },
+        current.note,
+        current.next,
+      )
     }
     const setNum = Number(fields.get('set') ?? '0')
     const set: StrengthSet = { set: setNum }
@@ -297,7 +319,6 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
     if (note !== undefined) {
       set.note = note
     }
-    current.strengthSets = current.strengthSets ?? []
     current.strengthSets.push(set)
   }
   /** Any raw block positioned at or past the last body line (trailing content). */
@@ -308,7 +329,7 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
     if (exercise.kind !== 'strength') {
       continue
     }
-    const sets = exercise.strengthSets ?? []
+    const sets = exercise.strengthSets
     for (let index = 0; index < sets.length; index += 1) {
       const expected = index + 1
       const actual = sets[index]?.set
@@ -443,7 +464,7 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
       insertBucket(`${i}:${rowCount}`)
     }
     if (exercise.kind === 'strength') {
-      for (const set of exercise.strengthSets ?? []) {
+      for (const set of exercise.strengthSets) {
         const parts = [`[exercise:: [[${exercise.exerciseName}]]]`, `[set:: ${set.set}]`]
         if (set.weight !== undefined) {
           parts.push(`[weight:: ${formatNumber(set.weight)}]`)
@@ -459,7 +480,7 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
         insertBucket(`${i}:${rowCount}`)
       }
     } else {
-      for (const entry of exercise.durationEntries ?? []) {
+      for (const entry of exercise.durationEntries) {
         const parts = [`[exercise:: [[${exercise.exerciseName}]]]`]
         if (entry.set !== undefined) {
           parts.push(`[set:: ${entry.set}]`)
@@ -499,17 +520,23 @@ export function canonicalizeForEquality(model: WorkoutNoteModel): unknown {
       kind: ex.kind,
       note: ex.note,
       next: ex.next,
-      strengthSets: ex.strengthSets?.map((set) => ({
-        set: set.set,
-        weight: set.weight,
-        reps: set.reps,
-        note: set.note,
-      })),
-      durationEntries: ex.durationEntries?.map((entry) => ({
-        set: entry.set,
-        durationSeconds: entry.durationSeconds,
-        note: entry.note,
-      })),
+      strengthSets:
+        ex.kind === 'strength'
+          ? ex.strengthSets.map((set) => ({
+              set: set.set,
+              weight: set.weight,
+              reps: set.reps,
+              note: set.note,
+            }))
+          : undefined,
+      durationEntries:
+        ex.kind === 'duration'
+          ? ex.durationEntries.map((entry) => ({
+              set: entry.set,
+              durationSeconds: entry.durationSeconds,
+              note: entry.note,
+            }))
+          : undefined,
     })),
   }
 }

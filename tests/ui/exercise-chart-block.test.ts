@@ -144,6 +144,21 @@ describe('exercise chart block rendering', () => {
     chartSvgMock.renderExerciseChartSvg.mockReset()
   })
 
+  it('names every known kind in the missing kind note for non-exercise notes', async () => {
+    const plugin = createPlugin([], new Map())
+
+    await renderExerciseChartBlock(
+      plugin,
+      'exercise: Bench Press',
+      new TestElement('div') as unknown as HTMLElement,
+      createContext('Fitness/Dashboard.md'),
+    )
+
+    expect(renderedNotes()).toEqual([
+      "No 'kind:' supplied; defaulting to strength. Add 'kind: strength' or 'kind: duration' to be explicit.",
+    ])
+  })
+
   it('shows a missing kind frontmatter note for exercise notes that fall back to strength', async () => {
     const file = new TFile('Fitness/Exercises/Bench Press.md')
     const plugin = createPlugin([file], new Map([[file.path, { type: 'exercise' }]]))
@@ -237,5 +252,64 @@ describe('exercise chart block rendering', () => {
     expect(renderedNotes()).toEqual([
       "Exercise note frontmatter has unrecognised 'kind: cardio'; using duration from the exercise registry. Use 'kind: strength' or 'kind: duration'.",
     ])
+  })
+
+  it('accepts and rejects the same kinds as the other frontmatter read paths', async () => {
+    const accepted: unknown[] = ['strength', 'duration', ' Strength ', 'DURATION']
+    for (const kind of accepted) {
+      chartSvgMock.renderExerciseChartSvg.mockReset()
+      const file = new TFile('Fitness/Exercises/Bench Press.md')
+      const plugin = createPlugin([file], new Map([[file.path, { type: 'exercise', kind }]]))
+
+      await renderExerciseChartBlock(
+        plugin,
+        '',
+        new TestElement('div') as unknown as HTMLElement,
+        createContext(file.path),
+      )
+
+      expect(renderedNotes()).toEqual([])
+    }
+
+    const invalid: unknown[] = ['cardio']
+    for (const kind of invalid) {
+      chartSvgMock.renderExerciseChartSvg.mockReset()
+      const file = new TFile('Fitness/Exercises/Bench Press.md')
+      const plugin = createPlugin([file], new Map([[file.path, { type: 'exercise', kind }]]))
+
+      await renderExerciseChartBlock(
+        plugin,
+        '',
+        new TestElement('div') as unknown as HTMLElement,
+        createContext(file.path),
+      )
+
+      expect(renderedNotes()).toEqual([
+        `Exercise note frontmatter has unrecognised 'kind: ${String(kind).trim()}'; defaulting to strength. Use 'kind: strength' or 'kind: duration'.`,
+      ])
+    }
+
+    const missing: Frontmatter[] = [
+      { type: 'exercise' },
+      { type: 'exercise', kind: '' },
+      { type: 'exercise', kind: '   ' },
+      { type: 'exercise', kind: 42 },
+    ]
+    for (const frontmatter of missing) {
+      chartSvgMock.renderExerciseChartSvg.mockReset()
+      const file = new TFile('Fitness/Exercises/Bench Press.md')
+      const plugin = createPlugin([file], new Map([[file.path, frontmatter]]))
+
+      await renderExerciseChartBlock(
+        plugin,
+        '',
+        new TestElement('div') as unknown as HTMLElement,
+        createContext(file.path),
+      )
+
+      expect(renderedNotes()).toEqual([
+        "Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add 'kind: strength' or 'kind: duration' to be explicit.",
+      ])
+    }
   })
 })

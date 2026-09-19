@@ -1,6 +1,7 @@
 import { Modal, Notice } from 'obsidian'
 
 import { formatErrorMessage } from '../domain/error'
+import { EXERCISE_KINDS, EXERCISE_KIND_LABELS, parseExerciseKind } from '../domain/exercise-kind'
 import type FitKitPlugin from '../main'
 import {
   ExerciseImportApplyError,
@@ -121,11 +122,15 @@ export class ImportExercisesModal extends Modal {
     }
     const select = kindCell.createEl('select', { cls: 'fitkit-import-select' })
     select.setAttr('aria-label', `Kind for ${row.name}`)
-    select.createEl('option', { value: 'strength', text: 'Strength' })
-    select.createEl('option', { value: 'duration', text: 'Duration' })
+    for (const kind of EXERCISE_KINDS) {
+      select.createEl('option', {
+        value: kind,
+        text: EXERCISE_KIND_LABELS[kind],
+      })
+    }
     select.value = row.kind
     select.addEventListener('change', () => {
-      row.kind = select.value === 'duration' ? 'duration' : 'strength'
+      row.kind = parseExerciseKind(select.value) ?? row.kind
     })
   }
 

@@ -1,3 +1,4 @@
+import { assertUnreachableKind, parseExerciseKind } from './exercise-kind'
 import {
   DEFAULT_EXERCISE_METRIC,
   parseExerciseMetric,
@@ -44,10 +45,7 @@ export function parseExerciseChartBlock(source: string): ParsedExerciseChartBloc
     if (key === 'exercise' || key === 'name') {
       result.exerciseName = value
     } else if (key === 'kind') {
-      const lowered = value.toLowerCase()
-      if (lowered === 'strength' || lowered === 'duration') {
-        result.kind = lowered
-      }
+      result.kind = parseExerciseKind(value) ?? result.kind
     } else if (key === 'metric') {
       const metricValue = normalizeMetricValue(value)
       if (metricValue === null) {
@@ -78,8 +76,13 @@ export function resolveExerciseChartMetric(
   kind: ExerciseKind,
   notes: string[],
 ): ExerciseMetric {
-  if (kind === 'duration') {
-    return DEFAULT_EXERCISE_METRIC
+  switch (kind) {
+    case 'duration':
+      return DEFAULT_EXERCISE_METRIC
+    case 'strength':
+      break
+    default:
+      return assertUnreachableKind(kind)
   }
   if (parsed.metricSupplied) {
     if (parsed.metric) {

@@ -41,6 +41,7 @@ vi.mock('../../src/vault/exercise-import-planner', () => {
   }
 })
 
+import { buildExerciseImportPlan } from '../../src/vault/exercise-import-planner'
 import type { ExerciseImportPlanRow } from '../../src/vault/exercise-import-planner'
 import { ImportExercisesModal } from '../../src/ui/import-exercises-modal'
 
@@ -48,6 +49,7 @@ interface TestElementOptions {
   cls?: string
   text?: string
   attr?: Record<string, string>
+  value?: string
 }
 
 type TestListener = () => void
@@ -61,6 +63,7 @@ class TestElement {
   checked = false
   parent: TestElement | null = null
   textContent = ''
+  value = ''
 
   constructor(readonly tagName: string) {}
 
@@ -73,6 +76,9 @@ class TestElement {
     if (options.text !== undefined) {
       child.textContent = options.text
     }
+    if (options.value !== undefined) {
+      child.value = options.value
+    }
     for (const [name, value] of Object.entries(options.attr ?? {})) {
       child.setAttr(name, value)
     }
@@ -82,6 +88,29 @@ class TestElement {
 
   createSpan(options: TestElementOptions = {}): TestElement {
     return this.createEl('span', options)
+  }
+
+  createDiv(options: TestElementOptions = {}): TestElement {
+    const child = new TestElement('div')
+    child.parent = this
+    if (options.cls) {
+      child.addClasses(options.cls)
+    }
+    if (options.text !== undefined) {
+      child.textContent = options.text
+    }
+    if (options.value !== undefined) {
+      child.value = options.value
+    }
+    for (const [name, value] of Object.entries(options.attr ?? {})) {
+      child.setAttr(name, value)
+    }
+    this.children.push(child)
+    return child
+  }
+
+  addClass(className: string): void {
+    this.classes.add(className)
   }
 
   addEventListener(type: string, listener: TestListener): void {
@@ -106,6 +135,12 @@ class TestElement {
     this.attributes.set(name, value)
     if (name.startsWith('data-')) {
       this.dataset[name.slice('data-'.length)] = value
+    }
+  }
+
+  fire(type: string): void {
+    for (const listener of this.listeners.get(type) ?? []) {
+      listener()
     }
   }
 }
@@ -146,6 +181,63 @@ function collectText(element: TestElement): string[] {
   const own = element.textContent ? [element.textContent] : []
   return [...own, ...element.children.flatMap((child) => collectText(child))]
 }
+
+function kindSelectForModal(modal: ImportExercisesModal): TestElement {
+  const select = findByTag(modal.contentEl as unknown as TestElement, 'select')
+  if (!select) {
+    throw new Error('Expected the kind cell to render a select.')
+  }
+  return select
+}
+
+async function openModalWithRows(rows: ExerciseImportPlanRow[]): Promise<{
+  modal: ImportExercisesModal
+  rows: ExerciseImportPlanRow[]
+}> {
+  vi.mocked(buildExerciseImportPlan).mockResolvedValue({ rows })
+  const modal = new ImportExercisesModal({ app: {} } as never, {})
+  modal.onOpen()
+  await vi.waitFor(() => {
+    if (!findByTag(modal.contentEl as unknown as TestElement, 'select')) {
+      throw new Error('Waiting for the modal rows to render.')
+    }
+  })
+  return { modal, rows }
+}
+
+function findByTag(element: TestElement, tagName: string): TestElement | null {
+  if (element.tagName === tagName) {
+    return element
+  }
+  for (const child of element.children) {
+    const found = findByTag(child, tagName)
+    if (found) {
+      return found
+    }
+  }
+  return null
+}
+
+describe('ImportExercisesModal kind select', () => {
+  it('lists strength then duration with their current labels', async () => {
+    const { modal } = await openModalWithRows([row({ status: 'unknown', registryName: null })])
+    const select = kindSelectForModal(modal)
+
+    expect(select.children.map((option) => option.value)).toEqual(['strength', 'duration'])
+    expect(select.children.map((option) => option.textContent)).toEqual(['Strength', 'Duration'])
+  })
+
+  it('keeps the row kind when the select reports an unrecognised value', async () => {
+    const target = row({ kind: 'duration', status: 'unknown', registryName: null })
+    const { modal } = await openModalWithRows([target])
+    const select = kindSelectForModal(modal)
+
+    select.value = 'cardio'
+    select.fire('change')
+
+    expect(target.kind).toBe('duration')
+  })
+})
 
 describe('ImportExercisesModal actions', () => {
   it('offers note creation for registry entries without exercise note files', () => {

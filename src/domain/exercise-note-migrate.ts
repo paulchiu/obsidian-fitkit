@@ -1,3 +1,4 @@
+import { EXERCISE_KINDS, parseExerciseKind } from './exercise-kind'
 import {
   kindForName,
   unitForName,
@@ -376,11 +377,7 @@ function frontmatterKind(lines: ReadonlyArray<string>): ExerciseKind | null {
   if (kindLineIndex < 0) {
     return null
   }
-  const value = scalarValue(lines[kindLineIndex] ?? '')
-  if (value === 'strength' || value === 'duration') {
-    return value
-  }
-  return null
+  return parseExerciseKind(scalarValue(lines[kindLineIndex] ?? ''))
 }
 
 function frontmatterMetric(line: string): ExerciseMetric | null {
@@ -451,12 +448,15 @@ function repairRecentSessions(
   if (currentBlock === canonicalBlock) {
     return { markdown: source, warnings: [] }
   }
-  const alternateCanonicalBlock = buildRecentSessionsBlock(
-    options.name,
-    alternateExerciseKind(kind),
-    options.fitnessRoot,
+  const matchesAnotherKind = EXERCISE_KINDS.some(
+    (otherKind) =>
+      otherKind !== kind &&
+      !isCustomDataviewBlock(
+        currentBlock,
+        buildRecentSessionsBlock(options.name, otherKind, options.fitnessRoot),
+      ),
   )
-  if (!isCustomDataviewBlock(currentBlock, alternateCanonicalBlock)) {
+  if (matchesAnotherKind) {
     const next = [
       ...document.lines.slice(0, block.start),
       ...canonicalLines,
@@ -482,13 +482,8 @@ function repairRecentSessions(
   return { markdown: joinMarkdown({ ...document, lines: next }), warnings: [] }
 }
 
-function alternateExerciseKind(kind: ExerciseKind): ExerciseKind {
-  return kind === 'strength' ? 'duration' : 'strength'
-}
-
 /**
- * Mirrors `repairRecentSessions` (minus the strength/duration kind
- * alternation, which the Notes query has no equivalent of): a block that
+ * Mirrors `repairRecentSessions` for the name-targeted Notes query: a block that
  * only differs from canonical by which exercise name it targets is treated
  * as stale, not customised, and is rewritten silently so a rename actually
  * follows through instead of leaving the survivor's per-session notes table

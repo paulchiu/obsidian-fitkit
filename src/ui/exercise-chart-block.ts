@@ -11,6 +11,7 @@ import {
   resolveExerciseChartMetric,
 } from '../domain/exercise-chart-block-parse'
 import { buildExerciseChartSeries } from '../domain/exercise-chart'
+import { EXERCISE_KINDS, assertUnreachableKind, parseExerciseKind } from '../domain/exercise-kind'
 import {
   createRegistry,
   kindForName,
@@ -96,29 +97,41 @@ async function renderInternal(
   }
   if (parsed.kind === null && !sourceIsExerciseNote) {
     notes.push(
-      `No 'kind:' supplied; defaulting to ${kind}. Add 'kind: strength' or 'kind: duration' to be explicit.`,
+      `No 'kind:' supplied; defaulting to ${kind}. Add ${formatKindOptions()} to be explicit.`,
     )
   }
   if (parsed.kind === null && sourceIsExerciseNote && frontmatterKind.kind === null) {
     if (frontmatterKind.reason === 'invalid') {
-      if (registryKind === 'duration') {
-        notes.push(
-          `Exercise note frontmatter has unrecognised 'kind: ${frontmatterKind.raw}'; using duration from the exercise registry. Use 'kind: strength' or 'kind: duration'.`,
-        )
-      } else {
-        notes.push(
-          `Exercise note frontmatter has unrecognised 'kind: ${frontmatterKind.raw}'; defaulting to strength. Use 'kind: strength' or 'kind: duration'.`,
-        )
+      switch (registryKind) {
+        case 'duration':
+          notes.push(
+            `Exercise note frontmatter has unrecognised 'kind: ${frontmatterKind.raw}'; using duration from the exercise registry. Use ${formatKindOptions()}.`,
+          )
+          break
+        case 'strength':
+        case null:
+          /** A silent registry joins strength here: neither supplied a kind, so the strength default applies. */
+          notes.push(
+            `Exercise note frontmatter has unrecognised 'kind: ${frontmatterKind.raw}'; defaulting to strength. Use ${formatKindOptions()}.`,
+          )
+          break
+        default:
+          assertUnreachableKind(registryKind)
       }
     } else if (kind === 'strength') {
+      /**
+       * Strength-only rule: this note describes the strength default, so a kind
+       * resolved from the registry stays silent (nothing was defaulted).
+       */
       notes.push(
-        "Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add 'kind: strength' or 'kind: duration' to be explicit.",
+        `Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add ${formatKindOptions()} to be explicit.`,
       )
     }
   }
 
   const metric = resolveExerciseChartMetric(parsed, exerciseFrontmatter, kind, notes)
 
+  /** Strength-only rule: weight units are a strength concern; other kinds chart without one. */
   const weightUnit =
     kind === 'strength'
       ? resolveExerciseWeightUnit(exerciseFrontmatter, registry, exerciseName)
@@ -177,25 +190,23 @@ function isExerciseSourceFile(file: TFile | null, plugin: FitKitPlugin): boolean
   return typeof typeValue === 'string' && typeValue.toLowerCase() === 'exercise'
 }
 
+/** Advice fragment naming every known kind, so the note text cannot drift from `EXERCISE_KINDS`. */
+function formatKindOptions(): string {
+  return EXERCISE_KINDS.map((kind) => `'kind: ${kind}'`).join(' or ')
+}
+
 function kindFromFrontmatter(
   frontmatter: CachedMetadata['frontmatter'] | undefined,
 ): KindFrontmatterResult {
   const value = readFrontmatterField(frontmatter, 'kind')
-  if (value === undefined || value === null) {
+  const kind = parseExerciseKind(value)
+  if (kind) {
+    return { kind }
+  }
+  if (typeof value !== 'string' || value.trim().length === 0) {
     return { kind: null, reason: 'missing' }
   }
-  if (typeof value !== 'string') {
-    return { kind: null, reason: 'missing' }
-  }
-  const raw = value.trim()
-  if (raw.length === 0) {
-    return { kind: null, reason: 'missing' }
-  }
-  const lowered = raw.toLowerCase()
-  if (lowered === 'strength' || lowered === 'duration') {
-    return { kind: lowered }
-  }
-  return { kind: null, reason: 'invalid', raw }
+  return { kind: null, reason: 'invalid', raw: value.trim() }
 }
 
 function resolveExerciseWeightUnit(

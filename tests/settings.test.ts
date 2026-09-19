@@ -75,6 +75,33 @@ describe('settings migration', () => {
     expect(migrated.exerciseRegistry[0]?.unit).toBeUndefined()
   })
 
+  it('preserves a valid stored registry kind', () => {
+    const migrated = settingsFromStored({
+      exerciseRegistry: [{ name: 'Plank', kind: 'duration', aliases: [] }],
+      schemaVersion: 1,
+    })
+
+    expect(migrated.exerciseRegistry).toEqual([{ name: 'Plank', kind: 'duration', aliases: [] }])
+  })
+
+  it('falls back to strength for an unrecognised stored registry kind', () => {
+    const migrated = settingsFromStored({
+      exerciseRegistry: [{ name: 'Plank', kind: 'cardio', aliases: [] }],
+      schemaVersion: 1,
+    } as unknown as Partial<FitKitSettings>)
+
+    expect(migrated.exerciseRegistry[0]?.kind).toBe('strength')
+  })
+
+  it('falls back to strength for a stored registry entry missing its kind', () => {
+    const migrated = settingsFromStored({
+      exerciseRegistry: [{ name: 'Plank', aliases: [] }],
+      schemaVersion: 1,
+    } as unknown as Partial<FitKitSettings>)
+
+    expect(migrated.exerciseRegistry[0]?.kind).toBe('strength')
+  })
+
   it('preserves stored deleted exercise tombstones', () => {
     expect(
       settingsFromStored({

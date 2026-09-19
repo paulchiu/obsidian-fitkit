@@ -13,6 +13,17 @@ function resolveMetric(source: string, frontmatter?: ExerciseChartFrontmatter): 
 }
 
 describe('exercise chart block parsing', () => {
+  // Lock: duration ignores any supplied or frontmatter metric and pushes no notes.
+  it('resolves duration to the default metric without reading metrics or notes', () => {
+    const notes: string[] = []
+    const parsed = parseExerciseChartBlock('metric: weight')
+
+    const metric = resolveExerciseChartMetric(parsed, { metric: 'weight' }, 'duration', notes)
+
+    expect(metric).toBe('e1rm')
+    expect(notes).toEqual([])
+  })
+
   it('lets the code-block metric override frontmatter metric', () => {
     expect(resolveMetric('metric: weight', { metric: 'e1rm' })).toBe('weight')
   })
@@ -98,5 +109,15 @@ window: 12
       window: 12,
       windowFallback: false,
     })
+  })
+
+  it('accepts kinds case-insensitively through the shared parser', () => {
+    expect(parseExerciseChartBlock('kind: DURATION').kind).toBe('duration')
+    expect(parseExerciseChartBlock('kind:   Strength  ').kind).toBe('strength')
+  })
+
+  it('leaves kind untouched on an unrecognised value', () => {
+    expect(parseExerciseChartBlock('kind: cardio').kind).toBeNull()
+    expect(parseExerciseChartBlock('kind: strength\nkind: cardio').kind).toBe('strength')
   })
 })

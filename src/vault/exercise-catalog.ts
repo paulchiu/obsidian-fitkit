@@ -1,5 +1,6 @@
 import type { App, CachedMetadata, TFile } from 'obsidian'
 
+import { parseExerciseKind } from '../domain/exercise-kind'
 import { normalize, type ExerciseKind } from '../domain/exercise-registry'
 import { parseWeightUnit, type WeightUnit } from '../domain/weight-unit'
 import type { FitKitSettings } from '../settings'
@@ -80,17 +81,7 @@ function isExerciseFrontmatter(frontmatter: CachedMetadata['frontmatter'] | unde
   return typeof type === 'string' && type.trim().toLowerCase() === 'exercise'
 }
 
-function parseExerciseKind(value: unknown): ExerciseKind | null {
-  if (typeof value !== 'string') {
-    return null
-  }
-  const normalized = value.trim().toLowerCase()
-  if (normalized === 'strength' || normalized === 'duration') {
-    return normalized
-  }
-  return null
-}
-
+/** Strength-only rule: only strength notes carry a unit; other kinds have none. */
 function unitFromFrontmatter(
   frontmatter: CachedMetadata['frontmatter'] | undefined,
   kind: ExerciseKind,

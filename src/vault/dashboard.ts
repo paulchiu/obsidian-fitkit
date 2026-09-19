@@ -1,5 +1,6 @@
 import type { App, CachedMetadata, TAbstractFile, TFile } from 'obsidian'
 
+import { assertUnreachableKind, type ExerciseKind } from '../domain/exercise-kind'
 import {
   DEFAULT_EXERCISE_METRIC,
   parseExerciseMetric,
@@ -21,7 +22,7 @@ import { markdownFilesInFolder } from './folder-scan'
 
 interface ExerciseAggregate {
   exerciseName: string
-  kind: 'strength' | 'duration'
+  kind: ExerciseKind
   metric: ExerciseMetric
   unit: WeightUnit
   pbSet?: StrengthPbSet
@@ -220,9 +221,15 @@ function getAggregate(
 function formatPb(exercise: ExerciseAggregate): string {
   const link = `[[#${exercise.exerciseName}|${exercise.exerciseName}]]`
 
-  if (exercise.kind === 'duration') {
-    const sessionLabel = exercise.sessionCount === 1 ? 'session' : 'sessions'
-    return `- **${link}:** total ${exercise.totalDurationSeconds}s across ${exercise.sessionCount} ${sessionLabel}`
+  switch (exercise.kind) {
+    case 'duration': {
+      const sessionLabel = exercise.sessionCount === 1 ? 'session' : 'sessions'
+      return `- **${link}:** total ${exercise.totalDurationSeconds}s across ${exercise.sessionCount} ${sessionLabel}`
+    }
+    case 'strength':
+      break
+    default:
+      return assertUnreachableKind(exercise.kind)
   }
 
   if (!exercise.pbSet) {
@@ -254,15 +261,20 @@ function isMoreRecentPlan(candidate: PlannedSession, current: PlannedSession): b
 }
 
 function dataviewQuery(exercise: ExerciseAggregate, workoutsFolderPath: string): string[] {
-  if (exercise.kind === 'duration') {
-    return [
-      'table without id file.link as Session, duration + "s" as Duration',
-      `from "${workoutsFolderPath}"`,
-      'flatten file.lists as item',
-      `where contains(item.text, "[exercise:: [[${exercise.exerciseName}]]]") and item.duration`,
-      'sort file.name desc',
-      'limit 12',
-    ]
+  switch (exercise.kind) {
+    case 'duration':
+      return [
+        'table without id file.link as Session, duration + "s" as Duration',
+        `from "${workoutsFolderPath}"`,
+        'flatten file.lists as item',
+        `where contains(item.text, "[exercise:: [[${exercise.exerciseName}]]]") and item.duration`,
+        'sort file.name desc',
+        'limit 12',
+      ]
+    case 'strength':
+      break
+    default:
+      return assertUnreachableKind(exercise.kind)
   }
 
   return [
@@ -284,6 +296,7 @@ function isMarkdownFile(file: TAbstractFile | null): file is TFile {
 }
 
 function pickDashboardSet(row: ExerciseIndexRow, metric: ExerciseMetric): StrengthPbSet | null {
+  /** Strength-only statistic: other kinds contribute nothing until they define their own. */
   if (row.kind !== 'strength') {
     return null
   }
@@ -354,6 +367,7 @@ function buildExerciseMetricMap(
 
   for (const entry of index.entries) {
     for (const row of entry.exercises) {
+      /** Strength-only statistic: other kinds contribute nothing until they define their own. */
       if (row.kind !== 'strength' || metrics.has(row.exerciseName)) {
         continue
       }
@@ -371,6 +385,7 @@ function readExerciseNoteMetrics(app: App, settings: FitKitSettings): Map<string
     const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter
     const type = readFrontmatterField(frontmatter, 'type')
     const kind = readFrontmatterField(frontmatter, 'kind')
+    /** Strength-only statistic read from frontmatter; other kinds contribute nothing. */
     if (
       typeof type !== 'string' ||
       type.toLowerCase().trim() !== 'exercise' ||
@@ -417,6 +432,7 @@ function buildExerciseUnitMap(
 
   for (const entry of index.entries) {
     for (const row of entry.exercises) {
+      /** Strength-only statistic: other kinds contribute nothing until they define their own. */
       if (row.kind !== 'strength' || units.has(row.exerciseName)) {
         continue
       }
@@ -434,6 +450,7 @@ function readExerciseNoteUnits(app: App, settings: FitKitSettings): Map<string, 
     const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter
     const type = readFrontmatterField(frontmatter, 'type')
     const kind = readFrontmatterField(frontmatter, 'kind')
+    /** Strength-only statistic read from frontmatter; other kinds contribute nothing. */
     if (
       typeof type !== 'string' ||
       type.toLowerCase().trim() !== 'exercise' ||

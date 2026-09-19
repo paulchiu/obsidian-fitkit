@@ -229,6 +229,28 @@ kind: duration
     expect(result.unknownKind).toBe(false)
   })
 
+  it('accepts and rejects the same kinds as the other frontmatter read paths', () => {
+    const accepted = ['strength', 'duration', ' Strength  ', 'DURATION']
+    const rejected = ['cardio', '', '   ', '42']
+    for (const value of accepted) {
+      const source = completeDurationNote('Mystery').replace('kind: duration', `kind: ${value}`)
+      const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
+      expect(result.unknownKind).toBe(false)
+    }
+    for (const value of rejected) {
+      const source = completeDurationNote('Mystery').replace('kind: duration', `kind: ${value}`)
+      const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
+      expect(result.unknownKind).toBe(true)
+      expect(result.status).toBe('unknown')
+    }
+    const missing = migrate(completeDurationNote('Mystery').replace('kind: duration\n', ''), {
+      name: 'Mystery',
+      registry: createRegistry([]),
+    })
+    expect(missing.unknownKind).toBe(true)
+    expect(missing.status).toBe('unknown')
+  })
+
   it('adds missing type to existing frontmatter', () => {
     const source = `---
 kind: duration
@@ -997,6 +1019,26 @@ LIMIT 10
 
     expect(result.markdown).toBe(source)
     expect(result.warnings).toEqual([{ kind: 'custom-recent-sessions' }])
+  })
+
+  it('rewrites a Recent sessions block left over from a kind switch without warning', () => {
+    const staleRecent = buildRecentSessionsBlock('Squat', 'duration', 'Fitness')
+    const source = completeStrengthNote(staleRecent)
+    const result = migrate(source)
+
+    expect(result.markdown).toContain(buildRecentSessionsBlock('Squat', 'strength', 'Fitness'))
+    expect(result.markdown).not.toContain(staleRecent)
+    expect(result.warnings).toEqual([])
+  })
+
+  it('rewrites a strength-shaped Recent sessions block on a duration note without warning', () => {
+    const staleRecent = buildRecentSessionsBlock('Plank', 'strength', 'Fitness')
+    const source = completeDurationNote('Plank', staleRecent)
+    const result = migrate(source, { name: 'Plank' })
+
+    expect(result.markdown).toContain(buildRecentSessionsBlock('Plank', 'duration', 'Fitness'))
+    expect(result.markdown).not.toContain(staleRecent)
+    expect(result.warnings).toEqual([])
   })
 
   it('is idempotent on a repaired note', () => {

@@ -100,6 +100,48 @@ describe('exercise catalog', () => {
     ])
   })
 
+  it('accepts and rejects the same kinds as the other frontmatter read paths', () => {
+    const accepted: Array<{ raw: unknown; kind: string }> = [
+      { raw: 'strength', kind: 'strength' },
+      { raw: 'duration', kind: 'duration' },
+      { raw: ' Strength ', kind: 'strength' },
+      { raw: 'DURATION', kind: 'duration' },
+    ]
+    const rejected: unknown[] = ['cardio', '', '   ', 42]
+    const snapshot = readExerciseCatalog(
+      mockApp([
+        ...accepted.map((entry, index) => ({
+          path: `Fitness/Exercises/Accepted${index}.md`,
+          basename: `Accepted${index}`,
+          frontmatter: { type: 'exercise', kind: entry.raw },
+        })),
+        ...rejected.map((kind, index) => ({
+          path: `Fitness/Exercises/Rejected${index}.md`,
+          basename: `Rejected${index}`,
+          frontmatter: { type: 'exercise', kind },
+        })),
+        {
+          path: 'Fitness/Exercises/Missing.md',
+          basename: 'Missing',
+          frontmatter: { type: 'exercise' },
+        },
+      ]),
+      settings(),
+    )
+
+    expect(snapshot.entries.map((entry) => entry.kind)).toEqual(accepted.map((entry) => entry.kind))
+    expect(snapshot.diagnostics.map((diagnostic) => diagnostic.path)).toEqual([
+      'Fitness/Exercises/Missing.md',
+      'Fitness/Exercises/Rejected0.md',
+      'Fitness/Exercises/Rejected1.md',
+      'Fitness/Exercises/Rejected2.md',
+      'Fitness/Exercises/Rejected3.md',
+    ])
+    for (const diagnostic of snapshot.diagnostics) {
+      expect(diagnostic.warnings).toEqual(['Exercise note is missing a valid kind.'])
+    }
+  })
+
   it('diagnoses and skips exercise notes with invalid or missing kind', () => {
     const snapshot = readExerciseCatalog(
       mockApp([

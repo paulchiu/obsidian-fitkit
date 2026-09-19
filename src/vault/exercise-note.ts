@@ -21,6 +21,7 @@ export function composeExerciseNote(
   lines.push('---')
   lines.push('type: exercise')
   lines.push(`kind: ${kind}`)
+  /** Strength-only rule: metric and unit are strength concerns; other kinds need neither. */
   if (kind === 'strength') {
     lines.push('metric: e1rm')
     lines.push(`unit: ${unit}`)

@@ -9,6 +9,7 @@ import type {
 import { formatErrorMessage } from './domain/error'
 import type { ExerciseRegistryEntry } from './domain/exercise-registry'
 import { createRegistry, normalize, removeEntry } from './domain/exercise-registry'
+import { parseExerciseKind } from './domain/exercise-kind'
 import { parseWeightUnit } from './domain/weight-unit'
 import type FitKitPlugin from './main'
 import { DeleteRegistryEntryModal } from './ui/delete-registry-entry-modal'
@@ -107,7 +108,7 @@ function normalizeStoredExerciseRegistry(
 ): ExerciseRegistryEntry[] {
   return entries.map((entry) => ({
     name: entry.name,
-    kind: entry.kind,
+    kind: parseExerciseKind(entry.kind) ?? 'strength',
     unit: parseWeightUnit(entry.unit) ?? undefined,
     aliases: [...entry.aliases],
   }))

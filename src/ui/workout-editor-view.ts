@@ -8,6 +8,7 @@ import {
   ZERO_DURATION_DISPLAY,
 } from '../domain/duration-input'
 import { formatErrorMessage } from '../domain/error'
+import { assertUnreachableKind, EXERCISE_KINDS } from '../domain/exercise-kind'
 import {
   formatExerciseHistoryBadges,
   formatNextPlanBadge,
@@ -34,10 +35,13 @@ import {
 import {
   parseWorkoutNote,
   serializeWorkoutNote,
+  withNoteAndNext,
   type DurationEntry,
+  type DurationExerciseEntry,
   type ExerciseEntry,
   type ExerciseKind,
   type PreserveBlock,
+  type StrengthExerciseEntry,
   type StrengthSet,
   type WorkoutNoteModel,
 } from '../domain/workout-note-model'
@@ -105,6 +109,12 @@ interface ExerciseCard {
   next?: NextPlan
   strengthSets: EditableStrengthSet[]
   durationEntries: EditableDurationEntry[]
+}
+
+/** Column label of the cell focused after adding an exercise, per kind. */
+const FOCUS_COLUMN_LABELS: Record<ExerciseKind, string> = {
+  strength: 'Weight',
+  duration: 'Duration',
 }
 
 const NEXT_PLAN_OPTIONS: ReadonlyArray<{
@@ -468,10 +478,15 @@ export class WorkoutEditorView extends ItemView {
       })
     }
 
-    if (ex.kind === 'strength') {
-      this.renderStrengthTable(card, ex, index)
-    } else {
-      this.renderDurationTable(card, ex, index)
+    switch (ex.kind) {
+      case 'strength':
+        this.renderStrengthTable(card, ex, index)
+        break
+      case 'duration':
+        this.renderDurationTable(card, ex, index)
+        break
+      default:
+        assertUnreachableKind(ex.kind)
     }
   }
 
@@ -1191,8 +1206,6 @@ export class WorkoutEditorView extends ItemView {
       return
     }
     const lastIndex = this.model.exercises.length - 1
-    const otherKind: ExerciseKind = ex.kind === 'strength' ? 'duration' : 'strength'
-    const switchLabel = otherKind === 'strength' ? 'Switch to strength' : 'Switch to duration'
 
     const menu = new Menu()
     menu.addItem((item) =>
@@ -1219,12 +1232,17 @@ export class WorkoutEditorView extends ItemView {
       this.addNextPlanMenuItems(menu, ex)
     }
     menu.addSeparator()
-    menu.addItem((item) =>
-      item
-        .setTitle(switchLabel)
-        .setIcon('repeat')
-        .onClick(() => void this.switchKind(index, otherKind)),
-    )
+    for (const nextKind of EXERCISE_KINDS) {
+      if (nextKind === ex.kind) {
+        continue
+      }
+      menu.addItem((item) =>
+        item
+          .setTitle(`Switch to ${nextKind}`)
+          .setIcon('repeat')
+          .onClick(() => void this.switchKind(index, nextKind)),
+      )
+    }
     menu.addSeparator()
     menu.addItem((item) =>
       item
@@ -1524,7 +1542,7 @@ export class WorkoutEditorView extends ItemView {
     this.model.exercises.push(card)
     this.markDirty()
     this.render()
-    const focusLabel = kind === 'strength' ? 'Weight' : 'Duration'
+    const focusLabel = FOCUS_COLUMN_LABELS[kind]
     this.focusRowCell(exerciseIndex, 0, focusLabel)
 
     if (registryKind === null) {
@@ -1890,9 +1908,14 @@ function seedEmptyRow(
   card: ExerciseCard,
   summary?: ExerciseHistorySummary,
 ): EditableStrengthSet | null {
-  if (card.kind !== 'strength') {
-    card.durationEntries.push({})
-    return null
+  switch (card.kind) {
+    case 'duration':
+      card.durationEntries.push({})
+      return null
+    case 'strength':
+      break
+    default:
+      return assertUnreachableKind(card.kind)
   }
   const target = seededSetWeight(summary)
   if (target === null) {
@@ -1941,13 +1964,21 @@ function toEditorWorkoutModel(
   }
 }
 
-function toEditorExercise(exercise: ExerciseEntry): ExerciseCard {
-  const card: ExerciseCard = {
-    name: exercise.exerciseName,
-    kind: exercise.kind,
-    strengthSets: (exercise.strengthSets ?? []).map(toEditorStrengthSet),
-    durationEntries: (exercise.durationEntries ?? []).map(toEditorDurationEntry),
-  }
+export function toEditorExercise(exercise: ExerciseEntry): ExerciseCard {
+  const card: ExerciseCard =
+    exercise.kind === 'strength'
+      ? {
+          name: exercise.exerciseName,
+          kind: exercise.kind,
+          strengthSets: exercise.strengthSets.map(toEditorStrengthSet),
+          durationEntries: [],
+        }
+      : {
+          name: exercise.exerciseName,
+          kind: exercise.kind,
+          strengthSets: [],
+          durationEntries: exercise.durationEntries.map(toEditorDurationEntry),
+        }
   if (exercise.note !== undefined) {
     card.exerciseNotes = exercise.note
   }
@@ -2001,23 +2032,27 @@ function toWorkoutNoteModel(model: EditorWorkoutModel): WorkoutNoteModel {
   }
 }
 
-function toWorkoutExercise(card: ExerciseCard): ExerciseEntry {
-  const exercise: ExerciseEntry = {
-    exerciseName: card.name,
-    kind: card.kind,
+export function toWorkoutExercise(card: ExerciseCard): ExerciseEntry {
+  const note = card.exerciseNotes
+  const next = card.next
+  switch (card.kind) {
+    case 'strength': {
+      const entry: StrengthExerciseEntry = {
+        exerciseName: card.name,
+        kind: card.kind,
+        strengthSets: card.strengthSets.map(toStrengthSet),
+      }
+      return withNoteAndNext(entry, note, next)
+    }
+    case 'duration': {
+      const entry: DurationExerciseEntry = {
+        exerciseName: card.name,
+        kind: card.kind,
+        durationEntries: card.durationEntries.map(toDurationEntry),
+      }
+      return withNoteAndNext(entry, note, next)
+    }
   }
-  if (card.exerciseNotes !== undefined) {
-    exercise.note = card.exerciseNotes
-  }
-  if (card.next !== undefined) {
-    exercise.next = card.next
-  }
-  if (card.kind === 'strength') {
-    exercise.strengthSets = card.strengthSets.map(toStrengthSet)
-  } else {
-    exercise.durationEntries = card.durationEntries.map(toDurationEntry)
-  }
-  return exercise
 }
 
 function toStrengthSet(set: EditableStrengthSet, index: number): StrengthSet {
