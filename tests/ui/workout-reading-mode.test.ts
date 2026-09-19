@@ -204,6 +204,32 @@ describe('workout reading mode rendering', () => {
     expect(root.findByClass('fitkit-reading-plan')?.allText()).toContain('Next time: up 2.5 kg')
   })
 
+  it('shows a bodyweight next-time plan as a count of rungs', () => {
+    const section = [
+      '## [[Push-up]]',
+      '',
+      '- [exercise:: [[Push-up]]] [next:: up 1]',
+      '- [exercise:: [[Push-up]]] [set:: 1] [level:: 2] [reps:: 10]',
+    ].join('\n')
+    const root = createRenderedSection([
+      '[exercise:: [[Push-up]]] [next:: up 1]',
+      '[exercise:: [[Push-up]]] [set:: 1] [level:: 2] [reps:: 10]',
+    ])
+    const plugin = createPlugin()
+    plugin.settings.exerciseRegistry = [
+      {
+        name: 'Push-up',
+        kind: 'bodyweight',
+        levels: ['Wall push-up', 'Knee push-up'],
+        aliases: [],
+      },
+    ]
+
+    renderWorkoutReadingModeSection(plugin, root as unknown as HTMLElement, createContext(section))
+
+    expect(root.findByClass('fitkit-reading-plan')?.allText()).toContain('Next time: up 1 rung')
+  })
+
   it('shows bodyweight rung names from the registry ladder', () => {
     const section = [
       '## [[Push-up]]',

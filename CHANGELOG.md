@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Workout notes now recognise a `bodyweight` exercise kind whose rows carry `[level::]` (with optional `[reps::]` and `[load::]`). Parsing, note round-trip, and the reading view table are in place; the ladder, history badges, and full editor card follow in later changes.
 - Bodyweight exercise notes now declare the ordered `levels:` ladder the `[level::]` index points at. The note ladder wins over a saved registry ladder (with a diagnostic on disagreement), repairs and new notes seed a one-rung ladder, and switching a note to bodyweight sheds strength-only `metric:`/`unit:` lines.
 - Reading view and history badges now show bodyweight rung names instead of bare level numbers, with a `Level N` fallback when no ladder names the rung. The bodyweight personal best is the highest rung reached, ties broken by reps then load, and `[next::]` plans work over the ladder (`Same level` holds, steps count rungs and clamp to the ladder ends).
+- The workout editor now renders bodyweight exercises as a full card: a level stepper and rung menu per row, reps and optional load inputs, a load column that appears only while a row carries load, and an add-set action that copies the previous rung and focuses reps. A rung name shortens to its compact form only when the name itself overruns its cell.
+- Next-time plans on bodyweight exercises now read as counts of rungs wherever they appear: the reading view, the dashboard, and the plan step prompt, which asks for a rung change instead of a weight change.
 
 ### Changed
 

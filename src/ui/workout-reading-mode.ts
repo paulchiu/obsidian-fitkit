@@ -153,9 +153,7 @@ function renderExercisePreview(
   if (exercise.next) {
     wrap.createDiv({
       cls: 'fitkit-reading-plan',
-      text: `Next time: ${formatNextPlanLabel(exercise.next).toLowerCase()}${
-        exercise.next.step === undefined ? '' : ' kg'
-      }`,
+      text: `Next time: ${formatNextPlanLabel(exercise.next, exercise.kind).toLowerCase()}${formatReadingPlanStepSuffix(exercise)}`,
     })
   }
 
@@ -277,6 +275,18 @@ function renderEmpty(container: HTMLElement, message: string): void {
 
 function formatSet(value: number): string {
   return Number.isFinite(value) && value > 0 ? formatNumber(value) : '-'
+}
+
+/** A bodyweight plan step counts rungs; every other kind keeps kilograms. */
+function formatReadingPlanStepSuffix(exercise: ExerciseEntry): string {
+  const step = exercise.next?.step
+  if (step === undefined) {
+    return ''
+  }
+  if (exercise.kind === 'bodyweight') {
+    return step === 1 ? ' rung' : ' rungs'
+  }
+  return ' kg'
 }
 
 function formatNumber(value: number): string {

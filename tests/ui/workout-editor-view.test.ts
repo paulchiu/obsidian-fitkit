@@ -172,6 +172,7 @@ vi.mock('../../src/vault/exercise-registry-vault', () => ({
 
 import { TFile } from 'obsidian'
 import {
+  shouldShortenLevelLabel,
   toEditorExercise,
   toWorkoutExercise,
   WorkoutEditorView,
@@ -451,6 +452,7 @@ describe('WorkoutEditorView row actions', () => {
           kind: 'strength',
           strengthSets: [],
           durationEntries: [],
+          bodyweightSets: [],
         },
       ],
     }
@@ -480,7 +482,9 @@ describe('WorkoutEditorView row actions', () => {
     for (const kind of EXERCISE_KINDS) {
       const view = createCardMenuView()
       view.model = {
-        exercises: [{ name: 'Squat', kind, strengthSets: [], durationEntries: [] }],
+        exercises: [
+          { name: 'Squat', kind, strengthSets: [], durationEntries: [], bodyweightSets: [] },
+        ],
       }
 
       view.openCardMenu({ currentTarget: new TestElement('button') } as unknown as MouseEvent, 0)
@@ -508,6 +512,7 @@ describe('WorkoutEditorView row actions', () => {
       kind: 'strength',
       strengthSets: [],
       durationEntries: [],
+      bodyweightSets: [],
     }
     view.model = { exercises: [exercise] }
     view.openOrCreateExerciseFile = vi.fn(() => Promise.resolve())
@@ -528,6 +533,7 @@ describe('WorkoutEditorView row actions', () => {
           kind: 'strength',
           strengthSets: [],
           durationEntries: [],
+          bodyweightSets: [],
         },
       ],
     }
@@ -551,7 +557,15 @@ describe('WorkoutEditorView row actions', () => {
     vi.stubGlobal('HTMLElement', TestElement)
     const view = createCardMenuView()
     view.model = {
-      exercises: [{ name: 'Squat', kind: 'strength', strengthSets: [], durationEntries: [] }],
+      exercises: [
+        {
+          name: 'Squat',
+          kind: 'strength',
+          strengthSets: [],
+          durationEntries: [],
+          bodyweightSets: [],
+        },
+      ],
     }
     view.openRenameExerciseModal = vi.fn(() => Promise.resolve())
 
@@ -587,6 +601,7 @@ describe('WorkoutEditorView row actions', () => {
           kind: 'strength',
           strengthSets: [],
           durationEntries: [],
+          bodyweightSets: [],
         },
       ],
     }
@@ -631,6 +646,7 @@ describe('WorkoutEditorView row actions', () => {
           kind: 'strength',
           strengthSets: [],
           durationEntries: [],
+          bodyweightSets: [],
         },
       ],
     }
@@ -678,6 +694,7 @@ describe('WorkoutEditorView row actions', () => {
           kind: 'strength',
           strengthSets: [],
           durationEntries: [],
+          bodyweightSets: [],
         },
       ],
     }
@@ -723,6 +740,7 @@ describe('WorkoutEditorView row actions', () => {
           kind: 'strength',
           strengthSets: [],
           durationEntries: [],
+          bodyweightSets: [],
         },
       ],
     }
@@ -774,6 +792,7 @@ describe('WorkoutEditorView row actions', () => {
           kind: 'strength',
           strengthSets: [],
           durationEntries: [],
+          bodyweightSets: [],
         },
       ],
     }
@@ -829,6 +848,7 @@ describe('WorkoutEditorView row actions', () => {
           kind,
           strengthSets: [],
           durationEntries: [],
+          bodyweightSets: [],
         },
       ],
     }
@@ -861,7 +881,15 @@ describe('WorkoutEditorView row actions', () => {
   it('renders no exercise notes textarea and no note line when the exercise has no note', () => {
     const view = createExerciseCardRenderView()
     view.model = {
-      exercises: [{ name: 'Squat', kind: 'strength', strengthSets: [], durationEntries: [] }],
+      exercises: [
+        {
+          name: 'Squat',
+          kind: 'strength',
+          strengthSets: [],
+          durationEntries: [],
+          bodyweightSets: [],
+        },
+      ],
     }
     view.exerciseHistory = new Map()
     const list = new TestElement('div')
@@ -882,6 +910,7 @@ describe('WorkoutEditorView row actions', () => {
           exerciseNotes: 'Belt on from set 2',
           strengthSets: [],
           durationEntries: [],
+          bodyweightSets: [],
         },
       ],
     }
@@ -910,6 +939,7 @@ describe('WorkoutEditorView row actions', () => {
           exerciseNotes: 'Belt on from set 2',
           strengthSets: [],
           durationEntries: [],
+          bodyweightSets: [],
         },
       ],
     }
@@ -928,6 +958,7 @@ describe('WorkoutEditorView row actions', () => {
           kind: 'strength',
           strengthSets: [],
           durationEntries: [],
+          bodyweightSets: [],
         },
       ],
     }
@@ -937,6 +968,396 @@ describe('WorkoutEditorView row actions', () => {
     view.renderExerciseCard(list as unknown as HTMLElement, 0)
 
     expect(list.findByClass('fitkit-card-history')).toBeNull()
+  })
+
+  it('renders a bodyweight card with level and reps columns and the badges row', () => {
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      {
+        name: 'Push-up',
+        kind: 'bodyweight',
+        levels: ['Wall push-up', 'Incline push-up', 'Knee push-up'],
+        aliases: [],
+      },
+    ])
+    const view = createExerciseCardRenderView()
+    view.model = {
+      exercises: [
+        {
+          name: 'Push-up',
+          kind: 'bodyweight',
+          strengthSets: [],
+          durationEntries: [],
+          bodyweightSets: [
+            { set: 1, level: 3, reps: 10 },
+            { set: 2, level: 2, reps: 12 },
+          ],
+        },
+      ],
+    }
+    view.exerciseHistory = new Map([
+      ['Push-up', { bodyweight: { personalBest: { level: 3, reps: 10, load: 0 } } }],
+    ])
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    const card = list.findByClass('fitkit-card')
+    expect(card?.classes.has('fitkit-bodyweight-card')).toBe(true)
+    const historyRow = card?.children.find((child) => child.classes.has('fitkit-card-history'))
+    expect(
+      historyRow?.findAllByClass('fitkit-card-badge').map((badge) => badge.textContent),
+    ).toEqual(['PB Knee push-up x 10'])
+    const head = card?.findByClass('fitkit-set-head')
+    expect(head?.classes.has('fitkit-bodyweight-row')).toBe(true)
+    expect(head?.children.map((child) => child.textContent)).toEqual(['', 'Level', 'Reps', ''])
+    expect(head?.findByClass('fitkit-bodyweight-head-spacer')).not.toBeNull()
+    const rows = card
+      ?.findAllByClass('fitkit-bodyweight-row')
+      .filter((row) => !row.classes.has('fitkit-set-head'))
+    expect(rows).toHaveLength(2)
+    expect(rows?.[0]?.findByClass('fitkit-bodyweight-level-full')?.textContent).toBe(
+      '3 · Knee push-up',
+    )
+    const reps = rows?.[0]
+      ?.findAllByClass('fitkit-cell')
+      .find((cell) => cell.dataset.label === 'Reps')?.children[0] as unknown as
+      (TestElement & { value: string }) | undefined
+    expect(reps?.value).toBe('10')
+  })
+
+  it('shows the load column only when a row on the card carries a load', () => {
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      {
+        name: 'Push-up',
+        kind: 'bodyweight',
+        levels: ['Wall push-up', 'Incline push-up', 'Knee push-up'],
+        aliases: [],
+      },
+    ])
+    const view = createExerciseCardRenderView()
+    view.model = {
+      exercises: [
+        {
+          name: 'Push-up',
+          kind: 'bodyweight',
+          strengthSets: [],
+          durationEntries: [],
+          bodyweightSets: [
+            { set: 1, level: 3, reps: 10, load: 20 },
+            { set: 2, level: 3, reps: 8 },
+          ],
+        },
+      ],
+    }
+    view.exerciseHistory = new Map()
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    const card = list.findByClass('fitkit-card')
+    const head = card?.findByClass('fitkit-set-head')
+    expect(head?.children.map((child) => child.textContent)).toEqual([
+      '',
+      'Level',
+      'Reps',
+      'Load',
+      '',
+    ])
+    const rows = card
+      ?.findAllByClass('fitkit-bodyweight-row')
+      .filter((row) => !row.classes.has('fitkit-set-head'))
+    expect(rows).toHaveLength(2)
+    expect(rows?.every((row) => row.classes.has('has-load'))).toBe(true)
+    const loads = rows?.map((row) =>
+      row.findAllByClass('fitkit-cell').find((cell) => cell.dataset.label === 'Load'),
+    )
+    expect(
+      loads
+        ?.map(
+          (cell) => cell?.children[0] as unknown as (TestElement & { value: string }) | undefined,
+        )
+        .map((input) => input?.value),
+    ).toEqual(['20', undefined])
+  })
+
+  it('disables the level stepper at the ends of the ladder without wrapping', () => {
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      {
+        name: 'Push-up',
+        kind: 'bodyweight',
+        levels: ['Wall push-up', 'Incline push-up', 'Knee push-up'],
+        aliases: [],
+      },
+    ])
+    const view = createExerciseCardRenderView()
+    view.model = {
+      exercises: [
+        {
+          name: 'Push-up',
+          kind: 'bodyweight',
+          strengthSets: [],
+          durationEntries: [],
+          bodyweightSets: [
+            { set: 1, level: 1, reps: 10 },
+            { set: 2, level: 3, reps: 8 },
+          ],
+        },
+      ],
+    }
+    view.exerciseHistory = new Map()
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    const steppers = list.findAllByClass('fitkit-bodyweight-stepper')
+    expect(steppers).toHaveLength(2)
+    const first = steppers[0]?.children as TestElement[]
+    const last = steppers[1]?.children as TestElement[]
+    expect((first[0] as TestElement & { disabled?: boolean }).disabled).toBe(true)
+    expect((first[2] as TestElement & { disabled?: boolean }).disabled).toBe(false)
+    expect((last[0] as TestElement & { disabled?: boolean }).disabled).toBe(false)
+    expect((last[2] as TestElement & { disabled?: boolean }).disabled).toBe(true)
+  })
+
+  it('disables both steps on a one-rung ladder', () => {
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      { name: 'Push-up', kind: 'bodyweight', levels: ['Push-up'], aliases: [] },
+    ])
+    const view = createExerciseCardRenderView()
+    view.model = {
+      exercises: [
+        {
+          name: 'Push-up',
+          kind: 'bodyweight',
+          strengthSets: [],
+          durationEntries: [],
+          bodyweightSets: [{ set: 1, level: 1, reps: 10 }],
+        },
+      ],
+    }
+    view.exerciseHistory = new Map()
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    const stepper = list.findByClass('fitkit-bodyweight-stepper')
+    const steps = stepper?.children
+    expect(steps).toHaveLength(3)
+    expect((steps?.[0] as TestElement & { disabled?: boolean }).disabled).toBe(true)
+    expect((steps?.[2] as TestElement & { disabled?: boolean }).disabled).toBe(true)
+  })
+
+  it('lists every rung in the level menu and sets only the chosen row', () => {
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      {
+        name: 'Push-up',
+        kind: 'bodyweight',
+        levels: ['Wall push-up', 'Incline push-up', 'Knee push-up'],
+        aliases: [],
+      },
+    ])
+    const ex = {
+      name: 'Push-up',
+      kind: 'bodyweight',
+      strengthSets: [],
+      durationEntries: [],
+      bodyweightSets: [
+        { set: 1, level: 2, reps: 10 },
+        { set: 2, level: 3, reps: 8 },
+      ],
+    }
+    const view = createExerciseCardRenderView()
+    view.model = { exercises: [ex] }
+    view.exerciseHistory = new Map()
+    const stubbed = Object.assign(view, {
+      markDirty: vi.fn(),
+      render: vi.fn(),
+      focusRowCell: vi.fn(),
+    })
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    list.findAllByClass('fitkit-bodyweight-level-label')[0]?.listenersFor('click')[0]?.({})
+
+    const menu = obsidianMock.menus[obsidianMock.menus.length - 1]
+    expect(menu?.items.map((item) => item.title)).toEqual([
+      '1 · Wall push-up',
+      '2 · Incline push-up',
+      '3 · Knee push-up',
+    ])
+    expect(menu?.items.map((item) => item.checked)).toEqual([false, true, false])
+    menu?.items[0]?.onClick?.()
+
+    expect(ex.bodyweightSets[0]?.level).toBe(1)
+    expect(ex.bodyweightSets[1]?.level).toBe(3)
+    expect(stubbed.markDirty).toHaveBeenCalled()
+    expect(stubbed.render).toHaveBeenCalled()
+  })
+
+  it('copies the previous row level when a set is added and focuses reps', () => {
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      {
+        name: 'Push-up',
+        kind: 'bodyweight',
+        levels: ['Wall push-up', 'Incline push-up', 'Knee push-up'],
+        aliases: [],
+      },
+    ])
+    const ex = {
+      name: 'Push-up',
+      kind: 'bodyweight',
+      strengthSets: [],
+      durationEntries: [],
+      bodyweightSets: [{ set: 1, level: 3, reps: 10 }],
+    }
+    const view = createExerciseCardRenderView()
+    view.model = { exercises: [ex] }
+    view.exerciseHistory = new Map()
+    const stubbed = Object.assign(view, {
+      markDirty: vi.fn(),
+      render: vi.fn(),
+      focusRowCell: vi.fn(),
+    })
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    list
+      .findByClass('fitkit-row-actions')
+      ?.children.find((child) => child.tagName === 'button' && child.textContent === 'Add set')
+      ?.listenersFor('click')[0]?.({})
+
+    expect(ex.bodyweightSets).toEqual([
+      { set: 1, level: 3, reps: 10 },
+      { set: 2, level: 3 },
+    ])
+    expect(stubbed.focusRowCell).toHaveBeenCalledWith(0, 1, 'Reps')
+    const rebuilt = new TestElement('div')
+    view.renderExerciseCard(rebuilt as unknown as HTMLElement, 0)
+    const rows = rebuilt
+      .findAllByClass('fitkit-bodyweight-row')
+      .filter((row) => !row.classes.has('fitkit-set-head'))
+    const repsCell = rows[1]
+      ?.findAllByClass('fitkit-cell')
+      .find((cell) => cell.dataset.label === 'Reps')
+    expect(repsCell?.findByClass('fitkit-input')).not.toBeNull()
+  })
+
+  it('starts the first row of an empty card at level 1', () => {
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      {
+        name: 'Push-up',
+        kind: 'bodyweight',
+        levels: ['Wall push-up', 'Incline push-up', 'Knee push-up'],
+        aliases: [],
+      },
+    ])
+    const ex = {
+      name: 'Push-up',
+      kind: 'bodyweight',
+      strengthSets: [],
+      durationEntries: [],
+      bodyweightSets: [],
+    }
+    const view = createExerciseCardRenderView()
+    view.model = { exercises: [ex] }
+    view.exerciseHistory = new Map()
+    const stubbed = Object.assign(view, {
+      markDirty: vi.fn(),
+      render: vi.fn(),
+      focusRowCell: vi.fn(),
+    })
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    list
+      .findByClass('fitkit-row-actions')
+      ?.children.find((child) => child.tagName === 'button' && child.textContent === 'Add set')
+      ?.listenersFor('click')[0]?.({})
+
+    expect(ex.bodyweightSets).toEqual([{ set: 1, level: 1 }])
+    expect(stubbed.focusRowCell).toHaveBeenCalledWith(0, 0, 'Reps')
+  })
+
+  it('adds and removes the load cell from the row kebab', () => {
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      {
+        name: 'Push-up',
+        kind: 'bodyweight',
+        levels: ['Wall push-up', 'Incline push-up', 'Knee push-up'],
+        aliases: [],
+      },
+    ])
+    const ex = {
+      name: 'Push-up',
+      kind: 'bodyweight',
+      strengthSets: [],
+      durationEntries: [],
+      bodyweightSets: [
+        { set: 1, level: 3, reps: 10, load: 20 },
+        { set: 2, level: 3, reps: 8 },
+      ],
+    }
+    const view = createExerciseCardRenderView()
+    view.model = { exercises: [ex] }
+    view.exerciseHistory = new Map()
+    const stubbed = Object.assign(view, {
+      markDirty: vi.fn(),
+      render: vi.fn(),
+      focusRowCell: vi.fn(),
+    })
+    const openKebab = (list: TestElement, rowIndex: number): void => {
+      list.findAllByClass('fitkit-row-kebab')[rowIndex]?.listenersFor('click')[0]?.({
+        stopPropagation: vi.fn(),
+      })
+    }
+    const clickMenuItem = (title: string): void => {
+      const menu = obsidianMock.menus[obsidianMock.menus.length - 1]
+      menu?.items.find((item) => item.title === title)?.onClick?.()
+    }
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    openKebab(list, 1)
+    expect(
+      obsidianMock.menus[obsidianMock.menus.length - 1]?.items.map((item) => item.title),
+    ).toEqual(['Edit note', 'Add load', 'Renumber sets', 'Delete row'])
+    clickMenuItem('Add load')
+    expect(ex.bodyweightSets[1]?.load).toBe(20)
+    expect(stubbed.render).toHaveBeenCalled()
+
+    const loaded = new TestElement('div')
+    view.renderExerciseCard(loaded as unknown as HTMLElement, 0)
+    expect(
+      loaded.findByClass('fitkit-set-head')?.children.map((child) => child.textContent),
+    ).toContain('Load')
+    openKebab(loaded, 0)
+    expect(
+      obsidianMock.menus[obsidianMock.menus.length - 1]?.items
+        .map((item) => item.title)
+        .filter((title) => title === 'Add load' || title === 'Remove load'),
+    ).toEqual(['Remove load'])
+    clickMenuItem('Remove load')
+    expect(ex.bodyweightSets[0]?.load).toBeUndefined()
+
+    const relabelled = new TestElement('div')
+    view.renderExerciseCard(relabelled as unknown as HTMLElement, 0)
+    openKebab(relabelled, 0)
+    clickMenuItem('Add load')
+    expect(ex.bodyweightSets[0]?.load).toBe(0)
+
+    ex.bodyweightSets[0] = { set: 1, level: 3, reps: 10 }
+    ex.bodyweightSets[1] = { set: 2, level: 3, reps: 8 }
+    const unloaded = new TestElement('div')
+    view.renderExerciseCard(unloaded as unknown as HTMLElement, 0)
+    expect(
+      unloaded.findByClass('fitkit-set-head')?.children.map((child) => child.textContent),
+    ).not.toContain('Load')
+  })
+
+  it('shortens a rung name only when its own width overruns the cell', () => {
+    expect(shouldShortenLevelLabel(100, 120)).toBe(true)
+    expect(shouldShortenLevelLabel(100, 100)).toBe(false)
+    expect(shouldShortenLevelLabel(200, 120)).toBe(false)
   })
 })
 
@@ -1263,6 +1684,7 @@ interface TimerExerciseCard {
   kind: 'duration'
   strengthSets: unknown[]
   durationEntries: { durationSeconds?: number; set?: number; note?: string }[]
+  bodyweightSets: unknown[]
 }
 
 interface RestTimerExerciseCard {
@@ -1270,6 +1692,7 @@ interface RestTimerExerciseCard {
   kind: 'strength' | 'duration'
   strengthSets: { set?: number; weight?: number; reps?: number; note?: string }[]
   durationEntries: { durationSeconds?: number; set?: number; note?: string }[]
+  bodyweightSets: unknown[]
 }
 
 interface RestTimerWorkoutModel {
@@ -1403,6 +1826,7 @@ describe('WorkoutEditorView rest timer', () => {
       kind: 'strength',
       strengthSets: [{ set: 1, weight: 80, reps: 5 }],
       durationEntries: [],
+      bodyweightSets: [],
     }
     const view = createRestTimerView(ex)
     const card = new TestElement('div')
@@ -1426,6 +1850,7 @@ describe('WorkoutEditorView rest timer', () => {
       kind: 'strength',
       strengthSets: [{ set: 1, weight: 80, reps: 5 }],
       durationEntries: [],
+      bodyweightSets: [],
     }
     const view = createRestTimerView(ex)
     const card = new TestElement('div')
@@ -1450,6 +1875,7 @@ describe('WorkoutEditorView rest timer', () => {
       kind: 'strength',
       strengthSets: [{ set: 1, weight: 80 }],
       durationEntries: [],
+      bodyweightSets: [],
     }
     const view = createRestTimerView(ex)
     view.startRestTimer = vi.fn()
@@ -1475,6 +1901,7 @@ describe('WorkoutEditorView rest timer', () => {
         { set: 3, weight: 90 },
       ],
       durationEntries: [],
+      bodyweightSets: [],
     }
     const view = createRestTimerView(ex)
     const card = new TestElement('div')
@@ -1492,6 +1919,7 @@ describe('WorkoutEditorView rest timer', () => {
       kind: 'strength',
       strengthSets: [{ set: 1, weight: 80, reps: 5 }],
       durationEntries: [],
+      bodyweightSets: [],
     }
     const enabledView = createRestTimerRenderView([ex])
 
@@ -1518,6 +1946,7 @@ describe('WorkoutEditorView rest timer', () => {
       kind: 'strength',
       strengthSets: [{ set: 1, weight: 80, reps: 5 }],
       durationEntries: [],
+      bodyweightSets: [],
     }
     const view = createRestTimerView(ex)
     view.plugin.settings.strengthRestTimerEnabled = false
@@ -1535,6 +1964,7 @@ describe('WorkoutEditorView rest timer', () => {
       kind: 'strength',
       strengthSets: [set],
       durationEntries: [],
+      bodyweightSets: [],
     }
     const view = createRestTimerView(ex)
 
@@ -1554,6 +1984,7 @@ describe('WorkoutEditorView rest timer', () => {
       kind: 'strength',
       strengthSets: [set],
       durationEntries: [],
+      bodyweightSets: [],
     }
     const view = createRestTimerView(ex)
 
@@ -1580,6 +2011,7 @@ describe('WorkoutEditorView rest timer', () => {
       kind: 'strength',
       strengthSets: [set],
       durationEntries: [],
+      bodyweightSets: [],
     }
     const view = createRestTimerView(ex)
 
@@ -1604,6 +2036,7 @@ describe('WorkoutEditorView rest timer', () => {
       kind: 'strength',
       strengthSets: [set],
       durationEntries: [],
+      bodyweightSets: [],
     }
     const view = createRestTimerView(ex)
 
@@ -1626,6 +2059,7 @@ describe('WorkoutEditorView rest timer', () => {
       kind: 'strength',
       strengthSets: [set],
       durationEntries: [],
+      bodyweightSets: [],
     }
     const view = createRestTimerView(ex)
     view.session = { file: { path: 'Workouts/A.md' } }
@@ -1658,6 +2092,7 @@ describe('WorkoutEditorView rest timer', () => {
       kind: 'strength',
       strengthSets: [set],
       durationEntries: [],
+      bodyweightSets: [],
     }
     const view = createRestTimerView(ex)
 
@@ -1687,6 +2122,7 @@ describe('WorkoutEditorView rest timer', () => {
       kind: 'strength',
       strengthSets: [set],
       durationEntries: [],
+      bodyweightSets: [],
     }
     const view = createRestTimerView(ex)
     view.session = {
@@ -1702,6 +2138,7 @@ describe('WorkoutEditorView rest timer', () => {
               kind: 'strength',
               strengthSets: [{ set: 1, weight: 90, reps: 3 }],
               durationEntries: [],
+              bodyweightSets: [],
             },
           ],
           preserveBlocks: [],
@@ -1731,6 +2168,7 @@ describe('WorkoutEditorView rest timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [durationEntry],
+      bodyweightSets: [],
     }
     const view = createRestTimerView(ex)
     view.activeTimer = {
@@ -1789,6 +2227,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{}],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
     const card = new TestElement('div')
@@ -1807,6 +2246,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{ durationSeconds: 60 }, { set: 7, durationSeconds: 30 }],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
     const card = new TestElement('div')
@@ -1832,6 +2272,7 @@ describe('WorkoutEditorView duration timer', () => {
         { set: 4, durationSeconds: 60 },
         { set: 9, durationSeconds: 30 },
       ],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
     const card = new TestElement('div')
@@ -1852,6 +2293,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{}],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
     view.activeTimer = {
@@ -1878,6 +2320,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
 
@@ -1898,6 +2341,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{ durationSeconds: 30 }],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
 
@@ -1913,6 +2357,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{ durationSeconds: 30 }],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
 
@@ -1928,6 +2373,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{ durationSeconds: 30 }],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
 
@@ -1945,6 +2391,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{ durationSeconds: 10 }],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
 
@@ -1964,6 +2411,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{ durationSeconds: 60 }],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
     const card = new TestElement('div')
@@ -1984,6 +2432,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{}],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
 
@@ -2009,6 +2458,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{ durationSeconds: 30 }],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
     ;(
@@ -2044,6 +2494,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{ durationSeconds: 30 }],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
     view.startCardTimer(ex)
@@ -2064,6 +2515,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{ durationSeconds: 30 }],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
     view.startCardTimer(ex)
@@ -2082,6 +2534,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{ durationSeconds: 90 }],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
 
@@ -2105,6 +2558,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{}],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
     const wrap = new TestElement('div')
@@ -2132,6 +2586,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{}],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
     const wrap = new TestElement('div')
@@ -2155,6 +2610,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{ durationSeconds: 90 }],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
     const wrap = new TestElement('div')
@@ -2183,6 +2639,7 @@ describe('WorkoutEditorView duration timer', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{ durationSeconds: 59 }],
+      bodyweightSets: [],
     }
     const view = createTimerView(ex)
     view.startCardTimer(ex)
@@ -2209,6 +2666,7 @@ interface NextPlanExerciseCard {
   next?: { direction: 'up' | 'down' | 'stay'; step?: number }
   strengthSets: Array<{ set?: number; weight?: number; reps?: number }>
   durationEntries: Array<{ durationSeconds?: number }>
+  bodyweightSets: unknown[]
 }
 
 interface NextPlanView {
@@ -2236,7 +2694,15 @@ describe('WorkoutEditorView set seeding', () => {
   const seedStrength = (history: unknown): SeedView => {
     const view = Object.create(WorkoutEditorView.prototype) as SeedView
     view.model = {
-      exercises: [{ name: 'Squat', kind: 'duration', strengthSets: [], durationEntries: [{}] }],
+      exercises: [
+        {
+          name: 'Squat',
+          kind: 'duration',
+          strengthSets: [],
+          durationEntries: [{}],
+          bodyweightSets: [],
+        },
+      ],
     }
     view.exerciseHistory = history
     view.activeTimer = null
@@ -2346,6 +2812,7 @@ describe('WorkoutEditorView next-time plan', () => {
       kind: 'strength',
       strengthSets: [{ set: 1, weight: 100, reps: 5 }],
       durationEntries: [],
+      bodyweightSets: [],
     })
 
     expect(items.map((item) => item.title)).toEqual([
@@ -2364,6 +2831,7 @@ describe('WorkoutEditorView next-time plan', () => {
       kind: 'duration',
       strengthSets: [],
       durationEntries: [{ durationSeconds: 60 }],
+      bodyweightSets: [],
     })
 
     expect(items).toEqual([])
@@ -2377,6 +2845,7 @@ describe('WorkoutEditorView next-time plan', () => {
       next: { direction: 'up', step: 2.5 },
       strengthSets: [{ set: 1, weight: 100, reps: 5 }],
       durationEntries: [],
+      bodyweightSets: [],
     })
 
     expect(items.filter((item) => item.checked).map((item) => item.title)).toEqual([
@@ -2391,6 +2860,7 @@ describe('WorkoutEditorView next-time plan', () => {
       kind: 'strength',
       strengthSets: [{ set: 1, weight: 100, reps: 5 }],
       durationEntries: [],
+      bodyweightSets: [],
     }
     const view = createNextPlanView(ex)
 
@@ -2409,6 +2879,7 @@ describe('WorkoutEditorView next-time plan', () => {
       next: { direction: 'up', step: 2.5 },
       strengthSets: [{ set: 1, weight: 100, reps: 5 }],
       durationEntries: [],
+      bodyweightSets: [],
     }
 
     planItems(ex)[0]?.onClick?.()
@@ -2424,6 +2895,7 @@ describe('WorkoutEditorView next-time plan', () => {
       next: { direction: 'up', step: 2.5 },
       strengthSets: [{ set: 1, weight: 100, reps: 5 }],
       durationEntries: [],
+      bodyweightSets: [],
     }
 
     planItems(ex)[2]?.onClick?.()
@@ -2442,6 +2914,7 @@ describe('WorkoutEditorView next-time plan', () => {
       kind: 'strength',
       strengthSets: [{ set: 1, weight: 100, reps: 5 }],
       durationEntries: [],
+      bodyweightSets: [],
     }
     if (next) {
       ex.next = next
@@ -2462,6 +2935,7 @@ describe('WorkoutEditorView next-time plan', () => {
       next: { direction: 'up', step: 2.5 },
       strengthSets: [{ set: 1, weight: 100, reps: 5 }],
       durationEntries: [],
+      bodyweightSets: [],
     })
     const list = new TestElement('div')
     view.renderExerciseCard(list as unknown as HTMLElement, 0)
@@ -2477,6 +2951,7 @@ describe('WorkoutEditorView next-time plan', () => {
       kind: 'strength',
       strengthSets: [],
       durationEntries: [],
+      bodyweightSets: [],
     })
     view.exerciseHistory = new Map([
       [

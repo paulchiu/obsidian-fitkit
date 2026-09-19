@@ -2,7 +2,11 @@ import type { App, WorkspaceLeaf } from 'obsidian'
 import { ItemView, Menu, Modal, Notice, TFile, normalizePath, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
-import { pickBestBodyweightSet } from '../domain/bodyweight-levels'
+import {
+  formatBodyweightLevelLabel,
+  formatBodyweightLevelShort,
+  pickBestBodyweightSet,
+} from '../domain/bodyweight-levels'
 import {
   formatDurationInput,
   parseDurationInput,
@@ -247,6 +251,25 @@ export class WorkoutEditorView extends ItemView {
 
   private updateNarrowState(): void {
     this.contentEl.classList.toggle('is-narrow', this.contentEl.clientWidth < 600)
+    this.contentEl.classList.toggle('is-compact', this.contentEl.clientWidth < 360)
+    this.refreshLevelLabels()
+  }
+
+  /**
+   * Refit every rung label after a resize. Labels fit themselves on first
+   * render; only a width change afterwards can overflow a new one.
+   */
+  private refreshLevelLabels(): void {
+    for (const label of this.contentEl.querySelectorAll('.fitkit-bodyweight-level-label')) {
+      if (!label.instanceOf(HTMLElement)) {
+        continue
+      }
+      const full = label.querySelector('.fitkit-bodyweight-level-full')
+      if (!full?.instanceOf(HTMLElement)) {
+        continue
+      }
+      this.fitLevelLabel(label, full)
+    }
   }
 
   async loadFile(file: TFile): Promise<void> {
@@ -497,7 +520,7 @@ export class WorkoutEditorView extends ItemView {
         this.renderStrengthTable(card, ex, index)
         break
       case 'bodyweight':
-        this.renderBodyweightTable(card, ex)
+        this.renderBodyweightTable(card, ex, index)
         break
       case 'duration':
         this.renderDurationTable(card, ex, index)
@@ -594,48 +617,85 @@ export class WorkoutEditorView extends ItemView {
     })
   }
 
-  private renderBodyweightTable(card: HTMLElement, ex: ExerciseCard): void {
+  private renderBodyweightTable(card: HTMLElement, ex: ExerciseCard, exerciseIndex: number): void {
+    card.addClass('fitkit-bodyweight-card')
+    const levels = this.levelsFor(ex.name)
+    const showLoad = ex.bodyweightSets.some((entry) => entry.load !== undefined)
     const wrap = card.createDiv({ cls: 'fitkit-set-area' })
 
-    const header = wrap.createDiv({ cls: 'fitkit-set-row fitkit-set-head' })
+    const header = wrap.createDiv({
+      cls: showLoad
+        ? 'fitkit-bodyweight-row fitkit-set-head has-load'
+        : 'fitkit-bodyweight-row fitkit-set-head',
+    })
     header.createSpan({ cls: 'fitkit-set-label fitkit-set-figure' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Level' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Reps' })
-    header.createSpan({ cls: 'fitkit-set-label', text: 'Load' })
+    if (showLoad) {
+      header.createSpan({ cls: 'fitkit-set-label', text: 'Load' })
+    }
+    header.createSpan({ cls: 'fitkit-bodyweight-head-spacer', attr: { 'aria-hidden': 'true' } })
 
     for (let i = 0; i < ex.bodyweightSets.length; i++) {
-      this.renderBodyweightRow(wrap, ex, i)
+      this.renderBodyweightRow(wrap, ex, i, levels, showLoad)
     }
 
     const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
     const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
     addBtn.addEventListener('click', () => {
-      ex.bodyweightSets.push({})
+      const last = ex.bodyweightSets[ex.bodyweightSets.length - 1]
+      ex.bodyweightSets.push({ set: ex.bodyweightSets.length + 1, level: last?.level ?? 1 })
       this.markDirty()
       this.render()
+      this.focusRowCell(exerciseIndex, ex.bodyweightSets.length - 1, 'Reps')
     })
   }
 
-  private renderBodyweightRow(wrap: HTMLElement, ex: ExerciseCard, i: number): void {
+  private renderBodyweightRow(
+    wrap: HTMLElement,
+    ex: ExerciseCard,
+    i: number,
+    levels: readonly string[] | undefined,
+    showLoad: boolean,
+  ): void {
     const set = ex.bodyweightSets[i]
     if (!set) {
       return
     }
+    const level = set.level ?? 1
     const container = wrap.createDiv({ cls: 'fitkit-row' })
     const body = container.createDiv({ cls: 'fitkit-row-body' })
-    const row = body.createDiv({ cls: 'fitkit-set-row' })
+    const row = body.createDiv({
+      cls: showLoad ? 'fitkit-bodyweight-row has-load' : 'fitkit-bodyweight-row',
+    })
 
     const setCell = this.createCell(row, 'Set', 'fitkit-set-figure')
     setCell.setText(String(set.set ?? i + 1))
 
-    const levelCell = this.createCell(row, 'Level')
-    levelCell.setText(set.level === undefined ? '-' : String(set.level))
+    this.renderBodyweightLevelCell(row, ex, i, levels, level)
 
-    const repsCell = this.createCell(row, 'Reps')
-    repsCell.setText(set.reps === undefined ? '-' : String(set.reps))
+    const repsInput = this.createInputCell(row, 'Reps', { type: 'number', inputmode: 'numeric' })
+    repsInput.value = set.reps !== undefined ? String(set.reps) : ''
+    repsInput.addEventListener('input', () => {
+      set.reps = parseNumberInput(repsInput.value)
+      this.markDirty()
+    })
 
-    const loadCell = this.createCell(row, 'Load')
-    loadCell.setText(set.load === undefined ? '-' : String(set.load))
+    if (showLoad) {
+      const loadCell = this.createCell(row, 'Load', 'fitkit-bodyweight-load')
+      if (set.load !== undefined) {
+        const loadInput = loadCell.createEl('input', {
+          cls: 'fitkit-input',
+          attr: { type: 'number', step: '0.1', inputmode: 'decimal' },
+        })
+        loadInput.setAttr('aria-label', 'Load')
+        loadInput.value = String(set.load)
+        loadInput.addEventListener('input', () => {
+          set.load = parseNumberInput(loadInput.value)
+          this.markDirty()
+        })
+      }
+    }
 
     this.renderRowActions(container, body, {
       label: `bodyweight entry ${i + 1}`,
@@ -657,7 +717,117 @@ export class WorkoutEditorView extends ItemView {
         this.markDirty()
         this.render()
       },
+      loadMenu: {
+        hasLoad: set.load !== undefined,
+        onAddLoad: () => {
+          const previous = ex.bodyweightSets[i - 1]
+          set.load = previous?.load ?? 0
+          this.markDirty()
+          this.render()
+        },
+        onRemoveLoad: () => {
+          set.load = undefined
+          this.markDirty()
+          this.render()
+        },
+      },
     })
+  }
+
+  private renderBodyweightLevelCell(
+    row: HTMLElement,
+    ex: ExerciseCard,
+    rowIndex: number,
+    levels: readonly string[] | undefined,
+    level: number,
+  ): void {
+    const rungCount = levels?.length ?? 0
+    const cell = this.createCell(row, 'Level')
+    const stepper = cell.createDiv({ cls: 'fitkit-bodyweight-stepper' })
+
+    const minus = stepper.createEl('button', {
+      cls: 'fitkit-btn fitkit-bodyweight-step',
+      attr: { type: 'button', 'aria-label': `Lower level for set ${rowIndex + 1}` },
+    })
+    setIcon(minus, 'minus')
+    minus.disabled = level <= 1
+    minus.addEventListener('click', () => {
+      if (level > 1) {
+        this.setBodyweightLevel(ex, rowIndex, level - 1)
+      }
+    })
+
+    const label = stepper.createEl('button', {
+      cls: 'fitkit-bodyweight-level-label',
+      attr: {
+        type: 'button',
+        'aria-haspopup': 'menu',
+        'aria-label': `Level for set ${rowIndex + 1}: ${formatBodyweightLevelLabel(levels, level)}`,
+      },
+    })
+    const full = label.createSpan({
+      cls: 'fitkit-bodyweight-level-full',
+      text: formatBodyweightLevelLabel(levels, level),
+    })
+    label.createSpan({
+      cls: 'fitkit-bodyweight-level-short',
+      text: formatBodyweightLevelShort(level),
+    })
+    const chevron = label.createSpan({
+      cls: 'fitkit-bodyweight-level-chevron',
+      attr: { 'aria-hidden': 'true' },
+    })
+    setIcon(chevron, 'chevron-down')
+    label.addEventListener('click', () => {
+      const menu = new Menu()
+      const top = Math.max(rungCount, level)
+      for (let n = 1; n <= top; n++) {
+        const target = n
+        menu.addItem((item) =>
+          item
+            .setTitle(formatBodyweightLevelLabel(levels, target))
+            .setChecked(target === level)
+            .onClick(() => this.setBodyweightLevel(ex, rowIndex, target)),
+        )
+      }
+      const rect = label.getBoundingClientRect()
+      menu.showAtPosition({ x: rect.left, y: rect.bottom })
+    })
+
+    const plus = stepper.createEl('button', {
+      cls: 'fitkit-btn fitkit-bodyweight-step',
+      attr: { type: 'button', 'aria-label': `Raise level for set ${rowIndex + 1}` },
+    })
+    setIcon(plus, 'plus')
+    plus.disabled = rungCount > 0 && level >= rungCount
+    plus.addEventListener('click', () => {
+      if (rungCount === 0 || level < rungCount) {
+        this.setBodyweightLevel(ex, rowIndex, level + 1)
+      }
+    })
+    this.fitLevelLabel(label, full)
+  }
+
+  private setBodyweightLevel(ex: ExerciseCard, rowIndex: number, level: number): void {
+    const set = ex.bodyweightSets[rowIndex]
+    if (!set) {
+      return
+    }
+    set.level = level
+    this.markDirty()
+    this.render()
+  }
+
+  /**
+   * Shorten a rung name that overflows its level cell. Only the width
+   * comparison is unit-tested; measured widths are zero in the test realm.
+   */
+  private fitLevelLabel(label: HTMLElement, full: HTMLElement): void {
+    if (shouldShortenLevelLabel(label.clientWidth, full.scrollWidth)) {
+      label.addClass('is-label-short')
+    } else {
+      label.removeClass('is-label-short')
+    }
   }
 
   private renderDurationTable(card: HTMLElement, ex: ExerciseCard, exerciseIndex: number): void {
@@ -819,6 +989,7 @@ export class WorkoutEditorView extends ItemView {
       onDelete: () => void
       onNoteSave: (next: string | undefined) => void
       onRenumber?: () => void
+      loadMenu?: { hasLoad: boolean; onAddLoad: () => void; onRemoveLoad: () => void }
     },
   ): void {
     const openNoteModal = (): void => {
@@ -832,7 +1003,14 @@ export class WorkoutEditorView extends ItemView {
       void this.confirmAndDeleteRow(opts.label, opts.onDelete)
     }
 
-    this.renderRowKebab(body, opts.label, openNoteModal, triggerDelete, opts.onRenumber)
+    this.renderRowKebab(
+      body,
+      opts.label,
+      openNoteModal,
+      triggerDelete,
+      opts.onRenumber,
+      opts.loadMenu,
+    )
 
     if (opts.currentNote && opts.currentNote.length > 0) {
       const line = container.createDiv({
@@ -856,6 +1034,7 @@ export class WorkoutEditorView extends ItemView {
     onNote: () => void,
     onDelete: () => void,
     onRenumber?: () => void,
+    loadMenu?: { hasLoad: boolean; onAddLoad: () => void; onRemoveLoad: () => void },
   ): void {
     const kebab = body.createEl('button', {
       cls: 'fitkit-btn fitkit-btn-muted fitkit-row-kebab',
@@ -866,6 +1045,17 @@ export class WorkoutEditorView extends ItemView {
       evt.stopPropagation()
       const menu = new Menu()
       menu.addItem((item) => item.setTitle('Edit note').setIcon('pencil').onClick(onNote))
+      if (loadMenu) {
+        if (loadMenu.hasLoad) {
+          menu.addItem((item) =>
+            item.setTitle('Remove load').setIcon('minus').onClick(loadMenu.onRemoveLoad),
+          )
+        } else {
+          menu.addItem((item) =>
+            item.setTitle('Add load').setIcon('plus').onClick(loadMenu.onAddLoad),
+          )
+        }
+      }
       if (onRenumber) {
         menu.addItem((item) =>
           item.setTitle('Renumber sets').setIcon('list-ordered').onClick(onRenumber),
@@ -1269,7 +1459,8 @@ export class WorkoutEditorView extends ItemView {
             return
           }
           new PlanStepModal(this.app, {
-            title: `Weight change for ${ex.name}`,
+            exerciseName: ex.name,
+            kind: ex.kind,
             initial: plan.step === undefined ? '' : formatPlanNumber(plan.step),
             onSave: (step) => {
               ex.next = buildNextPlan(plan.direction, step)
@@ -1377,7 +1568,7 @@ export class WorkoutEditorView extends ItemView {
       {
         plan: ex.next,
         sessionMax: pickMaxWeightSet(ex.strengthSets),
-        sessionBodyweightMax: pickBestBodyweightSet(ex.bodyweightSets ?? []),
+        sessionBodyweightMax: pickBestBodyweightSet(ex.bodyweightSets),
       },
       this.levelsFor(ex.name),
     )
@@ -1972,6 +2163,15 @@ class UnknownExerciseModal extends Modal {
     this.contentEl.empty()
     this.onChoice(this.choice)
   }
+}
+
+/**
+ * Whether a rung name needs its compact form. The name shortens only when
+ * its own rendered width overruns the space the cell offers, so an
+ * arbitrarily long ladder name still fits on a wide window.
+ */
+export function shouldShortenLevelLabel(availableWidth: number, labelWidth: number): boolean {
+  return labelWidth > availableWidth
 }
 
 function parseNumberInput(raw: string): number | undefined {

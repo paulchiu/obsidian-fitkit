@@ -191,6 +191,7 @@ interface TestExerciseCard {
   next?: { direction: 'up' | 'down' | 'stay'; step?: number }
   strengthSets: Array<{ set?: number; weight?: number; reps?: number; note?: string }>
   durationEntries: Array<{ set?: number; durationSeconds?: number; note?: string }>
+  bodyweightSets: unknown[]
 }
 
 interface TestEditorModel {
@@ -272,6 +273,7 @@ const createHarness = async (): Promise<Harness> => {
         next: { direction: 'up', step: 2.5 },
         strengthSets: [{ set: 1, weight: 100, reps: 5 }],
         durationEntries: [],
+        bodyweightSets: [],
       },
     ],
     preserveBlocks: [],
@@ -440,6 +442,7 @@ const createTeardownHarness = async (): Promise<TeardownHarness> => {
         next: { direction: 'up', step: 2.5 },
         strengthSets: [{ set: 1, weight: 100, reps: 5 }],
         durationEntries: [],
+        bodyweightSets: [],
       },
     ],
     preserveBlocks: [],

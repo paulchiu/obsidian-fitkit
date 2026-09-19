@@ -189,6 +189,34 @@ describe('dashboard composer', () => {
     expect(markdown.indexOf('## PBs')).toBeLessThan(markdown.indexOf('## Next session plans'))
   })
 
+  it('lists a bodyweight next-time plan as a count of rungs', () => {
+    const index: FitKitIndex = {
+      schemaVersion: 1,
+      builtAt: 0,
+      entries: [
+        {
+          path: 'Fitness/Workouts/2026-08-10.md',
+          mtime: 2,
+          date: '2026-08-10',
+          name: 'Later',
+          exercises: [
+            {
+              exerciseName: 'Push-up',
+              kind: 'bodyweight',
+              totalSets: 3,
+              next: { direction: 'up', step: 1 },
+            },
+          ],
+        },
+      ],
+      diagnostics: [],
+    }
+
+    const markdown = composeDashboard(index, 'Fitness/Workouts', 'Fitness/Exercises', new Set())
+
+    expect(markdown).toContain('- **[[#Push-up|Push-up]]:** up 1 rung (planned 2026-08-10)')
+  })
+
   it('lists the most recent workouts by date with linked names', () => {
     const entries = Array.from({ length: 12 }, (_, i) => {
       const day = String(i + 1).padStart(2, '0')

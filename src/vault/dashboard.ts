@@ -249,9 +249,20 @@ function formatNextPlanLine(exercise: ExerciseAggregate): string {
   if (!plan) {
     return `- **${link}:** no plan`
   }
-  const label = formatNextPlanLabel(plan.value).toLowerCase()
-  const change = plan.value.step === undefined ? label : `${label} ${exercise.unit}`
+  const label = formatNextPlanLabel(plan.value, exercise.kind).toLowerCase()
+  const change =
+    plan.value.step === undefined
+      ? label
+      : `${label} ${formatPlanStepUnit(exercise, plan.value.step)}`
   return `- **${link}:** ${change} (planned ${plan.date})`
+}
+
+/** A bodyweight plan step counts rungs; every other kind keeps the exercise unit. */
+function formatPlanStepUnit(exercise: ExerciseAggregate, step: number): string {
+  if (exercise.kind === 'bodyweight') {
+    return step === 1 ? 'rung' : 'rungs'
+  }
+  return exercise.unit
 }
 
 function isMoreRecentPlan(candidate: PlannedSession, current: PlannedSession): boolean {
