@@ -162,20 +162,21 @@ describe('workout reading mode rendering', () => {
     expect(root.querySelector('.fitkit-reading-table')?.textContent).toContain('100 lbs')
   })
 
-  it('builds the exercise registry snapshot once for a rendered preview', () => {
+  it('serves the ladder and the unit from one registry snapshot build', () => {
     const section = [
       '## [[Push-up]]',
       '',
-      '- [exercise:: [[Push-up]]] [set:: 1] [level:: 2] [reps:: 10] [weight:: 5]',
+      '- [exercise:: [[Push-up]]] [set:: 1] [level:: 2] [reps:: 10] [load:: 5]',
     ].join('\n')
     const root = createRenderedSection([
-      '[exercise:: [[Push-up]]] [set:: 1] [level:: 2] [reps:: 10] [weight:: 5]',
+      '[exercise:: [[Push-up]]] [set:: 1] [level:: 2] [reps:: 10] [load:: 5]',
     ])
     const plugin = createPlugin()
     plugin.settings.exerciseRegistry = [
       {
         name: 'Push-up',
         kind: 'bodyweight',
+        unit: 'lbs',
         levels: ['Wall push-up', 'Knee push-up'],
         aliases: [],
       },
@@ -189,7 +190,30 @@ describe('workout reading mode rendering', () => {
 
     renderWorkoutReadingModeSection(plugin, root, createContext(section))
 
-    expect(root.querySelector('.fitkit-reading-preview')).not.toBeNull()
+    const table = root.querySelector('.fitkit-reading-table')
+    expect(table?.textContent).toContain('Knee push-up')
+    expect(table?.textContent).toContain('5 lbs')
+    expect(folderLookups).toBe(1)
+  })
+
+  it('builds the registry snapshot once for a strength preview, not once per readout', () => {
+    const root = createRenderedSection([
+      '[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '[exercise:: [[Squat]]] [set:: 2] [weight:: 105] [reps:: 3] [notes:: smooth]',
+    ])
+    const plugin = createPlugin()
+    plugin.settings.exerciseRegistry = [
+      { name: 'Squat', kind: 'strength', unit: 'lbs', aliases: [] },
+    ]
+    let folderLookups = 0
+    plugin.app.vault.getFolderByPath = () => {
+      folderLookups += 1
+      return null
+    }
+
+    renderWorkoutReadingModeSection(plugin, root, createContext(strengthSection))
+
+    expect(root.querySelector('.fitkit-reading-table')?.textContent).toContain('100 lbs')
     expect(folderLookups).toBe(1)
   })
 
