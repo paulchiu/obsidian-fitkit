@@ -37,12 +37,11 @@ export function expectAppliedThemeToken(element: Element, property: string, toke
  * Classes on a rendered subtree that `styles.css` never styles, sorted, so a
  * `cls:` typo fails with the offender named instead of rendering unstyled.
  *
- * Only `fitkit-` classes are ours to style; anything else (`is-tall`,
- * `has-load`, Obsidian's own `setting-item` family) is a state hook consumed
- * inside a compound selector or styled by Obsidian, and is never reported.
- * A class counts as styled when it appears in any selector, standalone or
- * compound, so `.fitkit-skeleton-line` in `.fitkit-skeleton-line.is-tall`
- * covers the base class while the skipped prefix covers the state hook.
+ * A class passes when it is styled (named by any selector, standalone or
+ * compound) or recognised: `is-*` and `has-*` state hooks toggled at
+ * runtime, and the Obsidian classes below. Anything else is reported,
+ * including a mistyped prefix. Extend `OBSIDIAN_CLASSES` when the plugin
+ * renders an Obsidian class the stylesheet does not name.
  */
 export function findUnstyledClasses(root: Element): string[] {
   ensureStylesheetLoaded()
@@ -51,7 +50,7 @@ export function findUnstyledClasses(root: Element): string[] {
   const elements = [root, ...Array.from(root.querySelectorAll('*'))]
   for (const element of elements) {
     for (const name of Array.from(element.classList)) {
-      if (name.startsWith(OWN_CLASS_PREFIX) && !defined.has(name)) {
+      if (!defined.has(name) && !isRecognisedClass(name)) {
         unstyled.add(name)
       }
     }
@@ -59,8 +58,17 @@ export function findUnstyledClasses(root: Element): string[] {
   return [...unstyled].sort()
 }
 
-/** Prefix marking the classes this plugin owns the styling for. */
-const OWN_CLASS_PREFIX = 'fitkit-'
+/** Obsidian classes the plugin renders but the plugin stylesheet never names. */
+const OBSIDIAN_CLASSES: ReadonlySet<string> = new Set([
+  'mod-cta',
+  'setting-item-description',
+  'setting-item-name',
+])
+
+/** State hooks toggled at runtime and consumed inside compound selectors. */
+function isRecognisedClass(name: string): boolean {
+  return name.startsWith('is-') || name.startsWith('has-') || OBSIDIAN_CLASSES.has(name)
+}
 
 /**
  * Every class named by any selector in the loaded stylesheet. Compound

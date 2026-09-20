@@ -1,11 +1,6 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import {
-  createTestRoot,
-  harnessDocument,
-  harnessWindow,
-  installObsidianDomExtensions,
-} from './obsidian-dom'
+import { createTestRoot, harnessDocument, harnessWindow } from './obsidian-dom'
 import { ensureStylesheetLoaded, expectAppliedThemeToken, findUnstyledClasses } from './stylesheet'
 
 vi.mock('obsidian', () => {
@@ -36,10 +31,6 @@ beforeAll(() => {
   ensureStylesheetLoaded()
 })
 
-beforeEach(() => {
-  installObsidianDomExtensions()
-})
-
 afterEach(() => {
   harnessDocument.body.replaceChildren()
 })
@@ -61,6 +52,27 @@ describe('stylesheet', () => {
     const empty = root.createDiv({ cls: 'fitkit-empty' })
 
     expectAppliedThemeToken(empty, 'color', '--text-muted')
+  })
+
+  it('reports a class with a mistyped prefix instead of skipping it', () => {
+    const root = createTestRoot()
+    harnessDocument.body.appendChild(root)
+    const card = root.createDiv({ cls: 'fitkti-empty' })
+
+    expect(findUnstyledClasses(card)).toEqual(['fitkti-empty'])
+  })
+
+  it('honours a class styled only inside a media query', () => {
+    const style = harnessDocument.createElement('style')
+    style.textContent = '@media (max-width: 640px) { .fitkit-media-only-probe { display: block; } }'
+    harnessDocument.head.appendChild(style)
+    try {
+      const probed = createTestRoot().createDiv({ cls: 'fitkit-media-only-probe' })
+
+      expect(findUnstyledClasses(probed)).toEqual([])
+    } finally {
+      style.remove()
+    }
   })
 
   it('reports only the class the stylesheet never defines', () => {

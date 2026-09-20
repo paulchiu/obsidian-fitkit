@@ -4,11 +4,8 @@ import { JSDOM } from 'jsdom'
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg'
 
 /**
- * The harness runs in the default node environment, where `vi.mock('obsidian')`
- * keeps working, and owns its own jsdom instead of borrowing vitest globals.
- * Each test file gets one document; tests isolate through detached roots.
- * A real URL avoids an opaque origin, without which formatting a failing DOM
- * assertion throws `SecurityError` instead of showing the expected-actual diff.
+ * Own jsdom backing every harness element. A real URL avoids an opaque
+ * origin, without which formatting a failing DOM assertion throws.
  */
 const harnessDom = new JSDOM('<!doctype html><html><head></head><body></body></html>', {
   url: 'http://localhost/',
@@ -24,7 +21,7 @@ let installed = false
 
 /**
  * Install the Obsidian element extensions onto the harness prototypes.
- * Everything else (events, selectors, properties) already comes from jsdom.
+ * Self-latching, and applied on import so forgetting it cannot fail later.
  */
 export function installObsidianDomExtensions(): void {
   if (installed) {
@@ -50,12 +47,28 @@ export function installObsidianDomExtensions(): void {
   Object.assign(harnessWindow.SVGElement.prototype, extensions)
 }
 
-/**
- * Fresh detached root for a test to render into. Detached roots keep
+/** Fresh detached root for a test to render into. Detached roots keep
  * per-test DOM isolated while the shared document holds the stylesheet.
  */
 export function createTestRoot(): HTMLElement {
   return harnessDocument.createElement('div')
+}
+
+/** Buttons in a subtree whose visible label is exactly `text`, so every modal test finds actions one way. */
+export function findButtons(root: Element, text: string): HTMLButtonElement[] {
+  return [...root.querySelectorAll('button')].filter((button) => button.textContent === text)
+}
+
+/** The three elements modal tests read off a constructed modal. */
+export interface ModalElements {
+  contentEl: HTMLElement
+  modalEl: HTMLElement
+  titleEl: HTMLElement
+}
+
+/** Narrow a constructed modal to the elements tests read. */
+export function modalElements(modal: ModalElements): ModalElements {
+  return modal
 }
 
 /** Split a `cls` option (string or string array) into individual class names. */
@@ -73,7 +86,7 @@ function applyDomOptions(child: Element, options?: DomElementInfo | string): voi
   if (resolved.cls !== undefined) {
     child.classList.add(...splitClasses(resolved.cls))
   }
-  if (resolved.text !== undefined) {
+  if (typeof resolved.text === 'string') {
     setText.call(child, resolved.text)
   }
   if (resolved.title !== undefined) {
@@ -131,7 +144,6 @@ function appendChildElement(
 
 /**
  * Insert into `parent` when the options override it, otherwise the host.
- * `prepend` goes first, not last; both keys change structure, not styling.
  */
 function insertChild(
   host: Element,
@@ -223,12 +235,8 @@ function hasClass(this: Element, cls: string): boolean {
   return this.classList.contains(cls)
 }
 
-function setText(this: Element, value: string | DocumentFragment): void {
-  if (typeof value === 'string') {
-    this.textContent = value
-    return
-  }
-  this.replaceChildren(value)
+function setText(this: Element, value: string): void {
+  this.textContent = value
 }
 
 function setAttr(this: Element, name: string, value: string | number | boolean | null): void {
@@ -258,3 +266,5 @@ function instanceOf(this: Element, type: { new (...args: never[]): unknown }): b
 function detach(this: Element): void {
   this.remove()
 }
+
+installObsidianDomExtensions()

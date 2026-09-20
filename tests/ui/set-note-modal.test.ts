@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   createTestRoot,
+  findButtons,
   harnessDocument,
-  installObsidianDomExtensions,
+  modalElements,
 } from '../harness/obsidian-dom'
 
 vi.mock('obsidian', () => {
@@ -31,16 +32,6 @@ vi.mock('obsidian', () => {
 
 import { SetNoteModal } from '../../src/ui/set-note-modal'
 
-interface ModalElements {
-  contentEl: HTMLElement
-  modalEl: HTMLElement
-  titleEl: HTMLElement
-}
-
-function modalElements(modal: SetNoteModal): ModalElements {
-  return modal
-}
-
 /** Focus only lands when the element is connected, so each modal renders attached. */
 function openModal(options: {
   title: string
@@ -56,7 +47,6 @@ function openModal(options: {
 
 describe('set note modal', () => {
   beforeEach(() => {
-    installObsidianDomExtensions()
     vi.stubGlobal('window', {
       setTimeout: (callback: () => void): number => {
         callback()
@@ -98,9 +88,7 @@ describe('set note modal', () => {
 
     const { contentEl, modalEl } = modalElements(modal)
     const textarea = contentEl.querySelector('textarea')
-    const save = [...contentEl.querySelectorAll('button')].find(
-      (button) => button.textContent === 'Save',
-    )
+    const [save] = findButtons(contentEl, 'Save')
     if (!textarea || !save) {
       throw new Error('Expected textarea and Save button.')
     }
@@ -119,9 +107,7 @@ describe('set note modal', () => {
 
     const { contentEl } = modalElements(modal)
     const textarea = contentEl.querySelector('textarea')
-    const save = [...contentEl.querySelectorAll('button')].find(
-      (button) => button.textContent === 'Save',
-    )
+    const [save] = findButtons(contentEl, 'Save')
     if (!textarea || !save) {
       throw new Error('Expected textarea and Save button.')
     }

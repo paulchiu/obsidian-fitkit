@@ -1,11 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import {
-  createTestRoot,
-  harnessDocument,
-  harnessWindow,
-  installObsidianDomExtensions,
-} from '../harness/obsidian-dom'
+import { createTestRoot, harnessDocument, harnessWindow } from '../harness/obsidian-dom'
 
 vi.mock('obsidian', () => {
   class Modal {
@@ -118,10 +113,6 @@ async function openModalWithRows(rows: ExerciseImportPlanRow[]): Promise<{
 }
 
 describe('ImportExercisesModal kind select', () => {
-  beforeEach(() => {
-    installObsidianDomExtensions()
-  })
-
   it('lists strength, duration then bodyweight with their current labels', async () => {
     const { modal } = await openModalWithRows([row({ status: 'unknown', registryName: null })])
     const select = kindSelectForModal(modal)
@@ -148,10 +139,6 @@ describe('ImportExercisesModal kind select', () => {
 })
 
 describe('ImportExercisesModal actions', () => {
-  beforeEach(() => {
-    installObsidianDomExtensions()
-  })
-
   it('offers note creation for registry entries without exercise note files', () => {
     const text = actionCellText(row({ noteExists: false }))
 

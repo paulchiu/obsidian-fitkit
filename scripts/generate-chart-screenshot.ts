@@ -29,7 +29,7 @@ const { createRegistry } = await jiti.import('../src/domain/exercise-registry.ts
 const { pickBestSet, pickHeaviestSet } = await jiti.import('../src/domain/epley.ts')
 const { parseWorkoutNote } = await jiti.import('../src/domain/workout-note-model.ts')
 const { renderExerciseChartSvg } = await jiti.import('../src/ui/exercise-chart-svg.ts')
-const { extractChartCss } = await jiti.import('../tests/harness/svg-layout.ts')
+const { extractChartCss } = await jiti.import('../src/domain/chart-css.ts')
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..')
 const DEFAULT_WORKOUTS_DIR = '/Users/paul/dev-misc/dev-vault/dev/Fitness/Workouts'

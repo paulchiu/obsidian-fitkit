@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { createTestRoot, installObsidianDomExtensions } from '../harness/obsidian-dom'
+import { createTestRoot } from '../harness/obsidian-dom'
 
 vi.mock('obsidian', () => {
   class TFile {
@@ -75,10 +75,6 @@ function createRenderedSection(lines: string[]): HTMLElement {
 }
 
 describe('workout reading mode rendering', () => {
-  beforeEach(() => {
-    installObsidianDomExtensions()
-  })
-
   it('renders strength workout rows as a read-only table and hides source rows', () => {
     const root = createRenderedSection([
       '[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',

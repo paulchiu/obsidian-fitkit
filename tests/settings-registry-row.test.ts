@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { createTestRoot, installObsidianDomExtensions } from './harness/obsidian-dom'
+import { createTestRoot, findButtons } from './harness/obsidian-dom'
 
 vi.mock('obsidian', () => ({
   App: class {},
@@ -21,10 +21,6 @@ vi.mock('obsidian', () => ({
 
 import { FitKitSettingTab } from '../src/settings'
 import type { RegistryTableRow } from '../src/vault/exercise-registry-table'
-
-function findButtons(root: Element, text: string): HTMLButtonElement[] {
-  return [...root.querySelectorAll('button')].filter((button) => button.textContent === text)
-}
 
 function baseRow(overrides: Partial<RegistryTableRow>): RegistryTableRow {
   return {
@@ -58,10 +54,6 @@ function renderRow(row: RegistryTableRow): HTMLElement {
 }
 
 describe('FitKitSettingTab registry row provenance', () => {
-  beforeEach(() => {
-    installObsidianDomExtensions()
-  })
-
   it('offers an enabled Rename action for a note-backed row instead of a disabled Edit', () => {
     const table = renderRow(
       baseRow({ provenance: 'note', notePath: 'Fitness/Exercises/Squat.md', kind: 'strength' }),

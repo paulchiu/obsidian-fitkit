@@ -1,10 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  createTestRoot,
-  harnessDocument,
-  installObsidianDomExtensions,
-} from '../harness/obsidian-dom'
+import { createTestRoot, findButtons, harnessDocument } from '../harness/obsidian-dom'
 
 const notices: string[] = []
 
@@ -55,18 +51,8 @@ function openModal(options?: { initial?: string[]; onSave?: (levels: string[]) =
   return { modal, contentEl: modal.contentEl, onSave }
 }
 
-function findButton(root: HTMLElement, text: string): HTMLButtonElement | null {
-  for (const button of root.querySelectorAll('button')) {
-    if (button.textContent === text) {
-      return button
-    }
-  }
-  return null
-}
-
 describe('edit levels modal', () => {
   beforeEach(() => {
-    installObsidianDomExtensions()
     notices.length = 0
     vi.stubGlobal('window', {
       setTimeout: (callback: () => void): number => {
@@ -93,7 +79,7 @@ describe('edit levels modal', () => {
     const { contentEl, onSave } = openModal()
 
     const textarea = contentEl.querySelector('textarea')
-    const save = findButton(contentEl, 'Save')
+    const [save] = findButtons(contentEl, 'Save')
     if (!textarea || !save) {
       throw new Error('Expected textarea and Save button.')
     }
@@ -109,7 +95,7 @@ describe('edit levels modal', () => {
     const close = vi.spyOn(modal, 'close')
 
     const textarea = contentEl.querySelector('textarea')
-    const save = findButton(contentEl, 'Save')
+    const [save] = findButtons(contentEl, 'Save')
     if (!textarea || !save) {
       throw new Error('Expected textarea and Save button.')
     }

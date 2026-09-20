@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { createTestRoot, installObsidianDomExtensions } from './harness/obsidian-dom'
+import { createTestRoot } from './harness/obsidian-dom'
 
 /**
  * Obsidian below 1.13 renders the tab through display() rather than the
@@ -99,10 +99,6 @@ function displayTab(): {
 }
 
 describe('display fallback', () => {
-  beforeEach(() => {
-    installObsidianDomExtensions()
-  })
-
   it('renders a heading for every group and a row for every non-block definition', () => {
     const { tab } = displayTab()
     const definitions = tab.getSettingDefinitions() as unknown as {

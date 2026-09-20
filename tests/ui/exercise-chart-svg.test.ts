@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
 import type { ChartSeries } from '../../src/domain/exercise-chart'
 import { renderExerciseChartSvg } from '../../src/ui/exercise-chart-svg'
-import { createTestRoot, installObsidianDomExtensions } from '../harness/obsidian-dom'
+import { createTestRoot } from '../harness/obsidian-dom'
 
 function render(series: ChartSeries, options: { ladder?: readonly string[] } = {}): HTMLElement {
   const root = createTestRoot()
@@ -42,9 +42,6 @@ function strengthSeries(values: number[]): ChartSeries {
   }
 }
 
-/** Y of the x-axis date row. Texts sitting there are dates, not rung labels. */
-const X_AXIS_LABEL_Y = 294
-
 /** `Node.TEXT_NODE` without borrowing a DOM global the node environment lacks. */
 const TEXT_NODE_TYPE = 3
 
@@ -63,13 +60,9 @@ function ownText(element: Element): string {
 }
 
 function yLabelTexts(root: HTMLElement): string[] {
-  return Array.from(root.querySelectorAll('text'))
-    .filter(
-      (node) =>
-        node.getAttribute('text-anchor') === 'end' &&
-        node.getAttribute('y') !== String(X_AXIS_LABEL_Y),
-    )
-    .map((node) => ownText(node))
+  return Array.from(root.querySelectorAll('text.fitkit-chart-axis-label[data-axis="y"]')).map(
+    (node) => ownText(node),
+  )
 }
 
 function polylinePairs(root: HTMLElement): Array<{ x: number; y: number }> {
@@ -88,8 +81,20 @@ function polylinePairs(root: HTMLElement): Array<{ x: number; y: number }> {
 }
 
 describe('exercise chart svg', () => {
-  beforeEach(() => {
-    installObsidianDomExtensions()
+  it('centres the first date label over its own gridline like the middle ones', () => {
+    const root = render(strengthSeries([80, 82.5, 85, 87.5, 90]))
+    const anchors = Array.from(
+      root.querySelectorAll('text.fitkit-chart-axis-label[data-axis="x"]'),
+    ).map((node) => node.getAttribute('text-anchor'))
+
+    expect(anchors[0]).toBe('middle')
+  })
+
+  it('marks date labels and value labels with distinct roles', () => {
+    const root = render(strengthSeries([80, 85]))
+
+    expect(root.querySelectorAll('text.fitkit-chart-axis-label[data-axis="x"]')).toHaveLength(2)
+    expect(root.querySelectorAll('text.fitkit-chart-axis-label[data-axis="y"]')).toHaveLength(5)
   })
 
   it('gives a level axis a wider left margin than a numeric one', () => {
@@ -180,7 +185,7 @@ describe('exercise chart svg', () => {
         .map((child) => child.textContent),
     )
 
-    expect(labels.map((node) => node.textContent)).toContain('Wall push-up')
+    expect(labels.map((node) => ownText(node))).toContain('Wall push-up')
     expect(shortened).toHaveLength(1)
     expect(shortenedTitles).toEqual([longName])
   })
@@ -216,13 +221,9 @@ describe('exercise chart svg', () => {
     const gridYs = Array.from(root.querySelectorAll('line.fitkit-chart-grid')).map((node) =>
       Number(node.getAttribute('y1')),
     )
-    const labelYs = Array.from(root.querySelectorAll('text'))
-      .filter(
-        (node) =>
-          node.getAttribute('text-anchor') === 'end' &&
-          node.getAttribute('y') !== String(X_AXIS_LABEL_Y),
-      )
-      .map((node) => Number(node.getAttribute('y')) - 4)
+    const labelYs = Array.from(
+      root.querySelectorAll('text.fitkit-chart-axis-label[data-axis="y"]'),
+    ).map((node) => Number(node.getAttribute('y')) - 4)
 
     expect(gridYs).toEqual(labelYs)
   })

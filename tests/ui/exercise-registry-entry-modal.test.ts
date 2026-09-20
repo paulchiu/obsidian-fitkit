@@ -1,10 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  createTestRoot,
-  harnessWindow,
-  installObsidianDomExtensions,
-} from '../harness/obsidian-dom'
+import { createTestRoot, findButtons, harnessWindow } from '../harness/obsidian-dom'
 
 const obsidianMock = vi.hoisted((): { notices: string[] } => ({ notices: [] }))
 
@@ -69,7 +65,7 @@ function kindSelectIn(modal: ExerciseRegistryEntryModal): HTMLSelectElement {
 
 function saveIn(modal: ExerciseRegistryEntryModal): void {
   const root = modal.contentEl
-  const save = [...root.querySelectorAll('button')].find((button) => button.textContent === 'Save')
+  const [save] = findButtons(root, 'Save')
   if (!save) {
     throw new Error('Expected the modal to render a Save button.')
   }
@@ -86,7 +82,6 @@ function createPluginStub(registry: ExerciseRegistryEntry[]): FitKitPlugin {
 
 describe('ExerciseRegistryEntryModal kind select', () => {
   beforeEach(() => {
-    installObsidianDomExtensions()
     obsidianMock.notices = []
   })
 

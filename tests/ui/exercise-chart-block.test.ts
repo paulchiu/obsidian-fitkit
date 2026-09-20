@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createTestRoot, installObsidianDomExtensions } from '../harness/obsidian-dom'
+import { createTestRoot } from '../harness/obsidian-dom'
 
 const chartSvgMock = vi.hoisted(() => ({
   renderExerciseChartSvg: vi.fn(),
@@ -109,7 +109,6 @@ function renderedSeries(): ChartSeries {
 
 describe('exercise chart block rendering', () => {
   beforeEach(() => {
-    installObsidianDomExtensions()
     chartSvgMock.renderExerciseChartSvg.mockReset()
   })
 

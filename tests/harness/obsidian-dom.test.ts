@@ -1,10 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
-import { createTestRoot, harnessWindow, installObsidianDomExtensions } from './obsidian-dom'
-
-beforeEach(() => {
-  installObsidianDomExtensions()
-})
+import { createTestRoot, findButtons, harnessWindow } from './obsidian-dom'
 
 describe('obsidian dom', () => {
   it('builds a real div child with class and text, then empties it', () => {
@@ -32,10 +28,14 @@ describe('obsidian dom', () => {
 
   it('sets input type, value and placeholder from top-level options', () => {
     const root = createTestRoot()
-    const input = root.createEl('input', { type: 'checkbox', value: 'on', placeholder: 'x' })
+    const input = root.createEl('input', {
+      type: 'checkbox',
+      value: 'remember-me',
+      placeholder: 'x',
+    })
 
     expect(input.type).toBe('checkbox')
-    expect(input.value).toBe('on')
+    expect(input.value).toBe('remember-me')
     expect(input.placeholder).toBe('x')
   })
 
@@ -134,6 +134,16 @@ describe('obsidian dom', () => {
     expect(child.textContent).toBe('After')
   })
 
+  it('removes an attribute through setAttr with null', () => {
+    const root = createTestRoot()
+    const child = root.createDiv()
+    child.setAttr('title', 'Tip')
+
+    child.setAttr('title', null)
+
+    expect(child.getAttribute('title')).toBeNull()
+  })
+
   it('writes attributes through setAttr', () => {
     const root = createTestRoot()
     const child = root.createDiv()
@@ -159,5 +169,14 @@ describe('obsidian dom', () => {
 
     expect(root.childElementCount).toBe(0)
     expect(child.parentNode).toBe(null)
+  })
+
+  it('finds buttons by their exact visible label', () => {
+    const root = createTestRoot()
+    root.createEl('button', { text: 'Save' })
+    root.createEl('button', { text: 'Cancel' })
+
+    expect(findButtons(root, 'Save')).toHaveLength(1)
+    expect(findButtons(root, 'Missing')).toHaveLength(0)
   })
 })

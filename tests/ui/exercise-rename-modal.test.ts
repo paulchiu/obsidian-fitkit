@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createTestRoot, installObsidianDomExtensions } from '../harness/obsidian-dom'
+import { createTestRoot, findButtons } from '../harness/obsidian-dom'
 
 const obsidianMock = vi.hoisted((): { notices: string[] } => ({ notices: [] }))
 
@@ -57,10 +57,6 @@ function collectText(element: Element): string[] {
     .join('')
   const texts = own ? [own] : []
   return [...texts, ...[...element.children].flatMap((child) => collectText(child))]
-}
-
-function findButtons(root: Element, text: string): HTMLButtonElement[] {
-  return [...root.querySelectorAll('button')].filter((button) => button.textContent === text)
 }
 
 function basePlan(overrides: Partial<ExerciseRenamePlan> = {}): ExerciseRenamePlan {
@@ -206,7 +202,6 @@ describe('describeRenameApplySuccess', () => {
 
 describe('ExerciseRenameModal preview', () => {
   beforeEach(() => {
-    installObsidianDomExtensions()
     obsidianMock.notices = []
     vi.mocked(buildExerciseRenamePlanFromVault).mockReset()
     vi.mocked(applyExerciseRenamePlan).mockReset()
@@ -311,7 +306,6 @@ describe('ExerciseRenameModal preview', () => {
 
 describe('ExerciseRenameModal cancel', () => {
   beforeEach(() => {
-    installObsidianDomExtensions()
     obsidianMock.notices = []
     vi.mocked(buildExerciseRenamePlanFromVault).mockReset()
     vi.mocked(applyExerciseRenamePlan).mockReset()
@@ -325,7 +319,9 @@ describe('ExerciseRenameModal cancel', () => {
 
     const modalPrivate = modal as unknown as ModalPrivate & { titleEl: HTMLElement }
     expect(modalPrivate.titleEl.textContent).toBe('Rename exercise')
-    expect([...modalPrivate.contentEl.children].some((child) => child.tagName === 'h2')).toBe(false)
+    expect(
+      [...modalPrivate.contentEl.children].some((child) => child.tagName.toLowerCase() === 'h2'),
+    ).toBe(false)
   })
 
   it('writes nothing when cancelled at the input stage', () => {
@@ -365,7 +361,6 @@ describe('ExerciseRenameModal cancel', () => {
 
 describe('ExerciseRenameModal confirm', () => {
   beforeEach(() => {
-    installObsidianDomExtensions()
     obsidianMock.notices = []
     vi.mocked(buildExerciseRenamePlanFromVault).mockReset()
     vi.mocked(applyExerciseRenamePlan).mockReset()

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createTestRoot, installObsidianDomExtensions } from '../harness/obsidian-dom'
+import { createTestRoot, modalElements } from '../harness/obsidian-dom'
 
 vi.mock('obsidian', () => {
   class Modal {
@@ -27,18 +27,8 @@ vi.mock('obsidian', () => {
 
 import { PlanStepModal } from '../../src/ui/plan-step-modal'
 
-interface ModalElements {
-  contentEl: HTMLElement
-  titleEl: HTMLElement
-}
-
-function modalElements(modal: PlanStepModal): ModalElements {
-  return modal
-}
-
 describe('plan step modal', () => {
   beforeEach(() => {
-    installObsidianDomExtensions()
     vi.stubGlobal('window', {
       setTimeout: (callback: () => void): number => {
         callback()
