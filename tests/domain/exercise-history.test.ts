@@ -64,7 +64,7 @@ describe('exercise history aggregation', () => {
       value: { weight: 95, reps: 8 },
       date: '2026-04-23',
     })
-    expect(formatExerciseHistoryBadges(history.get('Squat'), 'strength')).toEqual([
+    expect(formatExerciseHistoryBadges(history.get('Squat'), 'strength', 'kg')).toEqual([
       {
         text: 'PB 100',
         title: 'Heaviest weight lifted (not 1RM): 100 kg x 1',
@@ -72,6 +72,26 @@ describe('exercise history aggregation', () => {
       {
         text: 'last 95x8',
         title: 'Heaviest weight in latest prior session: 95 kg x 8 (2026-04-23)',
+      },
+    ])
+  })
+
+  it('reads a pounds exercise history badge tooltips in pounds', () => {
+    const summary = {
+      strength: {
+        personalBest: { weight: 100, reps: 1 },
+        lastSessionMax: { value: { weight: 95, reps: 8 }, date: '2026-04-23' },
+      },
+    }
+
+    expect(formatExerciseHistoryBadges(summary, 'strength', 'lbs')).toEqual([
+      {
+        text: 'PB 100',
+        title: 'Heaviest weight lifted (not 1RM): 100 lbs x 1',
+      },
+      {
+        text: 'last 95x8',
+        title: 'Heaviest weight in latest prior session: 95 lbs x 8 (2026-04-23)',
       },
     ])
   })
@@ -112,7 +132,7 @@ describe('exercise history aggregation', () => {
       value: { weight: 80, reps: 5 },
       date: '2026-04-22',
     })
-    expect(formatExerciseHistoryBadges(history.get('Bench press'), 'strength')).toEqual([
+    expect(formatExerciseHistoryBadges(history.get('Bench press'), 'strength', 'kg')).toEqual([
       {
         text: 'PB 80',
         title: 'Heaviest weight lifted (not 1RM): 80 kg x 5',
@@ -148,7 +168,7 @@ describe('exercise history aggregation', () => {
 
     expect(history.has('Curl')).toBe(false)
     expect(history.has('Plank')).toBe(false)
-    expect(formatExerciseHistoryBadges(history.get('Curl'), 'strength')).toEqual([])
+    expect(formatExerciseHistoryBadges(history.get('Curl'), 'strength', 'kg')).toEqual([])
   })
 
   it('prefers a higher rung over more reps for the bodyweight personal best', () => {
@@ -178,7 +198,7 @@ describe('exercise history aggregation', () => {
       },
     )
 
-    expect(formatExerciseHistoryBadges(history.get('Push-up'), 'bodyweight', levels)).toEqual([
+    expect(formatExerciseHistoryBadges(history.get('Push-up'), 'bodyweight', 'kg', levels)).toEqual([
       {
         text: 'PB Diamond push-up x 1',
         title: 'Highest level reached: Diamond push-up x 1',
@@ -217,7 +237,7 @@ describe('exercise history aggregation', () => {
       },
     )
 
-    expect(formatExerciseHistoryBadges(history.get('Push-up'), 'bodyweight', levels)).toEqual([
+    expect(formatExerciseHistoryBadges(history.get('Push-up'), 'bodyweight', 'kg', levels)).toEqual([
       {
         text: 'PB Knee push-up x 12',
         title: 'Highest level reached: Knee push-up x 12',
@@ -286,7 +306,7 @@ describe('exercise history aggregation', () => {
       },
     )
 
-    expect(formatExerciseHistoryBadges(history.get('Pull-up'), 'strength')).toEqual([
+    expect(formatExerciseHistoryBadges(history.get('Pull-up'), 'strength', 'kg')).toEqual([
       {
         text: 'PB 20 reps',
         title: 'Heaviest weight lifted (not 1RM): 20 reps',
@@ -322,7 +342,7 @@ describe('exercise history aggregation', () => {
       },
     )
 
-    expect(formatExerciseHistoryBadges(history.get('Plank'), 'duration')).toEqual([
+    expect(formatExerciseHistoryBadges(history.get('Plank'), 'duration', 'kg')).toEqual([
       {
         text: 'PB 4m30s',
         title: 'Longest session total duration: 4m30s',

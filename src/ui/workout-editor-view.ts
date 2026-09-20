@@ -1848,13 +1848,14 @@ export class WorkoutEditorView extends ItemView {
     registry: ExerciseRegistry,
   ): void {
     const summary = this.exerciseHistory?.get(ex.name)
-    /** One lookup per card: both badge kinds read the same ladder. */
+    /** One lookup per card: both badge kinds read the same ladder and unit. */
     const levels = levelsForName(registry, ex.name)
-    const badges = formatExerciseHistoryBadges(summary, ex.kind, levels)
+    const unit = unitForName(registry, ex.name) ?? DEFAULT_WEIGHT_UNIT
+    const badges = formatExerciseHistoryBadges(summary, ex.kind, unit, levels)
     const planBadge = formatNextPlanBadge(
       summary,
       ex.kind,
-      unitForName(registry, ex.name) ?? DEFAULT_WEIGHT_UNIT,
+      unit,
       {
         plan: ex.next,
         sessionMax: pickMaxWeightSet(ex.strengthSets),
