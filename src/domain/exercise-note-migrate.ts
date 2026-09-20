@@ -117,6 +117,13 @@ export function migrateExerciseNote(
 export interface ExerciseNoteKindUpdateResult {
   markdown: string
   changed: boolean
+  warnings: ExerciseNoteMigrationWarning[]
+}
+
+/** What the Recent sessions query needs to be rebuilt: who it targets and where the workouts live. */
+export interface ExerciseNoteSectionOptions {
+  name: string
+  fitnessRoot: string
 }
 
 export interface ExerciseNoteLevelsUpdateResult {
@@ -194,26 +201,25 @@ function countListItemLines(lines: ReadonlyArray<string>, start: number): number
  * rest of migrateExerciseNote's repair pass. Used when the user explicitly
  * switches an exercise's kind, so the note (the store that wins on read via
  * buildExerciseRegistrySnapshot) reflects the choice immediately rather than
- * being downgraded back on the next read. Switching to bodyweight also drops
- * metric:/unit: lines, which only belong to strength notes; the ladder
+ * being downgraded back on the next read. The Recent sessions query travels
+ * with the kind, since it selects per-kind fields and would otherwise keep
+ * reporting on the fields the old kind logged. Switching to bodyweight also
+ * drops metric:/unit: lines, which only belong to strength notes; the ladder
  * itself is left for the repair pass, which knows the exercise name.
  */
 export function setExerciseNoteKind(
   source: string,
   kind: ExerciseKind,
+  options: ExerciseNoteSectionOptions,
 ): ExerciseNoteKindUpdateResult {
   const normalizedSource = normalizeMarkdownSource(source)
   const bounds = findFrontmatterBounds(normalizedSource.markdown)
   if (bounds.status !== 'found') {
-    return { markdown: source, changed: false }
+    return { markdown: source, changed: false, warnings: [] }
   }
 
   const lines = normalizedSource.markdown.split('\n')
   const frontmatterLines = lines.slice(bounds.start + 1, bounds.end)
-  if (frontmatterKind(frontmatterLines) === kind) {
-    return { markdown: source, changed: false }
-  }
-
   const kindLineIndex = findFrontmatterKeyLine(frontmatterLines, 'kind')
   const withKind =
     kindLineIndex < 0
@@ -226,13 +232,37 @@ export function setExerciseNoteKind(
       ? withKind.filter((line) => !isStrengthOnlyFrontmatterKey(line))
       : withKind
 
-  const markdown = [
+  const withFrontmatter = [
     ...lines.slice(0, bounds.start + 1),
     ...nextFrontmatterLines,
     ...lines.slice(bounds.end),
   ].join('\n')
+  const recent = rewriteRecentSessionsForKind(withFrontmatter, options, kind)
+  const markdown = restoreMarkdownSource(recent.markdown, normalizedSource)
 
-  return { markdown: restoreMarkdownSource(markdown, normalizedSource), changed: true }
+  return { markdown, changed: markdown !== source, warnings: recent.warnings }
+}
+
+/**
+ * Retargets an existing Recent sessions block at `kind`, leaving a note that
+ * has no such block to the repair pass: a kind switch reconciles what the note
+ * already says, it does not build out missing sections.
+ */
+function rewriteRecentSessionsForKind(
+  source: string,
+  options: ExerciseNoteSectionOptions,
+  kind: ExerciseKind,
+): SectionRepairResult {
+  const document = splitMarkdown(source)
+  const headingIndex = findHeadingIndex(document.lines, isRecentSessionsHeading)
+  if (headingIndex < 0) {
+    return { markdown: source, warnings: [] }
+  }
+  const block = findRecentSessionsBlock(document, headingIndex)
+  if (!block) {
+    return { markdown: source, warnings: [] }
+  }
+  return repairRecentSessionsBlock(document, block, options, kind)
 }
 
 function repairFrontmatter(
@@ -552,8 +582,9 @@ function repairRecentSessions(
   options: ExerciseNoteMigrationOptions,
   kind: ExerciseKind,
 ): SectionRepairResult {
-  const canonicalBlock = buildRecentSessionsBlock(options.name, kind, options.fitnessRoot)
-  const canonicalLines = canonicalBlock.split('\n')
+  const canonicalLines = buildRecentSessionsBlock(options.name, kind, options.fitnessRoot).split(
+    '\n',
+  )
   const document = splitMarkdown(source)
   const headingIndex = findHeadingIndex(document.lines, isRecentSessionsHeading)
   if (headingIndex < 0) {
@@ -570,21 +601,45 @@ function repairRecentSessions(
     return { markdown: joinMarkdown({ ...document, lines: next }), warnings: [] }
   }
 
-  const sectionEnd = findNextH2HeadingIndex(document.lines, headingIndex + 1)
-  const block = findDataviewBlockInRange(
-    document.lines,
-    headingIndex + 1,
-    sectionEnd >= 0 ? sectionEnd : document.lines.length,
-  )
+  const block = findRecentSessionsBlock(document, headingIndex)
   if (!block) {
     const next = insertBlockAfterHeading(document.lines, headingIndex, canonicalLines)
     return { markdown: joinMarkdown({ ...document, lines: next }), warnings: [] }
   }
 
+  return repairRecentSessionsBlock(document, block, options, kind)
+}
+
+function findRecentSessionsBlock(
+  document: MarkdownLines,
+  headingIndex: number,
+): FencedBlock | null {
+  const sectionEnd = findNextH2HeadingIndex(document.lines, headingIndex + 1)
+  return findDataviewBlockInRange(
+    document.lines,
+    headingIndex + 1,
+    sectionEnd >= 0 ? sectionEnd : document.lines.length,
+  )
+}
+
+/**
+ * Reconciles an existing Recent sessions block against the canonical query for
+ * `kind`. A block that is verbatim some other kind's query, or that differs
+ * only in which exercise it targets, is stale and is rewritten silently; a
+ * hand-edited one is left alone and reported so the user decides.
+ */
+function repairRecentSessionsBlock(
+  document: MarkdownLines,
+  block: FencedBlock,
+  options: ExerciseNoteSectionOptions,
+  kind: ExerciseKind,
+): SectionRepairResult {
+  const canonicalBlock = buildRecentSessionsBlock(options.name, kind, options.fitnessRoot)
   const currentBlock = document.lines.slice(block.start, block.end + 1).join('\n')
   if (currentBlock === canonicalBlock) {
-    return { markdown: source, warnings: [] }
+    return { markdown: joinMarkdown(document), warnings: [] }
   }
+
   const matchesAnotherKind = EXERCISE_KINDS.some(
     (otherKind) =>
       otherKind !== kind &&
@@ -593,27 +648,18 @@ function repairRecentSessions(
         buildRecentSessionsBlock(options.name, otherKind, options.fitnessRoot),
       ),
   )
-  if (matchesAnotherKind) {
-    const next = [
-      ...document.lines.slice(0, block.start),
-      ...canonicalLines,
-      ...document.lines.slice(block.end + 1),
-    ]
-    return { markdown: joinMarkdown({ ...document, lines: next }), warnings: [] }
-  }
-  if (isCustomDataviewBlock(currentBlock, canonicalBlock)) {
-    return {
-      markdown: source,
-      warnings: [{ kind: 'custom-recent-sessions' }],
+  if (!matchesAnotherKind) {
+    if (isCustomDataviewBlock(currentBlock, canonicalBlock)) {
+      return { markdown: joinMarkdown(document), warnings: [{ kind: 'custom-recent-sessions' }] }
     }
-  }
-  if (!hasStaleDataviewTarget(currentBlock, canonicalBlock)) {
-    return { markdown: source, warnings: [] }
+    if (!hasStaleDataviewTarget(currentBlock, canonicalBlock)) {
+      return { markdown: joinMarkdown(document), warnings: [] }
+    }
   }
 
   const next = [
     ...document.lines.slice(0, block.start),
-    ...canonicalLines,
+    ...canonicalBlock.split('\n'),
     ...document.lines.slice(block.end + 1),
   ]
   return { markdown: joinMarkdown({ ...document, lines: next }), warnings: [] }
