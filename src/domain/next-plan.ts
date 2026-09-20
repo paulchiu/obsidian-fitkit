@@ -97,9 +97,8 @@ export function nextPlanTargetWeight(plan: NextPlan, baseWeight: number): number
 }
 
 /**
- * Unit a plan's step is expressed in. A bodyweight step counts rungs; every
- * other kind is a weight in the exercise's own unit. Every surface that shows
- * a plan reads it from here so the card and the dashboard cannot disagree.
+ * Unit a plan's step is expressed in: rungs for bodyweight, the exercise's own
+ * weight unit otherwise. Shared so surfaces showing a plan cannot disagree.
  */
 export function planStepUnit(kind: ExerciseKind, step: number, unit: WeightUnit): string {
   return kind === 'bodyweight' ? formatRungUnit(step) : unit

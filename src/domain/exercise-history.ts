@@ -16,7 +16,7 @@ import {
   type NextPlan,
 } from './next-plan'
 import type { BodyweightBestSet, FitKitIndex, IndexEntry, LastSessionMax, WeightSet } from './types'
-import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from './weight-unit'
+import type { WeightUnit } from './weight-unit'
 
 export interface ExerciseHistoryAnchor {
   sourcePath: string
@@ -186,9 +186,9 @@ export function formatExerciseHistoryBadges(
 export function formatNextPlanBadge(
   summary: ExerciseHistorySummary | undefined,
   kind: ExerciseKind,
+  unit: WeightUnit,
   current?: CurrentExercisePlan,
   levels?: BodyweightLadder,
-  unit: WeightUnit = DEFAULT_WEIGHT_UNIT,
 ): NextPlanBadge | null {
   /** Plans are recorded for strength and bodyweight sets; duration has no plan badge. */
   if (kind !== 'strength' && kind !== 'bodyweight') {

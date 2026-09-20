@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- Next-time plans now read in the exercise's own weight unit on the exercise card and in reading mode, instead of always saying kilograms.
+- The next-time plan badge on an exercise card now reads in that exercise's own weight unit instead of always saying kilograms, so it agrees with the dashboard.
 
 ### Removed
 

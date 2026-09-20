@@ -1,9 +1,13 @@
 import { TFile, type MarkdownPostProcessorContext } from 'obsidian'
 
 import { EXERCISE_KIND_LABELS, assertUnreachableKind } from '../domain/exercise-kind'
-import { bodyweightLevelName, type BodyweightLadder } from '../domain/bodyweight-levels'
+import {
+  bodyweightLevelName,
+  formatRungUnit,
+  type BodyweightLadder,
+} from '../domain/bodyweight-levels'
 import { formatDurationInput } from '../domain/duration-input'
-import { formatNextPlanLabel, planStepUnit } from '../domain/next-plan'
+import { formatNextPlanLabel } from '../domain/next-plan'
 import { parseWorkoutNote } from '../domain/workout-note-model'
 import type {
   BodyweightSet,
@@ -12,7 +16,7 @@ import type {
   StrengthSet,
 } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
-import { bodyweightLevelsFor, weightUnitFor } from '../vault/exercise-registry-vault'
+import { bodyweightLevelsFor } from '../vault/exercise-registry-vault'
 
 const WORKOUT_SOURCE_ROW = /^\s*[-*]\s+.*\[exercise::/
 
@@ -152,7 +156,7 @@ function renderExercisePreview(
   if (exercise.next) {
     wrap.createDiv({
       cls: 'fitkit-reading-plan',
-      text: `Next time: ${formatNextPlanLabel(exercise.next, exercise.kind).toLowerCase()}${formatReadingPlanStepSuffix(exercise, plugin)}`,
+      text: `Next time: ${formatNextPlanLabel(exercise.next, exercise.kind).toLowerCase()}${formatReadingPlanStepSuffix(exercise)}`,
     })
   }
 
@@ -268,13 +272,16 @@ function formatSet(value: number): string {
   return Number.isFinite(value) && value > 0 ? formatNumber(value) : '-'
 }
 
-function formatReadingPlanStepSuffix(exercise: ExerciseEntry, plugin: FitKitPlugin): string {
+/** A bodyweight plan step counts rungs; every other kind keeps kilograms. */
+function formatReadingPlanStepSuffix(exercise: ExerciseEntry): string {
   const step = exercise.next?.step
   if (step === undefined) {
     return ''
   }
-  const unit = weightUnitFor(plugin.app, plugin.settings, exercise.exerciseName)
-  return ` ${planStepUnit(exercise.kind, step, unit)}`
+  if (exercise.kind === 'bodyweight') {
+    return ` ${formatRungUnit(step)}`
+  }
+  return ' kg'
 }
 
 function formatNumber(value: number): string {

@@ -3975,6 +3975,26 @@ describe('WorkoutEditorView next-time plan', () => {
     expect(badge?.children.map((child) => child.textContent).join('')).toContain('Next: 102.5 kg')
   })
 
+  it('reads a pounds exercise plan in pounds on the card', () => {
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      { name: 'Squat', kind: 'strength', unit: 'lbs', aliases: [] },
+    ])
+    const view = createNextPlanView({
+      name: 'Squat',
+      kind: 'strength',
+      next: { direction: 'up', step: 2.5 },
+      strengthSets: [{ set: 1, weight: 100, reps: 5 }],
+      durationEntries: [],
+      bodyweightSets: [],
+    })
+    const list = new TestElement('div')
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    const badge = list.findByClass('fitkit-plan-badge')
+    expect(badge?.attributes.get('title')).toBe('Planned for next time: up 2.5 lbs from 100 lbs')
+    expect(badge?.children.map((child) => child.textContent).join('')).toContain('Next: 102.5 lbs')
+  })
+
   it('shows the plan recorded last session as a badge', () => {
     const view = createNextPlanView({
       name: 'Squat',

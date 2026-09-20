@@ -1854,13 +1854,13 @@ export class WorkoutEditorView extends ItemView {
     const planBadge = formatNextPlanBadge(
       summary,
       ex.kind,
+      unitForName(registry, ex.name) ?? DEFAULT_WEIGHT_UNIT,
       {
         plan: ex.next,
         sessionMax: pickMaxWeightSet(ex.strengthSets),
         sessionBodyweightMax: pickBestBodyweightSet(ex.bodyweightSets),
       },
       levels,
-      unitForName(registry, ex.name) ?? DEFAULT_WEIGHT_UNIT,
     )
     if (badges.length === 0 && !planBadge) {
       return
