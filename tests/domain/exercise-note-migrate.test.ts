@@ -142,6 +142,34 @@ const BODYWEIGHT_RECENT_SESSIONS_BLOCK = [
   '```',
 ].join('\n')
 
+/** Canonical strength Recent sessions block, written out so a note fed to the rewriter does not come from the template it is meant to replace. */
+const STRENGTH_RECENT_SESSIONS_BLOCK = [
+  '```dataview',
+  'TABLE WITHOUT ID',
+  '  file.link AS Workout,',
+  '  L.set AS Set,',
+  '  L.weight AS Weight,',
+  '  L.reps AS Reps',
+  'FROM "Fitness/Workouts"',
+  'FLATTEN file.lists AS L',
+  'WHERE L.exercise = link("Mystery") AND L.set',
+  'SORT file.name DESC, L.set ASC',
+  'LIMIT 10',
+  '```',
+].join('\n')
+
+/** Canonical duration Recent sessions block, written out so the query it carries is verified literally rather than recomputed by the code under test. */
+const DURATION_RECENT_SESSIONS_BLOCK = [
+  '```dataview',
+  'table without id file.link as Session, duration + "s" as Duration',
+  'from "Fitness/Workouts"',
+  'flatten file.lists as item',
+  'where contains(item.text, "[exercise:: [[Mystery]]]") and item.duration',
+  'sort file.name desc',
+  'limit 12',
+  '```',
+].join('\n')
+
 function frontmatterMarkerCount(markdown: string): number {
   return markdown.split(/\r?\n/).filter((line) => line === '---' || line === '\ufeff---').length
 }
@@ -1404,6 +1432,10 @@ Existing notes.
 })
 
 describe('setExerciseNoteKind', () => {
+  const kindOptions = { name: 'Mystery', fitnessRoot: 'Fitness' }
+  const mysteryStrengthNote = (recent: string): string =>
+    completeStrengthNote(recent, buildNotesBlock('Mystery', 'Fitness'))
+
   it('drops metric and unit lines when switching to bodyweight', () => {
     const source = `---
 type: exercise
@@ -1415,7 +1447,7 @@ unit: kg
 Body.
 `
 
-    const result = setExerciseNoteKind(source, 'bodyweight')
+    const result = setExerciseNoteKind(source, 'bodyweight', kindOptions)
 
     expect(result.changed).toBe(true)
     expect(result.markdown).toContain('kind: bodyweight')
@@ -1434,7 +1466,7 @@ levels:
 Body.
 `
 
-    const result = setExerciseNoteKind(source, 'bodyweight')
+    const result = setExerciseNoteKind(source, 'bodyweight', kindOptions)
 
     expect(result.changed).toBe(true)
     expect(result.markdown).toContain('kind: bodyweight')
@@ -1450,7 +1482,7 @@ kind: duration
 Body.
 `
 
-    const result = setExerciseNoteKind(source, 'strength')
+    const result = setExerciseNoteKind(source, 'strength', kindOptions)
 
     expect(result.changed).toBe(true)
     expect(result.markdown).toContain('kind: strength')
@@ -1465,7 +1497,7 @@ type: exercise
 Body.
 `
 
-    const result = setExerciseNoteKind(source, 'duration')
+    const result = setExerciseNoteKind(source, 'duration', kindOptions)
 
     expect(result.changed).toBe(true)
     expect(result.markdown).toBe(`---
@@ -1486,16 +1518,127 @@ kind: strength
 Body.
 `
 
-    const result = setExerciseNoteKind(source, 'strength')
+    const result = setExerciseNoteKind(source, 'strength', kindOptions)
 
     expect(result.changed).toBe(false)
     expect(result.markdown).toBe(source)
   })
 
+  it('leaves a hand-edited Recent sessions query alone and reports it', () => {
+    const customBlock = [
+      '```dataview',
+      'TABLE WITHOUT ID',
+      '  file.link AS Workout,',
+      '  L.set AS Set,',
+      '  L.rpe AS RPE',
+      'FROM "Fitness/Workouts"',
+      'FLATTEN file.lists AS L',
+      'WHERE L.exercise = link("Mystery") AND L.set',
+      'SORT file.name DESC, L.set ASC',
+      'LIMIT 10',
+      '```',
+    ].join('\n')
+    const source = mysteryStrengthNote(customBlock)
+
+    const result = setExerciseNoteKind(source, 'bodyweight', kindOptions)
+
+    expect(extractDataviewBlockAfter(result.markdown, 'Recent sessions')).toBe(customBlock)
+    expect(result.changed).toBe(true)
+    expect(result.warnings).toEqual([{ kind: 'custom-recent-sessions' }])
+  })
+
+  it('leaves the chart block, the Notes query and prose untouched', () => {
+    const notesBlock = buildNotesBlock('Mystery', 'Fitness')
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
+unit: kg
+---
+
+## Progress chart
+
+\`\`\`fitkit-chart
+metric: e1rm
+\`\`\`
+
+## Recent sessions
+
+${buildRecentSessionsBlock('Mystery', 'strength', 'Fitness')}
+
+## Notes
+
+Keep the elbows tucked.
+
+${notesBlock}
+`
+
+    const result = setExerciseNoteKind(source, 'duration', kindOptions)
+
+    expect(result.markdown).toContain('```fitkit-chart\nmetric: e1rm\n```')
+    expect(result.markdown).toContain('Keep the elbows tucked.')
+    expect(extractDataviewBlockAfter(result.markdown, 'Notes')).toBe(notesBlock)
+    expect(extractDataviewBlockAfter(result.markdown, 'Recent sessions')).toBe(
+      DURATION_RECENT_SESSIONS_BLOCK,
+    )
+  })
+
+  it('rewrites the Recent sessions query to the new kind', () => {
+    const source = mysteryStrengthNote(STRENGTH_RECENT_SESSIONS_BLOCK)
+
+    const result = setExerciseNoteKind(source, 'bodyweight', kindOptions)
+
+    expect(result.changed).toBe(true)
+    expect(extractDataviewBlockAfter(result.markdown, 'Recent sessions')).toBe(
+      BODYWEIGHT_RECENT_SESSIONS_BLOCK,
+    )
+  })
+
+  it('absorbs a limit-only edit, the way the repair pass treats one', () => {
+    const source = mysteryStrengthNote(
+      STRENGTH_RECENT_SESSIONS_BLOCK.replace('LIMIT 10', 'LIMIT 25'),
+    )
+
+    const result = setExerciseNoteKind(source, 'bodyweight', kindOptions)
+
+    expect(extractDataviewBlockAfter(result.markdown, 'Recent sessions')).toBe(
+      BODYWEIGHT_RECENT_SESSIONS_BLOCK,
+    )
+    expect(result.warnings).toEqual([])
+  })
+
+  it('writes the kind without inventing a Recent sessions section', () => {
+    const source = `---
+type: exercise
+kind: strength
+---
+
+## Notes
+
+Keep the elbows tucked.
+`
+
+    const result = setExerciseNoteKind(source, 'duration', kindOptions)
+
+    expect(result.changed).toBe(true)
+    expect(result.markdown).toContain('kind: duration')
+    expect(result.markdown).not.toContain('## Recent sessions')
+    expect(result.markdown).toContain('Keep the elbows tucked.')
+  })
+
+  it('keeps CRLF line endings when it rewrites the query', () => {
+    const source = withLineEnding(mysteryStrengthNote(STRENGTH_RECENT_SESSIONS_BLOCK), '\r\n')
+
+    const result = setExerciseNoteKind(source, 'bodyweight', kindOptions)
+
+    expect(result.markdown).toContain(withLineEnding(BODYWEIGHT_RECENT_SESSIONS_BLOCK, '\r\n'))
+    expect(/[^\r]\n/.test(result.markdown)).toBe(false)
+  })
+
   it('leaves notes with no frontmatter block untouched', () => {
     const source = 'Body with no frontmatter.\n'
 
-    const result = setExerciseNoteKind(source, 'strength')
+    const result = setExerciseNoteKind(source, 'strength', kindOptions)
 
     expect(result.changed).toBe(false)
     expect(result.markdown).toBe(source)

@@ -1838,6 +1838,8 @@ interface PersistKindChangeMarkdownFile {
   path: string
   basename: string
   frontmatter?: Record<string, unknown>
+  /** Markdown after the frontmatter; the default note is frontmatter only. */
+  body?: string
 }
 
 interface PersistKindChangeView {
@@ -1871,7 +1873,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
     const contents = new Map(
       markdownFiles.map((file) => {
         const kind = typeof file.frontmatter?.kind === 'string' ? file.frontmatter.kind : 'strength'
-        return [file.path, `---\ntype: exercise\nkind: ${kind}\n---\n`] as const
+        return [file.path, `---\ntype: exercise\nkind: ${kind}\n---\n${file.body ?? ''}`] as const
       }),
     )
     const filesByPath = new Map(markdownFiles.map((file) => [file.path, new TFile()]))
@@ -1904,6 +1906,64 @@ describe('WorkoutEditorView kind switch persistence', () => {
 
   beforeEach(() => {
     obsidianMock.notices = []
+  })
+
+  const strengthRecentSessionsBody = [
+    '',
+    '## Recent sessions',
+    '',
+    '```dataview',
+    'TABLE WITHOUT ID',
+    '  file.link AS Workout,',
+    '  L.set AS Set,',
+    '  L.weight AS Weight,',
+    '  L.reps AS Reps',
+    'FROM "Fitness/Workouts"',
+    'FLATTEN file.lists AS L',
+    'WHERE L.exercise = link("Squat") AND L.set',
+    'SORT file.name DESC, L.set ASC',
+    'LIMIT 10',
+    '```',
+    '',
+  ].join('\n')
+
+  it('retargets the Recent sessions query at the switched kind', async () => {
+    const { view, contents } = createPersistKindChangeView([
+      {
+        path: 'Fitness/Exercises/Squat.md',
+        basename: 'Squat',
+        frontmatter: { type: 'exercise', kind: 'strength' },
+        body: strengthRecentSessionsBody,
+      },
+    ])
+
+    await view.persistKindChange('Squat', 'duration')
+
+    const written = contents.get('Fitness/Exercises/Squat.md') ?? ''
+    expect(written).toContain('table without id file.link as Session, duration + "s" as Duration')
+    expect(written).not.toContain('L.weight AS Weight')
+  })
+
+  it('tells the user when a customised Recent sessions query was left alone', async () => {
+    const customised = strengthRecentSessionsBody.replace(
+      '  L.weight AS Weight,\n  L.reps AS Reps',
+      '  L.weight AS Weight,\n  L.rpe AS RPE',
+    )
+    const { view, contents } = createPersistKindChangeView([
+      {
+        path: 'Fitness/Exercises/Squat.md',
+        basename: 'Squat',
+        frontmatter: { type: 'exercise', kind: 'strength' },
+        body: customised,
+      },
+    ])
+
+    await view.persistKindChange('Squat', 'duration')
+
+    expect(contents.get('Fitness/Exercises/Squat.md')).toContain('L.rpe AS RPE')
+    expect(obsidianMock.notices).toContain(
+      "The Recent sessions query in the note for Squat looks customised, so it was left as it is and still reads the old kind's fields.",
+    )
   })
 
   it('writes the switched kind into the exercise note and records it in the registry', async () => {

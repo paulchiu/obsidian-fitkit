@@ -1527,9 +1527,17 @@ export class WorkoutEditorView extends ItemView {
     if (noteFile instanceof TFile) {
       let result: ExerciseNoteKindUpdateResult | undefined
       await this.app.vault.process(noteFile, (text) => {
-        result = setExerciseNoteKind(text, nextKind)
+        result = setExerciseNoteKind(text, nextKind, {
+          name: noteFile.basename,
+          fitnessRoot: this.plugin.settings.fitnessRoot,
+        })
         return result.markdown
       })
+      if (result?.warnings.some((warning) => warning.kind === 'custom-recent-sessions')) {
+        new Notice(
+          `The Recent sessions query in the note for ${trimmed} looks customised, so it was left as it is and still reads the old kind's fields.`,
+        )
+      }
       if (result?.changed) {
         new Notice(`Exercise note now records ${trimmed} as ${nextKind}.`)
         /**
