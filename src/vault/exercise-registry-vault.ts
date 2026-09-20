@@ -1,7 +1,8 @@
 import type { App } from 'obsidian'
 
-import { createRegistry, levelsForName, normalize } from '../domain/exercise-registry'
+import { createRegistry, levelsForName, normalize, unitForName } from '../domain/exercise-registry'
 import type { ExerciseRegistryEntry } from '../domain/exercise-registry'
+import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
 import type { FitKitSettings } from '../settings'
 import { readExerciseCatalog, type ExerciseCatalogSnapshot } from './exercise-catalog'
 
@@ -36,6 +37,11 @@ export function bodyweightLevelsFor(
   name: string,
 ): string[] | undefined {
   return levelsForName(createRegistry(exerciseRegistryWithVaultNotes(app, settings)), name)
+}
+
+export function weightUnitFor(app: App, settings: FitKitSettings, name: string): WeightUnit {
+  const registry = createRegistry(exerciseRegistryWithVaultNotes(app, settings))
+  return unitForName(registry, name) ?? DEFAULT_WEIGHT_UNIT
 }
 
 /** Order-sensitive ladder equality: rung order is the ladder, so a reorder counts. */

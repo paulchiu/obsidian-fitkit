@@ -30,10 +30,12 @@ import {
   kindForName,
   levelsForName,
   normalize,
+  unitForName,
   upsertEntry,
   type ExerciseRegistry,
   type ExerciseRegistryEntry,
 } from '../domain/exercise-registry'
+import { DEFAULT_WEIGHT_UNIT } from '../domain/weight-unit'
 import type {
   ExerciseNoteKindUpdateResult,
   ExerciseNoteLevelsUpdateResult,
@@ -1858,6 +1860,7 @@ export class WorkoutEditorView extends ItemView {
         sessionBodyweightMax: pickBestBodyweightSet(ex.bodyweightSets),
       },
       levels,
+      unitForName(registry, ex.name) ?? DEFAULT_WEIGHT_UNIT,
     )
     if (badges.length === 0 && !planBadge) {
       return

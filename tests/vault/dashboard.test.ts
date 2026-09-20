@@ -189,6 +189,37 @@ describe('dashboard composer', () => {
     expect(markdown.indexOf('## PBs')).toBeLessThan(markdown.indexOf('## Next session plans'))
   })
 
+  it('lists a pounds exercise next-time plan in pounds', () => {
+    const index: FitKitIndex = {
+      schemaVersion: 1,
+      builtAt: 0,
+      entries: [
+        {
+          path: 'Fitness/Workouts/2026-08-10.md',
+          mtime: 1,
+          date: '2026-08-10',
+          name: 'Later',
+          exercises: [
+            {
+              exerciseName: 'Squat',
+              kind: 'strength',
+              maxWeightSet: { weight: 100, reps: 5 },
+              totalSets: 1,
+              next: { direction: 'up', step: 2.5 },
+            },
+          ],
+        },
+      ],
+      diagnostics: [],
+    }
+
+    const markdown = composeDashboard(index, 'Fitness/Workouts', 'Fitness/Exercises', new Set(), {
+      units: new Map([['Squat', 'lbs']]),
+    })
+
+    expect(markdown).toContain('- **[[#Squat|Squat]]:** up 2.5 lbs (planned 2026-08-10)')
+  })
+
   it('lists a bodyweight next-time plan as a count of rungs', () => {
     const index: FitKitIndex = {
       schemaVersion: 1,

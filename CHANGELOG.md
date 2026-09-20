@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Next-time plans now read in the exercise's own weight unit on the exercise card and in reading mode, instead of always saying kilograms.
+
 ### Removed
 
 ## [1.4.1] - 2026-09-20

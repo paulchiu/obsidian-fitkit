@@ -429,6 +429,19 @@ describe('exercise history aggregation', () => {
     })
   })
 
+  it('reads a pounds exercise plan in pounds', () => {
+    const summary = {
+      strength: { lastSessionMax: { value: { weight: 100, reps: 5 }, date: '2026-08-10' } },
+      nextPlan: { value: { direction: 'up' as const, step: 2.5 }, date: '2026-08-10' },
+    }
+
+    expect(formatNextPlanBadge(summary, 'strength', undefined, undefined, 'lbs')).toEqual({
+      text: 'Next: 102.5 lbs',
+      title: 'Planned on 2026-08-10: up 2.5 lbs from 100 lbs',
+      icon: 'arrow-up',
+    })
+  })
+
   it('falls back to the direction when the plan carries no step', () => {
     const badge = formatNextPlanBadge(
       {

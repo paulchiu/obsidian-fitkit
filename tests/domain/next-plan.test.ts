@@ -6,6 +6,7 @@ import {
   nextPlanTargetLevel,
   nextPlanTargetWeight,
   parseNextPlan,
+  planStepUnit,
 } from '../../src/domain/next-plan'
 
 describe('next plan parsing', () => {
@@ -103,5 +104,17 @@ describe('next plan targets', () => {
     expect(nextPlanTargetLevel({ direction: 'up', step: 3 }, 1, 1)).toBe(1)
     expect(nextPlanTargetLevel({ direction: 'down', step: 3 }, 1, 1)).toBe(1)
     expect(nextPlanTargetLevel({ direction: 'stay' }, 1, 1)).toBe(1)
+  })
+})
+
+describe('planStepUnit', () => {
+  it('counts a bodyweight step in rungs', () => {
+    expect(planStepUnit('bodyweight', 1, 'kg')).toBe('rung')
+    expect(planStepUnit('bodyweight', 2, 'kg')).toBe('rungs')
+  })
+
+  it('gives a strength step the exercise own weight unit', () => {
+    expect(planStepUnit('strength', 2.5, 'lbs')).toBe('lbs')
+    expect(planStepUnit('strength', 2.5, 'kg')).toBe('kg')
   })
 })

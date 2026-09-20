@@ -1,13 +1,9 @@
 import { TFile, type MarkdownPostProcessorContext } from 'obsidian'
 
 import { EXERCISE_KIND_LABELS, assertUnreachableKind } from '../domain/exercise-kind'
-import {
-  bodyweightLevelName,
-  formatRungUnit,
-  type BodyweightLadder,
-} from '../domain/bodyweight-levels'
+import { bodyweightLevelName, type BodyweightLadder } from '../domain/bodyweight-levels'
 import { formatDurationInput } from '../domain/duration-input'
-import { formatNextPlanLabel } from '../domain/next-plan'
+import { formatNextPlanLabel, planStepUnit } from '../domain/next-plan'
 import { parseWorkoutNote } from '../domain/workout-note-model'
 import type {
   BodyweightSet,
@@ -16,7 +12,7 @@ import type {
   StrengthSet,
 } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
-import { bodyweightLevelsFor } from '../vault/exercise-registry-vault'
+import { bodyweightLevelsFor, weightUnitFor } from '../vault/exercise-registry-vault'
 
 const WORKOUT_SOURCE_ROW = /^\s*[-*]\s+.*\[exercise::/
 
@@ -156,7 +152,7 @@ function renderExercisePreview(
   if (exercise.next) {
     wrap.createDiv({
       cls: 'fitkit-reading-plan',
-      text: `Next time: ${formatNextPlanLabel(exercise.next, exercise.kind).toLowerCase()}${formatReadingPlanStepSuffix(exercise)}`,
+      text: `Next time: ${formatNextPlanLabel(exercise.next, exercise.kind).toLowerCase()}${formatReadingPlanStepSuffix(exercise, plugin)}`,
     })
   }
 
@@ -272,16 +268,13 @@ function formatSet(value: number): string {
   return Number.isFinite(value) && value > 0 ? formatNumber(value) : '-'
 }
 
-/** A bodyweight plan step counts rungs; every other kind keeps kilograms. */
-function formatReadingPlanStepSuffix(exercise: ExerciseEntry): string {
+function formatReadingPlanStepSuffix(exercise: ExerciseEntry, plugin: FitKitPlugin): string {
   const step = exercise.next?.step
   if (step === undefined) {
     return ''
   }
-  if (exercise.kind === 'bodyweight') {
-    return ` ${formatRungUnit(step)}`
-  }
-  return ' kg'
+  const unit = weightUnitFor(plugin.app, plugin.settings, exercise.exerciseName)
+  return ` ${planStepUnit(exercise.kind, step, unit)}`
 }
 
 function formatNumber(value: number): string {
