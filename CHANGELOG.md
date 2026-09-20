@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [1.4.1] - 2026-09-20
+
+### Added
+
+### Changed
+
+### Fixed
+
 - The right-most date label on a progress chart is now fully readable. It anchors inward from its tick instead of centring on it, so no label hangs off the chart edge.
 
 ### Removed
