@@ -506,6 +506,11 @@ body.is-mobile .fitkit-editor-root {
   outline: none;
 }
 
+/** Exercise-level notes keep the same inset as the set-level note they vary from. */
+.fitkit-exercise-note-line {
+  padding-inline: var(--size-4-2, 8px);
+}
+
 .fitkit-set-note-modal-shell {
   max-height: calc(100vh - 32px);
   overflow: hidden;
@@ -1040,13 +1045,26 @@ body.is-mobile .fitkit-editor-root {
   grid-template-columns: 20px repeat(2, minmax(0, 1fr)) minmax(0, 72px);
 }
 
-/** Trailing column reserves the row kebab width so header labels sit over row inputs. */
+/** Shared width for the bodyweight header's reserved trailing column and its spacer. */
+.fitkit-bodyweight-card {
+  --fitkit-bodyweight-trailing-column-width: 26px;
+}
+
+/** The trailing header column reserves action space so labels align with row inputs. */
 .fitkit-bodyweight-row.fitkit-set-head {
-  grid-template-columns: 20px repeat(2, minmax(0, 1fr)) 26px;
+  grid-template-columns:
+    20px repeat(2, minmax(0, 1fr))
+    var(--fitkit-bodyweight-trailing-column-width, 26px);
 }
 
 .fitkit-bodyweight-row.fitkit-set-head.has-load {
-  grid-template-columns: 20px repeat(2, minmax(0, 1fr)) minmax(0, 72px) 26px;
+  grid-template-columns:
+    20px repeat(2, minmax(0, 1fr)) minmax(0, 72px)
+    var(--fitkit-bodyweight-trailing-column-width, 26px);
+}
+
+.fitkit-bodyweight-head-spacer {
+  inline-size: var(--fitkit-bodyweight-trailing-column-width, 26px);
 }
 
 /**

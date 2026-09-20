@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { createTestRoot, harnessDocument, harnessWindow } from './obsidian-dom'
@@ -83,6 +85,32 @@ describe('stylesheet', () => {
     expect(findUnstyledClasses(card)).toEqual(['fitkit-bodywieght-row'])
   })
 
+  it('keeps exercise notes at the shared note inset', () => {
+    const root = createTestRoot()
+    harnessDocument.body.appendChild(root)
+    const note = root.createDiv({ cls: 'fitkit-note-line fitkit-exercise-note-line' })
+
+    expect(harnessWindow.getComputedStyle(note).getPropertyValue('padding-inline')).toBe(
+      'var(--size-4-2, 8px)',
+    )
+  })
+
+  it('keeps bodyweight header tracks and spacer on one trailing-column token', () => {
+    const css = readFileSync(join(process.cwd(), 'styles.css'), 'utf8')
+    const token = '--fitkit-bodyweight-trailing-column-width'
+
+    expect(ruleDeclarations(css, '.fitkit-bodyweight-card')).toContain(`${token}: 26px;`)
+    expect(ruleDeclarations(css, '.fitkit-bodyweight-row.fitkit-set-head')).toContain(
+      `grid-template-columns: 20px repeat(2, minmax(0, 1fr)) var(${token}, 26px);`,
+    )
+    expect(ruleDeclarations(css, '.fitkit-bodyweight-row.fitkit-set-head.has-load')).toContain(
+      `grid-template-columns: 20px repeat(2, minmax(0, 1fr)) minmax(0, 72px) var(${token}, 26px);`,
+    )
+    expect(ruleDeclarations(css, '.fitkit-bodyweight-head-spacer')).toContain(
+      `inline-size: var(${token}, 26px);`,
+    )
+  })
+
   it('keeps a state class that only ever appears in a compound selector', () => {
     const root = createTestRoot()
     harnessDocument.body.appendChild(root)
@@ -156,3 +184,11 @@ describe('unstyled render', () => {
     }
   })
 })
+
+function ruleDeclarations(css: string, selector: string): string {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = css.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`))
+
+  expect(match, `Missing CSS rule for ${selector}`).not.toBeNull()
+  return (match?.[1] ?? '').replace(/\s+/g, ' ').trim()
+}
