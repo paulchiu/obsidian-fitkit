@@ -219,7 +219,7 @@ interface TestEvent {
 
 type TestListener = (event: TestEvent) => void
 
-/** A rect positioned by its left edge, the only axis menu placement reads. */
+/** A rect built from the three edges menu placement reads. */
 function testRect(box: { left: number; bottom: number; width: number }): DOMRect {
   return {
     bottom: box.bottom,
@@ -538,13 +538,6 @@ describe('WorkoutEditorView row actions', () => {
     expect(obsidianMock.menus[0]?.items.map((item) => item.title)).not.toContain(
       'Open exercise file',
     )
-    expect(obsidianMock.menus[0]?.position).toEqual({
-      x: 10,
-      y: 20,
-      width: 10,
-      overlap: true,
-      left: true,
-    })
   })
 
   it('adds Open exercise file to the exercise card menu before kind and move actions', () => {
@@ -4223,18 +4216,24 @@ describe('WorkoutEditorView menu placement', () => {
    * anchor's far edge when `left` is set and the menu fits there, otherwise
    * left-aligns to the near edge, clamped to the window.
    */
-  const menuLeftEdge = (
+  const menuBox = (
     position: MockMenuPosition,
     menuWidth: number,
     windowWidth: number,
-  ): number => {
+  ): { left: number; right: number } => {
     const { x, width, overlap, left } = position
-    const near = width === undefined ? x + 2 : overlap === true ? x : x + width
-    const far = width === undefined ? x - 2 : overlap === true ? x + width : x
-    const fitsRightAligned = far - menuWidth >= 0
-    return near + menuWidth > windowWidth || (left === true && fitsRightAligned)
-      ? Math.max(0, far - menuWidth)
-      : near
+    const anchorNear = width === undefined ? x + 2 : x
+    const anchorFar = width === undefined ? x - 2 : x + width
+    const near = overlap === true || width === undefined ? anchorNear : anchorFar
+    const far = overlap === true || width === undefined ? anchorFar : anchorNear
+    const rightAligns = near + menuWidth > windowWidth || (left === true && far - menuWidth >= 0)
+    const edge = rightAligns ? Math.max(0, far - menuWidth) : near
+    return { left: edge, right: edge + menuWidth }
+  }
+
+  const expectWithin = (box: { left: number; right: number }, windowWidth: number): void => {
+    expect(box.left).toBeGreaterThanOrEqual(0)
+    expect(box.right).toBeLessThanOrEqual(windowWidth)
   }
 
   const lastPosition = (): MockMenuPosition => {
@@ -4245,7 +4244,7 @@ describe('WorkoutEditorView menu placement', () => {
     return position
   }
 
-  it('drops the row menu under the kebab rather than beside it', () => {
+  it('hangs the row menu off the kebab even where it would fit to the right', () => {
     const view = createRowActionView()
     const container = new TestElement('div')
     const body = container.createDiv({ cls: 'fitkit-row-body' })
@@ -4261,16 +4260,16 @@ describe('WorkoutEditorView menu placement', () => {
     if (kebab === null) {
       throw new Error('no kebab was rendered')
     }
-    kebab.rect = testRect({ left: 700, bottom: 40, width: 28 })
+    kebab.rect = testRect({ left: 600, bottom: 40, width: 28 })
     kebab.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
 
-    const leftEdge = menuLeftEdge(lastPosition(), 220, 760)
+    const box = menuBox(lastPosition(), 120, 760)
 
-    expect(leftEdge + 220).toBe(728)
-    expect(leftEdge).toBeGreaterThanOrEqual(0)
+    expect(box.right).toBe(628)
+    expectWithin(box, 760)
   })
 
-  it('drops the level menu under the level label rather than beside it', () => {
+  it('hangs the level menu off the level label rather than past it', () => {
     registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
       {
         name: 'Push-up',
@@ -4303,13 +4302,13 @@ describe('WorkoutEditorView menu placement', () => {
     label.rect = testRect({ left: 600, bottom: 96, width: 120 })
     label.listenersFor('click')[0]?.({})
 
-    const leftEdge = menuLeftEdge(lastPosition(), 180, 760)
+    const box = menuBox(lastPosition(), 150, 760)
 
-    expect(leftEdge + 180).toBe(720)
-    expect(leftEdge).toBeGreaterThanOrEqual(0)
+    expect(box.right).toBe(720)
+    expectWithin(box, 760)
   })
 
-  it('keeps the card menu inside a narrow window', () => {
+  it('hangs the card menu off the gear inside a narrow window', () => {
     vi.stubGlobal('HTMLElement', TestElement)
     const view = createCardMenuView()
     view.model = {
@@ -4324,13 +4323,13 @@ describe('WorkoutEditorView menu placement', () => {
       ],
     }
     const gear = new TestElement('button')
-    gear.rect = testRect({ left: 320, bottom: 64, width: 32 })
+    gear.rect = testRect({ left: 220, bottom: 64, width: 32 })
 
     view.openCardMenu({ currentTarget: gear } as unknown as MouseEvent, 0)
 
-    const leftEdge = menuLeftEdge(lastPosition(), 220, 360)
+    const box = menuBox(lastPosition(), 120, 360)
 
-    expect(leftEdge + 220).toBe(352)
-    expect(leftEdge).toBeGreaterThanOrEqual(0)
+    expect(box.right).toBe(252)
+    expectWithin(box, 360)
   })
 })

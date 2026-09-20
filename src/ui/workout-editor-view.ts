@@ -42,7 +42,6 @@ import type {
 } from '../domain/exercise-note-migrate'
 import { setExerciseNoteKind, setExerciseNoteLevels } from '../domain/exercise-note-migrate'
 import { filterSuggestableNames } from '../domain/exercise-suggestions'
-import { menuAnchorForTrigger } from '../domain/menu-anchor'
 import {
   formatNumber as formatPlanNumber,
   nextPlanTargetWeight,
@@ -85,6 +84,7 @@ import { ConfirmModal } from './confirm-modal'
 import { EditLevelsModal } from './edit-levels-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
 import { KindSwitchChoiceModal, type KindSwitchChoice } from './kind-switch-choice-modal'
+import { menuAnchorForTrigger } from './menu-anchor'
 import { SetNoteModal } from './set-note-modal'
 import { PlanStepModal } from './plan-step-modal'
 
