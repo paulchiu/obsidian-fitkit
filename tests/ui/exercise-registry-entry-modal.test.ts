@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createTestRoot, findButtons, harnessWindow } from '../harness/obsidian-dom'
+
 const obsidianMock = vi.hoisted((): { notices: string[] } => ({ notices: [] }))
 
 vi.mock('obsidian', () => {
   class Modal {
-    contentEl = new TestElement('div')
+    contentEl = createTestRoot()
 
     constructor(readonly app: unknown) {}
 
@@ -52,19 +54,9 @@ function openModalWithKind(kind: 'strength' | 'duration'): {
 }
 
 /** The kind select is the first select the modal renders; the second is the unit select. */
-function kindSelectIn(modal: ExerciseRegistryEntryModal): TestElement {
-  const root = modal.contentEl as unknown as TestElement
-  const selects: TestElement[] = []
-  const visit = (element: TestElement): void => {
-    if (element.tagName === 'select') {
-      selects.push(element)
-    }
-    for (const child of element.children) {
-      visit(child)
-    }
-  }
-  visit(root)
-  const select = selects[0]
+function kindSelectIn(modal: ExerciseRegistryEntryModal): HTMLSelectElement {
+  const root = modal.contentEl
+  const select = root.querySelectorAll('select')[0]
   if (!select) {
     throw new Error('Expected the modal to render a kind select.')
   }
@@ -72,24 +64,20 @@ function kindSelectIn(modal: ExerciseRegistryEntryModal): TestElement {
 }
 
 function saveIn(modal: ExerciseRegistryEntryModal): void {
-  const root = modal.contentEl as unknown as TestElement
-  const visit = (element: TestElement): TestElement | null => {
-    if (element.tagName === 'button' && element.textContent === 'Save') {
-      return element
-    }
-    for (const child of element.children) {
-      const found = visit(child)
-      if (found) {
-        return found
-      }
-    }
-    return null
-  }
-  const save = visit(root)
+  const root = modal.contentEl
+  const [save] = findButtons(root, 'Save')
   if (!save) {
     throw new Error('Expected the modal to render a Save button.')
   }
-  save.fire('click')
+  save.click()
+}
+
+function createPluginStub(registry: ExerciseRegistryEntry[]): FitKitPlugin {
+  return {
+    app: {},
+    settings: { exerciseRegistry: registry },
+    saveSettings: vi.fn(() => Promise.resolve()),
+  } as unknown as FitKitPlugin
 }
 
 describe('ExerciseRegistryEntryModal kind select', () => {
@@ -99,13 +87,10 @@ describe('ExerciseRegistryEntryModal kind select', () => {
 
   it('lists strength, duration then bodyweight with their current labels', () => {
     const select = kindSelectIn(openModalWithKind('strength').modal)
+    const options = [...select.querySelectorAll('option')]
 
-    expect(select.children.map((option) => option.value)).toEqual([
-      'strength',
-      'duration',
-      'bodyweight',
-    ])
-    expect(select.children.map((option) => option.textContent)).toEqual([
+    expect(options.map((option) => option.value)).toEqual(['strength', 'duration', 'bodyweight'])
+    expect(options.map((option) => option.textContent)).toEqual([
       'Strength',
       'Duration',
       'Bodyweight',
@@ -117,7 +102,7 @@ describe('ExerciseRegistryEntryModal kind select', () => {
     const select = kindSelectIn(modal)
 
     select.value = 'cardio'
-    select.fire('change')
+    select.dispatchEvent(new harnessWindow.Event('change'))
     saveIn(modal)
 
     expect(plugin.settings.exerciseRegistry[0]).toMatchObject({
@@ -126,83 +111,6 @@ describe('ExerciseRegistryEntryModal kind select', () => {
     })
   })
 })
-
-function createPluginStub(registry: ExerciseRegistryEntry[]): FitKitPlugin {
-  return {
-    app: {},
-    settings: { exerciseRegistry: registry },
-    saveSettings: vi.fn(() => Promise.resolve()),
-  } as unknown as FitKitPlugin
-}
-
-interface TestElementOptions {
-  cls?: string
-  text?: string
-  type?: string
-  value?: string
-}
-
-class TestElement {
-  readonly children: TestElement[] = []
-  readonly listeners = new Map<string, Array<() => void>>()
-  checked = false
-  disabled = false
-  hidden = false
-  rows = 0
-  textContent = ''
-  value = ''
-
-  constructor(readonly tagName: string = 'div') {}
-
-  createDiv(options: TestElementOptions = {}): TestElement {
-    const child = new TestElement('div')
-    this.adopt(child, options)
-    return child
-  }
-
-  createEl(tagName: string, options: TestElementOptions = {}): TestElement {
-    if (tagName === 'div') {
-      return this.createDiv(options)
-    }
-    const child = new TestElement(tagName)
-    this.adopt(child, options)
-    return child
-  }
-
-  private adopt(child: TestElement, options: TestElementOptions): void {
-    if (options.text !== undefined) {
-      child.textContent = options.text
-    }
-    if (options.value !== undefined) {
-      child.value = options.value
-    }
-    this.children.push(child)
-  }
-
-  addEventListener(type: string, listener: () => void): void {
-    const current = this.listeners.get(type) ?? []
-    this.listeners.set(type, [...current, listener])
-  }
-
-  addClass(_className: string): void {}
-
-  empty(): void {
-    this.children.length = 0
-    this.textContent = ''
-  }
-
-  setText(text: string): void {
-    this.textContent = text
-  }
-
-  fire(type: string): void {
-    for (const listener of this.listeners.get(type) ?? []) {
-      listener()
-    }
-  }
-
-  focus(): void {}
-}
 
 describe('ExerciseRegistryEntryModal create-mode prefill', () => {
   beforeEach(() => {

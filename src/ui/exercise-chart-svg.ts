@@ -173,6 +173,7 @@ function drawYLabels(
         x: marginLeft(series) - 8,
         y: y + 4,
         'text-anchor': 'end',
+        'data-axis': 'y',
       },
     })
     label.textContent = formatChartValue(value, series, undefined)
@@ -199,6 +200,7 @@ function drawLevelYLabels(
         x: marginLeft(series) - 8,
         y: y + 4,
         'text-anchor': 'end',
+        'data-axis': 'y',
       },
     })
     label.textContent = shortenLevelLabel(fullName)
@@ -281,11 +283,23 @@ function drawXLabels(svg: SVGSVGElement, series: ChartSeries): void {
       attr: {
         x,
         y: MARGIN_TOP + PLOT_HEIGHT + 18,
-        'text-anchor': 'middle',
+        'text-anchor': xLabelAnchor(index, series.points.length),
+        'data-axis': 'x',
       },
     })
     label.textContent = condensed ? point.date.slice(5) : point.date
   }
+}
+
+/**
+ * The last date label anchors inward. Its tick sits one margin from the
+ * viewBox, so a centred label half wider than that margin hangs off the edge.
+ */
+function xLabelAnchor(index: number, count: number): string {
+  if (index === count - 1) {
+    return 'end'
+  }
+  return 'middle'
 }
 
 function drawSeries(

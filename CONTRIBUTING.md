@@ -30,7 +30,7 @@ To see your changes inside Obsidian, symlink `main.js`, `manifest.json`, and `st
 
 ## Tests and the local gate
 
-Before pushing, `npm test`, `npm run lint`, and `npm run format` must all pass. Vitest covers the pure modules in `src/domain/` and `src/vault/`; UI flows (the editor, the dashboard, the registry) are verified manually against a dev vault, since they depend on the Obsidian runtime.
+Before pushing, `npm test`, `npm run lint`, and `npm run format` must all pass. Vitest covers the pure modules in `src/domain/` and `src/vault/`, and the offline render harness in `tests/harness/` (see its README) covers UI structure, cascade, stylesheet coverage and chart SVG geometry against the real `styles.css`, without needing Obsidian. Flows the harness cannot reach (HTML layout, which jsdom cannot measure, and end-to-end vault interactions) are verified manually against a dev vault, since they depend on the Obsidian runtime.
 
 ## Pull requests
 

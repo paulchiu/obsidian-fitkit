@@ -10,7 +10,7 @@
 - **Runtime:** Loads inside Obsidian (Electron). Desktop and mobile both supported unless a feature needs `isDesktopOnly`.
 - **Bundler:** esbuild (CJS, bundled to `main.js`).
 - **Package manager:** npm.
-- **Testing:** Vitest for pure modules (parsers, serializers, registry logic). UI/flow testing is manual against a dev vault (see `/Users/paul/dev-misc/dev-vault/dev`).
+- **Testing:** Vitest for pure modules (parsers, serializers, registry logic) and for UI through the offline render harness in `tests/harness/` (see its README). The harness renders the real components against the real `styles.css` in jsdom and measures chart SVG geometry with resvg, so it checks structure, cascade, stylesheet coverage and SVG geometry. It never checks HTML layout (jsdom has no layout engine). Manual passes against a dev vault (see `/Users/paul/dev-misc/dev-vault/dev`) still cover flows the harness cannot reach.
 - **Related work:** De-risking POCs live in `/Users/paul/dev-misc/fitkit-pocs`. Product spec lives in the user's Obsidian vault at `Quartz/Projects/FitKit/`. Consult those before introducing new patterns.
 
 ## 2. Core Architectural Principles

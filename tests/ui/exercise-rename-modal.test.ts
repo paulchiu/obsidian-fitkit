@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createTestRoot, findButtons } from '../harness/obsidian-dom'
+
 const obsidianMock = vi.hoisted((): { notices: string[] } => ({ notices: [] }))
 
 vi.mock('obsidian', () => {
   class Modal {
-    contentEl = new TestElement('div')
+    contentEl = createTestRoot()
 
-    titleEl = new TestElement('div')
+    titleEl = createTestRoot()
 
     setTitle(title: string): this {
       this.titleEl.textContent = title
@@ -47,99 +49,14 @@ import {
   type ExerciseRenameApplyResult,
 } from '../../src/vault/exercise-rename-apply'
 
-interface TestElementOptions {
-  cls?: string
-  text?: string
-}
-
-type TestListener = () => void
-
-class TestElement {
-  readonly attributes = new Map<string, string>()
-  readonly children: TestElement[] = []
-  readonly classes = new Set<string>()
-  readonly listeners = new Map<string, TestListener[]>()
-  disabled = false
-  value = ''
-  textContent = ''
-
-  constructor(readonly tagName: string) {}
-
-  createEl(tagName: string, options: TestElementOptions = {}): TestElement {
-    const child = new TestElement(tagName)
-    this.children.push(child)
-    return this.applyOptions(child, options)
-  }
-
-  createSpan(options: TestElementOptions = {}): TestElement {
-    return this.createEl('span', options)
-  }
-
-  createDiv(options: TestElementOptions = {}): TestElement {
-    return this.createEl('div', options)
-  }
-
-  private applyOptions(child: TestElement, options: TestElementOptions): TestElement {
-    if (options.cls) {
-      for (const cls of options.cls.split(' ')) {
-        if (cls) child.classes.add(cls)
-      }
-    }
-    if (options.text !== undefined) {
-      child.textContent = options.text
-    }
-    return child
-  }
-
-  addEventListener(type: string, listener: TestListener): void {
-    const current = this.listeners.get(type) ?? []
-    this.listeners.set(type, [...current, listener])
-  }
-
-  trigger(type: string): void {
-    for (const listener of this.listeners.get(type) ?? []) {
-      listener()
-    }
-  }
-
-  addClass(name: string): void {
-    this.classes.add(name)
-  }
-
-  setText(text: string): void {
-    this.textContent = text
-  }
-
-  setAttr(name: string, value: string): void {
-    this.attributes.set(name, value)
-  }
-
-  focus(): void {}
-
-  empty(): void {
-    this.children.length = 0
-    this.textContent = ''
-  }
-}
-
-function collectText(element: TestElement): string[] {
-  const own = element.textContent ? [element.textContent] : []
-  return [...own, ...element.children.flatMap((child) => collectText(child))]
-}
-
-function findAll(root: TestElement, predicate: (el: TestElement) => boolean): TestElement[] {
-  const matches: TestElement[] = []
-  if (predicate(root)) {
-    matches.push(root)
-  }
-  for (const child of root.children) {
-    matches.push(...findAll(child, predicate))
-  }
-  return matches
-}
-
-function findButtons(root: TestElement, text: string): TestElement[] {
-  return findAll(root, (el) => el.tagName === 'button' && el.textContent === text)
+/** Direct text nodes per element, mirroring the old fake's own-text plus children walk. */
+function collectText(element: Element): string[] {
+  const own = [...element.childNodes]
+    .filter((node) => node.nodeType === 3)
+    .map((node) => node.textContent ?? '')
+    .join('')
+  const texts = own ? [own] : []
+  return [...texts, ...[...element.children].flatMap((child) => collectText(child))]
 }
 
 function basePlan(overrides: Partial<ExerciseRenamePlan> = {}): ExerciseRenamePlan {
@@ -209,7 +126,7 @@ function createPluginStub() {
 }
 
 type ModalPrivate = {
-  contentEl: TestElement
+  contentEl: HTMLElement
   plan: ExerciseRenamePlan | null
   computePreview(): Promise<void>
   handleConfirm(): Promise<void>
@@ -400,9 +317,11 @@ describe('ExerciseRenameModal cancel', () => {
 
     modal.onOpen()
 
-    const modalPrivate = modal as unknown as ModalPrivate & { titleEl: TestElement }
+    const modalPrivate = modal as unknown as ModalPrivate & { titleEl: HTMLElement }
     expect(modalPrivate.titleEl.textContent).toBe('Rename exercise')
-    expect(modalPrivate.contentEl.children.some((child) => child.tagName === 'h2')).toBe(false)
+    expect(
+      [...modalPrivate.contentEl.children].some((child) => child.tagName.toLowerCase() === 'h2'),
+    ).toBe(false)
   })
 
   it('writes nothing when cancelled at the input stage', () => {
@@ -414,7 +333,7 @@ describe('ExerciseRenameModal cancel', () => {
 
     const cancel = findButtons(modalPrivate.contentEl, 'Cancel')
     expect(cancel).toHaveLength(1)
-    cancel[0]?.trigger('click')
+    cancel[0]?.click()
 
     expect(closeSpy).toHaveBeenCalledTimes(1)
     expect(buildExerciseRenamePlanFromVault).not.toHaveBeenCalled()
@@ -432,7 +351,7 @@ describe('ExerciseRenameModal cancel', () => {
     await modalPrivate.computePreview()
     const cancel = findButtons(modalPrivate.contentEl, 'Cancel')
     expect(cancel).toHaveLength(1)
-    cancel[0]?.trigger('click')
+    cancel[0]?.click()
 
     expect(closeSpy).toHaveBeenCalledTimes(1)
     expect(applyExerciseRenamePlan).not.toHaveBeenCalled()

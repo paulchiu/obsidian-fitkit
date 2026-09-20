@@ -1,120 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-interface TestElementOptions {
-  cls?: string
-  text?: string
-  attr?: Record<string, string>
-}
-
-type TestListener = () => void
-
-class TestElement {
-  readonly attributes = new Map<string, string>()
-  readonly children: TestElement[] = []
-  readonly classes = new Set<string>()
-  readonly listeners = new Map<string, TestListener[]>()
-  focused = false
-  textContent = ''
-  value = ''
-
-  constructor(readonly tagName: string) {}
-
-  addClass(cls: string): void {
-    this.addClasses(cls)
-  }
-
-  removeClass(cls: string): void {
-    this.classes.delete(cls)
-  }
-
-  createDiv(options: TestElementOptions = {}): TestElement {
-    return this.appendChild('div', options)
-  }
-
-  createEl(tagName: string, options: TestElementOptions = {}): TestElement {
-    return this.appendChild(tagName, options)
-  }
-
-  private appendChild(tagName: string, options: TestElementOptions): TestElement {
-    const child = new TestElement(tagName)
-    if (options.cls) {
-      child.addClasses(options.cls)
-    }
-    if (options.text) {
-      child.textContent = options.text
-    }
-    for (const [name, value] of Object.entries(options.attr ?? {})) {
-      child.attributes.set(name, value)
-    }
-    this.children.push(child)
-    return child
-  }
-
-  addEventListener(type: string, listener: TestListener): void {
-    const current = this.listeners.get(type) ?? []
-    this.listeners.set(type, [...current, listener])
-  }
-
-  click(): void {
-    for (const listener of this.listeners.get('click') ?? []) {
-      listener()
-    }
-  }
-
-  empty(): void {
-    this.children.length = 0
-    this.textContent = ''
-  }
-
-  focus(): void {
-    this.focused = true
-  }
-
-  setSelectionRange(_start: number, _end: number): void {}
-
-  findByTag(tagName: string): TestElement | null {
-    if (this.tagName === tagName) {
-      return this
-    }
-    for (const child of this.children) {
-      const found = child.findByTag(tagName)
-      if (found) {
-        return found
-      }
-    }
-    return null
-  }
-
-  findButton(text: string): TestElement | null {
-    if (this.tagName === 'button' && this.textContent === text) {
-      return this
-    }
-    for (const child of this.children) {
-      const found = child.findButton(text)
-      if (found) {
-        return found
-      }
-    }
-    return null
-  }
-
-  private addClasses(cls: string): void {
-    for (const entry of cls.split(/\s+/)) {
-      if (entry.length > 0) {
-        this.classes.add(entry)
-      }
-    }
-  }
-}
+import { createTestRoot, findButtons, harnessDocument } from '../harness/obsidian-dom'
 
 const notices: string[] = []
 
 vi.mock('obsidian', () => {
   class Modal {
-    contentEl = new TestElement('div')
-    modalEl = new TestElement('div')
+    contentEl = createTestRoot()
+    modalEl = createTestRoot()
 
-    titleEl = new TestElement('div')
+    titleEl = createTestRoot()
 
     setTitle(title: string): this {
       this.titleEl.textContent = title
@@ -142,7 +37,7 @@ import { EditLevelsModal } from '../../src/ui/edit-levels-modal'
 
 function openModal(options?: { initial?: string[]; onSave?: (levels: string[]) => void }): {
   modal: EditLevelsModal
-  contentEl: TestElement
+  contentEl: HTMLElement
   onSave: ReturnType<typeof vi.fn>
 } {
   const onSave = vi.fn()
@@ -151,8 +46,9 @@ function openModal(options?: { initial?: string[]; onSave?: (levels: string[]) =
     initial: options?.initial ?? ['Wall push-up', 'Knee push-up'],
     onSave: options?.onSave ?? onSave,
   })
+  harnessDocument.body.appendChild(modal.contentEl)
   modal.onOpen()
-  return { modal, contentEl: modal.contentEl as unknown as TestElement, onSave }
+  return { modal, contentEl: modal.contentEl, onSave }
 }
 
 describe('edit levels modal', () => {
@@ -167,22 +63,23 @@ describe('edit levels modal', () => {
   })
 
   afterEach(() => {
+    harnessDocument.body.replaceChildren()
     vi.unstubAllGlobals()
   })
 
   it('prefills one rung per line and focuses the end of the text', () => {
     const { contentEl } = openModal()
 
-    const textarea = contentEl.findByTag('textarea')
+    const textarea = contentEl.querySelector('textarea')
     expect(textarea?.value).toBe('Wall push-up\nKnee push-up')
-    expect(textarea?.focused).toBe(true)
+    expect(harnessDocument.activeElement).toBe(textarea)
   })
 
   it('saves trimmed rungs with blanks dropped', () => {
     const { contentEl, onSave } = openModal()
 
-    const textarea = contentEl.findByTag('textarea')
-    const save = contentEl.findButton('Save')
+    const textarea = contentEl.querySelector('textarea')
+    const [save] = findButtons(contentEl, 'Save')
     if (!textarea || !save) {
       throw new Error('Expected textarea and Save button.')
     }
@@ -197,8 +94,8 @@ describe('edit levels modal', () => {
     const { modal, contentEl, onSave } = openModal()
     const close = vi.spyOn(modal, 'close')
 
-    const textarea = contentEl.findByTag('textarea')
-    const save = contentEl.findButton('Save')
+    const textarea = contentEl.querySelector('textarea')
+    const [save] = findButtons(contentEl, 'Save')
     if (!textarea || !save) {
       throw new Error('Expected textarea and Save button.')
     }

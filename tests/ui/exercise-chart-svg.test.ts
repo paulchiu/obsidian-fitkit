@@ -2,57 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import type { ChartSeries } from '../../src/domain/exercise-chart'
 import { renderExerciseChartSvg } from '../../src/ui/exercise-chart-svg'
+import { createTestRoot } from '../harness/obsidian-dom'
 
-interface TestElementOptions {
-  cls?: string
-  text?: string
-  attr?: Record<string, string | number>
-}
-
-class TestElement {
-  readonly children: TestElement[] = []
-  readonly classes = new Set<string>()
-  attrs: Record<string, string | number> = {}
-  textContent = ''
-
-  constructor(readonly tag: string) {}
-
-  empty(): void {
-    this.children.length = 0
-    this.textContent = ''
-  }
-
-  addClass(className: string): void {
-    this.classes.add(className)
-  }
-
-  createDiv(options: TestElementOptions = {}): TestElement {
-    return this.append('div', options)
-  }
-
-  createSvg(tag: string, options: TestElementOptions = {}): TestElement {
-    return this.append(tag, options)
-  }
-
-  private append(tag: string, options: TestElementOptions): TestElement {
-    const child = new TestElement(tag)
-    if (options.cls) {
-      child.addClass(options.cls)
-    }
-    if (options.text !== undefined) {
-      child.textContent = options.text
-    }
-    if (options.attr) {
-      child.attrs = { ...options.attr }
-    }
-    this.children.push(child)
-    return child
-  }
-}
-
-function render(series: ChartSeries, options: { ladder?: readonly string[] } = {}): TestElement {
-  const root = new TestElement('div')
-  renderExerciseChartSvg(root as unknown as HTMLElement, series, options)
+function render(series: ChartSeries, options: { ladder?: readonly string[] } = {}): HTMLElement {
+  const root = createTestRoot()
+  renderExerciseChartSvg(root, series, options)
   return root
 }
 
@@ -88,22 +42,35 @@ function strengthSeries(values: number[]): ChartSeries {
   }
 }
 
-function descendants(root: TestElement): TestElement[] {
-  return root.children.flatMap((child) => [child, ...descendants(child)])
+/** `Node.TEXT_NODE` without borrowing a DOM global the node environment lacks. */
+const TEXT_NODE_TYPE = 3
+
+/**
+ * An element's own text, excluding a child `<title>` tooltip. Real DOM folds
+ * child text into `textContent`; the per-file fake this replaces did not.
+ */
+function ownText(element: Element): string {
+  let text = ''
+  for (const node of Array.from(element.childNodes)) {
+    if (node.nodeType === TEXT_NODE_TYPE) {
+      text += node.textContent ?? ''
+    }
+  }
+  return text
 }
 
-function yLabelTexts(root: TestElement): string[] {
-  return descendants(root)
-    .filter((node) => node.tag === 'text' && node.attrs['text-anchor'] === 'end')
-    .map((node) => node.textContent)
+function yLabelTexts(root: HTMLElement): string[] {
+  return Array.from(root.querySelectorAll('text.fitkit-chart-axis-label[data-axis="y"]')).map(
+    (node) => ownText(node),
+  )
 }
 
-function polylinePairs(root: TestElement): Array<{ x: number; y: number }> {
-  const line = descendants(root).find((node) => node.tag === 'polyline')
+function polylinePairs(root: HTMLElement): Array<{ x: number; y: number }> {
+  const line = root.querySelector('polyline')
   if (!line) {
     return []
   }
-  const raw = String(line.attrs['points'] ?? '')
+  const raw = line.getAttribute('points') ?? ''
   if (raw.trim().length === 0) {
     return []
   }
@@ -114,15 +81,31 @@ function polylinePairs(root: TestElement): Array<{ x: number; y: number }> {
 }
 
 describe('exercise chart svg', () => {
+  it('centres the first date label over its own gridline like the middle ones', () => {
+    const root = render(strengthSeries([80, 82.5, 85, 87.5, 90]))
+    const anchors = Array.from(
+      root.querySelectorAll('text.fitkit-chart-axis-label[data-axis="x"]'),
+    ).map((node) => node.getAttribute('text-anchor'))
+
+    expect(anchors[0]).toBe('middle')
+  })
+
+  it('marks date labels and value labels with distinct roles', () => {
+    const root = render(strengthSeries([80, 85]))
+
+    expect(root.querySelectorAll('text.fitkit-chart-axis-label[data-axis="x"]')).toHaveLength(2)
+    expect(root.querySelectorAll('text.fitkit-chart-axis-label[data-axis="y"]')).toHaveLength(5)
+  })
+
   it('gives a level axis a wider left margin than a numeric one', () => {
     const levelRoot = render(levelSeries([1, 2]), { ladder: ['Wall push-up', 'Knee push-up'] })
     const strengthRoot = render(strengthSeries([80, 85]))
-    const levelLabelX = descendants(levelRoot)
-      .filter((node) => node.tag === 'text' && node.attrs['text-anchor'] === 'end')
-      .map((node) => Number(node.attrs['x']))
-    const strengthLabelX = descendants(strengthRoot)
-      .filter((node) => node.tag === 'text' && node.attrs['text-anchor'] === 'end')
-      .map((node) => Number(node.attrs['x']))
+    const levelLabelX = Array.from(levelRoot.querySelectorAll('text'))
+      .filter((node) => node.getAttribute('text-anchor') === 'end')
+      .map((node) => Number(node.getAttribute('x')))
+    const strengthLabelX = Array.from(strengthRoot.querySelectorAll('text'))
+      .filter((node) => node.getAttribute('text-anchor') === 'end')
+      .map((node) => Number(node.getAttribute('x')))
 
     expect(levelLabelX[0]).toBe(132)
     expect(strengthLabelX[0]).toBe(48)
@@ -150,25 +133,21 @@ describe('exercise chart svg', () => {
 
   it('draws a single level point with no line, exactly as other kinds do', () => {
     const root = render(levelSeries([2]))
-    const nodes = descendants(root)
 
-    expect(nodes.some((node) => node.tag === 'polyline')).toBe(false)
-    expect(nodes.filter((node) => node.tag === 'circle')).toHaveLength(1)
+    expect(root.querySelector('polyline')).toBeNull()
+    expect(root.querySelectorAll('circle')).toHaveLength(1)
   })
 
   it('renders the existing empty state for a level series with no sessions', () => {
     const root = render(levelSeries([]))
-    const nodes = descendants(root)
 
-    expect(nodes.some((node) => node.tag === 'svg')).toBe(false)
-    expect(nodes.some((node) => node.classes.has('fitkit-chart-empty'))).toBe(true)
+    expect(root.querySelector('svg')).toBeNull()
+    expect(root.querySelector('.fitkit-chart-empty')).not.toBeNull()
   })
 
   it('names the rung in each level dot tooltip from the ladder', () => {
     const root = render(levelSeries([2]), { ladder: ['Wall push-up', 'Knee push-up'] })
-    const titles = descendants(root)
-      .filter((node) => node.tag === 'title')
-      .map((node) => node.textContent)
+    const titles = Array.from(root.querySelectorAll('title')).map((node) => node.textContent)
 
     expect(titles).toEqual(['2026-04-01: Knee push-up'])
   })
@@ -196,15 +175,17 @@ describe('exercise chart svg', () => {
   it('keeps the full rung name where the axis label shortens it', () => {
     const longName = `Diamond push-up ${'x'.repeat(200)}`
     const root = render(levelSeries([1, 2]), { ladder: ['Wall push-up', longName] })
-    const labels = descendants(root).filter(
-      (node) => node.tag === 'text' && node.attrs['text-anchor'] === 'end',
+    const labels = Array.from(root.querySelectorAll('text')).filter(
+      (node) => node.getAttribute('text-anchor') === 'end',
     )
-    const shortened = labels.filter((node) => node.textContent.endsWith('\u2026'))
+    const shortened = labels.filter((node) => ownText(node).endsWith('\u2026'))
     const shortenedTitles = shortened.flatMap((node) =>
-      node.children.filter((child) => child.tag === 'title').map((child) => child.textContent),
+      Array.from(node.children)
+        .filter((child) => child.tagName.toLowerCase() === 'title')
+        .map((child) => child.textContent),
     )
 
-    expect(labels.map((node) => node.textContent)).toContain('Wall push-up')
+    expect(labels.map((node) => ownText(node))).toContain('Wall push-up')
     expect(shortened).toHaveLength(1)
     expect(shortenedTitles).toEqual([longName])
   })
@@ -219,7 +200,7 @@ describe('exercise chart svg', () => {
     const root = render(levelSeries([2, 3]))
 
     expect(yLabelTexts(root)).toEqual(['Level 2', 'Level 3'])
-    expect(descendants(root).some((node) => node.tag === 'svg')).toBe(true)
+    expect(root.querySelector('svg')).not.toBeNull()
   })
 
   it('thins a long ladder to the visited rungs and the span ends', () => {
@@ -237,13 +218,12 @@ describe('exercise chart svg', () => {
 
   it('draws level gridlines where the rung labels sit', () => {
     const root = render(levelSeries([2, 5]))
-    const nodes = descendants(root)
-    const gridYs = nodes
-      .filter((node) => node.tag === 'line' && node.classes.has('fitkit-chart-grid'))
-      .map((node) => Number(node.attrs['y1']))
-    const labelYs = nodes
-      .filter((node) => node.tag === 'text' && node.attrs['text-anchor'] === 'end')
-      .map((node) => Number(node.attrs['y']) - 4)
+    const gridYs = Array.from(root.querySelectorAll('line.fitkit-chart-grid')).map((node) =>
+      Number(node.getAttribute('y1')),
+    )
+    const labelYs = Array.from(
+      root.querySelectorAll('text.fitkit-chart-axis-label[data-axis="y"]'),
+    ).map((node) => Number(node.getAttribute('y')) - 4)
 
     expect(gridYs).toEqual(labelYs)
   })

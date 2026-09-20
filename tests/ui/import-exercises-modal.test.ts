@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { createTestRoot, harnessDocument, harnessWindow } from '../harness/obsidian-dom'
+
 vi.mock('obsidian', () => {
   class Modal {
-    contentEl = new TestElement('div')
+    contentEl = createTestRoot()
 
-    titleEl = new TestElement('div')
+    titleEl = createTestRoot()
 
     setTitle(title: string): this {
       this.titleEl.textContent = title
@@ -45,106 +47,6 @@ import { buildExerciseImportPlan } from '../../src/vault/exercise-import-planner
 import type { ExerciseImportPlanRow } from '../../src/vault/exercise-import-planner'
 import { ImportExercisesModal } from '../../src/ui/import-exercises-modal'
 
-interface TestElementOptions {
-  cls?: string
-  text?: string
-  attr?: Record<string, string>
-  value?: string
-}
-
-type TestListener = () => void
-
-class TestElement {
-  readonly attributes = new Map<string, string>()
-  readonly children: TestElement[] = []
-  readonly classes = new Set<string>()
-  readonly dataset: Record<string, string> = {}
-  readonly listeners = new Map<string, TestListener[]>()
-  checked = false
-  parent: TestElement | null = null
-  textContent = ''
-  value = ''
-
-  constructor(readonly tagName: string) {}
-
-  createEl(tagName: string, options: TestElementOptions = {}): TestElement {
-    const child = new TestElement(tagName)
-    child.parent = this
-    if (options.cls) {
-      child.addClasses(options.cls)
-    }
-    if (options.text !== undefined) {
-      child.textContent = options.text
-    }
-    if (options.value !== undefined) {
-      child.value = options.value
-    }
-    for (const [name, value] of Object.entries(options.attr ?? {})) {
-      child.setAttr(name, value)
-    }
-    this.children.push(child)
-    return child
-  }
-
-  createSpan(options: TestElementOptions = {}): TestElement {
-    return this.createEl('span', options)
-  }
-
-  createDiv(options: TestElementOptions = {}): TestElement {
-    const child = new TestElement('div')
-    child.parent = this
-    if (options.cls) {
-      child.addClasses(options.cls)
-    }
-    if (options.text !== undefined) {
-      child.textContent = options.text
-    }
-    if (options.value !== undefined) {
-      child.value = options.value
-    }
-    for (const [name, value] of Object.entries(options.attr ?? {})) {
-      child.setAttr(name, value)
-    }
-    this.children.push(child)
-    return child
-  }
-
-  addClass(className: string): void {
-    this.classes.add(className)
-  }
-
-  addEventListener(type: string, listener: TestListener): void {
-    const current = this.listeners.get(type) ?? []
-    this.listeners.set(type, [...current, listener])
-  }
-
-  addClasses(classNames: string): void {
-    for (const className of classNames.split(' ')) {
-      if (className) {
-        this.classes.add(className)
-      }
-    }
-  }
-
-  empty(): void {
-    this.children.length = 0
-    this.textContent = ''
-  }
-
-  setAttr(name: string, value: string): void {
-    this.attributes.set(name, value)
-    if (name.startsWith('data-')) {
-      this.dataset[name.slice('data-'.length)] = value
-    }
-  }
-
-  fire(type: string): void {
-    for (const listener of this.listeners.get(type) ?? []) {
-      listener()
-    }
-  }
-}
-
 function row(overrides: Partial<ExerciseImportPlanRow>): ExerciseImportPlanRow {
   return {
     name: 'Foam roll thigh',
@@ -164,7 +66,7 @@ function row(overrides: Partial<ExerciseImportPlanRow>): ExerciseImportPlanRow {
 
 function actionCellText(row: ExerciseImportPlanRow): string[] {
   const modal = new ImportExercisesModal({ app: {} } as never, {})
-  const actionCell = new TestElement('td')
+  const actionCell = harnessDocument.createElement('td')
   actionCell.dataset.label = 'Actions'
   const renderActionsCellContent = (
     modal as unknown as {
@@ -172,18 +74,23 @@ function actionCellText(row: ExerciseImportPlanRow): string[] {
     }
   ).renderActionsCellContent.bind(modal)
 
-  renderActionsCellContent(actionCell as unknown as HTMLElement, row)
+  renderActionsCellContent(actionCell, row)
 
   return collectText(actionCell)
 }
 
-function collectText(element: TestElement): string[] {
-  const own = element.textContent ? [element.textContent] : []
-  return [...own, ...element.children.flatMap((child) => collectText(child))]
+/** Direct text nodes per element, mirroring the old fake's own-text plus children walk. */
+function collectText(element: Element): string[] {
+  const own = [...element.childNodes]
+    .filter((node) => node.nodeType === 3)
+    .map((node) => node.textContent ?? '')
+    .join('')
+  const texts = own ? [own] : []
+  return [...texts, ...[...element.children].flatMap((child) => collectText(child))]
 }
 
-function kindSelectForModal(modal: ImportExercisesModal): TestElement {
-  const select = findByTag(modal.contentEl as unknown as TestElement, 'select')
+function kindSelectForModal(modal: ImportExercisesModal): HTMLSelectElement {
+  const select = modal.contentEl.querySelector('select')
   if (!select) {
     throw new Error('Expected the kind cell to render a select.')
   }
@@ -198,37 +105,21 @@ async function openModalWithRows(rows: ExerciseImportPlanRow[]): Promise<{
   const modal = new ImportExercisesModal({ app: {} } as never, {})
   modal.onOpen()
   await vi.waitFor(() => {
-    if (!findByTag(modal.contentEl as unknown as TestElement, 'select')) {
+    if (!modal.contentEl.querySelector('select')) {
       throw new Error('Waiting for the modal rows to render.')
     }
   })
   return { modal, rows }
 }
 
-function findByTag(element: TestElement, tagName: string): TestElement | null {
-  if (element.tagName === tagName) {
-    return element
-  }
-  for (const child of element.children) {
-    const found = findByTag(child, tagName)
-    if (found) {
-      return found
-    }
-  }
-  return null
-}
-
 describe('ImportExercisesModal kind select', () => {
   it('lists strength, duration then bodyweight with their current labels', async () => {
     const { modal } = await openModalWithRows([row({ status: 'unknown', registryName: null })])
     const select = kindSelectForModal(modal)
+    const options = [...select.querySelectorAll('option')]
 
-    expect(select.children.map((option) => option.value)).toEqual([
-      'strength',
-      'duration',
-      'bodyweight',
-    ])
-    expect(select.children.map((option) => option.textContent)).toEqual([
+    expect(options.map((option) => option.value)).toEqual(['strength', 'duration', 'bodyweight'])
+    expect(options.map((option) => option.textContent)).toEqual([
       'Strength',
       'Duration',
       'Bodyweight',
@@ -241,7 +132,7 @@ describe('ImportExercisesModal kind select', () => {
     const select = kindSelectForModal(modal)
 
     select.value = 'cardio'
-    select.fire('change')
+    select.dispatchEvent(new harnessWindow.Event('change'))
 
     expect(target.kind).toBe('duration')
   })
