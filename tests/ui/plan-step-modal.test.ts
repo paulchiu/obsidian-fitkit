@@ -1,99 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-interface TestElementOptions {
-  cls?: string
-  text?: string
-  attr?: Record<string, string>
-}
-
-type TestListener = () => void
-
-class TestElement {
-  readonly attributes = new Map<string, string>()
-  readonly children: TestElement[] = []
-  readonly classes = new Set<string>()
-  readonly listeners = new Map<string, TestListener[]>()
-  focused = false
-  textContent = ''
-  value = ''
-
-  constructor(readonly tagName: string) {}
-
-  addClass(cls: string): void {
-    this.addClasses(cls)
-  }
-
-  removeClass(cls: string): void {
-    this.classes.delete(cls)
-  }
-
-  createDiv(options: TestElementOptions = {}): TestElement {
-    return this.createEl('div', options)
-  }
-
-  createEl(tagName: string, options: TestElementOptions = {}): TestElement {
-    const child = new TestElement(tagName)
-    if (options.cls) {
-      child.addClasses(options.cls)
-    }
-    if (options.text) {
-      child.textContent = options.text
-    }
-    for (const [name, value] of Object.entries(options.attr ?? {})) {
-      child.attributes.set(name, value)
-    }
-    this.children.push(child)
-    return child
-  }
-
-  addEventListener(type: string, listener: TestListener): void {
-    const current = this.listeners.get(type) ?? []
-    this.listeners.set(type, [...current, listener])
-  }
-
-  empty(): void {
-    this.children.length = 0
-    this.textContent = ''
-  }
-
-  focus(): void {
-    this.focused = true
-  }
-
-  select(): void {}
-
-  setAttr(name: string, value: string): void {
-    this.attributes.set(name, value)
-  }
-
-  findByTag(tagName: string): TestElement | null {
-    if (this.tagName === tagName) {
-      return this
-    }
-    for (const child of this.children) {
-      const found = child.findByTag(tagName)
-      if (found) {
-        return found
-      }
-    }
-    return null
-  }
-
-  private addClasses(cls: string): void {
-    for (const entry of cls.split(/\s+/)) {
-      if (entry.length > 0) {
-        this.classes.add(entry)
-      }
-    }
-  }
-}
+import { createTestRoot, installObsidianDomExtensions } from '../harness/obsidian-dom'
 
 vi.mock('obsidian', () => {
   class Modal {
-    contentEl = new TestElement('div')
-    modalEl = new TestElement('div')
+    contentEl = createTestRoot()
+    modalEl = createTestRoot()
 
-    titleEl = new TestElement('div')
+    titleEl = createTestRoot()
 
     setTitle(title: string): this {
       this.titleEl.textContent = title
@@ -114,16 +28,17 @@ vi.mock('obsidian', () => {
 import { PlanStepModal } from '../../src/ui/plan-step-modal'
 
 interface ModalElements {
-  contentEl: TestElement
-  titleEl: TestElement
+  contentEl: HTMLElement
+  titleEl: HTMLElement
 }
 
 function modalElements(modal: PlanStepModal): ModalElements {
-  return modal as unknown as ModalElements
+  return modal
 }
 
 describe('plan step modal', () => {
   beforeEach(() => {
+    installObsidianDomExtensions()
     vi.stubGlobal('window', {
       setTimeout: (callback: () => void): number => {
         callback()
@@ -148,8 +63,8 @@ describe('plan step modal', () => {
 
     const { contentEl, titleEl } = modalElements(modal)
     expect(titleEl.textContent).toBe('Rung change for Push-up')
-    expect(contentEl.findByTag('label')?.textContent).toBe('Rung change')
-    expect(contentEl.findByTag('input')?.attributes.get('placeholder')).toBe('rungs')
+    expect(contentEl.querySelector('label')?.textContent).toBe('Rung change')
+    expect(contentEl.querySelector('input')?.getAttribute('placeholder')).toBe('rungs')
   })
 
   it('keeps the weight wording for other kinds', () => {
@@ -164,7 +79,7 @@ describe('plan step modal', () => {
 
     const { contentEl, titleEl } = modalElements(modal)
     expect(titleEl.textContent).toBe('Weight change for Squat')
-    expect(contentEl.findByTag('label')?.textContent).toBe('Weight change')
-    expect(contentEl.findByTag('input')?.attributes.get('placeholder')).toBe('kg')
+    expect(contentEl.querySelector('label')?.textContent).toBe('Weight change')
+    expect(contentEl.querySelector('input')?.getAttribute('placeholder')).toBe('kg')
   })
 })

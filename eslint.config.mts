@@ -113,6 +113,18 @@ export default tseslint.config(
     },
   },
   {
+    files: ['tests/harness/**/*.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+    rules: {
+      // Harness code runs under node during tests and never ships to a mobile device.
+      'obsidianmd/no-nodejs-modules': 'off',
+    },
+  },
+  {
     files: ['version-bump.mjs'],
     languageOptions: {
       globals: {
