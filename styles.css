@@ -264,7 +264,8 @@ body.is-mobile .fitkit-editor-root {
   stroke-width: 2.25;
 }
 
-.fitkit-card-icon-button {
+/* Compounded with .fitkit-btn so the shared button padding and chrome cannot win on source order. */
+.fitkit-btn.fitkit-card-icon-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -445,7 +446,8 @@ body.is-mobile .fitkit-editor-root {
   min-width: 0;
 }
 
-.fitkit-row-kebab {
+/* Compounded with .fitkit-btn so the shared button padding and chrome cannot win on source order. */
+.fitkit-btn.fitkit-row-kebab {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;

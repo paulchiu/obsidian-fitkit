@@ -42,6 +42,7 @@ import type {
 } from '../domain/exercise-note-migrate'
 import { setExerciseNoteKind, setExerciseNoteLevels } from '../domain/exercise-note-migrate'
 import { filterSuggestableNames } from '../domain/exercise-suggestions'
+import { menuAnchorForTrigger } from '../domain/menu-anchor'
 import {
   formatNumber as formatPlanNumber,
   nextPlanTargetWeight,
@@ -845,7 +846,7 @@ export class WorkoutEditorView extends ItemView {
         )
       }
       const rect = label.getBoundingClientRect()
-      menu.showAtPosition({ x: rect.left, y: rect.bottom })
+      menu.showAtPosition(menuAnchorForTrigger(rect))
     })
 
     const plus = stepper.createEl('button', {
@@ -1281,7 +1282,7 @@ export class WorkoutEditorView extends ItemView {
         item.setTitle('Delete row').setIcon('trash-2').setWarning(true).onClick(onDelete),
       )
       const rect = kebab.getBoundingClientRect()
-      menu.showAtPosition({ x: rect.left, y: rect.bottom })
+      menu.showAtPosition(menuAnchorForTrigger(rect))
     })
   }
 
@@ -1844,7 +1845,7 @@ export class WorkoutEditorView extends ItemView {
     const target = evt.currentTarget
     if (target instanceof HTMLElement) {
       const rect = target.getBoundingClientRect()
-      menu.showAtPosition({ x: rect.left, y: rect.bottom })
+      menu.showAtPosition(menuAnchorForTrigger(rect))
     } else {
       menu.showAtMouseEvent(evt)
     }
