@@ -5,6 +5,8 @@
 declare module 'jsdom' {
   export interface HarnessWindow {
     document: Document
+    CSSMediaRule: typeof CSSMediaRule
+    CSSStyleRule: typeof CSSStyleRule
     HTMLElement: typeof HTMLElement
     SVGElement: typeof SVGElement
     HTMLDivElement: typeof HTMLDivElement

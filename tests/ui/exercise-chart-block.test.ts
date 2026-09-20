@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createTestRoot, installObsidianDomExtensions } from '../harness/obsidian-dom'
+
 const chartSvgMock = vi.hoisted(() => ({
   renderExerciseChartSvg: vi.fn(),
 }))
@@ -41,53 +43,6 @@ import { buildMockVaultFolderTree } from '../fixtures/mock-vault-folder-tree'
 
 type ChartBlockPlugin = Parameters<typeof renderExerciseChartBlock>[0]
 type Frontmatter = Record<string, unknown>
-
-interface TestElementOptions {
-  cls?: string
-  text?: string
-  attr?: Record<string, string | number>
-}
-
-class TestElement {
-  readonly children: TestElement[] = []
-  readonly classes = new Set<string>()
-  attrs: Record<string, string | number> = {}
-  textContent = ''
-
-  constructor(readonly tagName: string) {}
-
-  empty(): void {
-    this.children.length = 0
-    this.textContent = ''
-  }
-
-  addClass(className: string): void {
-    this.classes.add(className)
-  }
-
-  createDiv(options: TestElementOptions = {}): TestElement {
-    return this.append('div', options)
-  }
-
-  createSvg(tag: string, options: TestElementOptions = {}): TestElement {
-    return this.append(tag, options)
-  }
-
-  private append(tag: string, options: TestElementOptions): TestElement {
-    const child = new TestElement(tag)
-    if (options.cls) {
-      child.addClass(options.cls)
-    }
-    if (options.text !== undefined) {
-      child.textContent = options.text
-    }
-    if (options.attr) {
-      child.attrs = { ...options.attr }
-    }
-    this.children.push(child)
-    return child
-  }
-}
 
 const emptyIndex: FitKitIndex = {
   schemaVersion: 1,
@@ -152,13 +107,9 @@ function renderedSeries(): ChartSeries {
   return call[1] as ChartSeries
 }
 
-function renderedTexts(root: TestElement): string[] {
-  const own = root.textContent.length > 0 ? [root.textContent] : []
-  return [...own, ...root.children.flatMap((child) => renderedTexts(child))]
-}
-
 describe('exercise chart block rendering', () => {
   beforeEach(() => {
+    installObsidianDomExtensions()
     chartSvgMock.renderExerciseChartSvg.mockReset()
   })
 
@@ -168,7 +119,7 @@ describe('exercise chart block rendering', () => {
     await renderExerciseChartBlock(
       plugin,
       'exercise: Bench Press',
-      new TestElement('div') as unknown as HTMLElement,
+      createTestRoot(),
       createContext('Fitness/Dashboard.md'),
     )
 
@@ -181,12 +132,7 @@ describe('exercise chart block rendering', () => {
     const file = new TFile('Fitness/Exercises/Bench Press.md')
     const plugin = createPlugin([file], new Map([[file.path, { type: 'exercise' }]]))
 
-    await renderExerciseChartBlock(
-      plugin,
-      '',
-      new TestElement('div') as unknown as HTMLElement,
-      createContext(file.path),
-    )
+    await renderExerciseChartBlock(plugin, '', createTestRoot(), createContext(file.path))
 
     expect(renderedNotes()).toEqual([
       "Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add 'kind: strength' or 'kind: duration' or 'kind: bodyweight' to be explicit.",
@@ -200,12 +146,7 @@ describe('exercise chart block rendering', () => {
       new Map([[file.path, { type: 'exercise', kind: 'cardio' }]]),
     )
 
-    await renderExerciseChartBlock(
-      plugin,
-      '',
-      new TestElement('div') as unknown as HTMLElement,
-      createContext(file.path),
-    )
+    await renderExerciseChartBlock(plugin, '', createTestRoot(), createContext(file.path))
 
     expect(renderedNotes()).toEqual([
       "Exercise note frontmatter has unrecognised 'kind: cardio'; defaulting to strength. Use 'kind: strength' or 'kind: duration' or 'kind: bodyweight'.",
@@ -222,12 +163,7 @@ describe('exercise chart block rendering', () => {
       }),
     )
 
-    await renderExerciseChartBlock(
-      plugin,
-      '',
-      new TestElement('div') as unknown as HTMLElement,
-      createContext(file.path),
-    )
+    await renderExerciseChartBlock(plugin, '', createTestRoot(), createContext(file.path))
 
     expect(renderedNotes()).toEqual([])
   })
@@ -239,12 +175,7 @@ describe('exercise chart block rendering', () => {
       new Map([[file.path, { type: 'exercise', kind: 'strength', unit: 'lbs' }]]),
     )
 
-    await renderExerciseChartBlock(
-      plugin,
-      '',
-      new TestElement('div') as unknown as HTMLElement,
-      createContext(file.path),
-    )
+    await renderExerciseChartBlock(plugin, '', createTestRoot(), createContext(file.path))
 
     expect(renderedSeries().unit).toBe('lbs')
   })
@@ -259,12 +190,7 @@ describe('exercise chart block rendering', () => {
       }),
     )
 
-    await renderExerciseChartBlock(
-      plugin,
-      '',
-      new TestElement('div') as unknown as HTMLElement,
-      createContext(file.path),
-    )
+    await renderExerciseChartBlock(plugin, '', createTestRoot(), createContext(file.path))
 
     expect(renderedSeries().kind).toBe('duration')
     expect(renderedNotes()).toEqual([
@@ -279,12 +205,7 @@ describe('exercise chart block rendering', () => {
       const file = new TFile('Fitness/Exercises/Bench Press.md')
       const plugin = createPlugin([file], new Map([[file.path, { type: 'exercise', kind }]]))
 
-      await renderExerciseChartBlock(
-        plugin,
-        '',
-        new TestElement('div') as unknown as HTMLElement,
-        createContext(file.path),
-      )
+      await renderExerciseChartBlock(plugin, '', createTestRoot(), createContext(file.path))
 
       expect(renderedNotes()).toEqual([])
     }
@@ -295,12 +216,7 @@ describe('exercise chart block rendering', () => {
       const file = new TFile('Fitness/Exercises/Bench Press.md')
       const plugin = createPlugin([file], new Map([[file.path, { type: 'exercise', kind }]]))
 
-      await renderExerciseChartBlock(
-        plugin,
-        '',
-        new TestElement('div') as unknown as HTMLElement,
-        createContext(file.path),
-      )
+      await renderExerciseChartBlock(plugin, '', createTestRoot(), createContext(file.path))
 
       expect(renderedNotes()).toEqual([
         `Exercise note frontmatter has unrecognised 'kind: ${String(kind).trim()}'; defaulting to strength. Use 'kind: strength' or 'kind: duration' or 'kind: bodyweight'.`,
@@ -318,12 +234,7 @@ describe('exercise chart block rendering', () => {
       const file = new TFile('Fitness/Exercises/Bench Press.md')
       const plugin = createPlugin([file], new Map([[file.path, frontmatter]]))
 
-      await renderExerciseChartBlock(
-        plugin,
-        '',
-        new TestElement('div') as unknown as HTMLElement,
-        createContext(file.path),
-      )
+      await renderExerciseChartBlock(plugin, '', createTestRoot(), createContext(file.path))
 
       expect(renderedNotes()).toEqual([
         "Exercise note frontmatter is missing 'kind:'; defaulting to strength. Add 'kind: strength' or 'kind: duration' or 'kind: bodyweight' to be explicit.",
@@ -378,15 +289,15 @@ describe('exercise chart block rendering', () => {
         },
       ],
     }
-    const el = new TestElement('div')
+    const el = createTestRoot()
 
     await renderExerciseChartBlock(
       plugin,
       'exercise: Push-Up\nkind: bodyweight',
-      el as unknown as HTMLElement,
+      el,
       createContext('Fitness/Dashboard.md'),
     )
 
-    expect(renderedTexts(el)).toContain('Knee push-up')
+    expect(el.textContent).toContain('Knee push-up')
   })
 })
