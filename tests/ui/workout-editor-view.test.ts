@@ -11,6 +11,8 @@ import type {
   ExerciseEntry,
   StrengthExerciseEntry,
 } from '../../src/domain/workout-note-model'
+import { createTestRoot } from '../harness/obsidian-dom'
+import { findUnstyledClasses } from '../harness/stylesheet'
 
 interface MockMenuItemState {
   title?: string
@@ -422,6 +424,26 @@ const createExerciseCardRenderView = (): ExerciseCardRenderView => {
   }
   return view
 }
+
+interface ExerciseCardFixtureOptions {
+  exerciseNotes?: string
+  reps?: number
+  load?: number
+}
+
+const createExerciseCardFixture = (
+  name: string,
+  kind: ExerciseKind,
+  options: ExerciseCardFixtureOptions = {},
+) => ({
+  name,
+  kind,
+  exerciseNotes: options.exerciseNotes,
+  strengthSets: [],
+  durationEntries: [],
+  bodyweightSets:
+    kind === 'bodyweight' ? [{ set: 1, level: 1, reps: options.reps, load: options.load }] : [],
+})
 
 const flushPromises = async (): Promise<void> => {
   await Promise.resolve()
@@ -989,6 +1011,33 @@ describe('WorkoutEditorView row actions', () => {
     expect(line?.attributes.get('tabindex')).toBe('0')
     expect(line?.listenersFor('click')).toHaveLength(1)
     expect(line?.listenersFor('keydown')).toHaveLength(1)
+  })
+
+  it('finds no unstyled class in rendered exercise cards', () => {
+    const view = createExerciseCardRenderView()
+    view.model = {
+      exercises: [
+        createExerciseCardFixture('Squat', 'strength', {
+          exerciseNotes: 'Belt on from set 2',
+        }),
+        createExerciseCardFixture('Push-up', 'bodyweight', { reps: 10 }),
+        createExerciseCardFixture('Weighted push-up', 'bodyweight', { reps: 8, load: 10 }),
+      ],
+    }
+    view.exerciseHistory = new Map()
+    const list = createTestRoot()
+
+    for (const index of [0, 1, 2]) {
+      view.renderExerciseCard(list, index)
+    }
+
+    expect(list.querySelectorAll('.fitkit-card')).toHaveLength(3)
+    expect(list.querySelector('.fitkit-exercise-note-line')).not.toBeNull()
+    expect(
+      list.querySelector('.fitkit-bodyweight-row.fitkit-set-head:not(.has-load)'),
+    ).not.toBeNull()
+    expect(list.querySelector('.fitkit-bodyweight-row.fitkit-set-head.has-load')).not.toBeNull()
+    expect(findUnstyledClasses(list)).toEqual([])
   })
 
   it('titles the card menu note item by whether a note already exists', () => {

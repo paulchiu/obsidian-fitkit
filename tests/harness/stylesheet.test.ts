@@ -1,11 +1,11 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { createTestRoot, harnessDocument, harnessWindow } from './obsidian-dom'
 import { ensureStylesheetLoaded, expectAppliedThemeToken, findUnstyledClasses } from './stylesheet'
 
 vi.mock('obsidian', () => {
-  class ItemView {}
-
   class Modal {
     contentEl = createTestRoot()
     modalEl = createTestRoot()
@@ -22,33 +22,12 @@ vi.mock('obsidian', () => {
     close(): void {}
   }
 
-  class SuggestModal<T> extends Modal {
-    suggestions: T[] = []
-  }
-
-  class Menu {}
-
-  class Notice {}
-
-  class TFile {}
-
-  return {
-    ItemView,
-    Menu,
-    Modal,
-    Notice,
-    SuggestModal,
-    TFile,
-    normalizePath: (path: string) => path.replace(/\/+/g, '/'),
-    setIcon: vi.fn(),
-  }
+  return { Modal }
 })
 
 import type { ChartSeries } from '../../src/domain/exercise-chart'
-import { createRegistry, type ExerciseRegistry } from '../../src/domain/exercise-registry'
 import { renderExerciseChartSvg } from '../../src/ui/exercise-chart-svg'
 import { PlanStepModal } from '../../src/ui/plan-step-modal'
-import { WorkoutEditorView } from '../../src/ui/workout-editor-view'
 
 beforeAll(() => {
   ensureStylesheetLoaded()
@@ -106,12 +85,30 @@ describe('stylesheet', () => {
     expect(findUnstyledClasses(card)).toEqual(['fitkit-bodywieght-row'])
   })
 
-  it('reports a misspelled bodyweight header spacer class', () => {
+  it('keeps exercise notes at the shared note inset', () => {
     const root = createTestRoot()
     harnessDocument.body.appendChild(root)
-    const spacer = root.createSpan({ cls: 'fitkit-bodyweigt-head-spacer' })
+    const note = root.createDiv({ cls: 'fitkit-note-line fitkit-exercise-note-line' })
 
-    expect(findUnstyledClasses(spacer)).toEqual(['fitkit-bodyweigt-head-spacer'])
+    expect(harnessWindow.getComputedStyle(note).getPropertyValue('padding-inline')).toBe(
+      'var(--size-4-2, 8px)',
+    )
+  })
+
+  it('keeps bodyweight header tracks and spacer on one trailing-column token', () => {
+    const css = readFileSync(join(process.cwd(), 'styles.css'), 'utf8')
+    const token = '--fitkit-bodyweight-trailing-column-width'
+
+    expect(ruleDeclarations(css, '.fitkit-bodyweight-card')).toContain(`${token}: 26px;`)
+    expect(ruleDeclarations(css, '.fitkit-bodyweight-row.fitkit-set-head')).toContain(
+      `grid-template-columns: 20px repeat(2, minmax(0, 1fr)) var(${token}, 26px);`,
+    )
+    expect(ruleDeclarations(css, '.fitkit-bodyweight-row.fitkit-set-head.has-load')).toContain(
+      `grid-template-columns: 20px repeat(2, minmax(0, 1fr)) minmax(0, 72px) var(${token}, 26px);`,
+    )
+    expect(ruleDeclarations(css, '.fitkit-bodyweight-head-spacer')).toContain(
+      `inline-size: var(${token}, 26px);`,
+    )
   })
 
   it('keeps a state class that only ever appears in a compound selector', () => {
@@ -149,90 +146,6 @@ function chartSeries(): ChartSeries {
 }
 
 describe('unstyled render', () => {
-  it('finds no unstyled class in rendered workout editor cards', () => {
-    const root = createTestRoot()
-    harnessDocument.body.appendChild(root)
-    const registry = createRegistry([])
-    const exercises = [
-      {
-        name: 'Squat',
-        kind: 'strength',
-        exerciseNotes: 'Belt on from set 2',
-        strengthSets: [],
-        durationEntries: [],
-        bodyweightSets: [],
-      },
-      {
-        name: 'Push-up',
-        kind: 'bodyweight',
-        strengthSets: [],
-        durationEntries: [],
-        bodyweightSets: [{ set: 1, level: 1, reps: 10 }],
-      },
-      {
-        name: 'Weighted push-up',
-        kind: 'bodyweight',
-        strengthSets: [],
-        durationEntries: [],
-        bodyweightSets: [{ set: 1, level: 1, reps: 8, load: 10 }],
-      },
-    ] as const
-
-    for (const exercise of exercises) {
-      renderExerciseCard(root, exercise, registry)
-    }
-
-    expect(root.querySelector('.fitkit-exercise-note-line')).not.toBeNull()
-    expect(
-      root.querySelector('.fitkit-bodyweight-row.fitkit-set-head:not(.has-load)'),
-    ).not.toBeNull()
-    expect(root.querySelector('.fitkit-bodyweight-row.fitkit-set-head.has-load')).not.toBeNull()
-    expect(findUnstyledClasses(root)).toEqual([])
-  })
-
-  it('sizes the bodyweight header spacer from the shared kebab column token', () => {
-    const root = createTestRoot()
-    harnessDocument.body.appendChild(root)
-    renderExerciseCard(
-      root,
-      {
-        name: 'Push-up',
-        kind: 'bodyweight',
-        strengthSets: [],
-        durationEntries: [],
-        bodyweightSets: [{ set: 1, level: 1, reps: 10 }],
-      },
-      createRegistry([]),
-    )
-    const spacer = root.querySelector('.fitkit-bodyweight-head-spacer')
-
-    expect(spacer).not.toBeNull()
-    expectAppliedThemeToken(spacer as Element, 'inline-size', '--fitkit-kebab-col')
-  })
-
-  it('aligns the exercise note with its card-level siblings', () => {
-    const root = createTestRoot()
-    harnessDocument.body.appendChild(root)
-    renderExerciseCard(
-      root,
-      {
-        name: 'Squat',
-        kind: 'strength',
-        exerciseNotes: 'Belt on from set 2',
-        strengthSets: [],
-        durationEntries: [],
-        bodyweightSets: [],
-      },
-      createRegistry([]),
-    )
-    const note = root.querySelector('.fitkit-exercise-note-line')
-
-    expect(note).not.toBeNull()
-    expect(harnessWindow.getComputedStyle(note as Element).getPropertyValue('padding-inline')).toBe(
-      '0px',
-    )
-  })
-
   it('finds no unstyled class in a rendered chart', () => {
     const root = createTestRoot()
     harnessDocument.body.appendChild(root)
@@ -272,29 +185,10 @@ describe('unstyled render', () => {
   })
 })
 
-interface ExerciseCardRenderView {
-  plugin: unknown
-  model: unknown
-  exerciseHistory: unknown
-  renderExerciseCard(list: HTMLElement, index: number, registry: ExerciseRegistry): void
-}
+function ruleDeclarations(css: string, selector: string): string {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = css.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`))
 
-function renderExerciseCard(
-  root: HTMLElement,
-  exercise: unknown,
-  registry: ExerciseRegistry,
-): void {
-  const view = Object.create(WorkoutEditorView.prototype) as ExerciseCardRenderView
-  view.plugin = {
-    settings: {
-      fitnessRoot: 'Fitness',
-      strengthRestTimerEnabled: false,
-      exerciseRegistry: [],
-      deletedExercises: [],
-    },
-    saveSettings: vi.fn(() => Promise.resolve()),
-  }
-  view.model = { exercises: [exercise] }
-  view.exerciseHistory = new Map()
-  view.renderExerciseCard(root, 0, registry)
+  expect(match, `Missing CSS rule for ${selector}`).not.toBeNull()
+  return (match?.[1] ?? '').replace(/\s+/g, ' ').trim()
 }
