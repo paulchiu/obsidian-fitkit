@@ -29,6 +29,7 @@ const { createRegistry } = await jiti.import('../src/domain/exercise-registry.ts
 const { pickBestSet, pickHeaviestSet } = await jiti.import('../src/domain/epley.ts')
 const { parseWorkoutNote } = await jiti.import('../src/domain/workout-note-model.ts')
 const { renderExerciseChartSvg } = await jiti.import('../src/ui/exercise-chart-svg.ts')
+const { extractChartCss } = await jiti.import('../tests/harness/svg-layout.ts')
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..')
 const DEFAULT_WORKOUTS_DIR = '/Users/paul/dev-misc/dev-vault/dev/Fitness/Workouts'
@@ -39,13 +40,7 @@ const OUTPUT_DATE = resolveOutputDate()
 const OUTPUT_DIR = path.join(REPO_ROOT, 'tmp')
 const CHART_WIDTH = 800
 const CHART_HEIGHT = 320
-const CHART_STYLE = `
-  .fitkit-chart-axis { stroke: #c7cdd6; stroke-width: 1; }
-  .fitkit-chart-grid { stroke: #c7cdd6; stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.6; }
-  .fitkit-chart-axis-label { fill: #5f6b7a; font-size: 11px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-  .fitkit-chart-line { stroke: #3f7ad8; stroke-width: 2; fill: none; }
-  .fitkit-chart-dot { fill: #3f7ad8; }
-`
+const CHART_STYLE = extractChartCss(await readFile(path.join(REPO_ROOT, 'styles.css'), 'utf8'))
 
 setupDom()
 await assertWorkoutsDir()

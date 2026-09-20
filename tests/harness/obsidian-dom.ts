@@ -60,7 +60,7 @@ function splitClasses(cls: string | string[]): string[] {
   return entries.flatMap((entry) => entry.split(/\s+/)).filter((entry) => entry.length > 0)
 }
 
-/** Apply the `{ cls, text, attr }` options object onto a new child element. */
+/** Apply the full `DomElementInfo` options object onto a new child element. */
 function applyDomOptions(child: Element, options?: DomElementInfo | string): void {
   if (options === undefined) {
     return
@@ -71,6 +71,25 @@ function applyDomOptions(child: Element, options?: DomElementInfo | string): voi
   }
   if (resolved.text !== undefined) {
     setText.call(child, resolved.text)
+  }
+  if (resolved.title !== undefined) {
+    setAttr.call(child, 'title', resolved.title)
+  }
+  if (resolved.value !== undefined) {
+    /** Property assignment keeps `input.value` live; on an option it reflects to the attribute. */
+    const valueTarget = child as unknown as { value?: unknown }
+    if (typeof valueTarget.value === 'string') {
+      valueTarget.value = resolved.value
+    }
+  }
+  if (resolved.type !== undefined) {
+    setAttr.call(child, 'type', resolved.type)
+  }
+  if (resolved.placeholder !== undefined) {
+    setAttr.call(child, 'placeholder', resolved.placeholder)
+  }
+  if (resolved.href !== undefined) {
+    setAttr.call(child, 'href', resolved.href)
   }
   if (resolved.attr !== undefined) {
     for (const [name, value] of Object.entries(resolved.attr)) {
@@ -102,8 +121,26 @@ function appendChildElement(
 ): HTMLElement {
   const child = host.ownerDocument.createElement(tagName)
   applyDomOptions(child, options)
-  host.appendChild(child)
+  insertChild(host, child, options)
   return child
+}
+
+/**
+ * Insert into `parent` when the options override it, otherwise the host.
+ * `prepend` goes first, not last; both keys change structure, not styling.
+ */
+function insertChild(
+  host: Element,
+  child: Node,
+  options?: DomElementInfo | SvgElementInfo | string,
+): void {
+  const resolved = typeof options === 'string' ? undefined : options
+  const target = (resolved?.parent ?? host) as Element
+  if (resolved?.prepend === true) {
+    target.prepend(child)
+    return
+  }
+  target.appendChild(child)
 }
 
 function createEl(
@@ -126,7 +163,7 @@ function createDiv(
 ): HTMLDivElement {
   const child = this.ownerDocument.createElement('div')
   applyDomOptions(child, options)
-  this.appendChild(child)
+  insertChild(this, child, options)
   if (callback !== undefined) {
     callback(child)
   }
@@ -140,7 +177,7 @@ function createSpan(
 ): HTMLSpanElement {
   const child = this.ownerDocument.createElement('span')
   applyDomOptions(child, options)
-  this.appendChild(child)
+  insertChild(this, child, options)
   if (callback !== undefined) {
     callback(child)
   }
@@ -155,7 +192,7 @@ function createSvg(
 ): SVGElement {
   const child = this.ownerDocument.createElementNS(SVG_NAMESPACE, tagName)
   applySvgOptions(child, options)
-  this.appendChild(child)
+  insertChild(this, child, options)
   if (callback !== undefined) {
     callback(child)
   }

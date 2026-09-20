@@ -122,6 +122,8 @@ export default tseslint.config(
     rules: {
       // Harness code runs under node during tests and never ships to a mobile device.
       'obsidianmd/no-nodejs-modules': 'off',
+      /** The harness implements the `createEl` family, so it cannot call it without recursing. */
+      'obsidianmd/prefer-create-el': 'off',
     },
   },
   {

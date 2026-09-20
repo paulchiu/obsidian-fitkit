@@ -30,6 +30,55 @@ describe('obsidian dom', () => {
     expect(input.getAttribute('data-kind')).toBe('weight')
   })
 
+  it('sets input type, value and placeholder from top-level options', () => {
+    const root = createTestRoot()
+    const input = root.createEl('input', { type: 'checkbox', value: 'on', placeholder: 'x' })
+
+    expect(input.type).toBe('checkbox')
+    expect(input.value).toBe('on')
+    expect(input.placeholder).toBe('x')
+  })
+
+  it('honours a parent override and prepends first when asked', () => {
+    const root = createTestRoot()
+    const other = createTestRoot()
+    root.createDiv({ text: 'first' })
+
+    root.createEl('span', { text: 'Zero', prepend: true })
+    root.createEl('span', { text: 'Away', parent: other })
+
+    expect(root.children.length).toBe(2)
+    expect(root.children[0]?.textContent).toBe('Zero')
+    expect(other.children.length).toBe(1)
+    expect(other.children[0]?.textContent).toBe('Away')
+  })
+
+  it('honours parent and prepend on svg children', () => {
+    const root = createTestRoot()
+    const svg = root.createSvg('svg', {})
+    const other = root.createSvg('svg', {})
+    svg.createSvg('circle', { attr: { cx: 1 } })
+
+    svg.createSvg('circle', { attr: { cx: 0 }, prepend: true })
+    svg.createSvg('circle', { attr: { cx: 2 }, parent: other })
+
+    expect(svg.children.length).toBe(2)
+    expect(svg.children[0]?.getAttribute('cx')).toBe('0')
+    expect(other.children.length).toBe(1)
+    expect(other.children[0]?.getAttribute('cx')).toBe('2')
+  })
+  it('sets title and href from top-level options', () => {
+    const root = createTestRoot()
+    const link = root.createEl('a', {
+      href: 'https://example.com/note',
+      title: 'Tip',
+      text: 'Link',
+    })
+
+    expect(link.getAttribute('href')).toBe('https://example.com/note')
+    expect(link.getAttribute('title')).toBe('Tip')
+  })
+
   it('creates a span child through createSpan', () => {
     const root = createTestRoot()
     const child = root.createSpan({ cls: 'a b', text: 'label' })

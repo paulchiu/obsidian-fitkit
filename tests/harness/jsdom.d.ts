@@ -10,6 +10,7 @@ declare module 'jsdom' {
     HTMLDivElement: typeof HTMLDivElement
     HTMLInputElement: typeof HTMLInputElement
     HTMLSpanElement: typeof HTMLSpanElement
+    XMLSerializer: typeof XMLSerializer
     getComputedStyle(element: Element): CSSStyleDeclaration
   }
 

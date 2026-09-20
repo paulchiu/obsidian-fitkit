@@ -92,9 +92,17 @@ function descendants(root: TestElement): TestElement[] {
   return root.children.flatMap((child) => [child, ...descendants(child)])
 }
 
+/** Y of the x-axis date row. Texts sitting there are dates, not rung labels. */
+const X_AXIS_LABEL_Y = 294
+
 function yLabelTexts(root: TestElement): string[] {
   return descendants(root)
-    .filter((node) => node.tag === 'text' && node.attrs['text-anchor'] === 'end')
+    .filter(
+      (node) =>
+        node.tag === 'text' &&
+        node.attrs['text-anchor'] === 'end' &&
+        node.attrs['y'] !== X_AXIS_LABEL_Y,
+    )
     .map((node) => node.textContent)
 }
 
@@ -242,7 +250,12 @@ describe('exercise chart svg', () => {
       .filter((node) => node.tag === 'line' && node.classes.has('fitkit-chart-grid'))
       .map((node) => Number(node.attrs['y1']))
     const labelYs = nodes
-      .filter((node) => node.tag === 'text' && node.attrs['text-anchor'] === 'end')
+      .filter(
+        (node) =>
+          node.tag === 'text' &&
+          node.attrs['text-anchor'] === 'end' &&
+          node.attrs['y'] !== X_AXIS_LABEL_Y,
+      )
       .map((node) => Number(node.attrs['y']) - 4)
 
     expect(gridYs).toEqual(labelYs)

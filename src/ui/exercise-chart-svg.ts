@@ -281,11 +281,27 @@ function drawXLabels(svg: SVGSVGElement, series: ChartSeries): void {
       attr: {
         x,
         y: MARGIN_TOP + PLOT_HEIGHT + 18,
-        'text-anchor': 'middle',
+        'text-anchor': xLabelAnchor(index, series.points.length),
       },
     })
     label.textContent = condensed ? point.date.slice(5) : point.date
   }
+}
+
+/**
+ * Outer date labels anchor inward. The edge ticks sit one margin from the
+ * viewBox, so a centred label half wider than that margin hangs off the
+ * edge; anchoring the first label at its start and the last at its end fits
+ * every label for any font without costing plot width.
+ */
+function xLabelAnchor(index: number, count: number): string {
+  if (index === 0) {
+    return 'start'
+  }
+  if (index === count - 1) {
+    return 'end'
+  }
+  return 'middle'
 }
 
 function drawSeries(
