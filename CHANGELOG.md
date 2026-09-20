@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Exercise notes now align with other card-level content, and bodyweight headers keep their reserved action column tied to the same width as its spacer.
+
 ### Removed
 
 ## [1.4.1] - 2026-09-20

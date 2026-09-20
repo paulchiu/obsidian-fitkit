@@ -500,6 +500,10 @@ body.is-mobile .fitkit-editor-root {
   white-space: pre-wrap;
 }
 
+.fitkit-exercise-note-line {
+  padding-inline: 0;
+}
+
 .fitkit-note-line:hover,
 .fitkit-note-line:focus-visible {
   color: var(--text-normal);
@@ -1021,6 +1025,10 @@ body.is-mobile .fitkit-editor-root {
   }
 }
 
+.fitkit-bodyweight-card {
+  --fitkit-kebab-col: 26px;
+}
+
 /**
  * Bodyweight card names size to their content rather than the shared basis,
  * so a long exercise name truncates with an ellipsis instead of wrapping.
@@ -1042,11 +1050,15 @@ body.is-mobile .fitkit-editor-root {
 
 /** Trailing column reserves the row kebab width so header labels sit over row inputs. */
 .fitkit-bodyweight-row.fitkit-set-head {
-  grid-template-columns: 20px repeat(2, minmax(0, 1fr)) 26px;
+  grid-template-columns: 20px repeat(2, minmax(0, 1fr)) var(--fitkit-kebab-col);
 }
 
 .fitkit-bodyweight-row.fitkit-set-head.has-load {
-  grid-template-columns: 20px repeat(2, minmax(0, 1fr)) minmax(0, 72px) 26px;
+  grid-template-columns: 20px repeat(2, minmax(0, 1fr)) minmax(0, 72px) var(--fitkit-kebab-col);
+}
+
+.fitkit-bodyweight-head-spacer {
+  inline-size: var(--fitkit-kebab-col);
 }
 
 /**
