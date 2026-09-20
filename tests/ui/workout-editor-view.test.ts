@@ -3995,6 +3995,41 @@ describe('WorkoutEditorView next-time plan', () => {
     expect(badge?.children.map((child) => child.textContent).join('')).toContain('Next: 102.5 lbs')
   })
 
+  it('reads a pounds exercise history badge tooltips in pounds on the card', () => {
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      { name: 'Squat', kind: 'strength', unit: 'lbs', aliases: [] },
+    ])
+    const view = createNextPlanView({
+      name: 'Squat',
+      kind: 'strength',
+      strengthSets: [],
+      durationEntries: [],
+      bodyweightSets: [],
+    })
+    view.exerciseHistory = new Map([
+      [
+        'Squat',
+        {
+          strength: {
+            personalBest: { weight: 100, reps: 1 },
+            lastSessionMax: { value: { weight: 95, reps: 8 }, date: '2026-04-23' },
+          },
+        },
+      ],
+    ])
+    const list = new TestElement('div')
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+
+    const historyRow = list.findByClass('fitkit-card-history')
+    const titles = historyRow
+      ?.findAllByClass('fitkit-card-badge')
+      .map((badge) => badge.attributes.get('title'))
+    expect(titles).toEqual([
+      'Heaviest weight lifted (not 1RM): 100 lbs x 1',
+      'Heaviest weight in latest prior session: 95 lbs x 8 (2026-04-23)',
+    ])
+  })
+
   it('shows the plan recorded last session as a badge', () => {
     const view = createNextPlanView({
       name: 'Squat',

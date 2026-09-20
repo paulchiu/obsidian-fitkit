@@ -114,6 +114,7 @@ export function buildExerciseHistoryMap(
 export function formatExerciseHistoryBadges(
   summary: ExerciseHistorySummary | undefined,
   kind: ExerciseKind,
+  unit: WeightUnit,
   levels?: BodyweightLadder,
 ): ExerciseHistoryBadge[] {
   if (!summary) {
@@ -161,13 +162,13 @@ export function formatExerciseHistoryBadges(
         history?.personalBest
           ? {
               text: `PB ${formatWeightSetShort(history.personalBest, { weightOnly: true })}`,
-              title: `Heaviest weight lifted (not 1RM): ${formatWeightSet(history.personalBest)}`,
+              title: `Heaviest weight lifted (not 1RM): ${formatWeightSet(history.personalBest, unit)}`,
             }
           : null,
         history?.lastSessionMax
           ? {
               text: `last ${formatWeightSetShort(history.lastSessionMax.value)}`,
-              title: `Heaviest weight in latest prior session: ${formatWeightSet(history.lastSessionMax.value)} (${history.lastSessionMax.date})`,
+              title: `Heaviest weight in latest prior session: ${formatWeightSet(history.lastSessionMax.value, unit)} (${history.lastSessionMax.date})`,
             }
           : null,
       ].filter((badge): badge is ExerciseHistoryBadge => badge !== null)
@@ -455,11 +456,11 @@ function isLaterSession<T>(candidate: SessionMetric<T>, current: SessionMetric<T
   return candidate.path > current.path
 }
 
-function formatWeightSet(set: WeightSet): string {
+function formatWeightSet(set: WeightSet, unit: WeightUnit): string {
   if (set.weight === 0) {
     return formatReps(set.reps)
   }
-  return `${formatNumber(set.weight)} kg x ${formatNumber(set.reps)}`
+  return `${formatNumber(set.weight)} ${unit} x ${formatNumber(set.reps)}`
 }
 
 /**

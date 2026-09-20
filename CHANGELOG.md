@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Weight readouts outside the plan badge now read in the exercise's own weight unit instead of always saying kilograms: the PB and last-session tooltips on an exercise card, and the set table and plan line in the reading-mode preview.
+
 ### Removed
 
 ## [1.4.2] - 2026-09-20
