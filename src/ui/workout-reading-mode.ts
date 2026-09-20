@@ -1,13 +1,10 @@
 import { TFile, type MarkdownPostProcessorContext } from 'obsidian'
 
 import { EXERCISE_KIND_LABELS, assertUnreachableKind } from '../domain/exercise-kind'
-import {
-  bodyweightLevelName,
-  formatRungUnit,
-  type BodyweightLadder,
-} from '../domain/bodyweight-levels'
+import { bodyweightLevelName, type BodyweightLadder } from '../domain/bodyweight-levels'
 import { formatDurationInput } from '../domain/duration-input'
-import { formatNextPlanLabel } from '../domain/next-plan'
+import { createRegistry, levelsForName, unitForName } from '../domain/exercise-registry'
+import { formatNextPlanLabel, planStepUnit } from '../domain/next-plan'
 import { parseWorkoutNote } from '../domain/workout-note-model'
 import type {
   BodyweightSet,
@@ -15,8 +12,9 @@ import type {
   ExerciseEntry,
   StrengthSet,
 } from '../domain/workout-note-model'
+import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
 import type FitKitPlugin from '../main'
-import { bodyweightLevelsFor } from '../vault/exercise-registry-vault'
+import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
 
 const WORKOUT_SOURCE_ROW = /^\s*[-*]\s+.*\[exercise::/
 
@@ -54,8 +52,8 @@ export function renderWorkoutReadingModeSection(
   renderExercisePreview(el, exercise, plugin)
 }
 
-export function formatWeight(value: number | undefined): string {
-  return value === undefined || !Number.isFinite(value) ? '-' : `${formatNumber(value)} kg`
+export function formatWeight(value: number | undefined, unit: WeightUnit): string {
+  return value === undefined || !Number.isFinite(value) ? '-' : `${formatNumber(value)} ${unit}`
 }
 
 export function formatReps(value: number | undefined): string {
@@ -141,6 +139,10 @@ function renderExercisePreview(
   exercise: ExerciseEntry,
   plugin: FitKitPlugin,
 ): void {
+  /** One snapshot per preview: the plan line, the set table and the ladder must all agree. */
+  const registry = createRegistry(exerciseRegistryWithVaultNotes(plugin.app, plugin.settings))
+  const unit = unitForName(registry, exercise.exerciseName) ?? DEFAULT_WEIGHT_UNIT
+
   const wrap = el.createDiv({ cls: 'fitkit-reading-preview' })
   const summary = wrap.createDiv({ cls: 'fitkit-reading-summary' })
   summary.createSpan({
@@ -156,19 +158,20 @@ function renderExercisePreview(
   if (exercise.next) {
     wrap.createDiv({
       cls: 'fitkit-reading-plan',
-      text: `Next time: ${formatNextPlanLabel(exercise.next, exercise.kind).toLowerCase()}${formatReadingPlanStepSuffix(exercise)}`,
+      text: `Next time: ${formatNextPlanLabel(exercise.next, exercise.kind).toLowerCase()}${formatReadingPlanStepSuffix(exercise, unit)}`,
     })
   }
 
   switch (exercise.kind) {
     case 'strength':
-      renderStrengthTable(wrap, exercise.strengthSets)
+      renderStrengthTable(wrap, exercise.strengthSets, unit)
       break
     case 'bodyweight':
       renderBodyweightTable(
         wrap,
         exercise.bodyweightSets,
-        bodyweightLevelsFor(plugin.app, plugin.settings, exercise.exerciseName),
+        unit,
+        levelsForName(registry, exercise.exerciseName),
       )
       break
     case 'duration':
@@ -194,7 +197,7 @@ function exerciseCountText(exercise: ExerciseEntry): string {
   }
 }
 
-function renderStrengthTable(container: HTMLElement, sets: StrengthSet[]): void {
+function renderStrengthTable(container: HTMLElement, sets: StrengthSet[], unit: WeightUnit): void {
   if (sets.length === 0) {
     renderEmpty(container, 'No strength rows recorded.')
     return
@@ -204,7 +207,7 @@ function renderStrengthTable(container: HTMLElement, sets: StrengthSet[]): void 
   for (const set of sets) {
     const row = body.createEl('tr')
     row.createEl('td', { text: formatSet(set.set) })
-    row.createEl('td', { text: formatWeight(set.weight) })
+    row.createEl('td', { text: formatWeight(set.weight, unit) })
     row.createEl('td', { text: formatReps(set.reps) })
     row.createEl('td', { text: set.note ?? '-' })
   }
@@ -213,6 +216,7 @@ function renderStrengthTable(container: HTMLElement, sets: StrengthSet[]): void 
 function renderBodyweightTable(
   container: HTMLElement,
   sets: BodyweightSet[],
+  unit: WeightUnit,
   levels: BodyweightLadder | undefined,
 ): void {
   if (sets.length === 0) {
@@ -230,7 +234,7 @@ function renderBodyweightTable(
     row.createEl('td', { text: formatSet(set.set ?? index + 1) })
     row.createEl('td', { text: bodyweightLevelName(levels, set.level) })
     row.createEl('td', { text: formatReps(set.reps) })
-    row.createEl('td', { text: formatWeight(set.load) })
+    row.createEl('td', { text: formatWeight(set.load, unit) })
     row.createEl('td', { text: set.note ?? '-' })
   }
 }
@@ -272,16 +276,9 @@ function formatSet(value: number): string {
   return Number.isFinite(value) && value > 0 ? formatNumber(value) : '-'
 }
 
-/** A bodyweight plan step counts rungs; every other kind keeps kilograms. */
-function formatReadingPlanStepSuffix(exercise: ExerciseEntry): string {
+function formatReadingPlanStepSuffix(exercise: ExerciseEntry, unit: WeightUnit): string {
   const step = exercise.next?.step
-  if (step === undefined) {
-    return ''
-  }
-  if (exercise.kind === 'bodyweight') {
-    return ` ${formatRungUnit(step)}`
-  }
-  return ' kg'
+  return step === undefined ? '' : ` ${planStepUnit(exercise.kind, step, unit)}`
 }
 
 function formatNumber(value: number): string {

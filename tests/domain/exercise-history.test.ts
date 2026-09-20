@@ -198,16 +198,18 @@ describe('exercise history aggregation', () => {
       },
     )
 
-    expect(formatExerciseHistoryBadges(history.get('Push-up'), 'bodyweight', 'kg', levels)).toEqual([
-      {
-        text: 'PB Diamond push-up x 1',
-        title: 'Highest level reached: Diamond push-up x 1',
-      },
-      {
-        text: 'last Push-up x 20',
-        title: 'Highest level in latest prior session: Push-up x 20 (2026-04-22)',
-      },
-    ])
+    expect(formatExerciseHistoryBadges(history.get('Push-up'), 'bodyweight', 'kg', levels)).toEqual(
+      [
+        {
+          text: 'PB Diamond push-up x 1',
+          title: 'Highest level reached: Diamond push-up x 1',
+        },
+        {
+          text: 'last Push-up x 20',
+          title: 'Highest level in latest prior session: Push-up x 20 (2026-04-22)',
+        },
+      ],
+    )
   })
 
   it('breaks a level tie on reps for the bodyweight personal best', () => {
@@ -237,16 +239,18 @@ describe('exercise history aggregation', () => {
       },
     )
 
-    expect(formatExerciseHistoryBadges(history.get('Push-up'), 'bodyweight', 'kg', levels)).toEqual([
-      {
-        text: 'PB Knee push-up x 12',
-        title: 'Highest level reached: Knee push-up x 12',
-      },
-      {
-        text: 'last Knee push-up x 12',
-        title: 'Highest level in latest prior session: Knee push-up x 12 (2026-04-22)',
-      },
-    ])
+    expect(formatExerciseHistoryBadges(history.get('Push-up'), 'bodyweight', 'kg', levels)).toEqual(
+      [
+        {
+          text: 'PB Knee push-up x 12',
+          title: 'Highest level reached: Knee push-up x 12',
+        },
+        {
+          text: 'last Knee push-up x 12',
+          title: 'Highest level in latest prior session: Knee push-up x 12 (2026-04-22)',
+        },
+      ],
+    )
   })
 
   it('breaks a level and reps tie on load for the bodyweight personal best', () => {
