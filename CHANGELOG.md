@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [1.4.4] - 2026-09-20
+
+### Added
+
+### Changed
+
+### Fixed
+
 - Switching an exercise's kind now rewrites the note's `## Recent sessions` query to match, instead of leaving a table selecting the old kind's fields. A query you have customised is left alone and reported.
 
 ### Removed
