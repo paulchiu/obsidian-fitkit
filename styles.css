@@ -268,7 +268,6 @@ body.is-mobile .fitkit-editor-root {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
   width: var(--fitkit-card-control-size, 32px);
   height: var(--fitkit-card-control-size, 32px);
   border-color: transparent;
@@ -452,7 +451,6 @@ body.is-mobile .fitkit-editor-root {
   justify-content: center;
   width: 28px;
   height: 28px;
-  padding: 0;
 }
 
 .fitkit-timer-button {
@@ -573,6 +571,15 @@ body.is-mobile .fitkit-editor-root {
   cursor: pointer;
   background: var(--background-primary);
   color: var(--text-normal);
+}
+
+/**
+ * Icon buttons size their box to the glyph, so the shared padding above would
+ * squash it. Compounded rather than reordered: source order must not decide.
+ */
+.fitkit-btn.fitkit-card-icon-button,
+.fitkit-btn.fitkit-row-kebab {
+  padding: 0;
 }
 
 .fitkit-btn:disabled {

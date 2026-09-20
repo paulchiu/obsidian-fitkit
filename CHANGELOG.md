@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Row, card and level menus in the workout editor now drop from the right edge of the control that opened them, instead of opening beside it and running past the card.
+- The row kebab and card gear icons now paint square. They were taking the shared button's padding, which squashed the glyph inside a fixed-size button.
+
 ### Removed
 
 ## [1.4.4] - 2026-09-20

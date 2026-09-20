@@ -23,9 +23,17 @@ interface MockMenuItemState {
   onClick?: () => void
 }
 
+interface MockMenuPosition {
+  x: number
+  y: number
+  width?: number
+  overlap?: boolean
+  left?: boolean
+}
+
 interface MockMenuState {
   items: MockMenuItemState[]
-  position?: { x: number; y: number }
+  position?: MockMenuPosition
 }
 
 const obsidianMock = vi.hoisted(
@@ -140,7 +148,7 @@ vi.mock('obsidian', () => {
       return this
     }
 
-    showAtPosition(position: { x: number; y: number }): void {
+    showAtPosition(position: MockMenuPosition): void {
       this.position = position
     }
 
@@ -211,6 +219,21 @@ interface TestEvent {
 
 type TestListener = (event: TestEvent) => void
 
+/** A rect built from the three edges menu placement reads. */
+function testRect(box: { left: number; bottom: number; width: number }): DOMRect {
+  return {
+    bottom: box.bottom,
+    height: 10,
+    left: box.left,
+    right: box.left + box.width,
+    top: box.bottom - 10,
+    width: box.width,
+    x: box.left,
+    y: box.bottom - 10,
+    toJSON: () => ({}),
+  }
+}
+
 class TestElement {
   readonly attributes = new Map<string, string>()
   readonly children: TestElement[] = []
@@ -221,6 +244,7 @@ class TestElement {
   textContent = ''
   clientWidth = 0
   scrollWidth = 0
+  rect: DOMRect = testRect({ left: 10, bottom: 20, width: 10 })
 
   constructor(readonly tagName: string) {}
 
@@ -301,17 +325,7 @@ class TestElement {
   }
 
   getBoundingClientRect(): DOMRect {
-    return {
-      bottom: 20,
-      height: 10,
-      left: 10,
-      right: 20,
-      top: 10,
-      width: 10,
-      x: 10,
-      y: 10,
-      toJSON: () => ({}),
-    }
+    return this.rect
   }
 
   findByClass(cls: string): TestElement | null {
@@ -524,7 +538,6 @@ describe('WorkoutEditorView row actions', () => {
     expect(obsidianMock.menus[0]?.items.map((item) => item.title)).not.toContain(
       'Open exercise file',
     )
-    expect(obsidianMock.menus[0]?.position).toEqual({ x: 10, y: 20 })
   })
 
   it('adds Open exercise file to the exercise card menu before kind and move actions', () => {
@@ -4188,5 +4201,135 @@ describe('WorkoutEditorView edit levels menu', () => {
 
   it('offers no Edit levels item on a strength card', () => {
     expect(titlesFor('strength')).not.toContain('Edit levels')
+  })
+})
+
+describe('WorkoutEditorView menu placement', () => {
+  afterEach(() => {
+    obsidianMock.menus = []
+    vi.unstubAllGlobals()
+  })
+
+  /**
+   * The left edge Obsidian gives a menu for a position def, mirroring
+   * `Menu.showAtPosition` in the shipped app: it right-aligns the menu to the
+   * anchor's far edge when `left` is set and the menu fits there, otherwise
+   * left-aligns to the near edge, clamped to the window.
+   */
+  const menuBox = (
+    position: MockMenuPosition,
+    menuWidth: number,
+    windowWidth: number,
+  ): { left: number; right: number } => {
+    const { x, width, overlap, left } = position
+    const anchorNear = width === undefined ? x + 2 : x
+    const anchorFar = width === undefined ? x - 2 : x + width
+    const near = overlap === true || width === undefined ? anchorNear : anchorFar
+    const far = overlap === true || width === undefined ? anchorFar : anchorNear
+    const rightAligns = near + menuWidth > windowWidth || (left === true && far - menuWidth >= 0)
+    const edge = rightAligns ? Math.max(0, far - menuWidth) : near
+    return { left: edge, right: edge + menuWidth }
+  }
+
+  const expectWithin = (box: { left: number; right: number }, windowWidth: number): void => {
+    expect(box.left).toBeGreaterThanOrEqual(0)
+    expect(box.right).toBeLessThanOrEqual(windowWidth)
+  }
+
+  const lastPosition = (): MockMenuPosition => {
+    const position = obsidianMock.menus[obsidianMock.menus.length - 1]?.position
+    if (position === undefined) {
+      throw new Error('no menu was shown')
+    }
+    return position
+  }
+
+  it('hangs the row menu off the kebab even where it would fit to the right', () => {
+    const view = createRowActionView()
+    const container = new TestElement('div')
+    const body = container.createDiv({ cls: 'fitkit-row-body' })
+
+    view.renderRowActions(container as unknown as HTMLElement, body as unknown as HTMLElement, {
+      label: 'set 1',
+      currentNote: undefined,
+      onDelete: vi.fn(),
+      onNoteSave: vi.fn(),
+    })
+
+    const kebab = body.findByClass('fitkit-row-kebab')
+    if (kebab === null) {
+      throw new Error('no kebab was rendered')
+    }
+    kebab.rect = testRect({ left: 600, bottom: 40, width: 28 })
+    kebab.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
+
+    const box = menuBox(lastPosition(), 120, 760)
+
+    expect(box.right).toBe(628)
+    expectWithin(box, 760)
+  })
+
+  it('hangs the level menu off the level label rather than past it', () => {
+    registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([
+      {
+        name: 'Push-up',
+        kind: 'bodyweight',
+        levels: ['Wall push-up', 'Incline push-up'],
+        aliases: [],
+      },
+    ])
+    const view = createExerciseCardRenderView()
+    view.model = {
+      exercises: [
+        {
+          name: 'Push-up',
+          kind: 'bodyweight',
+          strengthSets: [],
+          durationEntries: [],
+          bodyweightSets: [{ set: 1, level: 1, reps: 10 }],
+        },
+      ],
+    }
+    view.exerciseHistory = new Map()
+    Object.assign(view, { markDirty: vi.fn(), render: vi.fn(), focusRowCell: vi.fn() })
+    const list = new TestElement('div')
+
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    const label = list.findAllByClass('fitkit-bodyweight-level-label')[0]
+    if (label === undefined) {
+      throw new Error('no level label was rendered')
+    }
+    label.rect = testRect({ left: 600, bottom: 96, width: 120 })
+    label.listenersFor('click')[0]?.({})
+
+    const box = menuBox(lastPosition(), 150, 760)
+
+    expect(box.right).toBe(720)
+    expectWithin(box, 760)
+  })
+
+  it('hangs the card menu off the gear inside a narrow window', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
+    const view = createCardMenuView()
+    view.model = {
+      exercises: [
+        {
+          name: 'Push-up',
+          kind: 'strength',
+          strengthSets: [],
+          durationEntries: [],
+          bodyweightSets: [],
+        },
+      ],
+    }
+    const gear = new TestElement('button')
+    gear.rect = testRect({ left: 220, bottom: 64, width: 32 })
+
+    view.openCardMenu({ currentTarget: gear } as unknown as MouseEvent, 0)
+
+    const box = menuBox(lastPosition(), 120, 360)
+
+    expect(box.right).toBe(252)
+    expectWithin(box, 360)
   })
 })

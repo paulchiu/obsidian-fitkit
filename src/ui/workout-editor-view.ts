@@ -84,6 +84,7 @@ import { ConfirmModal } from './confirm-modal'
 import { EditLevelsModal } from './edit-levels-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
 import { KindSwitchChoiceModal, type KindSwitchChoice } from './kind-switch-choice-modal'
+import { menuAnchorForTrigger } from './menu-anchor'
 import { SetNoteModal } from './set-note-modal'
 import { PlanStepModal } from './plan-step-modal'
 
@@ -845,7 +846,7 @@ export class WorkoutEditorView extends ItemView {
         )
       }
       const rect = label.getBoundingClientRect()
-      menu.showAtPosition({ x: rect.left, y: rect.bottom })
+      menu.showAtPosition(menuAnchorForTrigger(rect))
     })
 
     const plus = stepper.createEl('button', {
@@ -1281,7 +1282,7 @@ export class WorkoutEditorView extends ItemView {
         item.setTitle('Delete row').setIcon('trash-2').setWarning(true).onClick(onDelete),
       )
       const rect = kebab.getBoundingClientRect()
-      menu.showAtPosition({ x: rect.left, y: rect.bottom })
+      menu.showAtPosition(menuAnchorForTrigger(rect))
     })
   }
 
@@ -1844,7 +1845,7 @@ export class WorkoutEditorView extends ItemView {
     const target = evt.currentTarget
     if (target instanceof HTMLElement) {
       const rect = target.getBoundingClientRect()
-      menu.showAtPosition({ x: rect.left, y: rect.bottom })
+      menu.showAtPosition(menuAnchorForTrigger(rect))
     } else {
       menu.showAtMouseEvent(evt)
     }
