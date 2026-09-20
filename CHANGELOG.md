@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [1.4.2] - 2026-09-20
+
+### Added
+
+### Changed
+
+### Fixed
+
 - The next-time plan badge on an exercise card now reads in that exercise's own weight unit instead of always saying kilograms, so it agrees with the dashboard.
 
 ### Removed
