@@ -3,7 +3,6 @@ import type { App, CachedMetadata, TAbstractFile, TFile } from 'obsidian'
 import {
   bodyweightLevelName,
   compareBodyweightSets,
-  formatRungUnit,
   type BodyweightLadder,
 } from '../domain/bodyweight-levels'
 import { type ExerciseKind } from '../domain/exercise-kind'
@@ -20,7 +19,7 @@ import {
   resolve,
   type ExerciseRegistry,
 } from '../domain/exercise-registry'
-import { formatNextPlanLabel, type NextPlan } from '../domain/next-plan'
+import { formatNextPlanLabel, planStepUnit, type NextPlan } from '../domain/next-plan'
 import { DEFAULT_WEIGHT_UNIT, parseWeightUnit, type WeightUnit } from '../domain/weight-unit'
 import type {
   BestSet,
@@ -276,16 +275,8 @@ function formatNextPlanLine(exercise: ExerciseAggregate): string {
   const change =
     plan.value.step === undefined
       ? label
-      : `${label} ${formatPlanStepUnit(exercise, plan.value.step)}`
+      : `${label} ${planStepUnit(exercise.kind, plan.value.step, exercise.unit)}`
   return `- **${link}:** ${change} (planned ${plan.date})`
-}
-
-/** A bodyweight plan step counts rungs; every other kind keeps the exercise unit. */
-function formatPlanStepUnit(exercise: ExerciseAggregate, step: number): string {
-  if (exercise.kind === 'bodyweight') {
-    return formatRungUnit(step)
-  }
-  return exercise.unit
 }
 
 function isMoreRecentPlan(candidate: PlannedSession, current: PlannedSession): boolean {

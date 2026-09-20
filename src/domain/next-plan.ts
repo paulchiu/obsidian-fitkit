@@ -4,7 +4,9 @@
  * exercise card the next time the exercise comes up.
  */
 
+import { formatRungUnit } from './bodyweight-levels'
 import type { ExerciseKind } from './exercise-kind'
+import type { WeightUnit } from './weight-unit'
 
 export type NextPlanDirection = 'up' | 'down' | 'stay'
 
@@ -92,6 +94,14 @@ export function nextPlanTargetWeight(plan: NextPlan, baseWeight: number): number
   }
   const target = plan.direction === 'up' ? baseWeight + plan.step : baseWeight - plan.step
   return Math.max(target, 0)
+}
+
+/**
+ * Unit a plan's step is expressed in: rungs for bodyweight, the exercise's own
+ * weight unit otherwise. Shared so surfaces showing a plan cannot disagree.
+ */
+export function planStepUnit(kind: ExerciseKind, step: number, unit: WeightUnit): string {
+  return kind === 'bodyweight' ? formatRungUnit(step) : unit
 }
 
 export function formatNumber(value: number): string {

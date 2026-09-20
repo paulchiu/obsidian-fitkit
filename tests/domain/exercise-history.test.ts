@@ -422,9 +422,22 @@ describe('exercise history aggregation', () => {
       nextPlan: { value: { direction: 'up' as const, step: 2.5 }, date: '2026-08-10' },
     }
 
-    expect(formatNextPlanBadge(summary, 'strength')).toEqual({
+    expect(formatNextPlanBadge(summary, 'strength', 'kg')).toEqual({
       text: 'Next: 102.5 kg',
       title: 'Planned on 2026-08-10: up 2.5 kg from 100 kg',
+      icon: 'arrow-up',
+    })
+  })
+
+  it('reads a pounds exercise plan in pounds', () => {
+    const summary = {
+      strength: { lastSessionMax: { value: { weight: 100, reps: 5 }, date: '2026-08-10' } },
+      nextPlan: { value: { direction: 'up' as const, step: 2.5 }, date: '2026-08-10' },
+    }
+
+    expect(formatNextPlanBadge(summary, 'strength', 'lbs')).toEqual({
+      text: 'Next: 102.5 lbs',
+      title: 'Planned on 2026-08-10: up 2.5 lbs from 100 lbs',
       icon: 'arrow-up',
     })
   })
@@ -436,6 +449,7 @@ describe('exercise history aggregation', () => {
         nextPlan: { value: { direction: 'down' }, date: '2026-08-10' },
       },
       'strength',
+      'kg',
     )
 
     expect(badge?.text).toBe('Next: down')
@@ -450,6 +464,7 @@ describe('exercise history aggregation', () => {
           nextPlan: { value: { direction: 'down', step: 5 }, date: '2026-08-10' },
         },
         'strength',
+        'kg',
         { plan: { direction: 'up', step: 2.5 }, sessionMax: { weight: 100, reps: 5 } },
       ),
     ).toEqual({
@@ -464,6 +479,7 @@ describe('exercise history aggregation', () => {
       formatNextPlanBadge(
         { strength: { lastSessionMax: { value: { weight: 100, reps: 5 }, date: '2026-08-10' } } },
         'strength',
+        'kg',
         { plan: { direction: 'up', step: 2.5 } },
       ),
     ).toEqual({
@@ -474,7 +490,7 @@ describe('exercise history aggregation', () => {
   })
 
   it('shows a plan recorded on a card that has no history at all', () => {
-    const badge = formatNextPlanBadge(undefined, 'strength', {
+    const badge = formatNextPlanBadge(undefined, 'strength', 'kg', {
       plan: { direction: 'up', step: 2.5 },
     })
 
@@ -491,7 +507,7 @@ describe('exercise history aggregation', () => {
       nextPlan: { value: { direction: 'up' as const, step: 1 }, date: '2026-08-10' },
     }
 
-    expect(formatNextPlanBadge(summary, 'bodyweight', undefined, levels)).toEqual({
+    expect(formatNextPlanBadge(summary, 'bodyweight', 'kg', undefined, levels)).toEqual({
       text: 'Next: L5 Diamond push-up',
       title: 'Planned on 2026-08-10: up 1 rung from L4 Push-up',
       icon: 'arrow-up',

@@ -12,9 +12,11 @@ import {
   formatNextPlanLabel,
   nextPlanTargetLevel,
   nextPlanTargetWeight,
+  planStepUnit,
   type NextPlan,
 } from './next-plan'
 import type { BodyweightBestSet, FitKitIndex, IndexEntry, LastSessionMax, WeightSet } from './types'
+import type { WeightUnit } from './weight-unit'
 
 export interface ExerciseHistoryAnchor {
   sourcePath: string
@@ -184,6 +186,7 @@ export function formatExerciseHistoryBadges(
 export function formatNextPlanBadge(
   summary: ExerciseHistorySummary | undefined,
   kind: ExerciseKind,
+  unit: WeightUnit,
   current?: CurrentExercisePlan,
   levels?: BodyweightLadder,
 ): NextPlanBadge | null {
@@ -206,11 +209,12 @@ export function formatNextPlanBadge(
   const base = baseWeight !== undefined && baseWeight > 0 ? baseWeight : null
   const target = base === null ? null : nextPlanTargetWeight(plan, base)
   const label = formatNextPlanLabel(plan, kind).toLowerCase()
-  const change = plan.step === undefined ? label : `${label} kg`
-  const from = base !== null && plan.direction !== 'stay' ? ` from ${formatNumber(base)} kg` : ''
+  const change = plan.step === undefined ? label : `${label} ${planStepUnit(kind, plan.step, unit)}`
+  const from =
+    base !== null && plan.direction !== 'stay' ? ` from ${formatNumber(base)} ${unit}` : ''
 
   return {
-    text: target !== null ? `Next: ${formatNumber(target)} kg` : `Next: ${change}`,
+    text: target !== null ? `Next: ${formatNumber(target)} ${unit}` : `Next: ${change}`,
     title: `${planned}: ${change}${from}`,
     icon: nextPlanIcon(plan),
   }
