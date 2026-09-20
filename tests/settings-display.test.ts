@@ -1,58 +1,11 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { createTestRoot, installObsidianDomExtensions } from './harness/obsidian-dom'
 
 /**
  * Obsidian below 1.13 renders the tab through display() rather than the
  * definitions, so these cover the fallback walking the same sections.
  */
-
-class TestElement {
-  readonly children: TestElement[] = []
-  readonly classes = new Set<string>()
-  textContent = ''
-  type = ''
-  placeholder = ''
-  value = ''
-
-  constructor(readonly tagName: string) {}
-
-  createEl(tagName: string, options: { cls?: string; text?: string } = {}): TestElement {
-    return this.spawn(tagName, options)
-  }
-
-  createDiv(options: { cls?: string; text?: string } = {}): TestElement {
-    return this.spawn('div', options)
-  }
-
-  createSpan(options: { cls?: string; text?: string } = {}): TestElement {
-    return this.spawn('span', options)
-  }
-
-  private spawn(tagName: string, options: { cls?: string; text?: string }): TestElement {
-    const child = new TestElement(tagName)
-    this.children.push(child)
-    if (options.cls) {
-      for (const cls of options.cls.split(' ')) {
-        if (cls) child.classes.add(cls)
-      }
-    }
-    if (options.text !== undefined) child.textContent = options.text
-    return child
-  }
-
-  setText(text: string): void {
-    this.textContent = text
-  }
-
-  addClass(cls: string): void {
-    this.classes.add(cls)
-  }
-
-  empty(): void {
-    this.children.length = 0
-  }
-
-  addEventListener(): void {}
-}
 
 const rendered = vi.hoisted(
   () => [] as { name: string; desc: string; heading: boolean; buttonText?: string }[],
@@ -95,7 +48,7 @@ vi.mock('obsidian', () => {
     }
     addText(cb: (text: unknown) => void): this {
       const text = {
-        inputEl: new TestElement('input'),
+        inputEl: createTestRoot().createEl('input'),
         setValue: () => text,
         onChange: () => text,
       }
@@ -130,22 +83,26 @@ interface DefinitionRow {
 
 function displayTab(): {
   tab: FitKitSettingTab
-  containerEl: TestElement
+  containerEl: HTMLElement
   settings: FitKitSettings
 } {
   rendered.length = 0
   const settings: FitKitSettings = { ...DEFAULT_SETTINGS }
-  const containerEl = new TestElement('div')
+  const containerEl = createTestRoot()
   const tab = Object.create(FitKitSettingTab.prototype) as FitKitSettingTab
   tab.plugin = { settings, saveSettings: async () => undefined } as never
   /** Cast off the deprecated signature; calling display() is the point here. */
-  const fallback = tab as unknown as { containerEl: TestElement; display: () => void }
+  const fallback = tab as unknown as { containerEl: HTMLElement; display: () => void }
   fallback.containerEl = containerEl
   fallback.display()
   return { tab, containerEl, settings }
 }
 
 describe('display fallback', () => {
+  beforeEach(() => {
+    installObsidianDomExtensions()
+  })
+
   it('renders a heading for every group and a row for every non-block definition', () => {
     const { tab } = displayTab()
     const definitions = tab.getSettingDefinitions() as unknown as {
@@ -180,10 +137,14 @@ describe('display fallback', () => {
   it('renders block rows straight into the container', () => {
     const { containerEl } = displayTab()
 
-    expect(containerEl.children.some((child) => child.textContent === 'Derived paths:')).toBe(true)
-    expect(containerEl.children.some((child) => child.classes.has('fitkit-registry-section'))).toBe(
+    expect([...containerEl.children].some((child) => child.textContent === 'Derived paths:')).toBe(
       true,
     )
+    expect(
+      [...containerEl.children].some((child) =>
+        child.classList.contains('fitkit-registry-section'),
+      ),
+    ).toBe(true)
   })
 
   it('labels each maintenance action button', () => {

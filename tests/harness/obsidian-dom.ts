@@ -7,8 +7,12 @@ const SVG_NAMESPACE = 'http://www.w3.org/2000/svg'
  * The harness runs in the default node environment, where `vi.mock('obsidian')`
  * keeps working, and owns its own jsdom instead of borrowing vitest globals.
  * Each test file gets one document; tests isolate through detached roots.
+ * A real URL avoids an opaque origin, without which formatting a failing DOM
+ * assertion throws `SecurityError` instead of showing the expected-actual diff.
  */
-const harnessDom = new JSDOM('<!doctype html><html><head></head><body></body></html>')
+const harnessDom = new JSDOM('<!doctype html><html><head></head><body></body></html>', {
+  url: 'http://localhost/',
+})
 
 /** Window backing every harness element. Use its constructors for `instanceof`. */
 export const harnessWindow = harnessDom.window

@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { createTestRoot, installObsidianDomExtensions } from '../harness/obsidian-dom'
 
 vi.mock('obsidian', () => {
   class TFile {
@@ -21,80 +23,6 @@ import {
   formatDurationSeconds,
   renderWorkoutReadingModeSection,
 } from '../../src/ui/workout-reading-mode'
-
-interface TestElementOptions {
-  cls?: string
-  text?: string
-}
-
-class TestElement {
-  readonly children: TestElement[] = []
-  readonly classes = new Set<string>()
-  readonly classList = {
-    contains: (className: string): boolean => this.classes.has(className),
-  }
-  textContent = ''
-
-  constructor(readonly tagName: string) {}
-
-  addClass(className: string): void {
-    this.classes.add(className)
-  }
-
-  createDiv(options: TestElementOptions = {}): TestElement {
-    return this.createEl('div', options)
-  }
-
-  createEl(tagName: string, options: TestElementOptions = {}): TestElement {
-    const child = new TestElement(tagName)
-    if (options.cls) {
-      child.addClass(options.cls)
-    }
-    if (options.text !== undefined) {
-      child.textContent = options.text
-    }
-    this.children.push(child)
-    return child
-  }
-
-  createSpan(options: TestElementOptions = {}): TestElement {
-    return this.createEl('span', options)
-  }
-
-  querySelectorAll(selector: string): TestElement[] {
-    if (selector !== 'li') {
-      return []
-    }
-    return this.findAllByTag('li')
-  }
-
-  findByClass(className: string): TestElement | null {
-    if (this.classes.has(className)) {
-      return this
-    }
-    for (const child of this.children) {
-      const found = child.findByClass(className)
-      if (found) {
-        return found
-      }
-    }
-    return null
-  }
-
-  findAllByClass(className: string): TestElement[] {
-    const own = this.classes.has(className) ? [this] : []
-    return [...own, ...this.children.flatMap((child) => child.findAllByClass(className))]
-  }
-
-  allText(): string {
-    return [this.textContent, ...this.children.map((child) => child.allText())].join(' ')
-  }
-
-  private findAllByTag(tagName: string): TestElement[] {
-    const own = this.tagName === tagName ? [this] : []
-    return [...own, ...this.children.flatMap((child) => child.findAllByTag(tagName))]
-  }
-}
 
 const strengthSection = [
   '## [[Squat]]',
@@ -137,8 +65,8 @@ function createContext(
   } as unknown as MarkdownPostProcessorContext
 }
 
-function createRenderedSection(lines: string[]): TestElement {
-  const root = new TestElement('div')
+function createRenderedSection(lines: string[]): HTMLElement {
+  const root = createTestRoot()
   const list = root.createEl('ul')
   for (const line of lines) {
     list.createEl('li', { text: line })
@@ -147,23 +75,23 @@ function createRenderedSection(lines: string[]): TestElement {
 }
 
 describe('workout reading mode rendering', () => {
+  beforeEach(() => {
+    installObsidianDomExtensions()
+  })
+
   it('renders strength workout rows as a read-only table and hides source rows', () => {
     const root = createRenderedSection([
       '[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
       '[exercise:: [[Squat]]] [set:: 2] [weight:: 105] [reps:: 3] [notes:: smooth]',
     ])
 
-    renderWorkoutReadingModeSection(
-      createPlugin(),
-      root as unknown as HTMLElement,
-      createContext(strengthSection),
-    )
+    renderWorkoutReadingModeSection(createPlugin(), root, createContext(strengthSection))
 
-    expect(root.findByClass('fitkit-reading-preview')).not.toBeNull()
-    expect(root.findAllByClass('fitkit-reading-hidden-source-row')).toHaveLength(2)
-    expect(root.allText()).toContain('Strength')
-    expect(root.allText()).toContain('100 kg')
-    expect(root.allText()).toContain('smooth')
+    expect(root.querySelector('.fitkit-reading-preview')).not.toBeNull()
+    expect(root.querySelectorAll('.fitkit-reading-hidden-source-row')).toHaveLength(2)
+    expect(root.textContent).toContain('Strength')
+    expect(root.textContent).toContain('100 kg')
+    expect(root.textContent).toContain('smooth')
   })
 
   it('renders duration rows with readable durations', () => {
@@ -172,15 +100,11 @@ describe('workout reading mode rendering', () => {
     )
     const root = createRenderedSection(['[exercise:: [[Plank]]] [set:: 1] [duration:: 95]'])
 
-    renderWorkoutReadingModeSection(
-      createPlugin(),
-      root as unknown as HTMLElement,
-      createContext(section),
-    )
+    renderWorkoutReadingModeSection(createPlugin(), root, createContext(section))
 
-    expect(root.findByClass('fitkit-reading-preview')).not.toBeNull()
-    expect(root.allText()).toContain('Duration')
-    expect(root.allText()).toContain('1m35s')
+    expect(root.querySelector('.fitkit-reading-preview')).not.toBeNull()
+    expect(root.textContent).toContain('Duration')
+    expect(root.textContent).toContain('1m35s')
   })
 
   it('shows the next-time plan recorded on the exercise', () => {
@@ -195,13 +119,11 @@ describe('workout reading mode rendering', () => {
       '[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
     ])
 
-    renderWorkoutReadingModeSection(
-      createPlugin(),
-      root as unknown as HTMLElement,
-      createContext(section),
-    )
+    renderWorkoutReadingModeSection(createPlugin(), root, createContext(section))
 
-    expect(root.findByClass('fitkit-reading-plan')?.allText()).toContain('Next time: up 2.5 kg')
+    expect(root.querySelector('.fitkit-reading-plan')?.textContent).toContain(
+      'Next time: up 2.5 kg',
+    )
   })
 
   it('shows a bodyweight next-time plan as a count of rungs', () => {
@@ -225,9 +147,11 @@ describe('workout reading mode rendering', () => {
       },
     ]
 
-    renderWorkoutReadingModeSection(plugin, root as unknown as HTMLElement, createContext(section))
+    renderWorkoutReadingModeSection(plugin, root, createContext(section))
 
-    expect(root.findByClass('fitkit-reading-plan')?.allText()).toContain('Next time: up 1 rung')
+    expect(root.querySelector('.fitkit-reading-plan')?.textContent).toContain(
+      'Next time: up 1 rung',
+    )
   })
 
   it('shows bodyweight rung names from the registry ladder', () => {
@@ -249,9 +173,9 @@ describe('workout reading mode rendering', () => {
       },
     ]
 
-    renderWorkoutReadingModeSection(plugin, root as unknown as HTMLElement, createContext(section))
+    renderWorkoutReadingModeSection(plugin, root, createContext(section))
 
-    expect(root.allText()).toContain('Knee push-up')
+    expect(root.textContent).toContain('Knee push-up')
   })
 
   it('falls back to the bare level when no ladder is on file', () => {
@@ -264,25 +188,17 @@ describe('workout reading mode rendering', () => {
       '[exercise:: [[Push-up]]] [set:: 1] [level:: 2] [reps:: 10]',
     ])
 
-    renderWorkoutReadingModeSection(
-      createPlugin(),
-      root as unknown as HTMLElement,
-      createContext(section),
-    )
+    renderWorkoutReadingModeSection(createPlugin(), root, createContext(section))
 
-    expect(root.allText()).toContain('Level 2')
+    expect(root.textContent).toContain('Level 2')
   })
 
   it('does not render when the source rows cannot be safely hidden', () => {
-    const root = new TestElement('div')
+    const root = createTestRoot()
 
-    renderWorkoutReadingModeSection(
-      createPlugin(),
-      root as unknown as HTMLElement,
-      createContext(strengthSection),
-    )
+    renderWorkoutReadingModeSection(createPlugin(), root, createContext(strengthSection))
 
-    expect(root.findByClass('fitkit-reading-preview')).toBeNull()
+    expect(root.querySelector('.fitkit-reading-preview')).toBeNull()
   })
 
   it('does not hide partial source rows when rendering is unsafe', () => {
@@ -292,14 +208,10 @@ describe('workout reading mode rendering', () => {
       'Another custom list item',
     ])
 
-    renderWorkoutReadingModeSection(
-      createPlugin(),
-      root as unknown as HTMLElement,
-      createContext(strengthSection),
-    )
+    renderWorkoutReadingModeSection(createPlugin(), root, createContext(strengthSection))
 
-    expect(root.findByClass('fitkit-reading-preview')).toBeNull()
-    expect(root.findAllByClass('fitkit-reading-hidden-source-row')).toHaveLength(0)
+    expect(root.querySelector('.fitkit-reading-preview')).toBeNull()
+    expect(root.querySelectorAll('.fitkit-reading-hidden-source-row')).toHaveLength(0)
   })
 
   it('skips non-workout notes', () => {
@@ -310,12 +222,12 @@ describe('workout reading mode rendering', () => {
 
     renderWorkoutReadingModeSection(
       createPlugin(),
-      root as unknown as HTMLElement,
+      root,
       createContext(strengthSection, { type: 'journal' }),
     )
 
-    expect(root.findByClass('fitkit-reading-preview')).toBeNull()
-    expect(root.findAllByClass('fitkit-reading-hidden-source-row')).toHaveLength(0)
+    expect(root.querySelector('.fitkit-reading-preview')).toBeNull()
+    expect(root.querySelectorAll('.fitkit-reading-hidden-source-row')).toHaveLength(0)
   })
 
   it('formats durations across minute and hour boundaries', () => {

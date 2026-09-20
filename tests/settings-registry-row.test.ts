@@ -1,9 +1,11 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { createTestRoot, installObsidianDomExtensions } from './harness/obsidian-dom'
 
 vi.mock('obsidian', () => ({
   App: class {},
   Modal: class {
-    contentEl = new TestElement('div')
+    contentEl = createTestRoot()
     constructor(readonly app: unknown) {}
     open(): void {}
     close(): void {}
@@ -20,83 +22,8 @@ vi.mock('obsidian', () => ({
 import { FitKitSettingTab } from '../src/settings'
 import type { RegistryTableRow } from '../src/vault/exercise-registry-table'
 
-interface TestElementOptions {
-  cls?: string
-  text?: string
-}
-
-class TestElement {
-  readonly children: TestElement[] = []
-  readonly classes = new Set<string>()
-  readonly attributes = new Map<string, string>()
-  disabled = false
-  textContent = ''
-
-  constructor(readonly tagName: string) {}
-
-  createEl(tagName: string, options: TestElementOptions = {}): TestElement {
-    const child = new TestElement(tagName)
-    this.children.push(child)
-    return this.applyOptions(child, options)
-  }
-
-  createSpan(options: TestElementOptions = {}): TestElement {
-    const child = new TestElement('span')
-    this.children.push(child)
-    return this.applyOptions(child, options)
-  }
-
-  createDiv(options: TestElementOptions = {}): TestElement {
-    const child = new TestElement('div')
-    this.children.push(child)
-    return this.applyOptions(child, options)
-  }
-
-  private applyOptions(child: TestElement, options: TestElementOptions): TestElement {
-    if (options.cls) {
-      for (const cls of options.cls.split(' ')) {
-        if (cls) child.classes.add(cls)
-      }
-    }
-    if (options.text !== undefined) {
-      child.textContent = options.text
-    }
-    return child
-  }
-
-  addClass(name: string): void {
-    this.classes.add(name)
-  }
-
-  setText(text: string): void {
-    this.textContent = text
-  }
-
-  setAttr(name: string, value: string): void {
-    this.attributes.set(name, value)
-  }
-
-  addEventListener(): void {}
-
-  empty(): void {
-    this.children.length = 0
-    this.textContent = ''
-  }
-}
-
-function findAll(root: TestElement, predicate: (el: TestElement) => boolean): TestElement[] {
-  const matches: TestElement[] = []
-  if (predicate(root)) {
-    matches.push(root)
-  }
-  for (const child of root.children) {
-    matches.push(...findAll(child, predicate))
-  }
-  return matches
-}
-
-function findButtons(root: TestElement, text: string): TestElement[] {
-  return findAll(root, (el) => el.tagName === 'button' && el.textContent === text)
+function findButtons(root: Element, text: string): HTMLButtonElement[] {
+  return [...root.querySelectorAll('button')].filter((button) => button.textContent === text)
 }
 
 function baseRow(overrides: Partial<RegistryTableRow>): RegistryTableRow {
@@ -112,7 +39,7 @@ function baseRow(overrides: Partial<RegistryTableRow>): RegistryTableRow {
   }
 }
 
-function renderRow(row: RegistryTableRow): TestElement {
+function renderRow(row: RegistryTableRow): HTMLElement {
   const tab = Object.create(FitKitSettingTab.prototype) as FitKitSettingTab
   Object.assign(tab, {
     plugin: {
@@ -120,17 +47,21 @@ function renderRow(row: RegistryTableRow): TestElement {
       app: { vault: { getAbstractFileByPath: () => null } },
     },
   })
-  const table = new TestElement('table')
+  const table = createTestRoot().createEl('table')
   const renderRegistryRow = (
     tab as unknown as {
       renderRegistryRow: (table: HTMLElement, row: RegistryTableRow, rerender: () => void) => void
     }
   ).renderRegistryRow.bind(tab)
-  renderRegistryRow(table as unknown as HTMLElement, row, vi.fn())
+  renderRegistryRow(table, row, vi.fn())
   return table
 }
 
 describe('FitKitSettingTab registry row provenance', () => {
+  beforeEach(() => {
+    installObsidianDomExtensions()
+  })
+
   it('offers an enabled Rename action for a note-backed row instead of a disabled Edit', () => {
     const table = renderRow(
       baseRow({ provenance: 'note', notePath: 'Fitness/Exercises/Squat.md', kind: 'strength' }),
@@ -140,7 +71,7 @@ describe('FitKitSettingTab registry row provenance', () => {
     const renameButtons = findButtons(table, 'Rename')
     expect(renameButtons).toHaveLength(1)
     expect(renameButtons[0]?.disabled).toBe(false)
-    expect(renameButtons[0]?.attributes.get('title')).toBeTruthy()
+    expect(renameButtons[0]?.getAttribute('title')).toBeTruthy()
     expect(findButtons(table, 'Delete')).toHaveLength(1)
   })
 

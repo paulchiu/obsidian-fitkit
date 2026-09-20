@@ -7,6 +7,7 @@ declare module 'jsdom' {
     document: Document
     CSSMediaRule: typeof CSSMediaRule
     CSSStyleRule: typeof CSSStyleRule
+    Event: typeof Event
     HTMLElement: typeof HTMLElement
     SVGElement: typeof SVGElement
     HTMLDivElement: typeof HTMLDivElement
@@ -17,7 +18,7 @@ declare module 'jsdom' {
   }
 
   export class JSDOM {
-    constructor(html?: string)
+    constructor(html?: string, options?: { url?: string })
     window: HarnessWindow
   }
 }
