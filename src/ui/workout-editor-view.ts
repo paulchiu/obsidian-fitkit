@@ -1,4 +1,4 @@
-import type { App, WorkspaceLeaf } from 'obsidian'
+import type { App, ViewStateResult, WorkspaceLeaf } from 'obsidian'
 import { ItemView, Menu, Modal, Notice, TFile, normalizePath, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
@@ -222,6 +222,21 @@ export class WorkoutEditorView extends ItemView {
 
   get currentFile(): TFile | null {
     return this.session?.file ?? null
+  }
+
+  /** Obsidian persists this state and hands it back to setState on relaunch, so the open workout survives iOS killing the app in the background. */
+  getState(): Record<string, unknown> {
+    const state = super.getState()
+    return this.currentFile ? { ...state, file: this.currentFile.path } : state
+  }
+
+  async setState(state: unknown, result: ViewStateResult): Promise<void> {
+    await super.setState(state, result)
+    const path = workoutPathFromState(state)
+    const file = path ? this.app.vault.getAbstractFileByPath(path) : null
+    if (file instanceof TFile && file.path !== this.currentFile?.path) {
+      await this.loadFile(file)
+    }
   }
 
   refreshSettingsDrivenUi(): void {
@@ -2496,6 +2511,13 @@ export function measureLevelLabelWidths(full: HTMLElement): LevelLabelWidths {
  */
 export function shouldShortenLevelLabel(labelWidth: number, availableWidth: number): boolean {
   return labelWidth > availableWidth
+}
+
+function workoutPathFromState(state: unknown): string | null {
+  if (typeof state !== 'object' || state === null || !('file' in state)) {
+    return null
+  }
+  return typeof state.file === 'string' ? state.file : null
 }
 
 function parseNumberInput(raw: string): number | undefined {
