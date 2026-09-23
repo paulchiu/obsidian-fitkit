@@ -395,7 +395,7 @@ export class WorkoutEditorView extends ItemView {
     wrap.setText(message)
   }
 
-  renderSkeleton(): void {
+  private renderSkeleton(): void {
     this.contentEl.empty()
     const wrap = this.contentEl.createDiv({ cls: 'fitkit-skeleton' })
     for (let i = 0; i < 3; i++) {

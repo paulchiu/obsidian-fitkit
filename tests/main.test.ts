@@ -46,6 +46,10 @@ vi.mock('obsidian', () => {
         clientWidth: 0,
       }
     }
+    getState(): Record<string, unknown> {
+      return {}
+    }
+    async setState(): Promise<void> {}
   }
 
   class MarkdownView {
@@ -148,6 +152,7 @@ import { buildMockVaultFolderTree, type MockVaultFolder } from './fixtures/mock-
 interface SetViewStateArg {
   type?: string
   active?: boolean
+  state?: Record<string, unknown>
 }
 
 interface MockLeaf {
@@ -199,27 +204,38 @@ const makeEditorView = (
   file: TFile | null,
 ): WorkoutEditorView & {
   loadFile: ReturnType<typeof vi.fn>
-  renderSkeleton: ReturnType<typeof vi.fn>
 } => {
   const view = Object.create(WorkoutEditorView.prototype) as WorkoutEditorView & {
     loadFile: ReturnType<typeof vi.fn>
-    renderSkeleton: ReturnType<typeof vi.fn>
     session: { file: TFile } | null
   }
+  Object.assign(view, {
+    app: { vault: { getAbstractFileByPath: (path: string) => makeWorkoutFile(path) } },
+  })
   view.loadFile = vi.fn(async () => undefined)
-  view.renderSkeleton = vi.fn()
   view.session = file ? { file } : null
   return view
+}
+
+/** Mirrors WorkspaceLeaf.setViewState: mount a new view only on a type change, then hand it the state. */
+const applyViewState = async (
+  leaf: MockLeaf,
+  state: SetViewStateArg,
+  currentFile: TFile | null,
+): Promise<void> => {
+  if (state.type !== VIEW_TYPE_FITKIT_WORKOUT_EDITOR) {
+    return
+  }
+  if (!(leaf.view instanceof WorkoutEditorView)) {
+    leaf.view = makeEditorView(currentFile)
+  }
+  await (leaf.view as WorkoutEditorView).setState(state.state ?? {}, { history: false })
 }
 
 const makeEditorLeaf = (currentFile: TFile | null): MockLeaf => {
   const leaf: MockLeaf = {
     view: makeEditorView(currentFile),
-    setViewState: vi.fn(async (state: SetViewStateArg) => {
-      if (state.type === VIEW_TYPE_FITKIT_WORKOUT_EDITOR) {
-        leaf.view = makeEditorView(currentFile)
-      }
-    }),
+    setViewState: vi.fn((state: SetViewStateArg) => applyViewState(leaf, state, currentFile)),
     detach: vi.fn(),
     getRoot: vi.fn(() => null),
   }
@@ -247,11 +263,7 @@ const makeWorkoutFile = (path = 'Workouts/2026-04-28.md'): TFile => {
 const makeLeafShowingFile = (file: TFile): MockLeaf => {
   const leaf: MockLeaf = {
     view: null,
-    setViewState: vi.fn(async (state: SetViewStateArg) => {
-      if (state.type === VIEW_TYPE_FITKIT_WORKOUT_EDITOR) {
-        leaf.view = makeEditorView(file)
-      }
-    }),
+    setViewState: vi.fn((state: SetViewStateArg) => applyViewState(leaf, state, null)),
     detach: vi.fn(),
     getRoot: vi.fn(() => null),
   }
@@ -419,6 +431,7 @@ describe('FitKitPlugin file-open routing (no editor open)', () => {
     expect(leaf.setViewState).toHaveBeenCalledWith({
       type: VIEW_TYPE_FITKIT_WORKOUT_EDITOR,
       active: true,
+      state: { file: file.path },
     })
     expect(leaf.view).toBeInstanceOf(WorkoutEditorView)
     const loadFile = (leaf.view as { loadFile: ReturnType<typeof vi.fn> }).loadFile
@@ -687,7 +700,11 @@ describe('FitKitPlugin file-open routing (editor already open)', () => {
     await plugin.maybeRouteWorkoutFile(fileB)
 
     expect(strayMarkdownLeaf.detach).toHaveBeenCalledTimes(1)
-    expect(editorLeaf.setViewState).not.toHaveBeenCalled()
+    expect(editorLeaf.setViewState).toHaveBeenCalledWith({
+      type: VIEW_TYPE_FITKIT_WORKOUT_EDITOR,
+      active: true,
+      state: { file: fileB.path },
+    })
     const loadFile = (editorLeaf.view as { loadFile: ReturnType<typeof vi.fn> }).loadFile
     expect(loadFile).toHaveBeenCalledWith(fileB)
   })
@@ -786,6 +803,7 @@ describe('FitKitPlugin layout-ready sweep', () => {
     expect(workoutLeaf.setViewState).toHaveBeenCalledWith({
       type: VIEW_TYPE_FITKIT_WORKOUT_EDITOR,
       active: true,
+      state: { file: workoutFile.path },
     })
     expect(journalLeaf.setViewState).not.toHaveBeenCalled()
   })
@@ -813,11 +831,9 @@ describe('FitKitPlugin openWorkoutEditor command path', () => {
       view: {
         getViewType: () => VIEW_TYPE_FITKIT_WORKOUT_EDITOR,
       },
-      setViewState: vi.fn(async (state: SetViewStateArg) => {
-        if (state.type === VIEW_TYPE_FITKIT_WORKOUT_EDITOR) {
-          existingEditorLeaf.view = makeEditorView(file)
-        }
-      }),
+      setViewState: vi.fn((state: SetViewStateArg) =>
+        applyViewState(existingEditorLeaf, state, null),
+      ),
       detach: vi.fn(),
       getRoot: vi.fn(() => null),
     }

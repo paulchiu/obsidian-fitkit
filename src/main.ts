@@ -219,21 +219,14 @@ export default class FitKitPlugin extends Plugin {
     await this.swapLeafToWorkoutEditor(leaf, file)
   }
 
+  /** The file travels in the view state, so the view loads it in setState and Obsidian persists it with the workspace. */
   private async swapLeafToWorkoutEditor(leaf: WorkspaceLeaf, file: TFile): Promise<void> {
-    const wasFreshMount = !(leaf.view instanceof WorkoutEditorView)
-    if (wasFreshMount) {
-      await leaf.setViewState({ type: VIEW_TYPE_FITKIT_WORKOUT_EDITOR, active: true })
-      /** Replace the onOpen empty hint with the skeleton synchronously, before any further await, so the user does not see the hint flash between mount and loadFile. */
-      const freshView = leaf.view
-      if (freshView instanceof WorkoutEditorView) {
-        freshView.renderSkeleton()
-      }
-    }
+    await leaf.setViewState({
+      type: VIEW_TYPE_FITKIT_WORKOUT_EDITOR,
+      active: true,
+      state: { file: file.path },
+    })
     await this.app.workspace.revealLeaf(leaf)
-    const view = leaf.view
-    if (view instanceof WorkoutEditorView) {
-      await view.loadFile(file)
-    }
   }
 
   private async maybeRouteWorkoutFile(file: TFile): Promise<void> {

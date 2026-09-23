@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The workout editor reopens the workout you had open when Obsidian restores its workspace, so resuming Obsidian on iOS no longer needs "Open today's workout" again.
+
 ### Removed
 
 ## [1.4.5] - 2026-09-20
