@@ -100,7 +100,11 @@ const createWorkoutFile = (path: string): TFile =>
   })
 
 /** A real WorkoutEditorView over an in-memory vault holding one workout note. */
-const createView = (): { view: WorkoutEditorView; contents: Map<string, string> } => {
+const createView = (): {
+  view: WorkoutEditorView
+  contents: Map<string, string>
+  requestSaveLayout: ReturnType<typeof vi.fn>
+} => {
   const file = createWorkoutFile(WORKOUT_PATH)
   const contents = new Map<string, string>([[WORKOUT_PATH, workoutSource]])
   const vault = {
@@ -111,12 +115,16 @@ const createView = (): { view: WorkoutEditorView; contents: Map<string, string> 
     },
     getAbstractFileByPath: (path: string): TFile | null => (contents.has(path) ? file : null),
   }
-  const app = { vault, metadataCache: { getFileCache: () => null } }
+  const app = {
+    vault,
+    metadataCache: { getFileCache: () => null },
+    workspace: { requestSaveLayout: vi.fn() },
+  }
   const plugin = Object.create(FitKitPlugin.prototype) as FitKitPlugin
   plugin.app = app as unknown as App
   plugin.settings = { ...DEFAULT_SETTINGS }
   const view = new WorkoutEditorView({ app } as unknown as WorkspaceLeaf, plugin)
-  return { view, contents }
+  return { view, contents, requestSaveLayout: app.workspace.requestSaveLayout }
 }
 
 describe('WorkoutEditorView workspace state', () => {
@@ -185,5 +193,14 @@ describe('WorkoutEditorView workspace state', () => {
 
     expect(view.contentEl.textContent).toContain('Squat')
     expect(view.contentEl.textContent).not.toContain('Deadlift')
+  })
+
+  it('asks Obsidian to save the workspace once a workout loads from state', async () => {
+    const { view, requestSaveLayout } = createView()
+    await view.onOpen()
+
+    await view.setState({ file: WORKOUT_PATH }, { history: false })
+
+    expect(requestSaveLayout).toHaveBeenCalled()
   })
 })

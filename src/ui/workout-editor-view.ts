@@ -236,6 +236,7 @@ export class WorkoutEditorView extends ItemView {
     const file = path ? this.app.vault.getAbstractFileByPath(path) : null
     if (file instanceof TFile && file.path !== this.currentFile?.path) {
       await this.loadFile(file)
+      this.app.workspace.requestSaveLayout()
     }
   }
 

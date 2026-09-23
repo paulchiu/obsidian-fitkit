@@ -210,7 +210,10 @@ const makeEditorView = (
     session: { file: TFile } | null
   }
   Object.assign(view, {
-    app: { vault: { getAbstractFileByPath: (path: string) => makeWorkoutFile(path) } },
+    app: {
+      vault: { getAbstractFileByPath: (path: string) => makeWorkoutFile(path) },
+      workspace: { requestSaveLayout: vi.fn() },
+    },
   })
   view.loadFile = vi.fn(async () => undefined)
   view.session = file ? { file } : null
@@ -852,7 +855,11 @@ describe('FitKitPlugin openWorkoutEditor command path', () => {
     await plugin.openWorkoutEditor(file)
 
     expect(getLeafSpy).not.toHaveBeenCalled()
-    expect(existingEditorLeaf.setViewState).toHaveBeenCalled()
+    expect(existingEditorLeaf.setViewState).toHaveBeenCalledWith({
+      type: VIEW_TYPE_FITKIT_WORKOUT_EDITOR,
+      active: true,
+      state: { file: file.path },
+    })
     expect(existingEditorLeaf.view).toBeInstanceOf(WorkoutEditorView)
     const loadFile = (existingEditorLeaf.view as { loadFile: ReturnType<typeof vi.fn> }).loadFile
     expect(loadFile).toHaveBeenCalledWith(file)
