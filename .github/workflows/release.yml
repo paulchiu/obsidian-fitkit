@@ -17,7 +17,7 @@ jobs:
   release:
     name: Bump version, tag, and publish release
     if: github.event.pull_request.merged == true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     # Scoped here rather than top-level so only this job gets the attestation signing token.
     permissions:
       contents: write

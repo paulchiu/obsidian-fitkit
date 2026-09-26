@@ -7,7 +7,7 @@ on:
 jobs:
   check-labels:
     name: Enforce semantic versioning
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Check for version labels
         uses: actions/github-script@v9
