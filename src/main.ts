@@ -54,10 +54,10 @@ export default class FitKitPlugin extends Plugin {
    */
   private indexRefreshQueue: Promise<void> | null = null
 
-  private markdownChoiceStore?: WeakMap<WorkspaceLeaf, string>
-  /** Tabs the user switched to markdown, keyed to the workout path they chose it for. Lazily created because prototype-built plugins never run field initializers. */
-  private get markdownChoiceByLeaf(): WeakMap<WorkspaceLeaf, string> {
-    this.markdownChoiceStore ??= new WeakMap<WorkspaceLeaf, string>()
+  /** The workout each tab was switched to markdown for, which file-open routing leaves alone. */
+  private markdownChoiceStore?: WeakMap<WorkspaceLeaf, TFile>
+  private get markdownChoiceByLeaf(): WeakMap<WorkspaceLeaf, TFile> {
+    this.markdownChoiceStore ??= new WeakMap<WorkspaceLeaf, TFile>()
     return this.markdownChoiceStore
   }
 
@@ -261,7 +261,7 @@ export default class FitKitPlugin extends Plugin {
   }
 
   async openLeafAsMarkdown(leaf: WorkspaceLeaf, file: TFile): Promise<void> {
-    this.markdownChoiceByLeaf.set(leaf, file.path)
+    this.markdownChoiceByLeaf.set(leaf, file)
     await leaf.setViewState({ type: 'markdown', state: { file: file.path } })
   }
 
@@ -285,7 +285,7 @@ export default class FitKitPlugin extends Plugin {
     if (!markdownView || markdownView.file !== file) {
       return
     }
-    if (this.markdownChoiceByLeaf.get(markdownView.leaf) === file.path) {
+    if (this.markdownChoiceByLeaf.get(markdownView.leaf) === file) {
       return
     }
     const editorLeaf = this.findExistingEditorLeaf()

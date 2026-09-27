@@ -229,7 +229,7 @@ export class WorkoutEditorView extends FileView {
     return this.session?.file ?? null
   }
 
-  /** Only markdown's file view base fires file-menu, so this tab adds its own switch. */
+  /** Obsidian fires file-menu only from its editable file views, so this tab adds its own switch. */
   onPaneMenu(menu: Menu, source: string): void {
     super.onPaneMenu(menu, source)
     const file = this.currentFile

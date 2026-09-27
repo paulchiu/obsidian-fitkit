@@ -219,7 +219,7 @@ const makeEditorView = (
   }
   Object.assign(view, {
     app: {
-      vault: { getAbstractFileByPath: (path: string) => makeWorkoutFile(path) },
+      vault: { getAbstractFileByPath: vaultFileAt },
       workspace: { requestSaveLayout: vi.fn() },
     },
   })
@@ -240,7 +240,7 @@ const applyViewState = async (
   if (state.type === 'markdown') {
     const path = state.state?.file
     leaf.view = new MarkdownView({
-      file: typeof path === 'string' ? makeWorkoutFile(path) : null,
+      file: typeof path === 'string' ? vaultFileAt(path) : null,
       leaf,
     })
     return
@@ -274,13 +274,19 @@ const createPlugin = (
   return plugin
 }
 
+/** Like Obsidian's vault, hands out one TFile per path, so a file keeps its identity across view switches and renames. */
+const mockVaultFiles = new Map<string, TFile>()
+
 const makeWorkoutFile = (path = 'Workouts/2026-04-28.md'): TFile => {
   const file = new TFile()
   file.path = path
   file.extension = 'md'
   file.basename = path.split('/').pop()?.replace(/\.md$/, '') ?? ''
+  mockVaultFiles.set(path, file)
   return file
 }
+
+const vaultFileAt = (path: string): TFile => mockVaultFiles.get(path) ?? makeWorkoutFile(path)
 
 const makeLeafShowingFile = (file: TFile): MockLeaf => {
   const leaf: MockLeaf = {
@@ -322,6 +328,7 @@ const makeApp = (
 
 beforeEach(() => {
   vi.stubGlobal('window', { setTimeout })
+  mockVaultFiles.clear()
 })
 
 afterEach(() => {
@@ -1056,12 +1063,12 @@ const makeRecordingMenu = (): {
   }
 }
 
-/** Loads the plugin and opens a tab's more-options menu the way Obsidian does: markdown tabs build it through file-menu, the workout editor builds its own. */
+/** Loads the plugin and opens a tab's menu the way Obsidian does: markdown tabs build it through file-menu, the workout editor builds its own. */
 const loadPluginCapturingEvents = async (
   app: MockApp,
 ): Promise<{
   handlers: Map<string, (...args: unknown[]) => unknown>
-  showMoreOptions: (leaf: MockLeaf, menu: unknown) => void
+  showMenu: (leaf: MockLeaf, menu: unknown, source?: string) => void
 }> => {
   const handlers = new Map<string, (...args: unknown[]) => unknown>()
   app.workspace.on = vi.fn((event: string, handler: (...args: unknown[]) => unknown) => {
@@ -1070,15 +1077,15 @@ const loadPluginCapturingEvents = async (
   })
   const plugin = new (FitKitPlugin as unknown as { new (app: MockApp): FitKitPlugin })(app)
   await plugin.onload()
-  const showMoreOptions = (leaf: MockLeaf, menu: unknown): void => {
+  const showMenu = (leaf: MockLeaf, menu: unknown, source = 'more-options'): void => {
     if (leaf.view instanceof WorkoutEditorView) {
       Object.assign(leaf.view, { plugin, leaf })
-      leaf.view.onPaneMenu(menu as Menu, 'more-options')
+      leaf.view.onPaneMenu(menu as Menu, source)
       return
     }
-    handlers.get('file-menu')?.(menu, (leaf.view as MarkdownView).file, 'more-options', leaf)
+    handlers.get('file-menu')?.(menu, (leaf.view as MarkdownView).file, source, leaf)
   }
-  return { handlers, showMoreOptions }
+  return { handlers, showMenu }
 }
 
 const makeWorkoutApp = (overrides: Partial<MockWorkspace> = {}): MockApp => {
@@ -1096,22 +1103,22 @@ describe('FitKitPlugin tab menu view switch', () => {
     const events = await loadPluginCapturingEvents(makeWorkoutApp())
     const menu = makeRecordingMenu()
 
-    events.showMoreOptions(editorLeaf, menu.menu)
+    events.showMenu(editorLeaf, menu.menu)
 
     expect(menu.titles()).toContain('Open as Markdown')
   })
 
   it('shows the workout as markdown in the same tab when "Open as Markdown" is chosen', async () => {
-    const file = makeWorkoutFile('Workouts/A.md')
+    const file = makeWorkoutFile('Workouts/2026-09-18.md')
     const editorLeaf = makeEditorLeaf(file)
     const events = await loadPluginCapturingEvents(makeWorkoutApp())
     const menu = makeRecordingMenu()
-    events.showMoreOptions(editorLeaf, menu.menu)
+    events.showMenu(editorLeaf, menu.menu)
 
     await menu.click('Open as Markdown')
 
     expect(editorLeaf.view).toBeInstanceOf(MarkdownView)
-    expect((editorLeaf.view as MarkdownView).file?.path).toBe('Workouts/A.md')
+    expect((editorLeaf.view as MarkdownView).file?.path).toBe('Workouts/2026-09-18.md')
   })
 
   it('keeps a workout switched to markdown as markdown when Obsidian reports it opened', async () => {
@@ -1121,7 +1128,7 @@ describe('FitKitPlugin tab menu view switch', () => {
       makeWorkoutApp({ getActiveViewOfType: vi.fn(() => editorLeaf.view) }),
     )
     const menu = makeRecordingMenu()
-    events.showMoreOptions(editorLeaf, menu.menu)
+    events.showMenu(editorLeaf, menu.menu)
     await menu.click('Open as Markdown')
 
     events.handlers.get('file-open')?.((editorLeaf.view as MarkdownView).file)
@@ -1135,7 +1142,7 @@ describe('FitKitPlugin tab menu view switch', () => {
     const markdownLeaf = makeLeafShowingFile(file)
     const events = await loadPluginCapturingEvents(makeWorkoutApp())
     const menu = makeRecordingMenu()
-    events.showMoreOptions(markdownLeaf, menu.menu)
+    events.showMenu(markdownLeaf, menu.menu)
 
     await menu.click('Open in workout editor')
 
@@ -1150,7 +1157,7 @@ describe('FitKitPlugin tab menu view switch', () => {
     const events = await loadPluginCapturingEvents(makeWorkoutApp())
     const menu = makeRecordingMenu()
 
-    events.showMoreOptions(markdownLeaf, menu.menu)
+    events.showMenu(markdownLeaf, menu.menu)
 
     expect(menu.titles()).toEqual([])
   })
@@ -1162,10 +1169,10 @@ describe('FitKitPlugin tab menu view switch', () => {
       makeWorkoutApp({ getActiveViewOfType: vi.fn(() => leaf.view) }),
     )
     const toMarkdown = makeRecordingMenu()
-    events.showMoreOptions(leaf, toMarkdown.menu)
+    events.showMenu(leaf, toMarkdown.menu)
     await toMarkdown.click('Open as Markdown')
     const toEditor = makeRecordingMenu()
-    events.showMoreOptions(leaf, toEditor.menu)
+    events.showMenu(leaf, toEditor.menu)
     await toEditor.click('Open in workout editor')
 
     /** Obsidian opens a clicked workout as markdown in the focused tab. */
@@ -1174,5 +1181,62 @@ describe('FitKitPlugin tab menu view switch', () => {
     await delayFor(BUSY_LEAF_SETTLE_MS)
 
     expect(leaf.view).toBeInstanceOf(WorkoutEditorView)
+  })
+  it('keeps a workout switched to markdown as markdown after it is renamed', async () => {
+    const file = makeWorkoutFile('Workouts/A.md')
+    const leaf = makeEditorLeaf(file)
+    const events = await loadPluginCapturingEvents(
+      makeWorkoutApp({ getActiveViewOfType: vi.fn(() => leaf.view) }),
+    )
+    const menu = makeRecordingMenu()
+    events.showMenu(leaf, menu.menu)
+    await menu.click('Open as Markdown')
+
+    file.path = 'Workouts/Renamed.md'
+    events.handlers.get('file-open')?.(file)
+    await delayFor(BUSY_LEAF_SETTLE_MS)
+
+    expect(leaf.view).toBeInstanceOf(MarkdownView)
+  })
+
+  it('still opens a different workout in the editor when it is clicked in a tab switched to markdown', async () => {
+    const fileA = makeWorkoutFile('Workouts/A.md')
+    const fileB = makeWorkoutFile('Workouts/B.md')
+    const leaf = makeEditorLeaf(fileA)
+    const events = await loadPluginCapturingEvents(
+      makeWorkoutApp({ getActiveViewOfType: vi.fn(() => leaf.view) }),
+    )
+    const menu = makeRecordingMenu()
+    events.showMenu(leaf, menu.menu)
+    await menu.click('Open as Markdown')
+
+    leaf.view = new MarkdownView({ file: fileB, leaf })
+    events.handlers.get('file-open')?.(fileB)
+    await delayFor(BUSY_LEAF_SETTLE_MS)
+
+    expect(leaf.view).toBeInstanceOf(WorkoutEditorView)
+  })
+
+  it('offers neither switch outside the tab more-options menu', async () => {
+    const file = makeWorkoutFile('Workouts/A.md')
+    const events = await loadPluginCapturingEvents(makeWorkoutApp())
+    const editorMenu = makeRecordingMenu()
+    const markdownMenu = makeRecordingMenu()
+
+    events.showMenu(makeEditorLeaf(file), editorMenu.menu, 'tab-header')
+    events.showMenu(makeLeafShowingFile(file), markdownMenu.menu, 'file-explorer-context-menu')
+
+    expect(editorMenu.titles()).toEqual([])
+    expect(markdownMenu.titles()).toEqual([])
+  })
+
+  it('does not offer "Open in workout editor" to a tab already in the workout editor', async () => {
+    const file = makeWorkoutFile('Workouts/A.md')
+    const events = await loadPluginCapturingEvents(makeWorkoutApp())
+    const menu = makeRecordingMenu()
+
+    events.handlers.get('file-menu')?.(menu.menu, file, 'more-options', makeEditorLeaf(file))
+
+    expect(menu.titles()).not.toContain('Open in workout editor')
   })
 })
