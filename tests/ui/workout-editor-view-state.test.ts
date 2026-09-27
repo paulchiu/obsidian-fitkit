@@ -171,13 +171,22 @@ describe('WorkoutEditorView workspace state', () => {
     expect(view.contentEl.textContent).toContain('Squat')
   })
 
-  it('reports the loaded workout path in its saved state', async () => {
-    const { view } = createView()
+  it('saves a pending edit to the previous workout before switching to another', async () => {
+    const { view, contents } = createView()
     await view.onOpen()
-
     await view.setState({ file: WORKOUT_PATH }, { history: false })
+    /** Hold the autosave debounce so the edit is still pending at the switch. */
+    vi.stubGlobal('window', { setTimeout: (): number => 1, clearTimeout: (): void => {} })
+    const reps = view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')
+    if (!reps) {
+      throw new Error('reps input not rendered')
+    }
+    reps.value = '7'
+    reps.dispatchEvent(new harnessWindow.Event('input'))
 
-    expect(view.getState()).toEqual({ file: WORKOUT_PATH })
+    await view.setState({ file: OTHER_WORKOUT_PATH }, { history: false })
+
+    expect(contents.get(WORKOUT_PATH)).toContain('[reps:: 7]')
   })
 
   it('keeps the empty hint when the restored workout no longer exists', async () => {
