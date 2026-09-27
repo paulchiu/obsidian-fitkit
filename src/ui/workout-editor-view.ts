@@ -66,7 +66,7 @@ import {
   type WorkoutNoteModel,
 } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
-import { exercisesFolder, workoutsFolder } from '../settings-paths'
+import { exercisesFolder, isInFolder, workoutsFolder } from '../settings-paths'
 import { findExerciseNotePath } from '../vault/exercise-catalog'
 import { composeExerciseNote } from '../vault/exercise-note'
 import { planExerciseFileOpen } from '../vault/exercise-file-plan'
@@ -255,7 +255,19 @@ export class WorkoutEditorView extends ItemView {
     this.resizeObserver.observe(this.contentEl)
     this.updateNarrowState()
     this.registerDragLifetimeListeners()
+    this.registerEvent(this.app.metadataCache.on('changed', (file) => this.onMetadataChanged(file)))
     this.renderEmpty('Open a workout note to edit.')
+  }
+
+  /** Exercise notes own ladders, kinds and units, so an edit made outside the editor re-renders the open workout. */
+  private onMetadataChanged(file: TFile): void {
+    if (!this.model || !this.session) {
+      return
+    }
+    if (!isInFolder(file.path, exercisesFolder(this.plugin.settings))) {
+      return
+    }
+    this.render()
   }
 
   private registerDragLifetimeListeners(): void {
