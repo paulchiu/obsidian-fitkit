@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The tab menu's view switches are now named "Markdown view" and "Workout view", matching Obsidian's "Reading view".
+
 ### Fixed
 
 ### Removed
