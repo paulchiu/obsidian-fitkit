@@ -54,6 +54,13 @@ export default class FitKitPlugin extends Plugin {
    */
   private indexRefreshQueue: Promise<void> | null = null
 
+  private markdownChoiceStore?: WeakMap<WorkspaceLeaf, string>
+  /** Tabs the user switched to markdown, keyed to the workout path they chose it for. Lazily created because prototype-built plugins never run field initializers. */
+  private get markdownChoiceByLeaf(): WeakMap<WorkspaceLeaf, string> {
+    this.markdownChoiceStore ??= new WeakMap<WorkspaceLeaf, string>()
+    return this.markdownChoiceStore
+  }
+
   async onload(): Promise<void> {
     await this.loadSettings()
     this.addSettingTab(new FitKitSettingTab(this.app, this))
@@ -71,6 +78,23 @@ export default class FitKitPlugin extends Plugin {
           return
         }
         void this.maybeRouteWorkoutFile(file)
+      }),
+    )
+
+    this.registerEvent(
+      this.app.workspace.on('file-menu', (menu, file, source, leaf) => {
+        if (source !== 'more-options' || !leaf || !(file instanceof TFile)) {
+          return
+        }
+        if (leaf.view instanceof MarkdownView && this.isWorkoutFile(file)) {
+          menu.addItem((item) =>
+            item
+              .setSection('pane')
+              .setTitle('Open in workout editor')
+              .setIcon('dumbbell')
+              .onClick(() => this.openLeafInWorkoutEditor(leaf, file)),
+          )
+        }
       }),
     )
 
@@ -236,6 +260,16 @@ export default class FitKitPlugin extends Plugin {
     await this.app.workspace.revealLeaf(leaf)
   }
 
+  async openLeafAsMarkdown(leaf: WorkspaceLeaf, file: TFile): Promise<void> {
+    this.markdownChoiceByLeaf.set(leaf, file.path)
+    await leaf.setViewState({ type: 'markdown', state: { file: file.path } })
+  }
+
+  private async openLeafInWorkoutEditor(leaf: WorkspaceLeaf, file: TFile): Promise<void> {
+    this.markdownChoiceByLeaf.delete(leaf)
+    await this.swapLeafToWorkoutEditor(leaf, file)
+  }
+
   private async maybeRouteWorkoutFile(file: TFile): Promise<void> {
     if (!this.shouldAutoOpenWorkoutEditor()) {
       return
@@ -249,6 +283,9 @@ export default class FitKitPlugin extends Plugin {
     /** Require an active markdown view for the event file. file-open fires for genuine clicks AND for internal Obsidian transitions (revealLeaf, leaf history). The markdown view is the user-click signal. */
     const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView)
     if (!markdownView || markdownView.file !== file) {
+      return
+    }
+    if (this.markdownChoiceByLeaf.get(markdownView.leaf) === file.path) {
       return
     }
     const editorLeaf = this.findExistingEditorLeaf()

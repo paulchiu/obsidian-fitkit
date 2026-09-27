@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The workout editor tab's more-options menu has "Open as Markdown" to show the workout's markdown in the same tab, and a markdown tab showing a workout has "Open in workout editor" to switch back. A workout switched to markdown stays as markdown in that tab until you switch it back.
+
 ### Changed
 
 ### Fixed
