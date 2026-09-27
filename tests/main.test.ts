@@ -162,6 +162,8 @@ interface SetViewStateArg {
 
 interface MockLeaf {
   view: unknown
+  /** Mirrors WorkspaceLeaf.working: true while Obsidian is still opening a view in the leaf. */
+  working?: boolean
   setViewState: (state: SetViewStateArg) => Promise<void>
   detach: () => void
   getRoot: () => unknown
@@ -225,12 +227,15 @@ const makeEditorView = (
   return view
 }
 
-/** Mirrors WorkspaceLeaf.setViewState: mount a new view only on a type change, then hand it the state. */
+/** Mirrors WorkspaceLeaf.setViewState: ignore the call while the leaf is busy, mount a new view only on a type change, then hand it the state. */
 const applyViewState = async (
   leaf: MockLeaf,
   state: SetViewStateArg,
   currentFile: TFile | null,
 ): Promise<void> => {
+  if (leaf.working) {
+    return
+  }
   if (state.type !== VIEW_TYPE_FITKIT_WORKOUT_EDITOR) {
     return
   }
@@ -304,6 +309,14 @@ const makeApp = (
   metadataCache: {
     getFileCache: vi.fn(() => null),
   },
+})
+
+beforeEach(() => {
+  vi.stubGlobal('window', { setTimeout })
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 describe('FitKitPlugin command registration', () => {
@@ -715,6 +728,45 @@ describe('FitKitPlugin file-open routing (editor already open)', () => {
     })
     const loadFile = (editorLeaf.view as { loadFile: ReturnType<typeof vi.fn> }).loadFile
     expect(loadFile).toHaveBeenCalledWith(fileB)
+  })
+
+  it('swaps the editor tab back to the workout editor when Obsidian opened the clicked workout in it', async () => {
+    /** Clicking a workout while the editor tab is focused opens it as markdown in that same tab, and file-open fires before Obsidian has finished opening it. */
+    const fileB = makeWorkoutFile('Workouts/B.md')
+    const editorTab = makeLeafShowingFile(fileB)
+    editorTab.working = true
+    const app = makeApp({ getActiveViewOfType: vi.fn(() => editorTab.view) })
+    app.metadataCache.getFileCache = vi.fn(() => ({ frontmatter: { type: 'workout' } }))
+    const plugin = createPlugin(app)
+
+    window.setTimeout(() => {
+      editorTab.working = false
+    }, 120)
+    await plugin.maybeRouteWorkoutFile(fileB)
+
+    expect(editorTab.view).toBeInstanceOf(WorkoutEditorView)
+    const loadFile = (editorTab.view as { loadFile: ReturnType<typeof vi.fn> }).loadFile
+    expect(loadFile).toHaveBeenCalledWith(fileB)
+  })
+
+  it('stops trying to swap a busy tab once the user has opened something else in it', async () => {
+    const fileB = makeWorkoutFile('Workouts/B.md')
+    const journal = makeWorkoutFile('Journal/today.md')
+    const editorTab = makeLeafShowingFile(fileB)
+    const workoutView = editorTab.view
+    editorTab.working = true
+    const app = makeApp({ getActiveViewOfType: vi.fn(() => workoutView) })
+    app.metadataCache.getFileCache = vi.fn(() => ({ frontmatter: { type: 'workout' } }))
+    const plugin = createPlugin(app)
+
+    window.setTimeout(() => {
+      editorTab.view = new MarkdownView({ file: journal, leaf: editorTab })
+      editorTab.working = false
+    }, 20)
+    await plugin.maybeRouteWorkoutFile(fileB)
+
+    expect(editorTab.view).toBeInstanceOf(MarkdownView)
+    expect((editorTab.view as MarkdownView).file).toBe(journal)
   })
 
   it('is a no-op when the user re-clicks the file the editor is already showing', async () => {

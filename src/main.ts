@@ -35,6 +35,13 @@ function emptyWorkoutMarkdown(date: string): string {
   return `---\ntype: workout\ndate: ${date}\nname: \n---\n`
 }
 
+const BUSY_LEAF_RETRY_MS = 50
+const BUSY_LEAF_MAX_ATTEMPTS = 40
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
+}
+
 export default class FitKitPlugin extends Plugin {
   settings!: FitKitSettings
   cachedIndex: FitKitIndex | null = null
@@ -256,7 +263,27 @@ export default class FitKitPlugin extends Plugin {
       await this.swapLeafToWorkoutEditor(editorLeaf, file)
       return
     }
-    await this.swapLeafToWorkoutEditor(markdownView.leaf, file)
+    await this.swapOpeningLeafToWorkoutEditor(markdownView, file)
+  }
+
+  /** file-open fires while Obsidian is still opening the leaf, and Obsidian ignores setViewState on a busy leaf, so retry until the swap takes or the leaf moves on to something else. */
+  private async swapOpeningLeafToWorkoutEditor(
+    markdownView: MarkdownView,
+    file: TFile,
+  ): Promise<void> {
+    const leaf = markdownView.leaf
+    const stillShowingWorkoutMarkdown = (): boolean =>
+      leaf.view === markdownView && markdownView.file === file
+    for (let attempt = 0; attempt < BUSY_LEAF_MAX_ATTEMPTS; attempt++) {
+      await this.swapLeafToWorkoutEditor(leaf, file)
+      if (!stillShowingWorkoutMarkdown()) {
+        return
+      }
+      await delay(BUSY_LEAF_RETRY_MS)
+      if (!stillShowingWorkoutMarkdown()) {
+        return
+      }
+    }
   }
 
   private findExistingEditorLeaf(): WorkspaceLeaf | null {
