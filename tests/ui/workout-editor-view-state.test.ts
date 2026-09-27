@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('obsidian', () => {
+vi.mock('obsidian', async () => {
+  const { mixinFileView } = await import('../fixtures/obsidian-file-view')
+
   class ItemView {
     app: unknown
     leaf: unknown
@@ -50,7 +52,10 @@ vi.mock('obsidian', () => {
     stat = { mtime: 1000 }
   }
 
+  const FileView = mixinFileView(ItemView, (value): value is TFile => value instanceof TFile)
+
   return {
+    FileView,
     ItemView,
     MarkdownView,
     Menu,
@@ -69,7 +74,7 @@ vi.mock('obsidian', () => {
 
 const harness = vi.hoisted(() => ({ createRoot: (): HTMLElement => undefined as never }))
 
-import { TFile } from 'obsidian'
+import { FileView, TFile } from 'obsidian'
 import type { App, WorkspaceLeaf } from 'obsidian'
 
 import FitKitPlugin from '../../src/main'
@@ -81,6 +86,7 @@ import { createTestRoot, harnessDocument, harnessWindow } from '../harness/obsid
 harness.createRoot = createTestRoot
 
 const WORKOUT_PATH = 'Fitness/Workouts/2026-08-15.md'
+const OTHER_WORKOUT_PATH = 'Fitness/Workouts/2026-08-17.md'
 
 const workoutSource = [
   '---',
@@ -104,28 +110,29 @@ const createWorkoutFile = (path: string): TFile =>
 const createView = (): {
   view: WorkoutEditorView
   contents: Map<string, string>
-  requestSaveLayout: ReturnType<typeof vi.fn>
 } => {
-  const file = createWorkoutFile(WORKOUT_PATH)
-  const contents = new Map<string, string>([[WORKOUT_PATH, workoutSource]])
+  const files = new Map([WORKOUT_PATH, OTHER_WORKOUT_PATH].map((p) => [p, createWorkoutFile(p)]))
+  const contents = new Map<string, string>([
+    [WORKOUT_PATH, workoutSource],
+    [OTHER_WORKOUT_PATH, workoutSource],
+  ])
   const vault = {
-    getFolderByPath: buildMockVaultFolderTree([file]).getFolderByPath,
+    getFolderByPath: buildMockVaultFolderTree([...files.values()]).getFolderByPath,
     read: async (target: TFile): Promise<string> => contents.get(target.path) ?? '',
     process: async (target: TFile, callback: (text: string) => string): Promise<void> => {
       contents.set(target.path, callback(contents.get(target.path) ?? ''))
     },
-    getAbstractFileByPath: (path: string): TFile | null => (contents.has(path) ? file : null),
+    getAbstractFileByPath: (path: string): TFile | null => files.get(path) ?? null,
   }
   const app = {
     vault,
     metadataCache: { getFileCache: () => null, on: () => ({}) },
-    workspace: { requestSaveLayout: vi.fn() },
   }
   const plugin = Object.create(FitKitPlugin.prototype) as FitKitPlugin
   plugin.app = app as unknown as App
   plugin.settings = { ...DEFAULT_SETTINGS }
   const view = new WorkoutEditorView({ app } as unknown as WorkspaceLeaf, plugin)
-  return { view, contents, requestSaveLayout: app.workspace.requestSaveLayout }
+  return { view, contents }
 }
 
 describe('WorkoutEditorView workspace state', () => {
@@ -164,13 +171,22 @@ describe('WorkoutEditorView workspace state', () => {
     expect(view.contentEl.textContent).toContain('Squat')
   })
 
-  it('reports the loaded workout path in its saved state', async () => {
-    const { view } = createView()
+  it('saves a pending edit to the previous workout before switching to another', async () => {
+    const { view, contents } = createView()
     await view.onOpen()
+    await view.setState({ file: WORKOUT_PATH }, { history: false })
+    /** Hold the autosave debounce so the edit is still pending at the switch. */
+    vi.stubGlobal('window', { setTimeout: (): number => 1, clearTimeout: (): void => {} })
+    const reps = view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')
+    if (!reps) {
+      throw new Error('reps input not rendered')
+    }
+    reps.value = '7'
+    reps.dispatchEvent(new harnessWindow.Event('input'))
 
-    await view.loadFile(createWorkoutFile(WORKOUT_PATH))
+    await view.setState({ file: OTHER_WORKOUT_PATH }, { history: false })
 
-    expect(view.getState()).toEqual({ file: WORKOUT_PATH })
+    expect(contents.get(WORKOUT_PATH)).toContain('[reps:: 7]')
   })
 
   it('keeps the empty hint when the restored workout no longer exists', async () => {
@@ -196,12 +212,23 @@ describe('WorkoutEditorView workspace state', () => {
     expect(view.contentEl.textContent).not.toContain('Deadlift')
   })
 
-  it('asks Obsidian to save the workspace once a workout loads from state', async () => {
-    const { view, requestSaveLayout } = createView()
+  it('reports the loaded workout as its file so Obsidian can reveal it', async () => {
+    const { view } = createView()
     await view.onOpen()
 
     await view.setState({ file: WORKOUT_PATH }, { history: false })
 
-    expect(requestSaveLayout).toHaveBeenCalled()
+    expect(view instanceof FileView).toBe(true)
+    expect(view.file?.path).toBe(WORKOUT_PATH)
+  })
+
+  it('reports the newly opened workout as its file after switching workouts', async () => {
+    const { view } = createView()
+    await view.onOpen()
+    await view.setState({ file: WORKOUT_PATH }, { history: false })
+
+    await view.setState({ file: OTHER_WORKOUT_PATH }, { history: false })
+
+    expect(view.file?.path).toBe(OTHER_WORKOUT_PATH)
   })
 })
