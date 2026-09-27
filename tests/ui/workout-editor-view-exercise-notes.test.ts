@@ -80,8 +80,7 @@ import { createTestRoot, harnessDocument, harnessWindow } from '../harness/obsid
 
 harness.createRoot = createTestRoot
 
-const WORKOUT_PATH = 'Fitness/Workouts/2026-08-15.md'
-const PUSH_UP_PATH = 'Fitness/Exercises/Push-up.md'
+const WORKOUT_NAME = '2026-08-15'
 
 const workoutSource = [
   '---',
@@ -103,23 +102,34 @@ const createFile = (path: string): TFile =>
 
 type ChangedListener = (file: TFile) => void
 
+interface CreateViewOptions {
+  levels: string[]
+  /** Vault-relative prefix the fixture files sit under; empty for the vault root. */
+  folderPrefix?: string
+  fitnessRoot?: string
+}
+
 /**
  * A real WorkoutEditorView over an in-memory vault holding one workout and
  * one bodyweight exercise note whose cached frontmatter the test can rewrite.
  */
-const createView = (
-  initialLevels: string[],
-): {
+const createView = ({
+  levels: initialLevels,
+  folderPrefix = 'Fitness/',
+  fitnessRoot = DEFAULT_SETTINGS.fitnessRoot,
+}: CreateViewOptions): {
   view: WorkoutEditorView
+  workout: TFile
   exerciseNote: TFile
   setLevels: (levels: string[]) => void
   fireChanged: (file: TFile) => void
 } => {
-  const workout = createFile(WORKOUT_PATH)
-  const exerciseNote = createFile(PUSH_UP_PATH)
-  const contents = new Map<string, string>([[WORKOUT_PATH, workoutSource]])
+  const workout = createFile(`${folderPrefix}Workouts/${WORKOUT_NAME}.md`)
+  const exerciseNote = createFile(`${folderPrefix}Exercises/Push-up.md`)
+  const filesByPath = new Map([workout, exerciseNote].map((file) => [file.path, file]))
+  const contents = new Map<string, string>([[workout.path, workoutSource]])
   const frontmatter = new Map<string, Record<string, unknown>>([
-    [PUSH_UP_PATH, { type: 'exercise', kind: 'bodyweight', levels: initialLevels }],
+    [exerciseNote.path, { type: 'exercise', kind: 'bodyweight', levels: initialLevels }],
   ])
   const listeners: ChangedListener[] = []
   const vault = {
@@ -128,8 +138,7 @@ const createView = (
     process: async (target: TFile, callback: (text: string) => string): Promise<void> => {
       contents.set(target.path, callback(contents.get(target.path) ?? ''))
     },
-    getAbstractFileByPath: (path: string): TFile | null =>
-      path === WORKOUT_PATH ? workout : path === PUSH_UP_PATH ? exerciseNote : null,
+    getAbstractFileByPath: (path: string): TFile | null => filesByPath.get(path) ?? null,
   }
   const app = {
     vault,
@@ -149,13 +158,14 @@ const createView = (
   }
   const plugin = Object.create(FitKitPlugin.prototype) as FitKitPlugin
   plugin.app = app as unknown as App
-  plugin.settings = { ...DEFAULT_SETTINGS }
+  plugin.settings = { ...DEFAULT_SETTINGS, fitnessRoot }
   const view = new WorkoutEditorView({ app } as unknown as WorkspaceLeaf, plugin)
   return {
     view,
+    workout,
     exerciseNote,
     setLevels: (levels) =>
-      frontmatter.set(PUSH_UP_PATH, { type: 'exercise', kind: 'bodyweight', levels }),
+      frontmatter.set(exerciseNote.path, { type: 'exercise', kind: 'bodyweight', levels }),
     fireChanged: (file) => listeners.forEach((listener) => listener(file)),
   }
 }
@@ -208,9 +218,11 @@ describe('WorkoutEditorView exercise note changes', () => {
   })
 
   it('shows renamed rungs once the exercise note levels change', async () => {
-    const { view, exerciseNote, setLevels, fireChanged } = createView(['Wall', 'Incline'])
+    const { view, workout, exerciseNote, setLevels, fireChanged } = createView({
+      levels: ['Wall', 'Incline'],
+    })
     await view.onOpen()
-    await view.loadFile(createFile(WORKOUT_PATH))
+    await view.loadFile(workout)
     expect(levelLabelText(view)).toBe('2 · Incline')
 
     setLevels(['Wall', 'Knee'])
@@ -219,10 +231,13 @@ describe('WorkoutEditorView exercise note changes', () => {
 
     expect(levelLabelText(view)).toBe('2 · Knee')
   })
+
   it('enables raising a set once a rung is added above its level', async () => {
-    const { view, exerciseNote, setLevels, fireChanged } = createView(['Wall', 'Incline'])
+    const { view, workout, exerciseNote, setLevels, fireChanged } = createView({
+      levels: ['Wall', 'Incline'],
+    })
     await view.onOpen()
-    await view.loadFile(createFile(WORKOUT_PATH))
+    await view.loadFile(workout)
     expect(raiseLevelButton(view)?.disabled).toBe(true)
 
     setLevels(['Wall', 'Incline', 'Knee'])
@@ -233,9 +248,11 @@ describe('WorkoutEditorView exercise note changes', () => {
   })
 
   it('keeps unsaved edits when an exercise note changes', async () => {
-    const { view, exerciseNote, setLevels, fireChanged } = createView(['Wall', 'Incline'])
+    const { view, workout, exerciseNote, setLevels, fireChanged } = createView({
+      levels: ['Wall', 'Incline'],
+    })
     await view.onOpen()
-    await view.loadFile(createFile(WORKOUT_PATH))
+    await view.loadFile(workout)
     timers.fireImmediately = false
     const reps = repsInput(view)
     if (!reps) {
@@ -250,5 +267,49 @@ describe('WorkoutEditorView exercise note changes', () => {
 
     expect(levelLabelText(view)).toBe('2 · Knee')
     expect(repsInput(view)?.value).toBe('14')
+  })
+  it('picks up level changes when the fitness root is the vault root', async () => {
+    const { view, workout, exerciseNote, setLevels, fireChanged } = createView({
+      levels: ['Wall', 'Incline'],
+      folderPrefix: '',
+      fitnessRoot: '/',
+    })
+    await view.onOpen()
+    await view.loadFile(workout)
+    expect(levelLabelText(view)).toBe('2 · Incline')
+
+    setLevels(['Wall', 'Knee'])
+    fireChanged(exerciseNote)
+    await settle()
+
+    expect(levelLabelText(view)).toBe('2 · Knee')
+  })
+
+  it.each([
+    ['a workout note', 'Fitness/Workouts/2026-08-14.md'],
+    ['a folder sharing the exercises prefix', 'Fitness/Exercises-old/Push-up.md'],
+  ])('leaves the editor in place when %s changes', async (_label, path) => {
+    const { view, workout, fireChanged } = createView({ levels: ['Wall', 'Incline'] })
+    await view.onOpen()
+    await view.loadFile(workout)
+    const reps = repsInput(view)
+
+    fireChanged(createFile(path))
+    await settle()
+
+    expect(reps).not.toBeNull()
+    expect(repsInput(view)).toBe(reps)
+  })
+
+  it('keeps the empty hint when an exercise note changes before a workout loads', async () => {
+    const { view, exerciseNote, fireChanged } = createView({ levels: ['Wall', 'Incline'] })
+    await view.onOpen()
+
+    fireChanged(exerciseNote)
+    await settle()
+
+    expect(view.contentEl.querySelector('.fitkit-empty')?.textContent).toBe(
+      'Open a workout note to edit.',
+    )
   })
 })
