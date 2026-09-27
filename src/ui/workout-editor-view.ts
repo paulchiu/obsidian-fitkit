@@ -255,7 +255,21 @@ export class WorkoutEditorView extends ItemView {
     this.resizeObserver.observe(this.contentEl)
     this.updateNarrowState()
     this.registerDragLifetimeListeners()
+    this.registerEvent(
+      this.app.metadataCache.on('changed', (file) => this.onExerciseNoteChanged(file)),
+    )
     this.renderEmpty('Open a workout note to edit.')
+  }
+
+  /** Exercise notes own ladders, kinds and units, so an edit made outside the editor re-renders the open workout. */
+  private onExerciseNoteChanged(file: TFile): void {
+    if (!this.model || !this.session) {
+      return
+    }
+    if (!file.path.startsWith(`${exercisesFolder(this.plugin.settings)}/`)) {
+      return
+    }
+    this.render()
   }
 
   private registerDragLifetimeListeners(): void {

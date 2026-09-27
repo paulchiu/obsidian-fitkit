@@ -14,6 +14,7 @@ vi.mock('obsidian', () => {
       this.contentEl = harness.createRoot()
     }
     registerDomEvent(): void {}
+    registerEvent(): void {}
     getState(): Record<string, unknown> {
       return {}
     }
@@ -117,7 +118,7 @@ const createView = (): {
   }
   const app = {
     vault,
-    metadataCache: { getFileCache: () => null },
+    metadataCache: { getFileCache: () => null, on: () => ({}) },
     workspace: { requestSaveLayout: vi.fn() },
   }
   const plugin = Object.create(FitKitPlugin.prototype) as FitKitPlugin
