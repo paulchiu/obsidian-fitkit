@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [1.5.1] - 2026-09-27
+
+### Added
+
+### Changed
+
+### Fixed
+
 - Clicking another workout in the file explorer while the workout editor is focused now opens it in the workout editor instead of as plain markdown.
 
 ### Removed
