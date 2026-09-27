@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [1.4.7] - 2026-09-27
+
+### Added
+
+### Changed
+
+### Fixed
+
 - The workout editor now picks up edits to an exercise note (such as new bodyweight levels) straight away, without reopening the workout.
 
 ### Removed
