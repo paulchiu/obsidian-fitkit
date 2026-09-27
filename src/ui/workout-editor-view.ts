@@ -239,7 +239,7 @@ export class WorkoutEditorView extends FileView {
     menu.addItem((item) =>
       item
         .setSection('pane')
-        .setTitle('Open as Markdown')
+        .setTitle('Markdown view')
         .setIcon('file-text')
         .onClick(() => this.plugin.openLeafAsMarkdown(this.leaf, file)),
     )
