@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [1.5.0] - 2026-09-27
+
+### Added
+
 - "Reveal current file in navigation" now reveals the workout open in the workout editor, and the file explorer highlights it.
 
 ### Changed
