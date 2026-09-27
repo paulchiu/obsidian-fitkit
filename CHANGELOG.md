@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- "Reveal current file in navigation" now reveals the workout open in the workout editor, and the file explorer highlights it.
+
 ### Changed
+
+- The workout editor tab now behaves like other file tabs: opening a non-workout note while it is focused opens the note in that tab.
 
 ### Fixed
 

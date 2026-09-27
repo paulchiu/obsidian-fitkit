@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('obsidian', () => {
+vi.mock('obsidian', async () => {
+  const { mixinFileView } = await import('../fixtures/obsidian-file-view')
+
   class ItemView {
     app: unknown
     leaf: unknown
@@ -50,7 +52,10 @@ vi.mock('obsidian', () => {
     stat = { mtime: 1000 }
   }
 
+  const FileView = mixinFileView(ItemView, (value): value is TFile => value instanceof TFile)
+
   return {
+    FileView,
     ItemView,
     MarkdownView,
     Menu,
@@ -222,7 +227,7 @@ describe('WorkoutEditorView exercise note changes', () => {
       levels: ['Wall', 'Incline'],
     })
     await view.onOpen()
-    await view.loadFile(workout)
+    await view.setState({ file: workout.path }, { history: false })
     expect(levelLabelText(view)).toBe('2 · Incline')
 
     setLevels(['Wall', 'Knee'])
@@ -237,7 +242,7 @@ describe('WorkoutEditorView exercise note changes', () => {
       levels: ['Wall', 'Incline'],
     })
     await view.onOpen()
-    await view.loadFile(workout)
+    await view.setState({ file: workout.path }, { history: false })
     expect(raiseLevelButton(view)?.disabled).toBe(true)
 
     setLevels(['Wall', 'Incline', 'Knee'])
@@ -252,7 +257,7 @@ describe('WorkoutEditorView exercise note changes', () => {
       levels: ['Wall', 'Incline'],
     })
     await view.onOpen()
-    await view.loadFile(workout)
+    await view.setState({ file: workout.path }, { history: false })
     timers.fireImmediately = false
     const reps = repsInput(view)
     if (!reps) {
@@ -275,7 +280,7 @@ describe('WorkoutEditorView exercise note changes', () => {
       fitnessRoot: '/',
     })
     await view.onOpen()
-    await view.loadFile(workout)
+    await view.setState({ file: workout.path }, { history: false })
     expect(levelLabelText(view)).toBe('2 · Incline')
 
     setLevels(['Wall', 'Knee'])
@@ -291,7 +296,7 @@ describe('WorkoutEditorView exercise note changes', () => {
   ])('leaves the editor in place when %s changes', async (_label, path) => {
     const { view, workout, fireChanged } = createView({ levels: ['Wall', 'Incline'] })
     await view.onOpen()
-    await view.loadFile(workout)
+    await view.setState({ file: workout.path }, { history: false })
     const reps = repsInput(view)
 
     fireChanged(createFile(path))

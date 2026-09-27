@@ -1,5 +1,5 @@
-import type { App, ViewStateResult, WorkspaceLeaf } from 'obsidian'
-import { ItemView, Menu, Modal, Notice, TFile, normalizePath, setIcon } from 'obsidian'
+import type { App, WorkspaceLeaf } from 'obsidian'
+import { FileView, Menu, Modal, Notice, TFile, normalizePath, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
 import {
@@ -174,7 +174,12 @@ interface EditorWorkoutModel {
   frontmatterExtra: string[]
 }
 
-export class WorkoutEditorView extends ItemView {
+/**
+ * A FileView so Obsidian treats the open workout as the active file (reveal in
+ * navigation, explorer highlight) and persists it in the workspace state.
+ */
+export class WorkoutEditorView extends FileView {
+  allowNoFile = true
   private session: FileSession | null = null
   private model: EditorWorkoutModel | null = null
   private exerciseHistory: ExerciseHistoryByName | null = null
@@ -222,22 +227,6 @@ export class WorkoutEditorView extends ItemView {
 
   get currentFile(): TFile | null {
     return this.session?.file ?? null
-  }
-
-  /** Obsidian persists this state and hands it back to setState on relaunch, so the open workout survives iOS killing the app in the background. */
-  getState(): Record<string, unknown> {
-    const state = super.getState()
-    return this.currentFile ? { ...state, file: this.currentFile.path } : state
-  }
-
-  async setState(state: unknown, result: ViewStateResult): Promise<void> {
-    await super.setState(state, result)
-    const path = workoutPathFromState(state)
-    const file = path ? this.app.vault.getAbstractFileByPath(path) : null
-    if (file instanceof TFile && file.path !== this.currentFile?.path) {
-      await this.loadFile(file)
-      this.app.workspace.requestSaveLayout()
-    }
   }
 
   refreshSettingsDrivenUi(): void {
@@ -346,7 +335,7 @@ export class WorkoutEditorView extends ItemView {
     }
   }
 
-  async loadFile(file: TFile): Promise<void> {
+  async onUnloadFile(): Promise<void> {
     this.stopTimer({ write: true })
     this.clearRestTimerState()
     if (this.autoSaveTimer !== null) {
@@ -356,6 +345,9 @@ export class WorkoutEditorView extends ItemView {
     if (this.session && this.dirty && !this.conflictDetected) {
       await this.flushAutoSave()
     }
+  }
+
+  async onLoadFile(file: TFile): Promise<void> {
     /** Fresh mount has no model yet; show a skeleton so the user is not staring at the onOpen empty state during the disk read. Retargets keep the previous content visible for a single-paint transition. */
     let skeletonShownAt: number | null = null
     if (!this.model) {
@@ -2524,13 +2516,6 @@ export function measureLevelLabelWidths(full: HTMLElement): LevelLabelWidths {
  */
 export function shouldShortenLevelLabel(labelWidth: number, availableWidth: number): boolean {
   return labelWidth > availableWidth
-}
-
-function workoutPathFromState(state: unknown): string | null {
-  if (typeof state !== 'object' || state === null || !('file' in state)) {
-    return null
-  }
-  return typeof state.file === 'string' ? state.file : null
 }
 
 function parseNumberInput(raw: string): number | undefined {

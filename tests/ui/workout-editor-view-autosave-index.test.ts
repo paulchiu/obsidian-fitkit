@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const noticeMessages = vi.hoisted(() => [] as string[])
 
-vi.mock('obsidian', () => {
+vi.mock('obsidian', async () => {
+  const { mixinFileView } = await import('../fixtures/obsidian-file-view')
+
   class App {}
   class Plugin {
     app: unknown
@@ -117,8 +119,11 @@ vi.mock('obsidian', () => {
     basename = ''
   }
 
+  const FileView = mixinFileView(ItemView, (value): value is TFile => value instanceof TFile)
+
   return {
     App,
+    FileView,
     ItemView,
     MarkdownView,
     Menu,

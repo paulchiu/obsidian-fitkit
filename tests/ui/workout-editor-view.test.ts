@@ -52,7 +52,9 @@ const registryVaultMock = vi.hoisted(() => ({
   exerciseRegistryWithVaultNotes: vi.fn<() => ExerciseRegistryEntry[]>(() => []),
 }))
 
-vi.mock('obsidian', () => {
+vi.mock('obsidian', async () => {
+  const { mixinFileView } = await import('../fixtures/obsidian-file-view')
+
   class Modal {
     contentEl = new TestElement('div')
 
@@ -163,7 +165,10 @@ vi.mock('obsidian', () => {
 
   class TFile {}
 
+  const FileView = mixinFileView(ItemView, (value): value is TFile => value instanceof TFile)
+
   return {
+    FileView,
     ItemView,
     Menu,
     Modal,
@@ -2771,6 +2776,7 @@ interface RestTimerWorkoutModel {
 }
 
 interface TimerView {
+  file: unknown
   model: { exercises: TimerExerciseCard[] }
   exerciseHistory: unknown
   activeTimer: unknown
@@ -2793,6 +2799,7 @@ interface TimerView {
 
 interface RestTimerView {
   plugin: { settings: { strengthRestTimerEnabled: boolean } }
+  file: unknown
   session: unknown
   model: RestTimerWorkoutModel
   exerciseHistory: unknown
@@ -2840,6 +2847,7 @@ describe('WorkoutEditorView rest timer', () => {
   const createRestTimerView = (ex: RestTimerExerciseCard): RestTimerView => {
     const view = Object.create(WorkoutEditorView.prototype) as RestTimerView
     view.plugin = { settings: { strengthRestTimerEnabled: true } }
+    view.file = { path: 'Workouts/A.md' }
     view.model = createRestTimerModel([ex])
     view.exerciseHistory = null
     view.activeTimer = null
@@ -3259,6 +3267,7 @@ describe('WorkoutEditorView rest timer', () => {
 describe('WorkoutEditorView duration timer', () => {
   const createTimerView = (ex: TimerExerciseCard): TimerView => {
     const view = Object.create(WorkoutEditorView.prototype) as TimerView
+    view.file = { path: 'Workouts/A.md' }
     view.model = { exercises: [ex] }
     view.exerciseHistory = null
     view.activeTimer = null
