@@ -229,6 +229,22 @@ export class WorkoutEditorView extends FileView {
     return this.session?.file ?? null
   }
 
+  /** Obsidian fires file-menu only from its editable file views, so this tab adds its own switch. */
+  onPaneMenu(menu: Menu, source: string): void {
+    super.onPaneMenu(menu, source)
+    const file = this.currentFile
+    if (source !== 'more-options' || !file) {
+      return
+    }
+    menu.addItem((item) =>
+      item
+        .setSection('pane')
+        .setTitle('Open as Markdown')
+        .setIcon('file-text')
+        .onClick(() => this.plugin.openLeafAsMarkdown(this.leaf, file)),
+    )
+  }
+
   refreshSettingsDrivenUi(): void {
     if (!this.isRestTimerEnabled()) {
       this.clearRestTimerState()
