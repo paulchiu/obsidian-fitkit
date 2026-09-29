@@ -980,6 +980,20 @@ export class WorkoutEditorView extends FileView {
       this.markDirty()
       this.render()
     })
+    const repeatBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Repeat' })
+    repeatBtn.disabled = ex.durationEntries.length === 0
+    repeatBtn.addEventListener('click', () => {
+      if (this.activeTimer && this.activeTimer.card === ex) {
+        this.stopTimer({ write: true })
+      }
+      const last = ex.durationEntries[ex.durationEntries.length - 1]
+      ex.durationEntries.push({
+        set: ex.durationEntries.length + 1,
+        durationSeconds: last?.durationSeconds,
+      })
+      this.markDirty()
+      this.render()
+    })
 
     const isRunningHere = this.activeTimer?.card === ex
     const timerBtn = actions.createEl('button', {

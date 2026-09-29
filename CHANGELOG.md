@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A `Repeat` button beside `Add set` on every exercise card appends a copy of the last row's values, so a run of identical sets is one click each. It is disabled until the card has a row to copy.
+
 ### Changed
 
 ### Fixed

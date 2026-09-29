@@ -41,13 +41,13 @@ An exercise note is added from the card menu and renders as a line under the bad
 
 ## Logging sets
 
-Strength cards give you a `Set` figure, a `Weight` field and a `Reps` field per set. The set figure shows the number stored in the note rather than a running count, so a hand-edited `1, 3, 7` stays as you wrote it; `Renumber sets` in the row menu resequences from 1 when you want it tidied. `Add set` appends a row carrying the previous set's weight, with reps left empty. The kebab on each row holds `Edit note`, `Renumber sets` and `Delete row`; a saved row note renders under the row and reopens the editor when clicked.
+Strength cards give you a `Set` figure, a `Weight` field and a `Reps` field per set. The set figure shows the number stored in the note rather than a running count, so a hand-edited `1, 3, 7` stays as you wrote it; `Renumber sets` in the row menu resequences from 1 when you want it tidied. `Add set` appends a row carrying the previous set's weight, with reps left empty. `Repeat` beside it appends a copy of the last set's weight and reps, leaving its note behind; it stays disabled until the card has a set. The kebab on each row holds `Edit note`, `Renumber sets` and `Delete row`; a saved row note renders under the row and reopens the editor when clicked.
 
 The last row of a strength card is the one you are logging, so its fields are drawn larger than the finished rows above them, and larger again on a phone or a narrow pane.
 
 The first set of a new card prefills its weight from the plan you recorded for that exercise last session, applied to that session's top set. A proposed weight is drawn dashed until you type over it. Reps are never prefilled: weight is what you choose before a set, reps are what you count after it. A row holding a weight and no reps counts for nothing until you record them, so it cannot become a personal best or move your history while the set is still in progress.
 
-Duration cards work the same way, swapping weight and reps for a single `Duration` field, with `Add set` and a play button beside it that fills the entry live and writes it on stop. Their set numbers are figures too, resequenced from the same `Renumber sets` item. The field accepts three shapes:
+Duration cards work the same way, swapping weight and reps for a single `Duration` field, with `Add set`, `Repeat` (which copies the last duration, stopping a running timer first) and a play button beside it that fills the entry live and writes it on stop. Their set numbers are figures too, resequenced from the same `Renumber sets` item. The field accepts three shapes:
 
 - Bare seconds, `90`.
 - Unit form, `1m30s` or `2h`.
@@ -59,7 +59,7 @@ While the timer runs, the row also records when it started (`[started:: ...]`), 
 
 Bodyweight cards show `Set`, `Level` and `Reps` per set, with a `Load` cell that appears only while some row in that exercise carries a load. The kebab on each row adds load to that row or removes it again.
 
-Each row carries a level stepper: minus and plus move one rung, stopping at the first and last rung of the ladder. The level label between them opens a menu of every rung, marking the current one. `Add set` copies the previous row's rung and puts the cursor in `Reps`.
+Each row carries a level stepper: minus and plus move one rung, stopping at the first and last rung of the ladder. The level label between them opens a menu of every rung, marking the current one. `Add set` copies the previous row's rung and puts the cursor in `Reps`; `Repeat` copies the whole row, rung, reps and load.
 
 The card menu holds `Edit levels`, which edits the ladder one rung per line. An edit that changes what an already-logged level means lists each affected level with its old and new rung, and applies only once confirmed. Appending a rung at the end changes nothing logged and does not prompt.
 
