@@ -4342,3 +4342,55 @@ describe('WorkoutEditorView menu placement', () => {
     expectWithin(box, 360)
   })
 })
+
+describe('WorkoutEditorView repeat set', () => {
+  const renderCard = (ex: {
+    name: string
+    kind: ExerciseKind
+    strengthSets: unknown[]
+    durationEntries: unknown[]
+    bodyweightSets: unknown[]
+  }): TestElement => {
+    const view = createExerciseCardRenderView()
+    view.model = { exercises: [ex] }
+    view.exerciseHistory = new Map()
+    Object.assign(view, { markDirty: vi.fn(), render: vi.fn(), focusRowCell: vi.fn() })
+    const list = new TestElement('div')
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    return list
+  }
+
+  const repeatButton = (list: TestElement): (TestElement & { disabled?: boolean }) | undefined =>
+    list
+      .findByClass('fitkit-row-actions')
+      ?.children.find((child) => child.tagName === 'button' && child.textContent === 'Repeat')
+
+  it('appends a strength set with the last weight and reps, leaving its note behind', () => {
+    const ex = {
+      name: 'Squat',
+      kind: 'strength' as const,
+      strengthSets: [
+        { set: 1, weight: 60, reps: 8 },
+        { set: 2, weight: 80, reps: 5, note: 'grindy' },
+      ],
+      durationEntries: [],
+      bodyweightSets: [],
+    }
+
+    repeatButton(renderCard(ex))?.listenersFor('click')[0]?.({})
+
+    expect(ex.strengthSets[2]).toEqual({ set: 3, weight: 80, reps: 5 })
+  })
+
+  it('disables Repeat on a card with no sets to copy', () => {
+    const ex = createExerciseCardFixture('Squat', 'strength')
+
+    expect(repeatButton(renderCard(ex))?.disabled).toBe(true)
+  })
+
+  it('enables Repeat once the card has a set', () => {
+    const ex = { ...createExerciseCardFixture('Squat', 'strength'), strengthSets: [{ set: 1 }] }
+
+    expect(repeatButton(renderCard(ex))?.disabled).toBe(false)
+  })
+})
