@@ -137,9 +137,10 @@ const clickButton = (view: WorkoutEditorView, label: string): void => {
   button.click()
 }
 
+/** Waits for autosave to write a line exactly equal to `expected`. */
 const savedRowingRow = async (contents: Map<string, string>, expected: string): Promise<void> => {
   await vi.waitFor(() => {
-    expect(contents.get(WORKOUT_PATH)).toContain(expected)
+    expect(contents.get(WORKOUT_PATH)?.split('\n')).toContain(expected)
   })
 }
 
@@ -187,5 +188,21 @@ describe('WorkoutEditorView duration timer persistence', () => {
       contents,
       '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90] [started:: 2026-09-30T07:15:03+10:00]',
     )
+  })
+
+  it('adds the elapsed time to the duration and drops the start time when the timer stops', async () => {
+    const { view, contents } = await openView(
+      workoutSource('- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90]'),
+    )
+    clickButton(view, 'Start timer')
+    await savedRowingRow(
+      contents,
+      '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90] [started:: 2026-09-30T07:15:03+10:00]',
+    )
+    vi.setSystemTime(new Date('2026-09-30T07:16:08+10:00'))
+
+    clickButton(view, 'Stop timer')
+
+    await savedRowingRow(contents, '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 155]')
   })
 })

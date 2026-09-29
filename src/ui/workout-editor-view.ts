@@ -1379,6 +1379,7 @@ export class WorkoutEditorView extends FileView {
       return
     }
     window.clearInterval(timer.intervalId)
+    delete timer.entry.startedAt
     if (opts.write) {
       timer.entry.durationSeconds = this.liveSeconds(timer)
       this.markDirty()
