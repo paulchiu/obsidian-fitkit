@@ -55,6 +55,8 @@ Duration cards work the same way, swapping weight and reps for a single `Duratio
 
 Whatever you type is normalised to the unit form on blur, and stored in the note as seconds.
 
+While the timer runs, the row also records when it started (`[started:: ...]`), so a timer cut off by the phone closing Obsidian in the background picks up where it left off the next time the workout opens. Stopping the timer, or closing the tab yourself, adds the elapsed time to the duration and removes the start time.
+
 Bodyweight cards show `Set`, `Level` and `Reps` per set, with a `Load` cell that appears only while some row in that exercise carries a load. The kebab on each row adds load to that row or removes it again.
 
 Each row carries a level stepper: minus and plus move one rung, stopping at the first and last rung of the ladder. The level label between them opens a menu of every rung, marking the current one. `Add set` copies the previous row's rung and puts the cursor in `Reps`.

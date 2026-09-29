@@ -13,7 +13,8 @@
  *  - Exercise-level note: has `[exercise::]` and optional `[notes::]` /
  *    `[next::]` only.
  *  - Strength row: has `[set::]`, optional `[weight::]`, optional `[reps::]`, optional `[notes::]`.
- *  - Duration row: has `[duration::]` (seconds), optional `[set::]`, optional `[notes::]`.
+ *  - Duration row: has `[duration::]` (seconds), optional `[set::]`, optional `[started::]`
+ *    (the ISO start time of a timer still running on that row), optional `[notes::]`.
  *  - Bodyweight row: has `[level::]`, optional `[set::]`, optional `[reps::]`, optional `[load::]`, optional `[notes::]`.
  *
  * A round-trip (parse then serialize) is content-preserving for anything the
@@ -46,6 +47,7 @@ export interface StrengthSet {
 export interface DurationEntry {
   set?: number
   durationSeconds: number
+  startedAt?: string
   note?: string
 }
 
@@ -376,6 +378,10 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
       if (hasSet) {
         entry.set = Number(fields.get('set'))
       }
+      const startedAt = fields.get('started')
+      if (startedAt !== undefined) {
+        entry.startedAt = startedAt
+      }
       if (note !== undefined) {
         entry.note = note
       }
@@ -621,6 +627,9 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
           parts.push(`[set:: ${entry.set}]`)
         }
         parts.push(`[duration:: ${formatNumber(entry.durationSeconds)}]`)
+        if (entry.startedAt !== undefined) {
+          parts.push(`[started:: ${entry.startedAt}]`)
+        }
         if (entry.note !== undefined) {
           parts.push(`[notes:: ${entry.note}]`)
         }
@@ -671,6 +680,7 @@ export function canonicalizeForEquality(model: WorkoutNoteModel): unknown {
           ? ex.durationEntries.map((entry) => ({
               set: entry.set,
               durationSeconds: entry.durationSeconds,
+              startedAt: entry.startedAt,
               note: entry.note,
             }))
           : undefined,

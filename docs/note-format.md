@@ -41,6 +41,7 @@ Dataview inline fields are the canonical format. The recognised ones are:
 | `weight`   | Weight lifted, in the exercise's unit.                                                                                |
 | `reps`     | Repetitions.                                                                                                          |
 | `duration` | Seconds. Always seconds, whatever you typed into the editor.                                                          |
+| `started`  | Local time a duration timer started, such as `2026-09-30T07:15:03+10:00`. Present only while that timer runs.         |
 | `level`    | Rung reached, as a 1-based position in the exercise's `levels:` ladder.                                               |
 | `load`     | Added weight on a bodyweight set, such as a vest.                                                                     |
 | `notes`    | Free text, on an exercise header row or on an individual set.                                                         |

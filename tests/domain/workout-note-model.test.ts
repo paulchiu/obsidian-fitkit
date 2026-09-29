@@ -242,6 +242,27 @@ describe('workout note model', () => {
     })
   })
 
+  it('writes back the start time of a running duration timer', () => {
+    const source = [
+      '---',
+      'type: workout',
+      'date: 2026-09-30',
+      'name: Cardio',
+      '---',
+      '',
+      '## [[Rowing]]',
+      '',
+      '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90] [started:: 2026-09-30T07:15:03+10:00] [notes:: easy]',
+      '',
+    ].join('\n')
+
+    const serialized = serializeWorkoutNote(expectWorkoutModel(source, 'running.md'))
+
+    expect(serialized).toContain(
+      '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90] [started:: 2026-09-30T07:15:03+10:00] [notes:: easy]',
+    )
+  })
+
   it('coerces strength rows to a duration entry carrying only the duration rows', () => {
     const result = parseWorkoutNote(
       [
