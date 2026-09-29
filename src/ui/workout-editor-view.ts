@@ -378,6 +378,7 @@ export class WorkoutEditorView extends FileView {
     this.exerciseHistory = await this.loadExerciseHistory()
     this.dirty = false
     this.conflictDetected = false
+    this.resumeSavedTimer()
     if (skeletonShownAt !== null) {
       const elapsed = Date.now() - skeletonShownAt
       const minSkeletonMs = 500
@@ -408,6 +409,7 @@ export class WorkoutEditorView extends FileView {
     }
     this.dirty = false
     this.conflictDetected = false
+    this.resumeSavedTimer()
     this.render()
     new Notice('Reloaded from disk.')
   }
@@ -1357,20 +1359,34 @@ export class WorkoutEditorView extends FileView {
     if (this.activeTimer && this.activeTimer.entry === entry) {
       return
     }
-    const accumulator = entry.durationSeconds ?? 0
     const startedAtMs = Date.now()
     entry.startedAt = formatLocalTimestamp(new Date(startedAtMs))
-    const intervalId = window.setInterval(() => this.tickTimer(), 1000)
+    this.runTimer(card, entry, startedAtMs)
+    this.markDirty()
+    this.render()
+  }
+
+  /** Picks up a timer the note records as running, such as one cut off when the app was killed. */
+  private resumeSavedTimer(): void {
+    for (const card of this.model?.exercises ?? []) {
+      const entry = card.durationEntries.find((candidate) => candidate.startedAt !== undefined)
+      const startedAtMs = Date.parse(entry?.startedAt ?? '')
+      if (entry && !Number.isNaN(startedAtMs)) {
+        this.runTimer(card, entry, startedAtMs)
+        return
+      }
+    }
+  }
+
+  private runTimer(card: ExerciseCard, entry: EditableDurationEntry, startedAtMs: number): void {
     this.activeTimer = {
       card,
       entry,
       startedAtMs,
-      accumulator,
-      intervalId,
+      accumulator: entry.durationSeconds ?? 0,
+      intervalId: window.setInterval(() => this.tickTimer(), 1000),
       inputEl: null,
     }
-    this.markDirty()
-    this.render()
   }
 
   private stopTimer(opts: { write: boolean; render?: boolean }): void {

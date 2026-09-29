@@ -205,4 +205,44 @@ describe('WorkoutEditorView duration timer persistence', () => {
 
     await savedRowingRow(contents, '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 155]')
   })
+
+  it('resumes a timer saved as running, counting from its start time', async () => {
+    vi.setSystemTime(new Date('2026-09-30T07:16:08+10:00'))
+
+    const { view } = await openView(
+      workoutSource(
+        '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90] [started:: 2026-09-30T07:15:03+10:00]',
+      ),
+    )
+
+    const duration = view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Duration"]')
+    expect(duration?.value).toBe('2m35s')
+  })
+
+  it('resumes a running timer found when reloading the workout from disk', async () => {
+    const { view, contents } = await openView(
+      workoutSource('- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90]'),
+    )
+    contents.set(
+      WORKOUT_PATH,
+      workoutSource(
+        '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90] [started:: 2026-09-30T07:15:03+10:00]',
+      ),
+    )
+    vi.setSystemTime(new Date('2026-09-30T07:16:08+10:00'))
+
+    await view.reloadFromDisk()
+
+    const duration = view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Duration"]')
+    expect(duration?.value).toBe('2m35s')
+  })
+
+  it('leaves the timer stopped when the saved start time is not a timestamp', async () => {
+    const { view } = await openView(
+      workoutSource('- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90] [started:: soon]'),
+    )
+
+    const duration = view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Duration"]')
+    expect(duration?.value).toBe('1m30s')
+  })
 })
