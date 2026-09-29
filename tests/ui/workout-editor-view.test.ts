@@ -4382,15 +4382,42 @@ describe('WorkoutEditorView repeat set', () => {
     expect(ex.strengthSets[2]).toEqual({ set: 3, weight: 80, reps: 5 })
   })
 
-  it('disables Repeat on a card with no sets to copy', () => {
-    const ex = createExerciseCardFixture('Squat', 'strength')
+  it('appends a bodyweight set with the last level, reps and load', () => {
+    const ex = {
+      name: 'Push-up',
+      kind: 'bodyweight' as const,
+      strengthSets: [],
+      durationEntries: [],
+      bodyweightSets: [
+        { set: 1, level: 2, reps: 12 },
+        { set: 2, level: 3, reps: 8, load: 10, note: 'last one' },
+      ],
+    }
 
-    expect(repeatButton(renderCard(ex))?.disabled).toBe(true)
+    repeatButton(renderCard(ex))?.listenersFor('click')[0]?.({})
+
+    expect(ex.bodyweightSets[2]).toEqual({ set: 3, level: 3, reps: 8, load: 10 })
   })
 
-  it('enables Repeat once the card has a set', () => {
-    const ex = { ...createExerciseCardFixture('Squat', 'strength'), strengthSets: [{ set: 1 }] }
+  const emptyCard = (kind: ExerciseKind) => ({
+    name: 'Any',
+    kind,
+    strengthSets: [],
+    durationEntries: [],
+    bodyweightSets: [],
+  })
 
-    expect(repeatButton(renderCard(ex))?.disabled).toBe(false)
+  it.each(['strength', 'bodyweight'] as const)(
+    'disables Repeat on an empty %s card, since there is no set to copy',
+    (kind) => {
+      expect(repeatButton(renderCard(emptyCard(kind)))?.disabled).toBe(true)
+    },
+  )
+
+  it.each([
+    { kind: 'strength' as const, rows: { strengthSets: [{ set: 1 }] } },
+    { kind: 'bodyweight' as const, rows: { bodyweightSets: [{ set: 1, level: 1 }] } },
+  ])('enables Repeat once a $kind card has a set', ({ kind, rows }) => {
+    expect(repeatButton(renderCard({ ...emptyCard(kind), ...rows }))?.disabled).toBe(false)
   })
 })

@@ -756,6 +756,19 @@ export class WorkoutEditorView extends FileView {
       this.render()
       this.focusRowCell(exerciseIndex, ex.bodyweightSets.length - 1, 'Reps')
     })
+    const repeatBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Repeat' })
+    repeatBtn.disabled = ex.bodyweightSets.length === 0
+    repeatBtn.addEventListener('click', () => {
+      const last = ex.bodyweightSets[ex.bodyweightSets.length - 1]
+      ex.bodyweightSets.push({
+        set: ex.bodyweightSets.length + 1,
+        level: last?.level,
+        reps: last?.reps,
+        load: last?.load,
+      })
+      this.markDirty()
+      this.render()
+    })
   }
 
   private renderBodyweightRow(
