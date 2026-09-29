@@ -245,4 +245,20 @@ describe('WorkoutEditorView duration timer persistence', () => {
     const duration = view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Duration"]')
     expect(duration?.value).toBe('1m30s')
   })
+
+  it('saves the elapsed time without a start time when the tab closes mid-timer', async () => {
+    const { view, contents } = await openView(
+      workoutSource('- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90]'),
+    )
+    clickButton(view, 'Start timer')
+    await savedRowingRow(
+      contents,
+      '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90] [started:: 2026-09-30T07:15:03+10:00]',
+    )
+    vi.setSystemTime(new Date('2026-09-30T07:16:08+10:00'))
+
+    await view.onClose()
+
+    await savedRowingRow(contents, '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 155]')
+  })
 })
