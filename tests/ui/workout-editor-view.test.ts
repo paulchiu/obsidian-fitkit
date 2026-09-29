@@ -3546,7 +3546,7 @@ describe('WorkoutEditorView duration timer', () => {
       ?.children.find((c) => c.tagName === 'button' && c.textContent === 'Repeat')
       ?.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
 
-    expect(ex.durationEntries[1]).toEqual({ set: 2, durationSeconds: 8 })
+    expect(ex.durationEntries).toEqual([{ durationSeconds: 8 }, { set: 2, durationSeconds: 8 }])
     expect(view.activeTimer).toBeNull()
   })
 
