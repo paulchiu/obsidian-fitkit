@@ -12,4 +12,10 @@ describe('formatLocalTimestamp', () => {
 
     expect(formatLocalTimestamp(new Date('2026-09-30T12:00:09Z'))).toBe('2026-09-30T09:30:09-02:30')
   })
+
+  it('writes UTC with a positive zero offset', () => {
+    vi.stubEnv('TZ', 'UTC')
+
+    expect(formatLocalTimestamp(new Date('2026-09-30T12:00:09Z'))).toBe('2026-09-30T12:00:09+00:00')
+  })
 })

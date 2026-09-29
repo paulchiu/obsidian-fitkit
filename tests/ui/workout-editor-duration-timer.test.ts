@@ -261,4 +261,17 @@ describe('WorkoutEditorView duration timer persistence', () => {
 
     await savedRowingRow(contents, '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 155]')
   })
+
+  it('saves the full elapsed time when a resumed timer stops', async () => {
+    vi.setSystemTime(new Date('2026-09-30T07:16:08+10:00'))
+    const { view, contents } = await openView(
+      workoutSource(
+        '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90] [started:: 2026-09-30T07:15:03+10:00]',
+      ),
+    )
+
+    clickButton(view, 'Stop timer')
+
+    await savedRowingRow(contents, '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 155]')
+  })
 })
