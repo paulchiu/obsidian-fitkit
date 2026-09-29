@@ -35,6 +35,7 @@ import {
   type ExerciseRegistry,
   type ExerciseRegistryEntry,
 } from '../domain/exercise-registry'
+import { formatLocalTimestamp } from '../domain/local-timestamp'
 import { DEFAULT_WEIGHT_UNIT } from '../domain/weight-unit'
 import type {
   ExerciseNoteKindUpdateResult,
@@ -126,6 +127,7 @@ interface EditableStrengthSet {
 interface EditableDurationEntry {
   set?: number
   durationSeconds?: number
+  startedAt?: string
   note?: string
 }
 
@@ -1356,11 +1358,13 @@ export class WorkoutEditorView extends FileView {
       return
     }
     const accumulator = entry.durationSeconds ?? 0
+    const startedAtMs = Date.now()
+    entry.startedAt = formatLocalTimestamp(new Date(startedAtMs))
     const intervalId = window.setInterval(() => this.tickTimer(), 1000)
     this.activeTimer = {
       card,
       entry,
-      startedAtMs: Date.now(),
+      startedAtMs,
       accumulator,
       intervalId,
       inputEl: null,
@@ -2714,6 +2718,9 @@ function toEditorDurationEntry(entry: DurationEntry): EditableDurationEntry {
   if (entry.set !== undefined) {
     editable.set = entry.set
   }
+  if (entry.startedAt !== undefined) {
+    editable.startedAt = entry.startedAt
+  }
   if (entry.note !== undefined) {
     editable.note = entry.note
   }
@@ -2825,6 +2832,9 @@ function toDurationEntry(entry: EditableDurationEntry): DurationEntry {
   }
   if (entry.set !== undefined) {
     durationEntry.set = entry.set
+  }
+  if (entry.startedAt !== undefined) {
+    durationEntry.startedAt = entry.startedAt
   }
   if (entry.note !== undefined) {
     durationEntry.note = entry.note
