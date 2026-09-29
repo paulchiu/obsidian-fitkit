@@ -646,6 +646,18 @@ export class WorkoutEditorView extends FileView {
       this.render()
       this.focusRowCell(exerciseIndex, ex.strengthSets.length - 1, 'Weight')
     })
+    const repeatBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Repeat' })
+    repeatBtn.disabled = ex.strengthSets.length === 0
+    repeatBtn.addEventListener('click', () => {
+      const last = ex.strengthSets[ex.strengthSets.length - 1]
+      ex.strengthSets.push({
+        set: ex.strengthSets.length + 1,
+        weight: last?.weight,
+        reps: last?.reps,
+      })
+      this.markDirty()
+      this.render()
+    })
   }
 
   private renderStrengthRow(wrap: HTMLElement, ex: ExerciseCard, i: number): void {
@@ -743,6 +755,19 @@ export class WorkoutEditorView extends FileView {
       this.markDirty()
       this.render()
       this.focusRowCell(exerciseIndex, ex.bodyweightSets.length - 1, 'Reps')
+    })
+    const repeatBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Repeat' })
+    repeatBtn.disabled = ex.bodyweightSets.length === 0
+    repeatBtn.addEventListener('click', () => {
+      const last = ex.bodyweightSets[ex.bodyweightSets.length - 1]
+      ex.bodyweightSets.push({
+        set: ex.bodyweightSets.length + 1,
+        level: last?.level,
+        reps: last?.reps,
+        load: last?.load,
+      })
+      this.markDirty()
+      this.render()
     })
   }
 
@@ -952,6 +977,20 @@ export class WorkoutEditorView extends FileView {
         this.stopTimer({ write: true })
       }
       ex.durationEntries.push({})
+      this.markDirty()
+      this.render()
+    })
+    const repeatBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Repeat' })
+    repeatBtn.disabled = ex.durationEntries.length === 0
+    repeatBtn.addEventListener('click', () => {
+      if (this.activeTimer && this.activeTimer.card === ex) {
+        this.stopTimer({ write: true })
+      }
+      const last = ex.durationEntries[ex.durationEntries.length - 1]
+      ex.durationEntries.push({
+        set: ex.durationEntries.length + 1,
+        durationSeconds: last?.durationSeconds,
+      })
       this.markDirty()
       this.render()
     })

@@ -3310,8 +3310,8 @@ describe('WorkoutEditorView duration timer', () => {
 
     const actions = card.findByClass('fitkit-row-actions')
     const buttons = actions?.children.filter((c) => c.tagName === 'button') ?? []
-    expect(buttons.map((b) => b.textContent)).toEqual(['Add set', 'Start timer'])
-    expect(buttons[1]?.attributes.get('data-icon')).toBe('play')
+    expect(buttons.map((b) => b.textContent)).toEqual(['Add set', 'Repeat', 'Start timer'])
+    expect(buttons[2]?.attributes.get('data-icon')).toBe('play')
   })
 
   it('shows the duration set number as a figure rather than an editable field', () => {
@@ -3384,8 +3384,8 @@ describe('WorkoutEditorView duration timer', () => {
 
     const actions = card.findByClass('fitkit-row-actions')
     const buttons = actions?.children.filter((c) => c.tagName === 'button') ?? []
-    expect(buttons.map((b) => b.textContent)).toEqual(['Add set', 'Stop timer'])
-    expect(buttons[1]?.attributes.get('data-icon')).toBe('square')
+    expect(buttons.map((b) => b.textContent)).toEqual(['Add set', 'Repeat', 'Stop timer'])
+    expect(buttons[2]?.attributes.get('data-icon')).toBe('square')
   })
 
   it('startCardTimer auto-creates a row when none exist and sets the active timer', () => {
@@ -3523,6 +3523,30 @@ describe('WorkoutEditorView duration timer', () => {
 
     expect(ex.durationEntries[0]?.durationSeconds).toBe(8)
     expect(ex.durationEntries).toHaveLength(2)
+    expect(view.activeTimer).toBeNull()
+  })
+
+  it('clicking Repeat while a timer is running writes back, then copies the timed duration', () => {
+    const ex: TimerExerciseCard = {
+      name: 'Plank',
+      kind: 'duration',
+      strengthSets: [],
+      durationEntries: [{}],
+      bodyweightSets: [],
+    }
+    const view = createTimerView(ex)
+
+    view.startCardTimer(ex)
+    vi.setSystemTime(new Date('2026-04-28T00:00:08Z'))
+
+    const card = new TestElement('div')
+    view.renderDurationTable(card as unknown as HTMLElement, ex, 0)
+    card
+      .findByClass('fitkit-row-actions')
+      ?.children.find((c) => c.tagName === 'button' && c.textContent === 'Repeat')
+      ?.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
+
+    expect(ex.durationEntries).toEqual([{ durationSeconds: 8 }, { set: 2, durationSeconds: 8 }])
     expect(view.activeTimer).toBeNull()
   })
 
@@ -4340,5 +4364,110 @@ describe('WorkoutEditorView menu placement', () => {
 
     expect(box.right).toBe(252)
     expectWithin(box, 360)
+  })
+})
+
+describe('WorkoutEditorView repeat set', () => {
+  const renderCard = (ex: {
+    name: string
+    kind: ExerciseKind
+    strengthSets: unknown[]
+    durationEntries: unknown[]
+    bodyweightSets: unknown[]
+  }): TestElement => {
+    const view = createExerciseCardRenderView()
+    view.model = { exercises: [ex] }
+    view.exerciseHistory = new Map()
+    Object.assign(view, { markDirty: vi.fn(), render: vi.fn(), focusRowCell: vi.fn() })
+    const list = new TestElement('div')
+    view.renderExerciseCard(list as unknown as HTMLElement, 0)
+    return list
+  }
+
+  const repeatButton = (list: TestElement): (TestElement & { disabled?: boolean }) | undefined =>
+    list
+      .findByClass('fitkit-row-actions')
+      ?.children.find((child) => child.tagName === 'button' && child.textContent === 'Repeat')
+
+  const emptyCard = (kind: ExerciseKind) => ({
+    name: 'Any',
+    kind,
+    strengthSets: [],
+    durationEntries: [],
+    bodyweightSets: [],
+  })
+
+  it.each(['strength', 'bodyweight'] as const)(
+    'places Repeat right after Add set on a %s card',
+    (kind) => {
+      const actions = renderCard(emptyCard(kind)).findByClass('fitkit-row-actions')
+
+      expect(actions?.children.map((child) => child.textContent)).toEqual(['Add set', 'Repeat'])
+    },
+  )
+
+  it('appends a strength set with the last weight and reps, leaving its note behind', () => {
+    const ex = {
+      name: 'Squat',
+      kind: 'strength' as const,
+      strengthSets: [
+        { set: 1, weight: 60, reps: 8 },
+        { set: 2, weight: 80, reps: 5, note: 'grindy' },
+      ],
+      durationEntries: [],
+      bodyweightSets: [],
+    }
+
+    repeatButton(renderCard(ex))?.listenersFor('click')[0]?.({})
+
+    expect(ex.strengthSets[2]).toEqual({ set: 3, weight: 80, reps: 5 })
+  })
+
+  it('appends a bodyweight set with the last level, reps and load', () => {
+    const ex = {
+      name: 'Push-up',
+      kind: 'bodyweight' as const,
+      strengthSets: [],
+      durationEntries: [],
+      bodyweightSets: [
+        { set: 1, level: 2, reps: 12 },
+        { set: 2, level: 3, reps: 8, load: 10, note: 'last one' },
+      ],
+    }
+
+    repeatButton(renderCard(ex))?.listenersFor('click')[0]?.({})
+
+    expect(ex.bodyweightSets[2]).toEqual({ set: 3, level: 3, reps: 8, load: 10 })
+  })
+
+  it('appends a duration entry with the last duration, leaving its start stamp and note behind', () => {
+    const ex = {
+      name: 'Plank',
+      kind: 'duration' as const,
+      strengthSets: [],
+      durationEntries: [
+        { set: 1, durationSeconds: 45, startedAt: '2026-09-30T07:00:00', note: 'shaky' },
+      ],
+      bodyweightSets: [],
+    }
+
+    repeatButton(renderCard(ex))?.listenersFor('click')[0]?.({})
+
+    expect(ex.durationEntries[1]).toEqual({ set: 2, durationSeconds: 45 })
+  })
+
+  it.each(['strength', 'bodyweight', 'duration'] as const)(
+    'disables Repeat on an empty %s card, since there is no set to copy',
+    (kind) => {
+      expect(repeatButton(renderCard(emptyCard(kind)))?.disabled).toBe(true)
+    },
+  )
+
+  it.each([
+    { kind: 'strength' as const, rows: { strengthSets: [{ set: 1 }] } },
+    { kind: 'bodyweight' as const, rows: { bodyweightSets: [{ set: 1, level: 1 }] } },
+    { kind: 'duration' as const, rows: { durationEntries: [{}] } },
+  ])('enables Repeat once a $kind card has a set', ({ kind, rows }) => {
+    expect(repeatButton(renderCard({ ...emptyCard(kind), ...rows }))?.disabled).toBe(false)
   })
 })
