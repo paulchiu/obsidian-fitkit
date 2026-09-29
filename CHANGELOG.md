@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A running duration timer now survives the phone closing Obsidian in the background: the row records when the timer started, and the timer resumes the next time the workout opens.
+
 ### Changed
 
 ### Fixed
