@@ -90,7 +90,7 @@ export default class FitKitPlugin extends Plugin {
           menu.addItem((item) =>
             item
               .setSection('pane')
-              .setTitle('Open in workout editor')
+              .setTitle('Workout view')
               .setIcon('dumbbell')
               .onClick(() => this.openLeafInWorkoutEditor(leaf, file)),
           )

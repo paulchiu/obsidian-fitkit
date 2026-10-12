@@ -1097,7 +1097,7 @@ const makeWorkoutApp = (overrides: Partial<MockWorkspace> = {}): MockApp => {
 }
 
 describe('FitKitPlugin tab menu view switch', () => {
-  it('offers "Open as Markdown" in the more-options menu of a workout editor tab', async () => {
+  it('offers "Markdown view" in the more-options menu of a workout editor tab', async () => {
     const file = makeWorkoutFile('Workouts/A.md')
     const editorLeaf = makeEditorLeaf(file)
     const events = await loadPluginCapturingEvents(makeWorkoutApp())
@@ -1105,17 +1105,17 @@ describe('FitKitPlugin tab menu view switch', () => {
 
     events.showMenu(editorLeaf, menu.menu)
 
-    expect(menu.titles()).toContain('Open as Markdown')
+    expect(menu.titles()).toContain('Markdown view')
   })
 
-  it('shows the workout as markdown in the same tab when "Open as Markdown" is chosen', async () => {
+  it('shows the workout as markdown in the same tab when "Markdown view" is chosen', async () => {
     const file = makeWorkoutFile('Workouts/2026-09-18.md')
     const editorLeaf = makeEditorLeaf(file)
     const events = await loadPluginCapturingEvents(makeWorkoutApp())
     const menu = makeRecordingMenu()
     events.showMenu(editorLeaf, menu.menu)
 
-    await menu.click('Open as Markdown')
+    await menu.click('Markdown view')
 
     expect(editorLeaf.view).toBeInstanceOf(MarkdownView)
     expect((editorLeaf.view as MarkdownView).file?.path).toBe('Workouts/2026-09-18.md')
@@ -1129,7 +1129,7 @@ describe('FitKitPlugin tab menu view switch', () => {
     )
     const menu = makeRecordingMenu()
     events.showMenu(editorLeaf, menu.menu)
-    await menu.click('Open as Markdown')
+    await menu.click('Markdown view')
 
     events.handlers.get('file-open')?.((editorLeaf.view as MarkdownView).file)
     await delayFor(BUSY_LEAF_SETTLE_MS)
@@ -1137,14 +1137,14 @@ describe('FitKitPlugin tab menu view switch', () => {
     expect(editorLeaf.view).toBeInstanceOf(MarkdownView)
   })
 
-  it('shows a markdown workout in the workout editor when "Open in workout editor" is chosen', async () => {
+  it('shows a markdown workout in the workout editor when "Workout view" is chosen', async () => {
     const file = makeWorkoutFile('Workouts/A.md')
     const markdownLeaf = makeLeafShowingFile(file)
     const events = await loadPluginCapturingEvents(makeWorkoutApp())
     const menu = makeRecordingMenu()
     events.showMenu(markdownLeaf, menu.menu)
 
-    await menu.click('Open in workout editor')
+    await menu.click('Workout view')
 
     expect(markdownLeaf.view).toBeInstanceOf(WorkoutEditorView)
     const loadFile = (markdownLeaf.view as { loadFile: ReturnType<typeof vi.fn> }).loadFile
@@ -1170,10 +1170,10 @@ describe('FitKitPlugin tab menu view switch', () => {
     )
     const toMarkdown = makeRecordingMenu()
     events.showMenu(leaf, toMarkdown.menu)
-    await toMarkdown.click('Open as Markdown')
+    await toMarkdown.click('Markdown view')
     const toEditor = makeRecordingMenu()
     events.showMenu(leaf, toEditor.menu)
-    await toEditor.click('Open in workout editor')
+    await toEditor.click('Workout view')
 
     /** Obsidian opens a clicked workout as markdown in the focused tab. */
     leaf.view = new MarkdownView({ file, leaf })
@@ -1190,7 +1190,7 @@ describe('FitKitPlugin tab menu view switch', () => {
     )
     const menu = makeRecordingMenu()
     events.showMenu(leaf, menu.menu)
-    await menu.click('Open as Markdown')
+    await menu.click('Markdown view')
 
     file.path = 'Workouts/Renamed.md'
     events.handlers.get('file-open')?.(file)
@@ -1208,7 +1208,7 @@ describe('FitKitPlugin tab menu view switch', () => {
     )
     const menu = makeRecordingMenu()
     events.showMenu(leaf, menu.menu)
-    await menu.click('Open as Markdown')
+    await menu.click('Markdown view')
 
     leaf.view = new MarkdownView({ file: fileB, leaf })
     events.handlers.get('file-open')?.(fileB)
@@ -1230,13 +1230,13 @@ describe('FitKitPlugin tab menu view switch', () => {
     expect(markdownMenu.titles()).toEqual([])
   })
 
-  it('does not offer "Open in workout editor" to a tab already in the workout editor', async () => {
+  it('does not offer "Workout view" to a tab already in the workout editor', async () => {
     const file = makeWorkoutFile('Workouts/A.md')
     const events = await loadPluginCapturingEvents(makeWorkoutApp())
     const menu = makeRecordingMenu()
 
     events.handlers.get('file-menu')?.(menu.menu, file, 'more-options', makeEditorLeaf(file))
 
-    expect(menu.titles()).not.toContain('Open in workout editor')
+    expect(menu.titles()).not.toContain('Workout view')
   })
 })
