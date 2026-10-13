@@ -141,6 +141,8 @@ interface ActiveRun {
   /** The phase the last tick saw, so the next one knows which cue it crossed. */
   lastPhase: RunPhase
   cues: CuePlayer
+  /** Where the card list was scrolled when the run took over the tab, restored on the way back. */
+  returnScrollTop: number
 }
 
 /** A tick this late means the app was suspended, so it catches up the way a reopen does. */
@@ -1633,6 +1635,7 @@ export class WorkoutEditorView extends FileView {
     this.activeRun?.cues.prime()
     this.markDirty()
     this.render()
+    this.contentEl.scrollTop = 0
   }
 
   private enterRun(card: ExerciseCard, plan: IntervalPlan, screen: RunnerScreen): void {
@@ -1647,6 +1650,7 @@ export class WorkoutEditorView extends FileView {
       clockEl: null,
       lastPhase: runPhase(card.durationEntries, plan, Date.now()),
       cues,
+      returnScrollTop: this.contentEl.scrollTop,
     }
   }
 
@@ -1663,8 +1667,10 @@ export class WorkoutEditorView extends FileView {
 
   /** Returns to the card list; the rows already hold everything. */
   private leaveRun(): void {
-    if (this.stopRun()) {
+    const run = this.stopRun()
+    if (run) {
       this.render()
+      this.contentEl.scrollTop = run.returnScrollTop
     }
   }
 

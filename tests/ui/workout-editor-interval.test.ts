@@ -630,6 +630,17 @@ describe('WorkoutEditorView interval plans', () => {
       ])
     })
 
+    it('shows the runner from the top and returns the list to where it was scrolled', async () => {
+      const { view } = await openView(workoutSource(...BIKE))
+      view.contentEl.scrollTop = 420
+
+      button(view, 'Start interval plan').click()
+      const runnerScroll = view.contentEl.scrollTop
+      button(view, 'End run').click()
+
+      expect([runnerScroll, view.contentEl.scrollTop]).toEqual([0, 420])
+    })
+
     it('pauses with the time banked, and End run returns to the card with the rows kept', async () => {
       const { view, contents } = await openView(workoutSource(...BIKE))
       button(view, 'Start interval plan').click()
