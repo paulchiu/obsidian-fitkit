@@ -782,6 +782,27 @@ describe('WorkoutEditorView interval plans', () => {
       ])
     })
 
+    it('runs from rep 1 when the first row has watts typed but no time or rest', async () => {
+      const { view, contents } = await openView(
+        workoutSource(
+          ...BIKE,
+          '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 0] [watts:: 300]',
+        ),
+      )
+
+      const label = button(view, 'Run interval plan').textContent
+      button(view, 'Run interval plan').click()
+
+      expect([label, runnerText(view, '.fitkit-runner-phase')]).toEqual([
+        'Run',
+        'Work · rep 1 of 3',
+      ])
+      await savedBody(contents, [
+        ...BIKE,
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 0] [watts:: 300] [started:: 2026-10-12T07:15:00+10:00]',
+      ])
+    })
+
     it('removes the plan line when Clear plan is chosen', async () => {
       const { view, contents } = await openView(
         workoutSource(...BIKE, '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30]'),

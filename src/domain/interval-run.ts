@@ -20,27 +20,36 @@ export interface RunRow {
   note?: string
 }
 
-/** Opens the next rep after the rows already logged, taking the place of any trailing blank rows. */
+/**
+ * Opens the next rep after the reps already done, on the first not-done row so any
+ * intensity or note typed there carries into the rep; later not-done rows are dropped.
+ */
 export function startRun(rows: readonly RunRow[], now: number): RunRow[] {
-  const logged = rows.slice(0, loggedReps(rows))
-  return [...logged, { set: logged.length + 1, durationSeconds: 0, startedAt: stamp(now) }]
+  const done = loggedReps(rows)
+  const { durationSeconds: _work, restSeconds: _rest, ...typed } = rows[done] ?? {}
+  return [
+    ...rows.slice(0, done),
+    { ...typed, set: done + 1, durationSeconds: 0, startedAt: stamp(now) },
+  ]
 }
 
-/** Rows that record something, ignoring the blank rows a fresh card or `Add set` leaves at the end. */
+/** Reps done so far, ignoring trailing rows with neither work nor rest time, like a fresh card's seeded row. */
 export function loggedReps(rows: readonly RunRow[]): number {
   let count = rows.length
-  while (count > 0 && isBlankRow(rows[count - 1])) {
+  while (count > 0 && isNotDone(rows[count - 1])) {
     count--
   }
   return count
 }
 
-function isBlankRow(row: RunRow | undefined): boolean {
-  if (!row) {
-    return false
-  }
-  const { set: _set, durationSeconds, ...rest } = row
-  return !durationSeconds && Object.values(rest).every((value) => value === undefined)
+function isNotDone(row: RunRow | undefined): boolean {
+  return (
+    row !== undefined &&
+    !row.durationSeconds &&
+    !row.restSeconds &&
+    row.startedAt === undefined &&
+    !row.paused
+  )
 }
 
 function stamp(ms: number): string {

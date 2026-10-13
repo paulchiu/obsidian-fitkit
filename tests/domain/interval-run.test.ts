@@ -515,11 +515,30 @@ describe('interval run', () => {
     ])
   })
 
-  it('counts logged reps without a trailing blank row, but keeps a row with a note', () => {
+  it('counts only reps with work or rest time, so a row of typed watts alone is not done', () => {
     expect([
       loggedReps([{ set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 }, {}]),
       loggedReps([{ durationSeconds: 0 }]),
-      loggedReps([{ durationSeconds: 0, note: 'warm-up skipped' }]),
-    ]).toEqual([1, 0, 1])
+      loggedReps([{ set: 1, durationSeconds: 0, watts: 300 }]),
+      loggedReps([{ durationSeconds: 0, note: 'legs heavy' }]),
+      loggedReps([{ durationSeconds: 0, restSeconds: 45 }]),
+    ]).toEqual([1, 0, 0, 0, 1])
+  })
+
+  it('starts rep 1 on a row that has watts and a note but no time, keeping both', () => {
+    expect(
+      startRun(
+        [{ set: 1, durationSeconds: 0, watts: 300, note: 'legs heavy' }, {}],
+        at('07:15:00'),
+      ),
+    ).toEqual([
+      {
+        set: 1,
+        durationSeconds: 0,
+        watts: 300,
+        note: 'legs heavy',
+        startedAt: '2026-10-12T07:15:00+10:00',
+      },
+    ])
   })
 })
