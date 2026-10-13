@@ -13,6 +13,7 @@ import {
   type ExerciseMetric,
 } from './exercise-metric'
 import { buildNotesBlock, buildRecentSessionsBlock } from './exercise-note-template'
+import { kindOfType, type ExerciseType } from './exercise-type'
 import { DEFAULT_WEIGHT_UNIT, parseWeightUnit, type WeightUnit } from './weight-unit'
 
 const FENCE_OPEN = /^(`{3,})([^`]*)$/
@@ -206,9 +207,13 @@ function countListItemLines(lines: ReadonlyArray<string>, start: number): number
  * drops metric:/unit: lines, which only belong to strength notes; the ladder
  * itself is left for the repair pass, which knows the exercise name.
  */
-export function setExerciseNoteKind(
+/**
+ * Records `type` in an exercise note's frontmatter: the stored kind, plus an
+ * `interval: true` line after it for interval, which any other type drops.
+ */
+export function setExerciseNoteType(
   source: string,
-  kind: ExerciseKind,
+  type: ExerciseType,
   options: ExerciseNoteQueryOptions,
 ): ExerciseNoteKindUpdateResult {
   const normalizedSource = normalizeMarkdownSource(source)
@@ -217,33 +222,46 @@ export function setExerciseNoteKind(
     return { markdown: source, changed: false, warnings: [] }
   }
 
+  const kind = kindOfType(type)
   const lines = normalizedSource.markdown.split('\n')
   const frontmatterLines = lines.slice(bounds.start + 1, bounds.end)
-  if (frontmatterKind(frontmatterLines) === kind) {
-    return { markdown: source, changed: false, warnings: [] }
-  }
+  const kindChanged = frontmatterKind(frontmatterLines) !== kind
 
   const kindLineIndex = findFrontmatterKeyLine(frontmatterLines, 'kind')
-  const withKind =
-    kindLineIndex < 0
+  const withKind = !kindChanged
+    ? frontmatterLines
+    : kindLineIndex < 0
       ? insertLines(frontmatterLines, findFrontmatterKeyLine(frontmatterLines, 'type') + 1, [
           `kind: ${kind}`,
         ])
       : replaceLine(frontmatterLines, kindLineIndex, `kind: ${kind}`)
+  const withoutMarker = withKind.filter(
+    (line) =>
+      !(kind === 'bodyweight' && isStrengthOnlyFrontmatterKey(line)) && !isIntervalMarkerLine(line),
+  )
   const nextFrontmatterLines =
-    kind === 'bodyweight'
-      ? withKind.filter((line) => !isStrengthOnlyFrontmatterKey(line))
-      : withKind
+    type === 'interval'
+      ? insertLines(withoutMarker, findFrontmatterKeyLine(withoutMarker, 'kind') + 1, [
+          'interval: true',
+        ])
+      : withoutMarker
 
   const withFrontmatter = [
     ...lines.slice(0, bounds.start + 1),
     ...nextFrontmatterLines,
     ...lines.slice(bounds.end),
   ].join('\n')
-  const recent = rewriteRecentSessionsForKind(withFrontmatter, options, kind)
+  const recent = kindChanged
+    ? rewriteRecentSessionsForKind(withFrontmatter, options, kind)
+    : { markdown: withFrontmatter, warnings: [] }
   const markdown = restoreMarkdownSource(recent.markdown, normalizedSource)
 
   return { markdown, changed: markdown !== source, warnings: recent.warnings }
+}
+
+function isIntervalMarkerLine(line: string): boolean {
+  const colon = line.indexOf(':')
+  return colon >= 0 && line.slice(0, colon).trim().toLowerCase() === 'interval'
 }
 
 /**

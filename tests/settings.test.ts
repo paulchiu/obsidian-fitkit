@@ -84,6 +84,23 @@ describe('settings migration', () => {
     expect(migrated.exerciseRegistry).toEqual([{ name: 'Plank', kind: 'duration', aliases: [] }])
   })
 
+  it('keeps the interval marker only on a stored duration entry', () => {
+    const migrated = settingsFromStored({
+      exerciseRegistry: [
+        { name: 'Bike', kind: 'duration', interval: true, aliases: [] },
+        { name: 'Squat', kind: 'strength', interval: true, aliases: [] },
+        { name: 'Row', kind: 'duration', interval: 'yes', aliases: [] },
+      ] as unknown as FitKitSettings['exerciseRegistry'],
+      schemaVersion: 1,
+    })
+
+    expect(migrated.exerciseRegistry.map((entry) => entry.interval)).toEqual([
+      true,
+      undefined,
+      undefined,
+    ])
+  })
+
   it('falls back to strength for an unrecognised stored registry kind', () => {
     const migrated = settingsFromStored({
       exerciseRegistry: [{ name: 'Plank', kind: 'cardio', aliases: [] }],

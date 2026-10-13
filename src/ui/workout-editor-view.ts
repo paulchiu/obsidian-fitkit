@@ -60,7 +60,7 @@ import type {
   ExerciseNoteKindUpdateResult,
   ExerciseNoteLevelsUpdateResult,
 } from '../domain/exercise-note-migrate'
-import { setExerciseNoteKind, setExerciseNoteLevels } from '../domain/exercise-note-migrate'
+import { setExerciseNoteType, setExerciseNoteLevels } from '../domain/exercise-note-migrate'
 import { filterSuggestableNames } from '../domain/exercise-suggestions'
 import {
   formatNumber as formatPlanNumber,
@@ -2009,7 +2009,7 @@ export class WorkoutEditorView extends FileView {
     if (noteFile instanceof TFile) {
       let result: ExerciseNoteKindUpdateResult | undefined
       await this.app.vault.process(noteFile, (text) => {
-        result = setExerciseNoteKind(text, nextKind, {
+        result = setExerciseNoteType(text, nextKind, {
           name: noteFile.basename,
           fitnessRoot: this.plugin.settings.fitnessRoot,
         })

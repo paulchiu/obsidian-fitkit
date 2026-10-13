@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { createRegistry, type ExerciseRegistry } from '../../src/domain/exercise-registry'
 import {
   migrateExerciseNote,
-  setExerciseNoteKind,
+  setExerciseNoteType,
   setExerciseNoteLevels,
 } from '../../src/domain/exercise-note-migrate'
 import { buildNotesBlock, buildRecentSessionsBlock } from '../../src/domain/exercise-note-template'
@@ -353,6 +353,17 @@ kind: duration
     expect(result.markdown).toBe(source)
     expect(result.status).toBe('already')
     expect(result.unknownKind).toBe(false)
+  })
+
+  it('leaves the interval marker on a complete duration note', () => {
+    const source = completeDurationNote('Mystery').replace(
+      'kind: duration\n',
+      'kind: duration\ninterval: true\n',
+    )
+    const result = migrate(source, { name: 'Mystery', registry: createRegistry([]) })
+
+    expect(result.markdown).toBe(source)
+    expect(result.status).toBe('already')
   })
 
   it('accepts and rejects the same kinds as the other frontmatter read paths', () => {
@@ -1431,7 +1442,7 @@ Existing notes.
   })
 })
 
-describe('setExerciseNoteKind', () => {
+describe('setExerciseNoteType', () => {
   const kindOptions = { name: 'Mystery', fitnessRoot: 'Fitness' }
   const mysteryStrengthNote = (recent: string): string =>
     completeStrengthNote(recent, buildNotesBlock('Mystery', 'Fitness'))
@@ -1447,7 +1458,7 @@ unit: kg
 Body.
 `
 
-    const result = setExerciseNoteKind(source, 'bodyweight', kindOptions)
+    const result = setExerciseNoteType(source, 'bodyweight', kindOptions)
 
     expect(result.changed).toBe(true)
     expect(result.markdown).toContain('kind: bodyweight')
@@ -1466,7 +1477,7 @@ levels:
 Body.
 `
 
-    const result = setExerciseNoteKind(source, 'bodyweight', kindOptions)
+    const result = setExerciseNoteType(source, 'bodyweight', kindOptions)
 
     expect(result.changed).toBe(true)
     expect(result.markdown).toContain('kind: bodyweight')
@@ -1482,7 +1493,7 @@ kind: duration
 Body.
 `
 
-    const result = setExerciseNoteKind(source, 'strength', kindOptions)
+    const result = setExerciseNoteType(source, 'strength', kindOptions)
 
     expect(result.changed).toBe(true)
     expect(result.markdown).toContain('kind: strength')
@@ -1497,7 +1508,7 @@ type: exercise
 Body.
 `
 
-    const result = setExerciseNoteKind(source, 'duration', kindOptions)
+    const result = setExerciseNoteType(source, 'duration', kindOptions)
 
     expect(result.changed).toBe(true)
     expect(result.markdown).toBe(`---
@@ -1518,10 +1529,88 @@ kind: strength
 Body.
 `
 
-    const result = setExerciseNoteKind(source, 'strength', kindOptions)
+    const result = setExerciseNoteType(source, 'strength', kindOptions)
 
     expect(result.changed).toBe(false)
     expect(result.markdown).toBe(source)
+  })
+
+  it('adds the interval marker after the kind line when a duration note becomes interval', () => {
+    const source = `---
+type: exercise
+kind: duration
+---
+
+Body.
+`
+
+    const result = setExerciseNoteType(source, 'interval', kindOptions)
+
+    expect(result.changed).toBe(true)
+    expect(result.markdown).toBe(`---
+type: exercise
+kind: duration
+interval: true
+---
+
+Body.
+`)
+  })
+
+  it('drops the interval marker when an interval note becomes duration or strength', () => {
+    const source = `---
+type: exercise
+kind: duration
+interval: true
+---
+
+Body.
+`
+
+    const toDuration = setExerciseNoteType(source, 'duration', kindOptions)
+    const toStrength = setExerciseNoteType(source, 'strength', kindOptions)
+
+    expect(toDuration.markdown).toBe(`---
+type: exercise
+kind: duration
+---
+
+Body.
+`)
+    expect(toStrength.markdown).toContain('kind: strength')
+    expect(toStrength.markdown).not.toContain('interval')
+  })
+
+  it('records a strength note switched to interval as duration with the marker', () => {
+    const source = `---
+type: exercise
+kind: strength
+metric: e1rm
+---
+
+Body.
+`
+
+    const result = setExerciseNoteType(source, 'interval', kindOptions)
+
+    expect(result.markdown).toContain('kind: duration\ninterval: true\n')
+  })
+
+  it('is a no-op when an interval note is set to interval again', () => {
+    const source = `---
+type: exercise
+kind: duration
+interval: true
+---
+
+Body.
+`
+
+    expect(setExerciseNoteType(source, 'interval', kindOptions)).toEqual({
+      markdown: source,
+      changed: false,
+      warnings: [],
+    })
   })
 
   it('leaves a hand-edited Recent sessions query alone and reports it', () => {
@@ -1540,7 +1629,7 @@ Body.
     ].join('\n')
     const source = mysteryStrengthNote(customBlock)
 
-    const result = setExerciseNoteKind(source, 'bodyweight', kindOptions)
+    const result = setExerciseNoteType(source, 'bodyweight', kindOptions)
 
     expect(extractDataviewBlockAfter(result.markdown, 'Recent sessions')).toBe(customBlock)
     expect(result.changed).toBe(true)
@@ -1573,7 +1662,7 @@ Keep the elbows tucked.
 ${notesBlock}
 `
 
-    const result = setExerciseNoteKind(source, 'duration', kindOptions)
+    const result = setExerciseNoteType(source, 'duration', kindOptions)
 
     expect(result.markdown).toContain('```fitkit-chart\nmetric: e1rm\n```')
     expect(result.markdown).toContain('Keep the elbows tucked.')
@@ -1586,7 +1675,7 @@ ${notesBlock}
   it('rewrites the Recent sessions query to the new kind', () => {
     const source = mysteryStrengthNote(STRENGTH_RECENT_SESSIONS_BLOCK)
 
-    const result = setExerciseNoteKind(source, 'bodyweight', kindOptions)
+    const result = setExerciseNoteType(source, 'bodyweight', kindOptions)
 
     expect(result.changed).toBe(true)
     expect(extractDataviewBlockAfter(result.markdown, 'Recent sessions')).toBe(
@@ -1599,7 +1688,7 @@ ${notesBlock}
       STRENGTH_RECENT_SESSIONS_BLOCK.replace('LIMIT 10', 'LIMIT 25'),
     )
 
-    const result = setExerciseNoteKind(source, 'bodyweight', kindOptions)
+    const result = setExerciseNoteType(source, 'bodyweight', kindOptions)
 
     expect(extractDataviewBlockAfter(result.markdown, 'Recent sessions')).toBe(
       BODYWEIGHT_RECENT_SESSIONS_BLOCK,
@@ -1618,7 +1707,7 @@ kind: strength
 Keep the elbows tucked.
 `
 
-    const result = setExerciseNoteKind(source, 'duration', kindOptions)
+    const result = setExerciseNoteType(source, 'duration', kindOptions)
 
     expect(result.changed).toBe(true)
     expect(result.markdown).toContain('kind: duration')
@@ -1629,7 +1718,7 @@ Keep the elbows tucked.
   it('keeps CRLF line endings when it rewrites the query', () => {
     const source = withLineEnding(mysteryStrengthNote(STRENGTH_RECENT_SESSIONS_BLOCK), '\r\n')
 
-    const result = setExerciseNoteKind(source, 'bodyweight', kindOptions)
+    const result = setExerciseNoteType(source, 'bodyweight', kindOptions)
 
     expect(result.markdown).toContain(withLineEnding(BODYWEIGHT_RECENT_SESSIONS_BLOCK, '\r\n'))
     expect(/[^\r]\n/.test(result.markdown)).toBe(false)
@@ -1638,7 +1727,7 @@ Keep the elbows tucked.
   it('leaves notes with no frontmatter block untouched', () => {
     const source = 'Body with no frontmatter.\n'
 
-    const result = setExerciseNoteKind(source, 'strength', kindOptions)
+    const result = setExerciseNoteType(source, 'strength', kindOptions)
 
     expect(result.changed).toBe(false)
     expect(result.markdown).toBe(source)

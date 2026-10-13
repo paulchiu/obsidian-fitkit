@@ -4,6 +4,7 @@
  */
 
 import type { ExerciseKind } from './exercise-kind'
+import { exerciseTypeOf, type ExerciseType } from './exercise-type'
 import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from './weight-unit'
 
 export type { ExerciseKind }
@@ -23,6 +24,8 @@ export type ExerciseRegistryEntry = {
    * distinct from an empty ladder; callers treat absence as no ladder.
    */
   levels?: string[]
+  /** Duration only: new cards start as interval. Absent on every other entry. */
+  interval?: true
   aliases: string[]
 }
 
@@ -83,8 +86,17 @@ function cloneEntry(entry: ExerciseRegistryEntry): ExerciseRegistryEntry {
     kind: entry.kind,
     unit: entry.unit,
     levels: entry.levels ? [...entry.levels] : undefined,
+    ...intervalMarker(entry),
     aliases: [...entry.aliases],
   }
+}
+
+/** The marker as a spreadable field, kept only on a duration entry. */
+export function intervalMarker(entry: {
+  kind: ExerciseKind
+  interval?: boolean
+}): { interval?: true } {
+  return entry.kind === 'duration' && entry.interval === true ? { interval: true } : {}
 }
 
 /**
@@ -120,6 +132,11 @@ function buildIndex(registry: ExerciseRegistry): Map<string, ExerciseRegistryEnt
 export function kindForName(registry: ExerciseRegistry, rawName: string): ExerciseKind | null {
   const result = resolve(registry, rawName)
   return result.kind === 'match' ? result.entry.kind : null
+}
+
+export function typeForName(registry: ExerciseRegistry, rawName: string): ExerciseType | null {
+  const result = resolve(registry, rawName)
+  return result.kind === 'match' ? exerciseTypeOf(result.entry) : null
 }
 
 export function unitForName(registry: ExerciseRegistry, rawName: string): WeightUnit | null {
@@ -218,6 +235,7 @@ export type RegistryEntryDraft = {
   kind: ExerciseKind
   unit?: WeightUnit
   levels?: string[]
+  interval?: true
   aliases: string[]
 }
 
@@ -261,6 +279,7 @@ export function sanitizeEntryDraft(draft: RegistryEntryDraft): RegistryEntryDraf
     kind: draft.kind,
     unit: draft.unit,
     levels: draft.levels ? [...draft.levels] : undefined,
+    ...intervalMarker(draft),
     aliases,
   }
 }
@@ -372,6 +391,7 @@ export function renameEntry(
     kind: next.kind,
     unit: next.unit,
     levels: next.levels ? [...next.levels] : undefined,
+    ...intervalMarker(next),
     aliases: dedupedAliases,
   })
 }

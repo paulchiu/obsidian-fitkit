@@ -8,7 +8,12 @@ import type {
 
 import { formatErrorMessage } from './domain/error'
 import type { ExerciseRegistryEntry } from './domain/exercise-registry'
-import { createRegistry, normalize, removeEntry } from './domain/exercise-registry'
+import {
+  createRegistry,
+  intervalMarker,
+  normalize,
+  removeEntry,
+} from './domain/exercise-registry'
 import { parseExerciseKind } from './domain/exercise-kind'
 import { DEFAULT_INTERVAL_PRESETS, parseIntervalPresets } from './domain/interval-presets'
 import { parseWeightUnit } from './domain/weight-unit'
@@ -114,13 +119,17 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
 function normalizeStoredExerciseRegistry(
   entries: readonly ExerciseRegistryEntry[] = [],
 ): ExerciseRegistryEntry[] {
-  return entries.map((entry) => ({
-    name: entry.name,
-    kind: parseExerciseKind(entry.kind) ?? 'strength',
-    unit: parseWeightUnit(entry.unit) ?? undefined,
-    levels: normalizeStoredLevels(entry.levels),
-    aliases: [...entry.aliases],
-  }))
+  return entries.map((entry) => {
+    const kind = parseExerciseKind(entry.kind) ?? 'strength'
+    return {
+      name: entry.name,
+      kind,
+      unit: parseWeightUnit(entry.unit) ?? undefined,
+      levels: normalizeStoredLevels(entry.levels),
+      ...intervalMarker({ kind, interval: entry.interval }),
+      aliases: [...entry.aliases],
+    }
+  })
 }
 
 /**
