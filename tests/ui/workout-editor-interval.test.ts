@@ -1139,6 +1139,22 @@ describe('WorkoutEditorView interval plans', () => {
       ])
     })
 
+    it('records the switch to interval in the registry alone when the exercise has no note', async () => {
+      const { view, plugin } = await openView(bikeCard, {
+        exerciseRegistry: [{ name: 'Exercise Bike', kind: 'duration', aliases: [] }],
+      })
+
+      button(view, 'Exercise options').click()
+      menuItem('Switch to interval').onClick?.()
+      choose('Update registry too')
+
+      await vi.waitFor(() =>
+        expect(plugin.settings.exerciseRegistry).toEqual([
+          { name: 'Exercise Bike', kind: 'duration', interval: true, aliases: [] },
+        ]),
+      )
+    })
+
     it('goes straight to the plan form when the registry already records interval', async () => {
       const { view } = await openView(bikeCard, BIKE_IS_INTERVAL)
 

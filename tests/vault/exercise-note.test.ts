@@ -108,7 +108,12 @@ describe('exercise-note composer', () => {
     const interval = composeExerciseNote('Bike', 'interval', 'Fitness/Workouts')
     const duration = composeExerciseNote('Bike', 'duration', 'Fitness/Workouts')
 
-    expect(interval).toBe(duration.replace('kind: duration\n', 'kind: duration\ninterval: true\n'))
+    expect(interval.startsWith('---\ntype: exercise\nkind: duration\ninterval: true\n---\n')).toBe(
+      true,
+    )
+    expect(interval.slice(interval.indexOf('## Progress chart'))).toBe(
+      duration.slice(duration.indexOf('## Progress chart')),
+    )
   })
 
   it('seeds a bodyweight note with a one-rung ladder and no metric or unit', () => {

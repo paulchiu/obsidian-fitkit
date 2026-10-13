@@ -176,7 +176,7 @@ describe('exercise chart block rendering', () => {
 
     await renderExerciseChartBlock(plugin, '', createTestRoot(), createContext(file.path))
 
-    expect(renderedNotes()).toEqual([])
+    expect([renderedSeries().kind, renderedNotes()]).toEqual(['duration', []])
   })
 
   it('uses exercise note unit frontmatter for strength charts', async () => {
