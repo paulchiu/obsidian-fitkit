@@ -4,5 +4,5 @@
     "types": ["node"],
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "tests/harness/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/harness/**/*.ts", "scripts/beta-version.ts"]
 }

@@ -38,6 +38,16 @@ Use a conventional commit style for the PR title (`feat:`, `fix:`, `refactor:`, 
 
 Every PR needs exactly one release label: `major`, `minor`, `patch`, or `norelease`. On merge to `main`, the Release workflow reads that label to decide the version bump: `major`, `minor`, and `patch` map to the matching `npm version` bump, and `norelease` skips the version bump and the GitHub release entirely. Pick `norelease` for changes with no user-facing effect; use one of the others for anything that should ship in the next release.
 
+### Beta builds for BRAT testers
+
+To try a change before everyone gets it, add the `beta` label to the open PR alongside its semver label. The Beta workflow then publishes a GitHub prerelease such as `1.9.0-beta.1` (the next version that label would release, plus a beta number), and every later push to the PR publishes the next number. Nothing is committed to `main`, so the community store keeps offering the current stable release.
+
+Testers install it with BRAT: add `paulchiu/obsidian-fitkit` as a beta plugin and pick the latest version (BRAT includes prereleases), or freeze to a specific beta tag. Testers on the latest version move on to the stable release once it outranks the beta; a frozen tester stays put until they change version in BRAT.
+
+Keep one beta PR open at a time. Betas are numbered per target version, so two `minor` PRs would interleave their builds under the same `X.Y.Z-beta.N` sequence and testers on the latest version would get whichever pushed last.
+
+Merging the PR is what releases to everyone, so keep a beta PR open until it has been tested. Remove the `beta` label to stop publishing betas from it.
+
 ## Licence
 
 By contributing, you agree that your contribution is licensed under this repository's MIT licence.
