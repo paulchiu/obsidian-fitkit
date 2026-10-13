@@ -17,6 +17,21 @@ import {
   ZERO_DURATION_DISPLAY,
 } from '../domain/duration-input'
 import { formatErrorMessage } from '../domain/error'
+import {
+  advanceRun,
+  catchUpRun,
+  endCutRun,
+  endRun,
+  endWork,
+  hitCount,
+  pauseRun,
+  resumeCutRun,
+  resumeRun,
+  runPhase,
+  skipRest,
+  startRun,
+  type RunRow,
+} from '../domain/interval-run'
 import { parseIntervalPlan, type IntensityKind, type IntervalPlan } from '../domain/interval-plan'
 import { assertUnreachableKind, EXERCISE_KINDS } from '../domain/exercise-kind'
 import {
@@ -84,6 +99,7 @@ import { markdownFilesInFolder } from '../vault/folder-scan'
 import { ensureParentFolder } from '../vault/vault-utils'
 import { ConfirmModal } from './confirm-modal'
 import { EditLevelsModal } from './edit-levels-modal'
+import { clockSeconds, formatClock, renderRunner, type RunnerScreen } from './interval-runner'
 import { IntervalPlanModal } from './interval-plan-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
 import { KindSwitchChoiceModal, type KindSwitchChoice } from './kind-switch-choice-modal'
@@ -110,6 +126,18 @@ interface ActiveTimer {
   intervalId: number
   inputEl: HTMLInputElement | null
 }
+
+interface ActiveRun {
+  card: ExerciseCard
+  plan: IntervalPlan
+  screen: RunnerScreen
+  intervalId: number
+  lastTickAt: number
+  clockEl: HTMLElement | null
+}
+
+/** A tick this late means the app was suspended, so it catches up the way a reopen does. */
+const LATE_TICK_MS = 5000
 
 interface ActiveRestTimer {
   startedAtMs: number
@@ -200,9 +228,11 @@ export class WorkoutEditorView extends FileView {
   private autoSaveTimer: number | null = null
   private autoSaveInflight = false
   private autoSaveRequeued = false
+  private inflightSave?: Promise<void>
   private dragSession: DragSession | null = null
   private activeTimer: ActiveTimer | null = null
   private activeRestTimer: ActiveRestTimer | null = null
+  private activeRun: ActiveRun | null = null
   private seededWeightsStore?: WeakSet<EditableStrengthSet>
   private ladderOverridesStore?: Map<string, string[]>
   private lastRestSeconds: number | null = null
@@ -305,13 +335,14 @@ export class WorkoutEditorView extends FileView {
   }
 
   async onClose(): Promise<void> {
+    this.pauseRunForClose()
     this.stopTimer({ write: true })
     this.clearRestTimerState()
     if (this.autoSaveTimer !== null) {
       window.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null
     }
-    await this.flushAutoSave()
+    await this.settleAutoSave()
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
     if (this.dragSession) {
@@ -363,14 +394,15 @@ export class WorkoutEditorView extends FileView {
   }
 
   async onUnloadFile(): Promise<void> {
+    this.pauseRunForClose()
     this.stopTimer({ write: true })
     this.clearRestTimerState()
     if (this.autoSaveTimer !== null) {
       window.clearTimeout(this.autoSaveTimer)
       this.autoSaveTimer = null
     }
-    if (this.session && this.dirty && !this.conflictDetected) {
-      await this.flushAutoSave()
+    if (this.session && (this.dirty || this.autoSaveInflight) && !this.conflictDetected) {
+      await this.settleAutoSave()
     }
   }
 
@@ -406,6 +438,7 @@ export class WorkoutEditorView extends FileView {
       return
     }
     this.abortTimer()
+    this.dropRun()
     this.clearRestTimer()
     if (this.autoSaveTimer !== null) {
       window.clearTimeout(this.autoSaveTimer)
@@ -450,6 +483,10 @@ export class WorkoutEditorView extends FileView {
     }
     this.contentEl.empty()
     const container = this.contentEl.createDiv({ cls: 'fitkit-container' })
+    if (this.activeRun) {
+      this.renderRun(container, this.activeRun)
+      return
+    }
 
     this.renderHeader(container)
 
@@ -1030,6 +1067,9 @@ export class WorkoutEditorView extends FileView {
         attr: { 'aria-label': 'Run interval plan' },
       })
       runBtn.disabled = done >= columns.plan.reps
+      const plan = columns.plan
+      runBtn.addEventListener('click', () => this.startIntervalRun(ex, plan))
+      return
     }
 
     const isRunningHere = this.activeTimer?.card === ex
@@ -1497,6 +1537,20 @@ export class WorkoutEditorView extends FileView {
   /** Picks up a timer the note records as running, such as one cut off when the app was killed. */
   private resumeSavedTimer(): void {
     for (const card of this.model?.exercises ?? []) {
+      const plan = intervalColumns(card).plan
+      const last = card.durationEntries.at(-1)
+      if (plan && last && (last.startedAt !== undefined || last.paused)) {
+        this.enterRun(card, plan, { kind: 'running' })
+        if (this.activeRun && last.startedAt !== undefined) {
+          this.catchUpRun(this.activeRun, Date.now())
+        }
+        return
+      }
+    }
+    for (const card of this.model?.exercises ?? []) {
+      if (intervalColumns(card).plan) {
+        continue
+      }
       const entry = card.durationEntries.find((candidate) => candidate.startedAt !== undefined)
       const startedAtMs = Date.parse(entry?.startedAt ?? '')
       if (entry && !Number.isNaN(startedAtMs)) {
@@ -1548,6 +1602,188 @@ export class WorkoutEditorView extends FileView {
 
   private liveSeconds(timer: ActiveTimer): number {
     return timer.accumulator + Math.max(0, Math.floor((Date.now() - timer.startedAtMs) / 1000))
+  }
+
+  private startIntervalRun(card: ExerciseCard, plan: IntervalPlan): void {
+    this.stopTimer({ write: true, render: false })
+    this.clearRestTimer()
+    card.durationEntries = startRun(card.durationEntries, Date.now())
+    this.enterRun(card, plan, { kind: 'running' })
+    this.markDirty()
+    this.render()
+  }
+
+  private enterRun(card: ExerciseCard, plan: IntervalPlan, screen: RunnerScreen): void {
+    this.activeRun = {
+      card,
+      plan,
+      screen,
+      intervalId: window.setInterval(() => this.tickRun(), 500),
+      lastTickAt: Date.now(),
+      clockEl: null,
+    }
+  }
+
+  /** Stops the runner and returns to the card list; the rows already hold everything. */
+  private leaveRun(): void {
+    const run = this.activeRun
+    if (!run) {
+      return
+    }
+    window.clearInterval(run.intervalId)
+    this.activeRun = null
+    this.render()
+  }
+
+  private renderRun(container: HTMLElement, run: ActiveRun): void {
+    const now = Date.now()
+    run.clockEl = renderRunner(
+      container,
+      {
+        exerciseName: run.card.name,
+        plan: run.plan,
+        rows: run.card.durationEntries,
+        now,
+        screen: run.screen,
+      },
+      {
+        primary: () => {
+          const rows = run.card.durationEntries
+          if (runPhase(rows, run.plan, Date.now()).kind === 'rest') {
+            this.applyRunRows(skipRest(rows, Date.now()), false)
+          } else {
+            const result = endWork(rows, run.plan, Date.now())
+            this.applyRunRows(result.rows, result.finished)
+          }
+        },
+        togglePause: () => {
+          const rows = run.card.durationEntries
+          const phase = runPhase(rows, run.plan, Date.now())
+          const paused = phase.kind !== 'idle' && phase.paused
+          this.applyRunRows(
+            paused ? resumeRun(rows, Date.now()) : pauseRun(rows, Date.now()),
+            false,
+          )
+        },
+        end: () => {
+          this.applyRunRows(endRun(run.card.durationEntries, Date.now()), false)
+          this.leaveRun()
+        },
+        adjust: (delta) => this.adjustLastRep(run, delta),
+        resumeCut: () => {
+          run.screen = { kind: 'running' }
+          this.applyRunRows(resumeCutRun(run.card.durationEntries, run.plan, Date.now()), false)
+        },
+        endCut: () => {
+          this.applyRunRows(endCutRun(run.card.durationEntries), false)
+          this.leaveRun()
+        },
+        back: () => this.leaveRun(),
+      },
+    )
+  }
+
+  private tickRun(): void {
+    const run = this.activeRun
+    if (!run || run.screen.kind !== 'running') {
+      return
+    }
+    const now = Date.now()
+    const late = now - run.lastTickAt > LATE_TICK_MS
+    run.lastTickAt = now
+    if (late) {
+      this.catchUpRun(run, now)
+      this.render()
+      return
+    }
+    const result = advanceRun(run.card.durationEntries, run.plan, now)
+    if (!this.applyRunRows(result.rows, result.finished) && run.clockEl) {
+      run.clockEl.setText(formatClock(clockSeconds({ ...runnerContext(run), now })))
+    }
+  }
+
+  /**
+   * Swaps in the run's next rows when they differ, marking the note dirty and
+   * redrawing. Returns whether anything changed, so a plain tick only moves the clock.
+   */
+  private applyRunRows(rows: EditableDurationEntry[], finished: boolean): boolean {
+    const run = this.activeRun
+    if (!run) {
+      return false
+    }
+    const changed = JSON.stringify(rows) !== JSON.stringify(run.card.durationEntries)
+    if (changed) {
+      run.card.durationEntries = rows
+      this.markDirty()
+    }
+    if (finished) {
+      run.screen = { kind: 'finished', hits: hitCount(rows, run.plan) }
+    }
+    if (changed || finished) {
+      this.render()
+    }
+    return changed || finished
+  }
+
+  private adjustLastRep(run: ActiveRun, delta: number): void {
+    const kind = run.plan.intensity.kind
+    const rows = run.card.durationEntries.map((row) => ({ ...row }))
+    const last = rows[rows.length - 1]
+    if (!last) {
+      return
+    }
+    last[kind] = Math.max(
+      0,
+      Math.round(((last[kind] ?? run.plan.intensity.target) + delta) * 10) / 10,
+    )
+    this.applyRunRows(rows, false)
+  }
+
+  /** Picks a run back up from the note after the app was away: catch up, or report a cut-off. */
+  private catchUpRun(run: ActiveRun, now: number): void {
+    const result = catchUpRun(run.card.durationEntries, run.plan, now)
+    if (result.kind === 'cut-off') {
+      run.screen = { kind: 'cut-off', rep: result.rep, resting: result.resting }
+      return
+    }
+    if (result.finished) {
+      run.screen = { kind: 'finished', hits: hitCount(result.rows, run.plan) }
+    }
+    if (result.filled > 0) {
+      run.card.durationEntries = result.rows
+      this.markDirty()
+      const label = INTENSITY_LABELS[run.plan.intensity.kind].toLowerCase()
+      new Notice(
+        result.filled === 1
+          ? `1 rep finished while Obsidian was closed. It has the target filled in, so check its ${label}.`
+          : `${result.filled} reps finished while Obsidian was closed. They have the target filled in, so check their ${label}.`,
+      )
+    }
+  }
+
+  /** Closing the tab pauses a run, banking the time so far the way the duration timer does. */
+  private pauseRunForClose(): void {
+    const run = this.activeRun
+    if (!run) {
+      return
+    }
+    window.clearInterval(run.intervalId)
+    this.activeRun = null
+    if (run.screen.kind !== 'running') {
+      return
+    }
+    const rows = pauseRun(run.card.durationEntries, Date.now())
+    if (JSON.stringify(rows) !== JSON.stringify(run.card.durationEntries)) {
+      run.card.durationEntries = rows
+      this.markDirty()
+    }
+  }
+
+  private dropRun(): void {
+    if (this.activeRun) {
+      window.clearInterval(this.activeRun.intervalId)
+      this.activeRun = null
+    }
   }
 
   private startRestTimer(): void {
@@ -2584,6 +2820,23 @@ export class WorkoutEditorView extends FileView {
       return
     }
     this.autoSaveInflight = true
+    this.inflightSave = this.writeAutoSave()
+    await this.inflightSave
+  }
+
+  /** Waits out a write already in flight, then writes whatever it could not include. */
+  private async settleAutoSave(): Promise<void> {
+    while (this.autoSaveInflight) {
+      await this.inflightSave
+    }
+    await this.flushAutoSave()
+  }
+
+  private async writeAutoSave(): Promise<void> {
+    if (!this.session || !this.model) {
+      this.autoSaveInflight = false
+      return
+    }
     /**
      * Captured before the write so a concurrent onClose/loadFile on this view
      * (which can null out or reassign this.session while we await below)
@@ -3037,4 +3290,12 @@ function carriedIntervalFields(last: EditableDurationEntry | undefined): Editabl
     carried.restSeconds = last.restSeconds
   }
   return carried
+}
+
+function runnerContext(run: ActiveRun): {
+  exerciseName: string
+  plan: IntervalPlan
+  rows: RunRow[]
+} {
+  return { exerciseName: run.card.name, plan: run.plan, rows: run.card.durationEntries }
 }

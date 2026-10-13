@@ -270,6 +270,7 @@ describe('interval run', () => {
     expect(catchUpRun(rows, plan('4 x 30s @ 300W, 90s rest'), at('07:19:40'))).toEqual({
       kind: 'caught-up',
       filled: 2,
+      finished: false,
       rows: [
         { set: 1, durationSeconds: 30, watts: 280, restSeconds: 90 },
         {
@@ -377,5 +378,34 @@ describe('interval run', () => {
     ]
 
     expect(hitCount(rows, SLED)).toBe(2)
+  })
+
+  it('finishes a run whose plan ended moments ago, since a locked screen is not a stop', () => {
+    const rows: RunRow[] = [
+      { set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 },
+      { set: 2, durationSeconds: 30, watts: 300, restSeconds: 90 },
+      { set: 3, durationSeconds: 0, startedAt: '2026-10-12T07:19:00+10:00' },
+    ]
+
+    expect(catchUpRun(rows, BIKE, at('07:21:00'))).toEqual({
+      kind: 'caught-up',
+      filled: 1,
+      finished: true,
+      rows: [
+        { set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 },
+        { set: 2, durationSeconds: 30, watts: 300, restSeconds: 90 },
+        { set: 3, durationSeconds: 30, watts: 300, note: 'logged while Obsidian was closed' },
+      ],
+    })
+  })
+
+  it('cuts off a run whose plan ended more than two minutes ago', () => {
+    const rows: RunRow[] = [
+      { set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 },
+      { set: 2, durationSeconds: 30, watts: 300, restSeconds: 90 },
+      { set: 3, durationSeconds: 0, startedAt: '2026-10-12T07:19:00+10:00' },
+    ]
+
+    expect(catchUpRun(rows, BIKE, at('07:21:31')).kind).toBe('cut-off')
   })
 })

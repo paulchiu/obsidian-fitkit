@@ -147,6 +147,7 @@ import { DEFAULT_SETTINGS } from '../../src/settings'
 import { WorkoutEditorView } from '../../src/ui/workout-editor-view'
 import { buildMockVaultFolderTree } from '../fixtures/mock-vault-folder-tree'
 import { createTestRoot, harnessDocument, harnessWindow } from '../harness/obsidian-dom'
+import { findUnstyledClasses } from '../harness/stylesheet'
 
 obsidian.createRoot = createTestRoot
 
@@ -155,8 +156,29 @@ const WORKOUT_PATH = 'Fitness/Workouts/2026-10-12.md'
 const workoutSource = (...body: string[]): string =>
   ['---', 'type: workout', 'date: 2026-10-12', 'name: Intervals', '---', '', ...body, ''].join('\n')
 
-/** Interval callbacks the view registered, keyed by id. */
+/** Interval callbacks the view registered; `tick()` runs them as time passing would. */
 let intervals = new Map<number, () => void>()
+
+const tick = (): void => {
+  for (const callback of [...intervals.values()]) {
+    callback()
+  }
+}
+
+/** Moves the wall clock to a Brisbane time on the workout's day and fires the view's ticks. */
+const at = (time: string): void => {
+  vi.setSystemTime(new Date(`2026-10-12T${time}+10:00`))
+  tick()
+}
+
+/** Walks the clock forward a second at a time to `time`, the way the view's ticks would see it. */
+const runTo = (time: string): void => {
+  const target = Date.parse(`2026-10-12T${time}+10:00`)
+  while (Date.now() < target) {
+    vi.setSystemTime(Math.min(Date.now() + 1000, target))
+    tick()
+  }
+}
 
 /** A real WorkoutEditorView over an in-memory vault holding one workout note. */
 const openView = async (
@@ -260,7 +282,7 @@ describe('WorkoutEditorView interval plans', () => {
       '',
       '- [exercise:: [[Exercise Bike]]] [plan:: 8 x 30s @ 300W, 90s rest]',
       '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 305] [rest:: 90]',
-      '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 30] [load:: 20] [level:: 4] [rest:: 41] [paused:: true]',
+      '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 30] [load:: 20] [level:: 4] [rest:: 41]',
     ]
     const { view, contents } = await openView(workoutSource(...body))
 
@@ -355,5 +377,241 @@ describe('WorkoutEditorView interval plans', () => {
       '- [exercise:: [[Spin Bike]]] [set:: 2] [duration:: 20] [level:: 12] [rest:: 40]',
       '- [exercise:: [[Spin Bike]]] [duration:: 0] [level:: 12] [rest:: 40]',
     ])
+  })
+
+  describe('run', () => {
+    const BIKE = [
+      '## [[Exercise Bike]]',
+      '',
+      '- [exercise:: [[Exercise Bike]]] [plan:: 3 x 30s @ 300W, 90s rest]',
+    ]
+
+    const runnerText = (view: WorkoutEditorView, selector: string): string | null | undefined =>
+      view.contentEl.querySelector(`.fitkit-runner ${selector}`)?.textContent
+
+    it('takes over the tab with a clock counting the work down and a Rest button', async () => {
+      const { view } = await openView(workoutSource(...BIKE))
+
+      button(view, 'Run interval plan').click()
+      at('07:15:10')
+
+      expect({
+        cards: view.contentEl.querySelectorAll('.fitkit-card').length,
+        phase: runnerText(view, '.fitkit-runner-phase'),
+        clock: runnerText(view, '.fitkit-runner-clock'),
+        primary: runnerText(view, '.fitkit-runner-primary'),
+      }).toEqual({ cards: 0, phase: 'Work · rep 1 of 3', clock: '0:20', primary: 'Rest' })
+    })
+
+    const runnerButton = (view: WorkoutEditorView, text: string): HTMLButtonElement => {
+      const found = [
+        ...view.contentEl.querySelectorAll<HTMLButtonElement>('.fitkit-runner button'),
+      ].find((candidate) => candidate.textContent === text)
+      if (!found) {
+        throw new Error(`${text} not on the runner`)
+      }
+      return found
+    }
+
+    it('writes the seconds done when Rest ends work early, and the rest taken when Skip ends rest', async () => {
+      const { view, contents } = await openView(workoutSource(...BIKE))
+      button(view, 'Run interval plan').click()
+
+      at('07:15:22')
+      runnerButton(view, 'Rest').click()
+      at('07:16:00')
+      runnerButton(view, 'Skip').click()
+
+      await savedBody(contents, [
+        ...BIKE,
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 22] [watts:: 300] [rest:: 38]',
+        '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 0] [started:: 2026-10-12T07:16:00+10:00]',
+      ])
+    })
+
+    it('ends work by itself when its time runs out and writes the rep with the target', async () => {
+      const { view, contents } = await openView(workoutSource(...BIKE))
+      button(view, 'Run interval plan').click()
+
+      runTo('07:15:31')
+
+      expect(runnerText(view, '.fitkit-runner-primary')).toBe('Skip')
+      await savedBody(contents, [
+        ...BIKE,
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 0] [started:: 2026-10-12T07:15:30+10:00]',
+      ])
+    })
+
+    it('corrects the rep just done from the stepper during rest', async () => {
+      const { view, contents } = await openView(workoutSource(...BIKE))
+      button(view, 'Run interval plan').click()
+      at('07:15:20')
+      runnerButton(view, 'Rest').click()
+
+      button(view, 'Lower last rep').click()
+      button(view, 'Lower last rep').click()
+
+      expect(runnerText(view, '.fitkit-runner-stepper-value')).toBe('Rep 1: 290 W')
+      await savedBody(contents, [
+        ...BIKE,
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 20] [watts:: 290] [rest:: 0] [started:: 2026-10-12T07:15:20+10:00]',
+      ])
+    })
+
+    it('pauses with the time banked, and End run returns to the card with the rows kept', async () => {
+      const { view, contents } = await openView(workoutSource(...BIKE))
+      button(view, 'Run interval plan').click()
+      at('07:15:12')
+
+      button(view, 'Pause run').click()
+      await savedBody(contents, [
+        ...BIKE,
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 12] [paused:: true]',
+      ])
+      at('07:20:00')
+      button(view, 'Resume run').click()
+      at('07:20:05')
+      button(view, 'End run').click()
+
+      expect(view.contentEl.querySelectorAll('.fitkit-runner').length).toBe(0)
+      await savedBody(contents, [
+        ...BIKE,
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 17]',
+      ])
+    })
+
+    it('pauses the run when the tab closes mid-run', async () => {
+      const { view, contents } = await openView(workoutSource(...BIKE))
+      button(view, 'Run interval plan').click()
+      at('07:15:12')
+
+      await view.onClose()
+
+      await savedBody(contents, [
+        ...BIKE,
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 12] [paused:: true]',
+      ])
+    })
+
+    it('shows how many reps hit the target when the run finishes', async () => {
+      const { view } = await openView(
+        workoutSource(
+          ...BIKE,
+          '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 90]',
+          '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 30] [watts:: 250] [rest:: 90]',
+        ),
+      )
+      button(view, 'Run interval plan').click()
+
+      runTo('07:15:31')
+
+      expect([
+        runnerText(view, '.fitkit-runner-phase'),
+        runnerText(view, '.fitkit-runner-hits'),
+      ]).toEqual(['Run finished', '2/3'])
+    })
+
+    it('catches up reps that ended while Obsidian was closed and says how many', async () => {
+      vi.setSystemTime(new Date('2026-10-12T07:19:40+10:00'))
+      const { view, contents } = await openView(
+        workoutSource(
+          '## [[Exercise Bike]]',
+          '',
+          '- [exercise:: [[Exercise Bike]]] [plan:: 4 x 30s @ 300W, 90s rest]',
+          '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 280] [rest:: 90]',
+          '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 0] [started:: 2026-10-12T07:17:00+10:00]',
+        ),
+      )
+
+      expect([obsidian.notices.at(-1), runnerText(view, '.fitkit-runner-phase')]).toEqual([
+        '2 reps finished while Obsidian was closed. They have the target filled in, so check their watts.',
+        'Rest · rep 3 of 4',
+      ])
+      await savedBody(contents, [
+        '## [[Exercise Bike]]',
+        '',
+        '- [exercise:: [[Exercise Bike]]] [plan:: 4 x 30s @ 300W, 90s rest]',
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 280] [rest:: 90]',
+        '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 30] [watts:: 300] [rest:: 90] [notes:: logged while Obsidian was closed]',
+        '- [exercise:: [[Exercise Bike]]] [set:: 3] [duration:: 30] [watts:: 300] [rest:: 0] [started:: 2026-10-12T07:19:30+10:00] [notes:: logged while Obsidian was closed]',
+      ])
+    })
+
+    it('reports a cut-off run past the end of the plan and can end it there', async () => {
+      vi.setSystemTime(new Date('2026-10-12T08:00:00+10:00'))
+      const source = workoutSource(
+        ...BIKE,
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 0] [started:: 2026-10-12T07:15:30+10:00]',
+      )
+      const { view, contents } = await openView(source)
+
+      const phase = runnerText(view, '.fitkit-runner-phase')
+      runnerButton(view, 'End run here').click()
+
+      expect(phase).toBe('Run cut off at rep 1 rest')
+      await savedBody(contents, [
+        ...BIKE,
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300]',
+      ])
+    })
+
+    it('resumes a cut-off run from the next rep', async () => {
+      vi.setSystemTime(new Date('2026-10-12T08:00:00+10:00'))
+      const { view, contents } = await openView(
+        workoutSource(
+          ...BIKE,
+          '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 0] [started:: 2026-10-12T07:15:30+10:00]',
+        ),
+      )
+
+      runnerButton(view, 'Resume rep 2').click()
+
+      await savedBody(contents, [
+        ...BIKE,
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 90]',
+        '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 0] [started:: 2026-10-12T08:00:00+10:00]',
+      ])
+    })
+
+    it('offers Run instead of the stopwatch on a card with a plan', async () => {
+      const { view } = await openView(workoutSource(...BIKE))
+
+      expect(view.contentEl.querySelector('button[aria-label="Start timer"]')).toBeNull()
+    })
+
+    it('styles every class the plan card, the runner screens and the plan form render', async () => {
+      const rendered: string[] = []
+      const collect = (root: Element): void => {
+        rendered.push(...findUnstyledClasses(root))
+      }
+      const { view } = await openView(
+        workoutSource(
+          ...BIKE,
+          '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 90]',
+        ),
+      )
+      collect(view.contentEl)
+      button(view, 'Exercise options').click()
+      menuItem('Set interval plan').onClick?.()
+      const modal = obsidian.modals.at(-1)
+      if (modal) {
+        collect(modal.contentEl)
+      }
+      button(view, 'Run interval plan').click()
+      collect(view.contentEl)
+      at('07:15:20')
+      runnerButton(view, 'Rest').click()
+      collect(view.contentEl)
+      button(view, 'Pause run').click()
+      collect(view.contentEl)
+      button(view, 'Resume run').click()
+      runTo('07:17:30')
+      collect(view.contentEl)
+
+      expect([runnerText(view, '.fitkit-runner-phase'), [...new Set(rendered)]]).toEqual([
+        'Run finished',
+        [],
+      ])
+    })
   })
 })

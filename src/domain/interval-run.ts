@@ -102,21 +102,21 @@ function advance(
   plan: IntervalPlan,
   now: number,
   note?: string,
-): RunAdvance & { closed: number } {
+): RunAdvance & { closed: number; endedAt: number } {
   const next = rows.map((row) => ({ ...row }))
   let closed = 0
   for (;;) {
     const row = next[next.length - 1]
     if (!row || row.startedAt === undefined || row.paused) {
-      return { rows: next, finished: false, closed }
+      return { rows: next, finished: false, closed, endedAt: 0 }
     }
     const target = phaseTarget(row, plan)
     if (target === null) {
-      return { rows: next, finished: false, closed }
+      return { rows: next, finished: false, closed, endedAt: 0 }
     }
     const boundary = phaseStartMs(row) + target * 1000
     if (now < boundary) {
-      return { rows: next, finished: false, closed }
+      return { rows: next, finished: false, closed, endedAt: 0 }
     }
     if (isResting(row)) {
       row.restSeconds = target
@@ -129,7 +129,7 @@ function advance(
       row.note ??= note
     }
     if (closeWork(next, plan, target, boundary)) {
-      return { rows: next, finished: true, closed }
+      return { rows: next, finished: true, closed, endedAt: boundary }
     }
   }
 }
@@ -229,23 +229,26 @@ export function endRun(rows: readonly RunRow[], now: number): RunRow[] {
 }
 
 export type RunCatchUp =
-  | { kind: 'caught-up'; rows: RunRow[]; filled: number }
+  | { kind: 'caught-up'; rows: RunRow[]; filled: number; finished: boolean }
   | { kind: 'cut-off'; rep: number; resting: boolean; startedAt: string }
 
 export const CAUGHT_UP_NOTE = 'logged while Obsidian was closed'
 
+/** A plan that ended this recently was probably finished behind a locked screen, not abandoned. */
+const CUT_OFF_GRACE_MS = 2 * 60 * 1000
+
 /**
  * Picks a run back up after the app was away. Reps whose end passed in the meantime are
- * filled with the target and flagged. A clock that has run past the end of the plan
+ * filled with the target and flagged. A plan that ended more than a grace period ago
  * means the athlete stopped, so it reports a cut-off and leaves the rows alone.
  */
 export function catchUpRun(rows: readonly RunRow[], plan: IntervalPlan, now: number): RunCatchUp {
   const result = advance(rows, plan, now, CAUGHT_UP_NOTE)
   const row = openRow(rows)
-  if (result.finished && row?.startedAt !== undefined) {
+  if (result.finished && now - result.endedAt > CUT_OFF_GRACE_MS && row?.startedAt !== undefined) {
     return { kind: 'cut-off', rep: rows.length, resting: isResting(row), startedAt: row.startedAt }
   }
-  return { kind: 'caught-up', rows: result.rows, filled: result.closed }
+  return { kind: 'caught-up', rows: result.rows, filled: result.closed, finished: result.finished }
 }
 
 /** Resume after a cut-off: a rep cut off in work starts over, and a cut-off rest counts as taken in full. */

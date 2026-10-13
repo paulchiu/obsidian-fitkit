@@ -1296,3 +1296,152 @@ body.is-mobile .fitkit-editor-root {
 .is-compact .fitkit-bodyweight-stepper > .fitkit-bodyweight-level-label {
   padding: var(--size-4-1) var(--size-4-1);
 }
+
+/* Interval runner: takes over the editor tab while a plan runs. */
+.fitkit-runner {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 16px;
+  min-height: min(640px, 80vh);
+  padding: 16px;
+  border-radius: var(--radius-l, 12px);
+  background: var(--background-secondary);
+  border: 2px solid var(--background-modifier-border);
+}
+
+.fitkit-runner.is-work {
+  border-color: var(--interactive-accent);
+}
+
+.fitkit-runner.is-rest {
+  border-color: var(--color-green, var(--text-success));
+}
+
+.fitkit-runner.is-paused .fitkit-runner-clock {
+  opacity: 0.5;
+}
+
+.fitkit-runner-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+}
+
+.fitkit-runner-phase {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.fitkit-runner-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fitkit-runner-center {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.fitkit-runner-clock,
+.fitkit-runner-hits {
+  font-size: clamp(64px, 22vw, 120px);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.fitkit-runner-target,
+.fitkit-runner-stats,
+.fitkit-runner-note {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.fitkit-runner-target {
+  font-size: var(--font-ui-large);
+}
+
+.fitkit-runner-dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.fitkit-runner-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--background-modifier-border);
+}
+
+.fitkit-runner-dot.is-hit {
+  background: var(--color-green, var(--text-success));
+  border-color: var(--color-green, var(--text-success));
+}
+
+.fitkit-runner-dot.is-miss {
+  background: var(--color-orange, var(--text-warning));
+  border-color: var(--color-orange, var(--text-warning));
+}
+
+.fitkit-runner-dot.is-current {
+  border-color: var(--interactive-accent);
+}
+
+.fitkit-runner-stepper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fitkit-runner-stepper .fitkit-btn {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: var(--font-ui-large);
+}
+
+.fitkit-runner-stepper-value {
+  min-width: 9em;
+  font-variant-numeric: tabular-nums;
+}
+
+.fitkit-runner-primary {
+  min-height: 88px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.fitkit-runner-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.fitkit-runner-controls .fitkit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+}
+
+.fitkit-runner-banner {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: var(--radius-m, 8px);
+  border: 1px solid var(--text-warning);
+}
+
+.fitkit-run-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

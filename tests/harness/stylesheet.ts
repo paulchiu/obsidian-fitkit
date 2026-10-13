@@ -60,6 +60,7 @@ export function findUnstyledClasses(root: Element): string[] {
 
 /** Obsidian classes the plugin renders but the plugin stylesheet never names. */
 const OBSIDIAN_CLASSES: ReadonlySet<string> = new Set([
+  'dropdown',
   'mod-cta',
   'setting-item-description',
   'setting-item-name',
