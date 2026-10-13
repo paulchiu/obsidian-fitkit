@@ -20,9 +20,27 @@ export interface RunRow {
   note?: string
 }
 
-/** Opens the next rep after the rows already logged. */
+/** Opens the next rep after the rows already logged, taking the place of any trailing blank rows. */
 export function startRun(rows: readonly RunRow[], now: number): RunRow[] {
-  return [...rows, { set: rows.length + 1, durationSeconds: 0, startedAt: stamp(now) }]
+  const logged = rows.slice(0, loggedReps(rows))
+  return [...logged, { set: logged.length + 1, durationSeconds: 0, startedAt: stamp(now) }]
+}
+
+/** Rows that record something, ignoring the blank rows a fresh card or `Add set` leaves at the end. */
+export function loggedReps(rows: readonly RunRow[]): number {
+  let count = rows.length
+  while (count > 0 && isBlankRow(rows[count - 1])) {
+    count--
+  }
+  return count
+}
+
+function isBlankRow(row: RunRow | undefined): boolean {
+  if (!row) {
+    return false
+  }
+  const { set: _set, durationSeconds, ...rest } = row
+  return !durationSeconds && Object.values(rest).every((value) => value === undefined)
 }
 
 function stamp(ms: number): string {

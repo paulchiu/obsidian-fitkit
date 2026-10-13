@@ -8,6 +8,7 @@ import {
   endRun,
   endWork,
   hitCount,
+  loggedReps,
   pauseRun,
   pressRunButton,
   resumeCutRun,
@@ -506,5 +507,19 @@ describe('interval run', () => {
       'caught-up',
       { kind: 'cut-off', rep: 1, resting: false, startedAt: '2026-10-12T07:15:00+10:00' },
     ])
+  })
+
+  it('starts rep 1 in place of the blank row a fresh card is seeded with', () => {
+    expect(startRun([{ durationSeconds: 0 }], at('07:15:00'))).toEqual([
+      { set: 1, durationSeconds: 0, startedAt: '2026-10-12T07:15:00+10:00' },
+    ])
+  })
+
+  it('counts logged reps without a trailing blank row, but keeps a row with a note', () => {
+    expect([
+      loggedReps([{ set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 }, {}]),
+      loggedReps([{ durationSeconds: 0 }]),
+      loggedReps([{ durationSeconds: 0, note: 'warm-up skipped' }]),
+    ]).toEqual([1, 0, 1])
   })
 })

@@ -25,6 +25,7 @@ import {
   endRun,
   hasOpenRep,
   hitCount,
+  loggedReps,
   pauseRun,
   pressRunButton,
   resumeCutRun,
@@ -1073,7 +1074,7 @@ export class WorkoutEditorView extends FileView {
     })
 
     if (columns.plan) {
-      const done = ex.durationEntries.length
+      const done = loggedReps(ex.durationEntries)
       const runBtn = actions.createEl('button', {
         cls: 'fitkit-btn fitkit-btn-primary fitkit-run-button',
         text: done > 0 ? `Run from rep ${done + 1}` : 'Run',
