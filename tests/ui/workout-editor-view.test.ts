@@ -573,6 +573,7 @@ describe('WorkoutEditorView row actions', () => {
       'Plan: decrease',
       'Set plan step...',
       'Switch to duration',
+      'Switch to interval',
       'Switch to bodyweight',
       'Move up',
       'Move down',
@@ -580,7 +581,7 @@ describe('WorkoutEditorView row actions', () => {
     ])
   })
 
-  it('offers a switch item for every kind other than the current one, never the current kind', () => {
+  it('offers a switch item for every type other than the current one, interval included', () => {
     vi.stubGlobal('HTMLElement', TestElement)
     for (const kind of EXERCISE_KINDS) {
       const view = createCardMenuView()
@@ -595,9 +596,9 @@ describe('WorkoutEditorView row actions', () => {
       const items = obsidianMock.menus[obsidianMock.menus.length - 1]?.items ?? []
       const titles = items.map((item) => item.title)
       const switchItems = items.filter((item) => item.title?.startsWith('Switch to ') === true)
-      const expected = EXERCISE_KINDS.filter((other) => other !== kind).map(
-        (other) => `Switch to ${other}`,
-      )
+      const expected = ['strength', 'duration', 'interval', 'bodyweight']
+        .filter((other) => other !== kind)
+        .map((other) => `Switch to ${other}`)
       expect(switchItems.map((item) => item.title)).toEqual(expected)
       expect(switchItems.map((item) => item.icon)).toEqual(expected.map(() => 'repeat'))
       for (const item of switchItems) {

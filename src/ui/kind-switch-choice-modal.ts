@@ -10,6 +10,8 @@ export interface KindSwitchChoiceModalOptions {
   nextKind: ExerciseKind
   hasRows: boolean
   registryKind: ExerciseKind | null
+  /** What the user chose when it is not a stored kind, such as interval, which is stored as duration. */
+  targetLabel?: string
 }
 
 export class KindSwitchChoiceModal extends Modal {
@@ -25,10 +27,10 @@ export class KindSwitchChoiceModal extends Modal {
 
   onOpen(): void {
     const { contentEl } = this
-    const { exerciseName, currentKind, nextKind, hasRows, registryKind } = this.options
+    const { exerciseName, currentKind, nextKind, hasRows, registryKind, targetLabel } = this.options
     contentEl.empty()
     contentEl.addClass('fitkit-kind-confirm-modal')
-    this.setTitle(`Switch ${exerciseName} to ${nextKind}?`)
+    this.setTitle(`Switch ${exerciseName} to ${targetLabel ?? nextKind}?`)
 
     if (hasRows) {
       contentEl.createEl('p', {
@@ -45,6 +47,11 @@ export class KindSwitchChoiceModal extends Modal {
     contentEl.createEl('p', {
       text: `${registryLine} New cards default their kind from the registry.`,
     })
+    if (targetLabel !== undefined) {
+      contentEl.createEl('p', {
+        text: `The registry records ${targetLabel} exercises as ${nextKind}; the plan lives on the card in this workout.`,
+      })
+    }
 
     const actions = contentEl.createDiv({ cls: 'fitkit-confirm-actions' })
 

@@ -35,7 +35,7 @@ import {
   type RunPhase,
 } from '../domain/interval-run'
 import { parseIntervalPlan, type IntensityKind, type IntervalPlan } from '../domain/interval-plan'
-import { assertUnreachableKind, EXERCISE_KINDS } from '../domain/exercise-kind'
+import { assertUnreachableKind } from '../domain/exercise-kind'
 import {
   formatExerciseHistoryBadges,
   formatNextPlanBadge,
@@ -1861,7 +1861,39 @@ export class WorkoutEditorView extends FileView {
     return this.plugin.settings.strengthRestTimerEnabled !== false
   }
 
-  private async switchKind(index: number, nextKind: ExerciseKind): Promise<void> {
+  /**
+   * Interval is a duration card with a plan rather than a stored kind, so switching to
+   * it sets up a duration card and opens the plan form, and switching an interval card
+   * to duration only drops its plan.
+   */
+  private async switchCardType(index: number, target: CardType): Promise<void> {
+    const ex = this.model?.exercises[index]
+    if (!ex) {
+      return
+    }
+    if (target === 'interval') {
+      if (ex.kind !== 'duration') {
+        await this.switchKind(index, 'duration', 'interval')
+      }
+      if (ex.kind === 'duration') {
+        this.openIntervalPlanModal(ex)
+      }
+      return
+    }
+    if (target === 'duration' && ex.kind === 'duration') {
+      ex.plan = undefined
+      this.markDirty()
+      this.render()
+      return
+    }
+    await this.switchKind(index, target)
+  }
+
+  private async switchKind(
+    index: number,
+    nextKind: ExerciseKind,
+    targetLabel?: string,
+  ): Promise<void> {
     if (!this.model) {
       return
     }
@@ -1872,7 +1904,7 @@ export class WorkoutEditorView extends FileView {
     const hadRows = hasRows(ex)
     const registry = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
     const registryKind = kindForName(registry, ex.name)
-    const choice = await this.chooseKindSwitch(ex, nextKind, registryKind)
+    const choice = await this.chooseKindSwitch(ex, nextKind, registryKind, targetLabel)
     if (choice === 'cancel') {
       return
     }
@@ -1996,6 +2028,7 @@ export class WorkoutEditorView extends FileView {
     card: ExerciseCard,
     nextKind: ExerciseKind,
     registryKind: ExerciseKind | null,
+    targetLabel?: string,
   ): Promise<KindSwitchChoice> {
     return new Promise((resolve) => {
       new KindSwitchChoiceModal(
@@ -2006,6 +2039,7 @@ export class WorkoutEditorView extends FileView {
           nextKind,
           hasRows: hasRows(card),
           registryKind,
+          ...(targetLabel === undefined ? {} : { targetLabel }),
         },
         resolve,
       ).open()
@@ -2061,6 +2095,7 @@ export class WorkoutEditorView extends FileView {
     }
     const previousKind = ex.kind
     ex.kind = nextKind
+    ex.plan = undefined
     ex.strengthSets = []
     ex.durationEntries = []
     ex.bodyweightSets = []
@@ -2237,10 +2272,11 @@ export class WorkoutEditorView extends FileView {
           .onClick(() => this.openEditLevelsModal(ex)),
       )
     }
-    if (ex.kind === 'duration') {
+    const shownKind = cardTypeOf(ex)
+    if (shownKind === 'interval') {
       menu.addItem((item) =>
         item
-          .setTitle('Set interval plan')
+          .setTitle('Edit interval plan')
           .setIcon('timer')
           .onClick(() => this.openIntervalPlanModal(ex)),
       )
@@ -2250,15 +2286,15 @@ export class WorkoutEditorView extends FileView {
       this.addNextPlanMenuItems(menu, ex)
     }
     menu.addSeparator()
-    for (const nextKind of EXERCISE_KINDS) {
-      if (nextKind === ex.kind) {
+    for (const target of CARD_TYPES) {
+      if (target === shownKind) {
         continue
       }
       menu.addItem((item) =>
         item
-          .setTitle(`Switch to ${nextKind}`)
+          .setTitle(`Switch to ${target}`)
           .setIcon('repeat')
-          .onClick(() => void this.switchKind(index, nextKind)),
+          .onClick(() => void this.switchCardType(index, target)),
       )
     }
     menu.addSeparator()
@@ -3306,4 +3342,13 @@ function carriedIntervalFields(last: EditableDurationEntry | undefined): Editabl
     carried.restSeconds = last.restSeconds
   }
   return carried
+}
+
+/** The types the card menu offers: the stored kinds, plus interval for a duration card with a plan. */
+type CardType = ExerciseKind | 'interval'
+
+const CARD_TYPES: readonly CardType[] = ['strength', 'duration', 'interval', 'bodyweight']
+
+function cardTypeOf(card: ExerciseCard): CardType {
+  return card.kind === 'duration' && card.plan !== undefined ? 'interval' : card.kind
 }

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Interval training on duration cards. `Set interval plan` in the card menu writes a one-line plan such as `[plan:: 8 x 30s @ 300W, 90s rest]`, with presets, watts, load or level targets, open work, and a Pace setting that turns a fixed rest into `every 1m` (EMOM). The card then shows each rep's intensity and rest, and `Add set` and `Repeat` carry both forward.
+- Interval training. `Switch to interval` in the card menu, beside the other exercise types, writes a one-line plan such as `[plan:: 8 x 30s @ 300W, 90s rest]`, with presets, watts, load or level targets, open work, and a Pace setting that turns a fixed rest into `every 1m` (EMOM). The card then shows each rep's intensity and rest, and `Add set` and `Repeat` carry both forward.
 - `Run` on a planned card takes over the editor tab with a big clock and one big button, which reads `Rest` while you work (ending the rep with the time you actually did) and `Skip` while you rest. Each rep is written to the note as it finishes, with a stepper during rest to correct the intensity you just held. Pause, End run, rep dots and a finished screen with the reps on target round it out.
 - A run survives Obsidian being closed or killed. The note holds one start stamp, so reopening it catches up reps that finished meanwhile (filled with the target and flagged `logged while Obsidian was closed`), or offers to resume or end a run whose plan has long since ended. Closing the tab pauses the run.
 - `Interval beeps` in settings beeps the last three seconds of each interval and the change between work and rest, and vibrates where the device can. The runner also keeps the screen awake where the platform allows.

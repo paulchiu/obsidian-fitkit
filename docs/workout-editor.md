@@ -67,9 +67,9 @@ A rung name too long for its cell shortens to a compact form (`L2`), and grows b
 
 ## Interval training
 
-`Set interval plan` in a duration card's menu opens a form for a one-line plan: reps, an intensity (watts, load or level) and its target, the work time or `Open` for work that ends when you say so, and a `Pace`. `Rest after each rep` gives every rep the same rest; `Start every (EMOM)` starts each rep one period after the last one started, so a slow rep eats its own rest. Presets cover a bike 8 x 30, Tabata, EMOM and a sled every two minutes, and the form explains any plan that cannot run. The plan shows above the rows (tap it to edit), the rows gain intensity and rest columns, and `Add set` and `Repeat` carry both forward.
+`Switch to interval` in any card's menu sits beside the other types and opens a form for a one-line plan: reps, an intensity (watts, load or level) and its target, the work time or `Open` for work that ends when you say so, and a `Pace`. `Rest after each rep` gives every rep the same rest; `Start every (EMOM)` starts each rep one period after the last one started, so a slow rep eats its own rest. Presets cover a bike 8 x 30, Tabata, EMOM and a sled every two minutes, and the form explains any plan that cannot run. The plan shows above the rows (tap it, or `Edit interval plan` in the menu, to change it), the rows gain intensity and rest columns, and `Add set` and `Repeat` carry both forward. An interval exercise is stored as a duration exercise with a plan, so `Switch to duration` keeps the rows and drops only the plan, and choosing `Update registry too` when switching records the exercise as duration.
 
-A card with a plan swaps its play button for `Run`, which reads `Run from rep N` once some reps are logged. Run takes over the tab:
+An interval card swaps the play button for `Run`, which reads `Run from rep N` once some reps are logged; a blank row left by adding the exercise does not count. Run takes over the tab:
 
 - The clock counts the work down (or up, for open work) and then the rest.
 - The big button reads `Rest` while you work, ending the rep with the time you actually did, and `Skip` while you rest, starting the next rep at once. A phase whose time runs out ends by itself.

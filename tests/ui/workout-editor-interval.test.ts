@@ -217,7 +217,7 @@ const button = (view: WorkoutEditorView, label: string): HTMLButtonElement => {
   return found
 }
 
-const openedModal = (): { contentEl: HTMLElement } => {
+const openedModal = (): { contentEl: HTMLElement; titleEl: HTMLElement } => {
   const modal = obsidian.modals.at(-1)
   if (!modal) {
     throw new Error('no modal opened')
@@ -308,7 +308,7 @@ describe('WorkoutEditorView interval plans', () => {
     await savedBody(contents, body)
   })
 
-  it('writes the plan line chosen through Set interval plan', async () => {
+  it('writes the plan line chosen through the plan form', async () => {
     const { view, contents } = await openView(
       workoutSource(
         '## [[Exercise Bike]]',
@@ -318,7 +318,7 @@ describe('WorkoutEditorView interval plans', () => {
     )
 
     button(view, 'Exercise options').click()
-    menuItem('Set interval plan').onClick?.()
+    menuItem('Switch to interval').onClick?.()
     const modal = openedModal()
     const reps = modal.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')
     if (!reps) {
@@ -425,6 +425,97 @@ describe('WorkoutEditorView interval plans', () => {
     }
 
     await vi.waitFor(() => expect(contents.get(WORKOUT_PATH)).toContain('name: Second'))
+  })
+
+  describe('switching to interval', () => {
+    const menuTitles = (): Array<string | undefined> =>
+      obsidian.menus.at(-1)?.items.map((item) => item.title) ?? []
+
+    const saveForm = (): void => {
+      const save = openedModal().contentEl.querySelector<HTMLButtonElement>('.fitkit-btn-primary')
+      if (!save) {
+        throw new Error('Save not rendered')
+      }
+      save.click()
+    }
+
+    it('offers Switch to interval on a duration card and writes the plan chosen in one step', async () => {
+      const { view, contents } = await openView(
+        workoutSource(
+          '## [[Exercise Bike]]',
+          '',
+          '- [exercise:: [[Exercise Bike]]] [duration:: 0]',
+        ),
+      )
+
+      button(view, 'Exercise options').click()
+      const titles = menuTitles()
+      menuItem('Switch to interval').onClick?.()
+      saveForm()
+
+      expect(titles.filter((title) => title?.startsWith('Switch to'))).toEqual([
+        'Switch to strength',
+        'Switch to interval',
+        'Switch to bodyweight',
+      ])
+      expect(titles).not.toContain('Set interval plan')
+      await savedBody(contents, [
+        '## [[Exercise Bike]]',
+        '',
+        '- [exercise:: [[Exercise Bike]]] [plan:: 8 x 30s @ 300W, 90s rest]',
+        '- [exercise:: [[Exercise Bike]]] [duration:: 0]',
+      ])
+    })
+
+    it('treats a card with a plan as interval, editable in place and switchable back to duration', async () => {
+      const rows = [
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 90]',
+      ]
+      const { view, contents } = await openView(
+        workoutSource(
+          '## [[Exercise Bike]]',
+          '',
+          '- [exercise:: [[Exercise Bike]]] [plan:: 3 x 30s @ 300W, 90s rest]',
+          ...rows,
+        ),
+      )
+
+      button(view, 'Exercise options').click()
+      const titles = menuTitles()
+      menuItem('Switch to duration').onClick?.()
+
+      expect(titles).toContain('Edit interval plan')
+      expect(titles.filter((title) => title?.startsWith('Switch to'))).toEqual([
+        'Switch to strength',
+        'Switch to duration',
+        'Switch to bodyweight',
+      ])
+      await savedBody(contents, ['## [[Exercise Bike]]', '', ...rows])
+    })
+
+    it('switches a strength card straight to interval, naming interval when it asks', async () => {
+      const { view, contents } = await openView(
+        workoutSource('## [[Sled Push]]', '', '- [exercise:: [[Sled Push]]] [set:: 1]'),
+      )
+
+      button(view, 'Exercise options').click()
+      menuItem('Switch to interval').onClick?.()
+      const choice = openedModal()
+      const title = choice.titleEl.textContent
+      ;[...choice.contentEl.querySelectorAll('button')]
+        .find((candidate) => candidate.textContent === 'Just this workout')
+        ?.click()
+      await vi.waitFor(() => expect(obsidian.modals.length).toBe(2))
+      saveForm()
+
+      expect(title).toBe('Switch Sled Push to interval?')
+      await savedBody(contents, [
+        '## [[Sled Push]]',
+        '',
+        '- [exercise:: [[Sled Push]]] [plan:: 8 x 30s @ 300W, 90s rest]',
+        '- [exercise:: [[Sled Push]]] [duration:: 0]',
+      ])
+    })
   })
 
   describe('run', () => {
@@ -651,7 +742,7 @@ describe('WorkoutEditorView interval plans', () => {
       )
       collect(view.contentEl)
       button(view, 'Exercise options').click()
-      menuItem('Set interval plan').onClick?.()
+      menuItem('Edit interval plan').onClick?.()
       collect(openedModal().contentEl)
       button(view, 'Run interval plan').click()
       collect(view.contentEl)
@@ -694,7 +785,7 @@ describe('WorkoutEditorView interval plans', () => {
       )
 
       button(view, 'Exercise options').click()
-      menuItem('Set interval plan').onClick?.()
+      menuItem('Edit interval plan').onClick?.()
       const clear = [...openedModal().contentEl.querySelectorAll('button')].find(
         (candidate) => candidate.textContent === 'Clear plan',
       )
