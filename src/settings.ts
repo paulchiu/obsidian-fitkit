@@ -11,7 +11,11 @@ import type { ExerciseRegistryEntry } from './domain/exercise-registry'
 import { createRegistry, intervalMarker, normalize, removeEntry } from './domain/exercise-registry'
 import { parseExerciseKind } from './domain/exercise-kind'
 import { exerciseTypeOf } from './domain/exercise-type'
-import { DEFAULT_INTERVAL_PRESETS, parseIntervalPresets } from './domain/interval-presets'
+import {
+  DEFAULT_INTERVAL_PRESETS,
+  parseIntervalPresets,
+  upgradeIntervalPresets,
+} from './domain/interval-presets'
 import { parseWeightUnit } from './domain/weight-unit'
 import type FitKitPlugin from './main'
 import { DeleteRegistryEntryModal } from './ui/delete-registry-entry-modal'
@@ -97,7 +101,9 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
     strengthRestTimerEnabled:
       stored.strengthRestTimerEnabled ?? DEFAULT_SETTINGS.strengthRestTimerEnabled,
     intervalBeepsEnabled: stored.intervalBeepsEnabled ?? DEFAULT_SETTINGS.intervalBeepsEnabled,
-    intervalPresets: stored.intervalPresets ?? DEFAULT_SETTINGS.intervalPresets,
+    intervalPresets: upgradeIntervalPresets(
+      stored.intervalPresets ?? DEFAULT_SETTINGS.intervalPresets,
+    ),
     autosaveDebounceMs: stored.autosaveDebounceMs ?? DEFAULT_SETTINGS.autosaveDebounceMs,
     chartSessionsWindow: stored.chartSessionsWindow ?? DEFAULT_SETTINGS.chartSessionsWindow,
     exerciseRegistry: normalizeStoredExerciseRegistry(

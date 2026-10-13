@@ -135,8 +135,16 @@ describe('settings migration', () => {
   it('keeps stored interval presets, even none, and defaults them when missing', () => {
     expect([
       settingsFromStored({ intervalPresets: '', schemaVersion: 1 }).intervalPresets,
-      settingsFromStored({ schemaVersion: 1 }).intervalPresets,
-    ]).toEqual(['', 'Tabata: 8 x 20s @ 400W, 10s rest\nEMOM: 10 x 40s @ 300W, every 1m'])
+      settingsFromStored({ schemaVersion: 1 }).intervalPresets.split('\n')[0],
+    ]).toEqual(['', 'Tabata: (x 8 (work 20s 400W) (rest 10s))'])
+  })
+
+  it('moves presets still on the first defaults to the current ones', () => {
+    const stored = 'Tabata: 8 x 20s @ 400W, 10s rest\nEMOM: 10 x 40s @ 300W, every 1m'
+
+    expect(
+      settingsFromStored({ intervalPresets: stored, schemaVersion: 1 }).intervalPresets.split('\n'),
+    ).toHaveLength(6)
   })
 
   it('preserves stored deleted exercise tombstones', () => {
