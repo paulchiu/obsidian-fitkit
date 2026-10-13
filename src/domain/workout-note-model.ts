@@ -13,11 +13,12 @@
  *  - Exercise-level note: has `[exercise::]` and optional `[notes::]` /
  *    `[next::]` only.
  *  - Strength row: has `[set::]`, optional `[weight::]`, optional `[reps::]`, optional `[notes::]`.
- *  - Duration row: has `[duration::]` (seconds), optional `[set::]`, optional intensity
+ *  - Duration row: has `[duration::]` (seconds), optional `[set::]`, optional `[step::]`
+ *    (the interval plan step it ran), optional intensity
  *    (`[watts::]`, `[load::]` or `[level::]`), optional `[rest::]` (seconds rested after it),
  *    optional `[started::]` (the ISO start time of a timer still running on that row),
  *    optional `[paused:: true]`, optional `[notes::]`. A duration exercise's note row may
- *    also carry `[plan::]`, an interval plan kept as written (see `interval-plan.ts`).
+ *    also carry `[plan::]`, an interval plan kept as written (see `interval-program.ts`).
  *  - Bodyweight row: has `[level::]`, optional `[set::]`, optional `[reps::]`, optional `[load::]`, optional `[notes::]`.
  *
  * A round-trip (parse then serialize) is content-preserving for anything the
@@ -57,6 +58,8 @@ export interface DurationEntry {
   startedAt?: string
   paused?: boolean
   note?: string
+  /** The plan step this row ran, from `[step::]`. */
+  step?: string
 }
 
 export interface BodyweightSet {
@@ -407,6 +410,10 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
       if (hasSet) {
         entry.set = Number(fields.get('set'))
       }
+      const step = fields.get('step')
+      if (step !== undefined) {
+        entry.step = step
+      }
       for (const [field, key] of DURATION_NUMBER_FIELDS) {
         const raw = fields.get(field)
         if (raw !== undefined) {
@@ -667,6 +674,9 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
         if (entry.set !== undefined) {
           parts.push(`[set:: ${entry.set}]`)
         }
+        if (entry.step !== undefined) {
+          parts.push(`[step:: ${entry.step}]`)
+        }
         parts.push(`[duration:: ${formatNumber(entry.durationSeconds)}]`)
         for (const [field, key] of DURATION_NUMBER_FIELDS) {
           const value = entry[key]
@@ -738,6 +748,7 @@ export function canonicalizeForEquality(model: WorkoutNoteModel): unknown {
               startedAt: entry.startedAt,
               paused: entry.paused,
               note: entry.note,
+              step: entry.step,
             }))
           : undefined,
       bodyweightSets:

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { parseIntervalPlan, type IntervalPlan } from '../../src/domain/interval-plan'
+import { parseIntervalProgram, type IntervalProgram } from '../../src/domain/interval-program'
 import {
   advanceRun,
   catchUpRun,
@@ -15,6 +15,7 @@ import {
   resumeRun,
   runPhase,
   skipRest,
+  targetedSteps,
   startRun,
   togglePauseRun,
   type RunRow,
@@ -23,12 +24,12 @@ import {
 /** Epoch ms for a Brisbane wall-clock time on the workout's day. */
 const at = (time: string): number => Date.parse(`2026-10-12T${time}+10:00`)
 
-const plan = (line: string): IntervalPlan => {
-  const result = parseIntervalPlan(line)
+const plan = (line: string): IntervalProgram => {
+  const result = parseIntervalProgram(line)
   if (!result.ok) {
     throw new Error(result.reason)
   }
-  return result.plan
+  return result.program
 }
 
 const BIKE = plan('3 x 30s @ 300W, 90s rest')
@@ -47,7 +48,7 @@ describe('interval run', () => {
   it('starts the next rep as a row stamped with the start time', () => {
     const done: RunRow[] = [{ set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 }]
 
-    expect(startRun(done, at('07:15:00'))).toEqual([
+    expect(startRun(done, BIKE, at('07:15:00'))).toEqual([
       { set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 },
       { set: 2, durationSeconds: 0, startedAt: '2026-10-12T07:15:00+10:00' },
     ])
@@ -56,6 +57,7 @@ describe('interval run', () => {
   it('reports the open rep as work, with the time left counted from its stamp', () => {
     const rows = startRun(
       [{ set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 }],
+      BIKE,
       at('07:15:00'),
     )
 
@@ -95,7 +97,7 @@ describe('interval run', () => {
   })
 
   it('closes work whose time has run out, prefilling the target and starting rest at the boundary', () => {
-    const rows = startRun([], at('07:15:00'))
+    const rows = startRun([], BIKE, at('07:15:00'))
 
     expect(advanceRun(rows, BIKE, at('07:15:31')).rows).toEqual([
       {
@@ -126,7 +128,7 @@ describe('interval run', () => {
   })
 
   it('walks every boundary a late tick missed', () => {
-    const rows = startRun([], at('07:15:00'))
+    const rows = startRun([], BIKE, at('07:15:00'))
 
     expect(advanceRun(rows, BIKE, at('07:17:10')).rows).toEqual([
       { set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 },
@@ -152,7 +154,7 @@ describe('interval run', () => {
   })
 
   it('records the seconds actually done when Rest ends work early', () => {
-    const rows = startRun([], at('07:15:00'))
+    const rows = startRun([], BIKE, at('07:15:00'))
 
     expect(endWork(rows, BIKE, at('07:15:22')).rows).toEqual([
       {
@@ -176,14 +178,14 @@ describe('interval run', () => {
       },
     ]
 
-    expect(skipRest(rows, at('07:16:15'))).toEqual([
+    expect(skipRest(rows, BIKE, at('07:16:15'))).toEqual([
       { set: 1, durationSeconds: 30, watts: 300, restSeconds: 45 },
       { set: 2, durationSeconds: 0, startedAt: '2026-10-12T07:16:15+10:00' },
     ])
   })
 
   it('rests for what the rep left of the period when paced every minute', () => {
-    const rows = startRun([], at('07:15:00'))
+    const rows = startRun([], BIKE, at('07:15:00'))
 
     expect(advanceRun(rows, EMOM, at('07:16:01')).rows).toEqual([
       { set: 1, durationSeconds: 40, watts: 300, restSeconds: 20 },
@@ -192,7 +194,7 @@ describe('interval run', () => {
   })
 
   it('counts open work up without ending it', () => {
-    const rows = startRun([], at('07:15:00'))
+    const rows = startRun([], BIKE, at('07:15:00'))
 
     expect([
       runPhase(rows, SLED, at('07:15:50')),
@@ -201,7 +203,7 @@ describe('interval run', () => {
   })
 
   it('gives a rep that overruns the period no rest and starts the next one at once', () => {
-    const worked = endWork(startRun([], at('07:15:00')), SLED, at('07:16:15')).rows
+    const worked = endWork(startRun([], BIKE, at('07:15:00')), SLED, at('07:16:15')).rows
 
     expect(advanceRun(worked, SLED, at('07:16:15')).rows).toEqual([
       { set: 1, durationSeconds: 75, load: 120, restSeconds: 0 },
@@ -210,7 +212,7 @@ describe('interval run', () => {
   })
 
   it('banks the elapsed time and marks the row paused when the run pauses', () => {
-    const rows = startRun([], at('07:15:00'))
+    const rows = startRun([], BIKE, at('07:15:00'))
 
     expect(pauseRun(rows, BIKE, at('07:15:12')).rows).toEqual([
       { set: 1, durationSeconds: 12, paused: true },
@@ -230,6 +232,7 @@ describe('interval run', () => {
   it('keeps the time done on a rep cut off by End run, and leaves nothing open', () => {
     const rows = startRun(
       [{ set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 }],
+      BIKE,
       at('07:17:00'),
     )
 
@@ -242,6 +245,7 @@ describe('interval run', () => {
   it('drops a rep End run cuts off before any work was done', () => {
     const rows = startRun(
       [{ set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 }],
+      BIKE,
       at('07:17:00'),
     )
 
@@ -269,6 +273,7 @@ describe('interval run', () => {
   it('fills reps that ended while Obsidian was closed with the target, and flags them', () => {
     const rows = startRun(
       [{ set: 1, durationSeconds: 30, watts: 280, restSeconds: 90 }],
+      BIKE,
       at('07:17:00'),
     )
 
@@ -415,13 +420,13 @@ describe('interval run', () => {
   })
 
   it('makes the big button end work while working and skip rest while resting', () => {
-    const working = startRun([], at('07:15:00'))
+    const working = startRun([], BIKE, at('07:15:00'))
     const resting = endWork(working, BIKE, at('07:15:20')).rows
 
     expect([
       pressRunButton(working, BIKE, at('07:15:20')).rows,
       pressRunButton(resting, BIKE, at('07:15:50')).rows,
-    ]).toEqual([resting, skipRest(resting, at('07:15:50'))])
+    ]).toEqual([resting, skipRest(resting, BIKE, at('07:15:50'))])
   })
 
   it('toggles between paused and running, banking rest time when paused during rest', () => {
@@ -451,13 +456,13 @@ describe('interval run', () => {
   })
 
   it('rounds part seconds to the nearest whole second when Rest ends work', () => {
-    const rows = startRun([], at('07:15:00'))
+    const rows = startRun([], BIKE, at('07:15:00'))
 
     expect(endWork(rows, BIKE, at('07:15:00') + 22_600).rows[0]?.durationSeconds).toBe(23)
   })
 
   it('rests for what a short rep left of the period, not what the plan expected it to leave', () => {
-    const worked = endWork(startRun([], at('07:15:00')), EMOM, at('07:15:30')).rows
+    const worked = endWork(startRun([], BIKE, at('07:15:00')), EMOM, at('07:15:30')).rows
 
     expect(runPhase(worked, EMOM, at('07:15:30'))).toEqual({
       kind: 'rest',
@@ -479,7 +484,7 @@ describe('interval run', () => {
   })
 
   it('closes a boundary that passed before pausing, so the pause banks only the current phase', () => {
-    const rows = startRun([], at('07:15:00'))
+    const rows = startRun([], BIKE, at('07:15:00'))
 
     expect(pauseRun(rows, BIKE, at('07:15:45'))).toEqual({
       finished: false,
@@ -498,7 +503,7 @@ describe('interval run', () => {
   })
 
   it('cuts off open work left running past a whole period and the grace', () => {
-    const rows = startRun([], at('07:15:00'))
+    const rows = startRun([], BIKE, at('07:15:00'))
 
     expect([
       catchUpRun(rows, SLED, at('07:17:59')).kind,
@@ -510,7 +515,7 @@ describe('interval run', () => {
   })
 
   it('starts rep 1 in place of the blank row a fresh card is seeded with', () => {
-    expect(startRun([{ durationSeconds: 0 }], at('07:15:00'))).toEqual([
+    expect(startRun([{ durationSeconds: 0 }], BIKE, at('07:15:00'))).toEqual([
       { set: 1, durationSeconds: 0, startedAt: '2026-10-12T07:15:00+10:00' },
     ])
   })
@@ -529,6 +534,7 @@ describe('interval run', () => {
     expect(
       startRun(
         [{ set: 1, durationSeconds: 0, watts: 300, note: 'legs heavy' }, {}],
+        BIKE,
         at('07:15:00'),
       ),
     ).toEqual([
@@ -540,5 +546,85 @@ describe('interval run', () => {
         startedAt: '2026-10-12T07:15:00+10:00',
       },
     ])
+  })
+
+  describe('with named steps', () => {
+    const ON_OFF = plan('(x 2 (on 30s 350W) (off 30s 150W))')
+
+    it('opens a named step on a row that carries its name', () => {
+      expect(startRun([], ON_OFF, at('07:15:00'))).toEqual([
+        { set: 1, step: 'on', durationSeconds: 0, startedAt: '2026-10-12T07:15:00+10:00' },
+      ])
+    })
+
+    it('runs a step with no rest after it straight into the next, each with its own target', () => {
+      const rows = startRun([], ON_OFF, at('07:15:00'))
+
+      expect(advanceRun(rows, ON_OFF, at('07:16:05'))).toEqual({
+        finished: false,
+        rows: [
+          { set: 1, step: 'on', durationSeconds: 30, watts: 350 },
+          { set: 2, step: 'off', durationSeconds: 30, watts: 150 },
+          { set: 3, step: 'on', durationSeconds: 0, startedAt: '2026-10-12T07:16:00+10:00' },
+        ],
+      })
+    })
+
+    it('starts the next step at once when work ends early and no rest follows', () => {
+      const rows = startRun([], ON_OFF, at('07:15:00'))
+
+      expect(endWork(rows, ON_OFF, at('07:15:20')).rows).toEqual([
+        { set: 1, step: 'on', durationSeconds: 20, watts: 350 },
+        { set: 2, step: 'off', durationSeconds: 0, startedAt: '2026-10-12T07:15:20+10:00' },
+      ])
+    })
+
+    it('scores hits only against steps with a target', () => {
+      const program = plan('(warmup 10m) (x 2 (hard 1m 300W) (rest 1m))')
+      const rows: RunRow[] = [
+        { set: 1, step: 'warmup', durationSeconds: 600 },
+        { set: 2, step: 'hard', durationSeconds: 60, watts: 300, restSeconds: 60 },
+        { set: 3, step: 'hard', durationSeconds: 60, watts: 250 },
+      ]
+
+      expect([hitCount(rows, program), targetedSteps(program)]).toEqual([1, 2])
+    })
+
+    it('leaves a step with no target unfilled when its work ends', () => {
+      const program = plan('(warmup 1m) (hard 1m 300W)')
+      const rows = startRun([], program, at('07:15:00'))
+
+      expect(advanceRun(rows, program, at('07:15:30')).rows).toEqual([
+        { set: 1, step: 'warmup', durationSeconds: 0, startedAt: '2026-10-12T07:15:00+10:00' },
+      ])
+      expect(advanceRun(rows, program, at('07:16:10')).rows[0]).toEqual({
+        set: 1,
+        step: 'warmup',
+        durationSeconds: 60,
+      })
+    })
+
+    it('rests for what the period left plus the fixed rest after an every step', () => {
+      const program = plan('(x 2 (every 1m (a 40s 300W))) (rest 3m) (b 30s 300W)')
+      const rows: RunRow[] = [
+        { set: 1, step: 'a', durationSeconds: 40, watts: 300, restSeconds: 20 },
+        {
+          set: 2,
+          step: 'a',
+          durationSeconds: 40,
+          watts: 300,
+          restSeconds: 0,
+          startedAt: '2026-10-12T07:16:40+10:00',
+        },
+      ]
+
+      expect(runPhase(rows, program, at('07:16:40'))).toEqual({
+        kind: 'rest',
+        rep: 2,
+        elapsed: 0,
+        remaining: 200,
+        paused: false,
+      })
+    })
   })
 })

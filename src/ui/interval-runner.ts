@@ -1,11 +1,14 @@
 import { setIcon } from 'obsidian'
 
-import { formatTarget, type IntensityKind, type IntervalPlan } from '../domain/interval-plan'
+import { formatTarget, type IntensityKind } from '../domain/interval-plan'
+import { formatStep, type IntervalProgram, type PlanStep } from '../domain/interval-program'
 import {
   hasOpenRep,
   isOnTarget,
   repsWithWorkDone,
+  restsAfter,
   runPhase,
+  targetedSteps,
   type RunRow,
 } from '../domain/interval-run'
 
@@ -16,7 +19,7 @@ export type RunnerScreen =
 
 export interface RunnerModel {
   exerciseName: string
-  plan: IntervalPlan
+  program: IntervalProgram
   rows: readonly RunRow[]
   now: number
   screen: RunnerScreen
@@ -67,7 +70,7 @@ export function formatClock(seconds: number): string {
 
 /** The big clock's value: time left, or time so far for open work. */
 export function clockSeconds(model: Omit<RunnerModel, 'screen'>): number {
-  const phase = runPhase(model.rows, model.plan, model.now)
+  const phase = runPhase(model.rows, model.program, model.now)
   if (phase.kind === 'idle') {
     return 0
   }
@@ -79,8 +82,9 @@ function renderRunning(
   model: RunnerModel,
   handlers: RunnerHandlers,
 ): HTMLElement | null {
-  const phase = runPhase(model.rows, model.plan, model.now)
-  if (phase.kind === 'idle') {
+  const phase = runPhase(model.rows, model.program, model.now)
+  const step = model.program.steps[phase.kind === 'idle' ? -1 : phase.rep - 1]
+  if (phase.kind === 'idle' || !step) {
     return null
   }
   const resting = phase.kind === 'rest'
@@ -92,19 +96,30 @@ function renderRunning(
   const top = runner.createDiv({ cls: 'fitkit-runner-top' })
   top.createSpan({
     cls: 'fitkit-runner-phase',
-    text: `${resting ? 'Rest' : 'Work'} · rep ${phase.rep} of ${model.plan.reps}`,
+    text: `${resting ? 'Rest' : 'Work'} · rep ${phase.rep} of ${model.program.steps.length}`,
   })
   top.createSpan({ cls: 'fitkit-runner-name', text: model.exerciseName })
 
   const center = runner.createDiv({ cls: 'fitkit-runner-center' })
+  if (!resting && step.name !== undefined) {
+    center.createDiv({ cls: 'fitkit-runner-step', text: step.name })
+  }
   const clock = center.createDiv({
     cls: 'fitkit-runner-clock',
     text: formatClock(clockSeconds(model)),
   })
-  center.createDiv({
-    cls: 'fitkit-runner-target',
-    text: resting ? 'rest' : `${formatTarget(model.plan.intensity)} target`,
-  })
+  const target = resting ? 'rest' : step.target ? `${formatTarget(step.target)} target` : null
+  if (target !== null) {
+    center.createDiv({ cls: 'fitkit-runner-target', text: target })
+  }
+  const rounds = roundsLabel(step, model.program)
+  if (rounds !== null) {
+    center.createDiv({ cls: 'fitkit-runner-rounds', text: rounds })
+  }
+  const upcoming = model.program.steps[phase.rep]
+  if (upcoming) {
+    center.createDiv({ cls: 'fitkit-runner-next', text: `Next: ${formatStep(upcoming)}` })
+  }
   renderDots(center, model)
   renderStats(center, model)
   if (phase.paused) {
@@ -116,7 +131,7 @@ function renderRunning(
 
   const primary = runner.createEl('button', {
     cls: `fitkit-btn fitkit-runner-primary${resting ? '' : ' fitkit-btn-primary'}`,
-    text: resting ? 'Skip' : 'Rest',
+    text: primaryLabel(resting, step, upcoming),
     attr: { type: 'button' },
   })
   primary.disabled = phase.paused
@@ -140,26 +155,60 @@ function renderRunning(
   return clock
 }
 
-/** One dot per planned rep: on target, short of it, the rep under way, or still to come. */
+/** Skip during rest; during work, Rest when a rest follows, Next when a step does, Finish on the last. */
+function primaryLabel(resting: boolean, step: PlanStep, upcoming: PlanStep | undefined): string {
+  if (resting) {
+    return 'Skip'
+  }
+  if (!upcoming) {
+    return 'Finish'
+  }
+  return restsAfter(step) ? 'Rest' : 'Next'
+}
+
+/**
+ * Where the step sits in its repeats, or null when that would only repeat the rep count:
+ * `Round 3 of 10` for one repeat, `Set 2 of 3 · round 1 of 3` for two.
+ */
+function roundsLabel(step: PlanStep, program: IntervalProgram): string | null {
+  const [outer, inner, ...deeper] = step.rounds
+  if (!outer || (!inner && outer.of === program.steps.length)) {
+    return null
+  }
+  if (!inner) {
+    return `Round ${outer.round} of ${outer.of}`
+  }
+  if (deeper.length === 0) {
+    return `Set ${outer.round} of ${outer.of} · round ${inner.round} of ${inner.of}`
+  }
+  return step.rounds.map(({ round, of }) => `${round}/${of}`).join(' · ')
+}
+
+/** One dot per planned step: on target, short of it, done with no target, under way, or to come. */
 function renderDots(parent: HTMLElement, model: RunnerModel): void {
   const dots = parent.createDiv({ cls: 'fitkit-runner-dots' })
   const done = repsWithWorkDone(model.rows)
   const working = hasOpenRep(model.rows) && done.length < model.rows.length
-  for (let i = 0; i < model.plan.reps; i++) {
+  model.program.steps.forEach((step, i) => {
     const row = done[i]
     const state = row
-      ? isOnTarget(row, model.plan)
-        ? 'is-hit'
-        : 'is-miss'
+      ? !step.target
+        ? 'is-done'
+        : isOnTarget(row, step)
+          ? 'is-hit'
+          : 'is-miss'
       : working && i === done.length
         ? 'is-current'
         : ''
     dots.createSpan({ cls: `fitkit-runner-dot ${state}`.trim() })
-  }
+  })
 }
 
 function renderStats(parent: HTMLElement, model: RunnerModel): void {
-  const kind = model.plan.intensity.kind
+  const kind = model.program.intensity
+  if (!kind) {
+    return
+  }
   const done = repsWithWorkDone(model.rows)
     .map((row) => row[kind])
     .filter((value): value is number => value !== undefined)
@@ -176,7 +225,10 @@ function renderStats(parent: HTMLElement, model: RunnerModel): void {
 
 /** During rest, corrects the rep just done, read off the machine's console. */
 function renderStepper(parent: HTMLElement, model: RunnerModel, handlers: RunnerHandlers): void {
-  const kind = model.plan.intensity.kind
+  const kind = model.program.intensity
+  if (!kind) {
+    return
+  }
   const value = model.rows[model.rows.length - 1]?.[kind]
   const stepper = parent.createDiv({ cls: 'fitkit-runner-stepper' })
   const lower = stepper.createEl('button', {
@@ -208,8 +260,14 @@ function renderFinished(
   top.createSpan({ cls: 'fitkit-runner-phase', text: 'Run finished' })
   top.createSpan({ cls: 'fitkit-runner-name', text: model.exerciseName })
   const center = runner.createDiv({ cls: 'fitkit-runner-center' })
-  center.createDiv({ cls: 'fitkit-runner-hits', text: `${hits}/${model.plan.reps}` })
-  center.createDiv({ cls: 'fitkit-runner-target', text: 'reps on target' })
+  const targeted = targetedSteps(model.program)
+  if (targeted > 0) {
+    center.createDiv({ cls: 'fitkit-runner-hits', text: `${hits}/${targeted}` })
+    center.createDiv({ cls: 'fitkit-runner-target', text: 'reps on target' })
+  } else {
+    center.createDiv({ cls: 'fitkit-runner-hits', text: String(model.rows.length) })
+    center.createDiv({ cls: 'fitkit-runner-target', text: 'reps done' })
+  }
   renderDots(center, model)
   const back = runner.createEl('button', {
     cls: 'fitkit-btn fitkit-btn-primary fitkit-runner-primary',

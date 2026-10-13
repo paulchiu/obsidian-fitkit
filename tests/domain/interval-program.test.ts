@@ -45,7 +45,7 @@ describe('parseIntervalProgram', () => {
     })
   })
 
-  it('paces a one-line every plan by its period, except the last rep', () => {
+  it('paces every rep of a one-line every plan by its period', () => {
     const steps = program('2 x open @ 120kg, every 2m').steps
 
     expect(steps).toEqual([
@@ -60,6 +60,7 @@ describe('parseIntervalProgram', () => {
         workSeconds: null,
         target: { kind: 'load', target: 120 },
         restSeconds: 0,
+        everySeconds: 120,
         rounds: [{ round: 2, of: 2 }],
       },
     ])

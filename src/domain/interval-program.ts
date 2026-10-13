@@ -27,7 +27,10 @@ export interface PlanStep {
   target?: PlanTarget
   /** Fixed rest after the work; 0 when the next step follows at once. */
   restSeconds: number
-  /** When set, the next step starts this long after this one began, plus any fixed rest. */
+  /**
+   * When set, the next step starts this long after this one began, plus any fixed rest.
+   * The last step keeps it, so open work there still has a period to be cut off by.
+   */
   everySeconds?: number
   /** This step's round in each enclosing repeat, outermost first. */
   rounds: Array<{ round: number; of: number }>
@@ -136,10 +139,6 @@ function compileProgram(nodes: readonly PlanNode[]): IntervalProgram {
     } else if (previous) {
       previous.restSeconds += item.seconds
     }
-  }
-  const last = steps[steps.length - 1]
-  if (last) {
-    delete last.everySeconds
   }
   const kinds = [...new Set(steps.flatMap((step) => (step.target ? [step.target.kind] : [])))]
   if (kinds.length > 1) {
@@ -276,13 +275,13 @@ export function formatStep(step: PlanStep): string {
   return `${step.name === undefined ? '' : `${step.name} `}${work}${target}`
 }
 
-/** How long the plan takes as written; open work counts as its whole period. */
+/** How long the plan takes as written: open work counts as its whole period, and the last step as its work alone. */
 export function programSeconds(program: IntervalProgram): number {
-  return program.steps.reduce(
-    (total, step) =>
-      total + Math.max(step.everySeconds ?? 0, step.workSeconds ?? 0) + step.restSeconds,
-    0,
-  )
+  return program.steps.reduce((total, step, index) => {
+    const last = index === program.steps.length - 1
+    const span = last ? 0 : Math.max(step.everySeconds ?? 0, step.workSeconds ?? 0)
+    return total + (last ? (step.workSeconds ?? 0) : span + step.restSeconds)
+  }, 0)
 }
 
 function programFromPlan(plan: IntervalPlan): IntervalProgram {
@@ -294,7 +293,7 @@ function programFromPlan(plan: IntervalPlan): IntervalProgram {
       restSeconds: !last && plan.pace.kind === 'rest' ? plan.pace.seconds : 0,
       rounds: [{ round: index + 1, of: plan.reps }],
     }
-    if (!last && plan.pace.kind === 'every') {
+    if (plan.pace.kind === 'every') {
       step.everySeconds = plan.pace.seconds
     }
     return step

@@ -28,13 +28,15 @@ import {
   loggedReps,
   pauseRun,
   pressRunButton,
+  restsAfter,
   resumeCutRun,
   runPhase,
   startRun,
   togglePauseRun,
   type RunPhase,
 } from '../domain/interval-run'
-import { parseIntervalPlan, type IntensityKind, type IntervalPlan } from '../domain/interval-plan'
+import type { IntensityKind } from '../domain/interval-plan'
+import { parseIntervalProgram, type IntervalProgram } from '../domain/interval-program'
 import { parseIntervalPresets } from '../domain/interval-presets'
 import { assertUnreachableKind } from '../domain/exercise-kind'
 import {
@@ -140,7 +142,7 @@ interface ActiveTimer {
 
 interface ActiveRun {
   card: ExerciseCard
-  plan: IntervalPlan
+  program: IntervalProgram
   screen: RunnerScreen
   intervalId: number
   lastTickAt: number
@@ -180,6 +182,7 @@ interface EditableDurationEntry {
   startedAt?: string
   paused?: boolean
   note?: string
+  step?: string
 }
 
 interface EditableBodyweightSet {
@@ -1090,9 +1093,9 @@ export class WorkoutEditorView extends FileView {
         text: done > 0 ? `Start from rep ${done + 1}` : 'Start',
         attr: { 'aria-label': 'Start interval plan' },
       })
-      runBtn.disabled = done >= columns.plan.reps
-      const plan = columns.plan
-      runBtn.addEventListener('click', () => this.startIntervalRun(ex, plan))
+      runBtn.disabled = done >= columns.plan.steps.length
+      const program = columns.plan
+      runBtn.addEventListener('click', () => this.startIntervalRun(ex, program))
       return
     }
 
@@ -1634,28 +1637,28 @@ export class WorkoutEditorView extends FileView {
     return timer.accumulator + Math.max(0, Math.floor((Date.now() - timer.startedAtMs) / 1000))
   }
 
-  private startIntervalRun(card: ExerciseCard, plan: IntervalPlan): void {
+  private startIntervalRun(card: ExerciseCard, program: IntervalProgram): void {
     this.stopTimer({ write: true, render: false })
     this.clearRestTimer()
-    card.durationEntries = startRun(card.durationEntries, Date.now())
-    this.enterRun(card, plan, { kind: 'running' })
+    card.durationEntries = startRun(card.durationEntries, program, Date.now())
+    this.enterRun(card, program, { kind: 'running' })
     this.activeRun?.cues.prime()
     this.markDirty()
     this.render()
     this.contentEl.scrollTop = 0
   }
 
-  private enterRun(card: ExerciseCard, plan: IntervalPlan, screen: RunnerScreen): void {
+  private enterRun(card: ExerciseCard, program: IntervalProgram, screen: RunnerScreen): void {
     const cues = createCuePlayer(activeWindow, this.plugin.settings.intervalBeepsEnabled !== false)
     cues.keepAwake()
     this.activeRun = {
       card,
-      plan,
+      program,
       screen,
       intervalId: window.setInterval(() => this.tickRun(), 500),
       lastTickAt: Date.now(),
       clockEl: null,
-      lastPhase: runPhase(card.durationEntries, plan, Date.now()),
+      lastPhase: runPhase(card.durationEntries, program, Date.now()),
       cues,
       returnScrollTop: this.contentEl.scrollTop,
     }
@@ -1687,7 +1690,7 @@ export class WorkoutEditorView extends FileView {
       container,
       {
         exerciseName: run.card.name,
-        plan: run.plan,
+        program: run.program,
         rows: rows(),
         now: Date.now(),
         screen: run.screen,
@@ -1695,11 +1698,11 @@ export class WorkoutEditorView extends FileView {
       {
         primary: () => {
           run.cues.prime()
-          this.applyRunRows(pressRunButton(rows(), run.plan, Date.now()))
+          this.applyRunRows(pressRunButton(rows(), run.program, Date.now()))
         },
         togglePause: () => {
           run.cues.prime()
-          this.applyRunRows(togglePauseRun(rows(), run.plan, Date.now()))
+          this.applyRunRows(togglePauseRun(rows(), run.program, Date.now()))
         },
         end: () => {
           this.applyRunRows({ rows: endRun(rows(), Date.now()) })
@@ -1709,7 +1712,7 @@ export class WorkoutEditorView extends FileView {
         resumeCut: () => {
           run.cues.prime()
           run.screen = { kind: 'running' }
-          this.applyRunRows({ rows: resumeCutRun(rows(), run.plan, Date.now()) })
+          this.applyRunRows({ rows: resumeCutRun(rows(), run.program, Date.now()) })
         },
         endCut: () => {
           this.applyRunRows({ rows: endCutRun(rows()) })
@@ -1730,19 +1733,23 @@ export class WorkoutEditorView extends FileView {
     run.lastTickAt = now
     if (late) {
       this.catchUpActiveRun(run, now)
-      run.lastPhase = runPhase(run.card.durationEntries, run.plan, now)
+      run.lastPhase = runPhase(run.card.durationEntries, run.program, now)
       this.render()
       return
     }
     const before = run.lastPhase
-    const result = advanceRun(run.card.durationEntries, run.plan, now)
+    const result = advanceRun(run.card.durationEntries, run.program, now)
     const redrawn = this.applyRunRows(result)
     const cue = result.finished ? 'go' : cueBetween(before, run.lastPhase)
     if (cue) {
       run.cues.play(cue)
     }
     if (!redrawn && run.clockEl) {
-      const clock = { exerciseName: run.card.name, plan: run.plan, rows: run.card.durationEntries }
+      const clock = {
+        exerciseName: run.card.name,
+        program: run.program,
+        rows: run.card.durationEntries,
+      }
       run.clockEl.setText(formatClock(clockSeconds({ ...clock, now })))
     }
   }
@@ -1761,9 +1768,9 @@ export class WorkoutEditorView extends FileView {
       run.card.durationEntries = next.rows
       this.markDirty()
     }
-    run.lastPhase = runPhase(next.rows, run.plan, Date.now())
+    run.lastPhase = runPhase(next.rows, run.program, Date.now())
     if (next.finished) {
-      run.screen = { kind: 'finished', hits: hitCount(next.rows, run.plan) }
+      run.screen = { kind: 'finished', hits: hitCount(next.rows, run.program) }
     }
     const redraw = changed || next.finished === true
     if (redraw) {
@@ -1773,33 +1780,32 @@ export class WorkoutEditorView extends FileView {
   }
 
   private adjustLastRep(run: ActiveRun, delta: number): void {
-    const kind = run.plan.intensity.kind
+    const kind = run.program.intensity
     const rows = run.card.durationEntries.map((row) => ({ ...row }))
     const last = rows[rows.length - 1]
-    if (!last) {
+    if (!last || !kind) {
       return
     }
-    last[kind] = Math.max(
-      0,
-      Math.round(((last[kind] ?? run.plan.intensity.target) + delta) * 10) / 10,
-    )
+    const target = run.program.steps[rows.length - 1]?.target?.target ?? 0
+    last[kind] = Math.max(0, Math.round(((last[kind] ?? target) + delta) * 10) / 10)
     this.applyRunRows({ rows })
   }
 
   /** Picks a run back up from the note after the app was away: catch up, or report a cut-off. */
   private catchUpActiveRun(run: ActiveRun, now: number): void {
-    const result = catchUpRun(run.card.durationEntries, run.plan, now)
+    const result = catchUpRun(run.card.durationEntries, run.program, now)
     if (result.kind === 'cut-off') {
       run.screen = { kind: 'cut-off', rep: result.rep, resting: result.resting }
       return
     }
     if (result.finished) {
-      run.screen = { kind: 'finished', hits: hitCount(result.rows, run.plan) }
+      run.screen = { kind: 'finished', hits: hitCount(result.rows, run.program) }
     }
     if (result.filled > 0) {
       run.card.durationEntries = result.rows
       this.markDirty()
-      const label = INTENSITY_LABELS[run.plan.intensity.kind].toLowerCase()
+      const kind = run.program.intensity
+      const label = kind ? INTENSITY_LABELS[kind].toLowerCase() : 'times'
       new Notice(
         result.filled === 1
           ? `1 rep finished while Obsidian was closed. It has the target filled in, so check its ${label}.`
@@ -1814,7 +1820,7 @@ export class WorkoutEditorView extends FileView {
     if (!run || run.screen.kind !== 'running') {
       return
     }
-    const { rows } = pauseRun(run.card.durationEntries, run.plan, Date.now())
+    const { rows } = pauseRun(run.card.durationEntries, run.program, Date.now())
     if (JSON.stringify(rows) !== JSON.stringify(run.card.durationEntries)) {
       run.card.durationEntries = rows
       this.markDirty()
@@ -3313,22 +3319,24 @@ const INTENSITY_LABELS: Record<IntensityKind, string> = {
 const INTENSITY_KINDS: readonly IntensityKind[] = ['watts', 'load', 'level']
 
 interface IntervalColumns {
-  plan: IntervalPlan | null
+  plan: IntervalProgram | null
   intensity: IntensityKind | null
   rest: boolean
 }
 
 /** Which interval columns a duration card shows: the plan's intensity, or whichever its rows already log. */
 function intervalColumns(card: ExerciseCard): IntervalColumns {
-  const parsed = card.plan === undefined ? null : parseIntervalPlan(card.plan)
-  const plan = parsed?.ok ? parsed.plan : null
+  const parsed = card.plan === undefined ? null : parseIntervalProgram(card.plan)
+  const plan = parsed?.ok ? parsed.program : null
   const logged = INTENSITY_KINDS.find((kind) =>
     card.durationEntries.some((entry) => entry[kind] !== undefined),
   )
   return {
     plan,
-    intensity: plan?.intensity.kind ?? logged ?? null,
-    rest: plan !== null || card.durationEntries.some((entry) => entry.restSeconds !== undefined),
+    intensity: plan?.intensity ?? logged ?? null,
+    rest:
+      plan?.steps.some(restsAfter) === true ||
+      card.durationEntries.some((entry) => entry.restSeconds !== undefined),
   }
 }
 

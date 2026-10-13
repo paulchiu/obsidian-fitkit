@@ -42,4 +42,8 @@ describe('cueBetween', () => {
 
     expect([cueBetween(rest(4), rest(3)), cueBetween(rest(1), rest(0))]).toEqual(['count', null])
   })
+
+  it('gives work running straight into the next step a cue of its own', () => {
+    expect(cueBetween(work(1, 0), work(2, 30))).toBe('shift')
+  })
 })

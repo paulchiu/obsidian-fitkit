@@ -1008,6 +1008,95 @@ describe('WorkoutEditorView interval plans', () => {
         )
       })
     })
+
+    describe('with named steps', () => {
+      const ON_OFF = [
+        '## [[Exercise Bike]]',
+        '',
+        '- [exercise:: [[Exercise Bike]]] [plan:: (x 2 (on 30s 350W) (off 30s 150W))]',
+      ]
+
+      it('heads the clock with the step, its target and what comes next', async () => {
+        const { view } = await openView(workoutSource(...ON_OFF))
+
+        button(view, 'Start interval plan').click()
+        at('07:15:10')
+
+        expect({
+          phase: runnerText(view, '.fitkit-runner-phase'),
+          step: runnerText(view, '.fitkit-runner-step'),
+          target: runnerText(view, '.fitkit-runner-target'),
+          next: runnerText(view, '.fitkit-runner-next'),
+          rounds: runnerText(view, '.fitkit-runner-rounds'),
+          primary: runnerText(view, '.fitkit-runner-primary'),
+        }).toEqual({
+          phase: 'Work · rep 1 of 4',
+          step: 'on',
+          target: '350W target',
+          next: 'Next: off 30s @ 150W',
+          rounds: 'Round 1 of 2',
+          primary: 'Next',
+        })
+      })
+
+      it('moves straight to the next step and writes each step name on its row', async () => {
+        const { view, contents } = await openView(workoutSource(...ON_OFF))
+        button(view, 'Start interval plan').click()
+
+        at('07:15:20')
+        runnerButton(view, 'Next').click()
+
+        expect(runnerText(view, '.fitkit-runner-step')).toBe('off')
+        await savedBody(contents, [
+          ...ON_OFF,
+          '- [exercise:: [[Exercise Bike]]] [set:: 1] [step:: on] [duration:: 20] [watts:: 350]',
+          '- [exercise:: [[Exercise Bike]]] [set:: 2] [step:: off] [duration:: 0] [started:: 2026-10-12T07:15:20+10:00]',
+        ])
+      })
+
+      it('counts sets and rounds when repeats nest', async () => {
+        const { view } = await openView(
+          workoutSource(
+            '## [[Exercise Bike]]',
+            '',
+            '- [exercise:: [[Exercise Bike]]] [plan:: (x 2 (x 2 (over 1m 300W) (under 1m 220W)) (rest 2m))]',
+            '- [exercise:: [[Exercise Bike]]] [set:: 1] [step:: over] [duration:: 60] [watts:: 300]',
+            '- [exercise:: [[Exercise Bike]]] [set:: 2] [step:: under] [duration:: 60] [watts:: 220]',
+            '- [exercise:: [[Exercise Bike]]] [set:: 3] [step:: over] [duration:: 60] [watts:: 300]',
+            '- [exercise:: [[Exercise Bike]]] [set:: 4] [step:: under] [duration:: 60] [watts:: 220] [rest:: 120]',
+          ),
+        )
+
+        button(view, 'Start interval plan').click()
+
+        expect(runnerText(view, '.fitkit-runner-rounds')).toBe('Set 2 of 2 · round 1 of 2')
+      })
+
+      it('finishes on the last step and scores hits against targeted steps only', async () => {
+        const { view, contents } = await openView(
+          workoutSource(
+            '## [[Exercise Bike]]',
+            '',
+            '- [exercise:: [[Exercise Bike]]] [plan:: (warmup 30s) (hard 30s 300W)]',
+            '- [exercise:: [[Exercise Bike]]] [set:: 1] [step:: warmup] [duration:: 30]',
+          ),
+        )
+        button(view, 'Start interval plan').click()
+        at('07:15:10')
+        const primary = runnerText(view, '.fitkit-runner-primary')
+
+        runTo('07:15:31')
+
+        expect([primary, runnerText(view, '.fitkit-runner-hits')]).toEqual(['Finish', '1/1'])
+        await savedBody(contents, [
+          '## [[Exercise Bike]]',
+          '',
+          '- [exercise:: [[Exercise Bike]]] [plan:: (warmup 30s) (hard 30s 300W)]',
+          '- [exercise:: [[Exercise Bike]]] [set:: 1] [step:: warmup] [duration:: 30]',
+          '- [exercise:: [[Exercise Bike]]] [set:: 2] [step:: hard] [duration:: 30] [watts:: 300]',
+        ])
+      })
+    })
   })
 
   describe('remembering the interval plan', () => {

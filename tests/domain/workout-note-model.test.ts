@@ -294,6 +294,31 @@ describe('workout note model', () => {
     expect(serializeWorkoutNote(expectWorkoutModel(source, 'intervals.md'))).toBe(source)
   })
 
+  it('round-trips a nested plan and the step name on each row', () => {
+    const source = [
+      '---',
+      'type: workout',
+      'date: 2026-10-14',
+      'name: Over-unders',
+      '---',
+      '',
+      '## [[Indoor Bike]]',
+      '',
+      '- [exercise:: [[Indoor Bike]]] [plan:: (warmup 10m 150W) (x 3 (over 1m 300W) (under 2m 220W)) ("cool down" 5m)]',
+      '- [exercise:: [[Indoor Bike]]] [set:: 1] [step:: warmup] [duration:: 600] [watts:: 152]',
+      '- [exercise:: [[Indoor Bike]]] [set:: 2] [step:: over] [duration:: 0] [started:: 2026-10-14T07:25:00+10:00]',
+      '',
+    ].join('\n')
+
+    const model = expectWorkoutModel(source, 'overs.md')
+    const bike = model.exercises[0]
+    expect(bike?.kind === 'duration' && bike.durationEntries.map((entry) => entry.step)).toEqual([
+      'warmup',
+      'over',
+    ])
+    expect(serializeWorkoutNote(model)).toBe(source)
+  })
+
   it('keeps a plan line on its own as a duration exercise with no rows', () => {
     const source = [
       '---',

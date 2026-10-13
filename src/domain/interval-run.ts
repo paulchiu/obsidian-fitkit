@@ -5,7 +5,7 @@
  * and `duration` otherwise. Nothing lives only in memory, so a killed app loses nothing.
  */
 
-import type { IntervalPlan } from './interval-plan'
+import type { IntervalProgram, PlanStep } from './interval-program'
 import { formatLocalTimestamp } from './local-timestamp'
 
 export interface RunRow {
@@ -18,19 +18,39 @@ export interface RunRow {
   startedAt?: string
   paused?: boolean
   note?: string
+  /** The plan step's name, written when the runner opens the row. */
+  step?: string
 }
 
 /**
  * Opens the next rep after the reps already done, on the first not-done row so any
  * intensity or note typed there carries into the rep; later not-done rows are dropped.
  */
-export function startRun(rows: readonly RunRow[], now: number): RunRow[] {
+export function startRun(rows: readonly RunRow[], program: IntervalProgram, now: number): RunRow[] {
   const done = loggedReps(rows)
-  const { durationSeconds: _work, restSeconds: _rest, ...typed } = rows[done] ?? {}
-  return [
-    ...rows.slice(0, done),
-    { ...typed, set: done + 1, durationSeconds: 0, startedAt: stamp(now) },
-  ]
+  const { durationSeconds: _work, restSeconds: _rest, step: _step, ...typed } = rows[done] ?? {}
+  return [...rows.slice(0, done), { ...typed, ...openedRep(program, done, now) }]
+}
+
+/** The fields of a rep the runner opens at `index` in the plan. */
+function openedRep(program: IntervalProgram, index: number, now: number): RunRow {
+  const name = program.steps[index]?.name
+  return {
+    set: index + 1,
+    durationSeconds: 0,
+    startedAt: stamp(now),
+    ...(name === undefined ? {} : { step: name }),
+  }
+}
+
+/** The step the open or last row runs. */
+function stepOf(rows: readonly RunRow[], program: IntervalProgram): PlanStep | undefined {
+  return program.steps[rows.length - 1]
+}
+
+/** Whether a rest follows the step's work, rather than the next step starting at once. */
+export function restsAfter(step: PlanStep): boolean {
+  return step.restSeconds > 0 || step.everySeconds !== undefined
 }
 
 /** Reps done so far, ignoring trailing rows with neither work nor rest time, like a fresh card's seeded row. */
@@ -66,13 +86,14 @@ export type RunPhase =
       paused: boolean
     }
 
-export function runPhase(rows: readonly RunRow[], plan: IntervalPlan, now: number): RunPhase {
+export function runPhase(rows: readonly RunRow[], program: IntervalProgram, now: number): RunPhase {
   const row = openRow(rows)
-  if (!row) {
+  const step = stepOf(rows, program)
+  if (!row || !step) {
     return { kind: 'idle' }
   }
   const elapsed = Math.floor(liveSeconds(row, now))
-  const target = phaseTarget(row, plan)
+  const target = phaseTarget(row, step)
   return {
     kind: isResting(row) ? 'rest' : 'work',
     rep: rows.length,
@@ -115,16 +136,17 @@ function liveSeconds(row: RunRow, now: number): number {
 }
 
 /**
- * How long the open phase runs: the work time (null for open work), the fixed rest,
- * or for an every pace whatever the rep left of the period.
+ * How long the open phase runs: the work time (null for open work), or the rest,
+ * which under an every pace starts with whatever the rep left of the period.
  */
-function phaseTarget(row: RunRow, plan: IntervalPlan): number | null {
+function phaseTarget(row: RunRow, step: PlanStep): number | null {
   if (!isResting(row)) {
-    return plan.workSeconds
+    return step.workSeconds
   }
-  return plan.pace.kind === 'rest'
-    ? plan.pace.seconds
-    : Math.max(0, plan.pace.seconds - (row.durationSeconds ?? 0))
+  const period = step.everySeconds
+  return (
+    step.restSeconds + (period === undefined ? 0 : Math.max(0, period - (row.durationSeconds ?? 0)))
+  )
 }
 
 export interface RunAdvance {
@@ -133,15 +155,19 @@ export interface RunAdvance {
 }
 
 /** Closes every phase whose planned end has passed, as a live tick does. */
-export function advanceRun(rows: readonly RunRow[], plan: IntervalPlan, now: number): RunAdvance {
-  const { rows: next, finished } = advance(rows, plan, now)
+export function advanceRun(
+  rows: readonly RunRow[],
+  program: IntervalProgram,
+  now: number,
+): RunAdvance {
+  const { rows: next, finished } = advance(rows, program, now)
   return { rows: next, finished }
 }
 
 /** `note` marks each rep whose work this closes, and `closed` counts them. */
 function advance(
   rows: readonly RunRow[],
-  plan: IntervalPlan,
+  program: IntervalProgram,
   now: number,
   note?: string,
 ): RunAdvance & { closed: number; endedAt?: number } {
@@ -149,10 +175,11 @@ function advance(
   let closed = 0
   for (;;) {
     const row = next[next.length - 1]
-    if (!row || row.startedAt === undefined || row.paused) {
+    const step = stepOf(next, program)
+    if (!row || !step || row.startedAt === undefined || row.paused) {
       return { rows: next, finished: false, closed }
     }
-    const target = phaseTarget(row, plan)
+    const target = phaseTarget(row, step)
     if (target === null) {
       return { rows: next, finished: false, closed }
     }
@@ -163,36 +190,50 @@ function advance(
     if (isResting(row)) {
       row.restSeconds = target
       delete row.startedAt
-      next.push({ set: next.length + 1, durationSeconds: 0, startedAt: stamp(boundary) })
+      next.push(openedRep(program, next.length, boundary))
       continue
     }
     closed++
     if (note !== undefined) {
       row.note ??= note
     }
-    if (closeWork(next, plan, target, boundary)) {
+    if (closeWork(next, program, target, boundary)) {
       return { rows: next, finished: true, closed, endedAt: boundary }
     }
   }
 }
 
 /**
- * Ends the open rep's work with `seconds` done at `endMs`, prefilling the target, and
- * starts its rest. Returns true when that was the last rep, which takes no rest.
+ * Ends the open rep's work with `seconds` done at `endMs`, prefilling the target, then
+ * starts its rest, or the next step when none follows. Returns true when that was the
+ * last step, which takes no rest.
  */
-function closeWork(rows: RunRow[], plan: IntervalPlan, seconds: number, endMs: number): boolean {
+function closeWork(
+  rows: RunRow[],
+  program: IntervalProgram,
+  seconds: number,
+  endMs: number,
+): boolean {
   const row = rows[rows.length - 1]
-  if (!row) {
+  const step = stepOf(rows, program)
+  if (!row || !step) {
     return false
   }
   row.durationSeconds = seconds
-  row[plan.intensity.kind] ??= plan.intensity.target
-  if (rows.length >= plan.reps) {
+  if (step.target) {
+    row[step.target.kind] ??= step.target.target
+  }
+  if (rows.length >= program.steps.length) {
     delete row.startedAt
     return true
   }
-  row.restSeconds = 0
-  row.startedAt = stamp(endMs)
+  if (restsAfter(step)) {
+    row.restSeconds = 0
+    row.startedAt = stamp(endMs)
+  } else {
+    delete row.startedAt
+    rows.push(openedRep(program, rows.length, endMs))
+  }
   return false
 }
 
@@ -202,33 +243,41 @@ function phaseStartMs(row: RunRow): number {
 }
 
 /** The Rest button: ends the open rep's work now, with the time actually done. */
-export function endWork(rows: readonly RunRow[], plan: IntervalPlan, now: number): RunAdvance {
+export function endWork(
+  rows: readonly RunRow[],
+  program: IntervalProgram,
+  now: number,
+): RunAdvance {
   const next = rows.map((row) => ({ ...row }))
   const row = openRow(next)
   if (!row || isResting(row)) {
     return { rows: next, finished: false }
   }
-  const finished = closeWork(next, plan, Math.round(liveSeconds(row, now)), now)
+  const finished = closeWork(next, program, Math.round(liveSeconds(row, now)), now)
   return { rows: next, finished }
 }
 
 /** The Skip button: ends the open rest now and starts the next rep. */
-export function skipRest(rows: readonly RunRow[], now: number): RunRow[] {
+export function skipRest(rows: readonly RunRow[], program: IntervalProgram, now: number): RunRow[] {
   const next = rows.map((row) => ({ ...row }))
   const row = openRow(next)
   if (!row || !isResting(row)) {
     return next
   }
   bankLiveSeconds(row, now)
-  return startRun(next, now)
+  return startRun(next, program, now)
 }
 
 /**
  * Closes any boundary that has already passed, then banks the open phase's time on the
  * row and swaps its stamp for `[paused:: true]`, so a late pause never stretches a phase.
  */
-export function pauseRun(rows: readonly RunRow[], plan: IntervalPlan, now: number): RunAdvance {
-  const { rows: next, finished } = advanceRun(rows, plan, now)
+export function pauseRun(
+  rows: readonly RunRow[],
+  program: IntervalProgram,
+  now: number,
+): RunAdvance {
+  const { rows: next, finished } = advanceRun(rows, program, now)
   const row = openRow(next)
   if (finished || !row || row.paused) {
     return { rows: next, finished }
@@ -287,10 +336,15 @@ const CUT_OFF_GRACE_MS = 2 * 60 * 1000
  * period, more than a grace period ago means the athlete stopped, so it reports a
  * cut-off and leaves the rows alone.
  */
-export function catchUpRun(rows: readonly RunRow[], plan: IntervalPlan, now: number): RunCatchUp {
-  const result = advance(rows, plan, now, CAUGHT_UP_NOTE)
+export function catchUpRun(
+  rows: readonly RunRow[],
+  program: IntervalProgram,
+  now: number,
+): RunCatchUp {
+  const result = advance(rows, program, now, CAUGHT_UP_NOTE)
   const row = openRow(rows)
-  const stoppedBy = result.endedAt ?? (row && openWorkLimit(row, plan))
+  const step = stepOf(rows, program)
+  const stoppedBy = result.endedAt ?? (row && step && openWorkLimit(row, step))
   if (
     stoppedBy !== undefined &&
     now - stoppedBy > CUT_OFF_GRACE_MS &&
@@ -302,17 +356,22 @@ export function catchUpRun(rows: readonly RunRow[], plan: IntervalPlan, now: num
 }
 
 /** Open work has no planned end, so a rep still going a whole period after it began was abandoned. */
-function openWorkLimit(row: RunRow, plan: IntervalPlan): number | undefined {
-  return plan.workSeconds === null && !isResting(row)
-    ? phaseStartMs(row) + plan.pace.seconds * 1000
+function openWorkLimit(row: RunRow, step: PlanStep): number | undefined {
+  return step.workSeconds === null && step.everySeconds !== undefined && !isResting(row)
+    ? phaseStartMs(row) + step.everySeconds * 1000
     : undefined
 }
 
 /** Resume after a cut-off: a rep cut off in work starts over, and a cut-off rest counts as taken in full. */
-export function resumeCutRun(rows: readonly RunRow[], plan: IntervalPlan, now: number): RunRow[] {
+export function resumeCutRun(
+  rows: readonly RunRow[],
+  program: IntervalProgram,
+  now: number,
+): RunRow[] {
   const next = rows.map((row) => ({ ...row }))
   const row = openRow(next)
-  if (!row) {
+  const step = stepOf(next, program)
+  if (!row || !step) {
     return next
   }
   if (!isResting(row)) {
@@ -320,9 +379,9 @@ export function resumeCutRun(rows: readonly RunRow[], plan: IntervalPlan, now: n
     row.startedAt = stamp(now)
     return next
   }
-  row.restSeconds = phaseTarget(row, plan) ?? 0
+  row.restSeconds = phaseTarget(row, step) ?? 0
   delete row.startedAt
-  return startRun(next, now)
+  return startRun(next, program, now)
 }
 
 /** End a cut-off run at the last rep known to be done, dropping the rest or rep the clock cannot vouch for. */
@@ -343,36 +402,47 @@ export function endCutRun(rows: readonly RunRow[]): RunRow[] {
 /** Within 5% of the target counts, since a console's average wobbles; open work is judged on intensity alone. */
 const ON_TARGET_RATIO = 0.95
 
-export function isOnTarget(row: RunRow, plan: IntervalPlan): boolean {
-  const intensity = row[plan.intensity.kind]
-  const heldIntensity =
-    intensity !== undefined && intensity >= plan.intensity.target * ON_TARGET_RATIO
-  const fullTime = plan.workSeconds === null || (row.durationSeconds ?? 0) >= plan.workSeconds
+/** Whether the rep held its step's target; a step with no target is never a hit or a miss. */
+export function isOnTarget(row: RunRow, step: PlanStep): boolean {
+  if (!step.target) {
+    return false
+  }
+  const intensity = row[step.target.kind]
+  const heldIntensity = intensity !== undefined && intensity >= step.target.target * ON_TARGET_RATIO
+  const fullTime = step.workSeconds === null || (row.durationSeconds ?? 0) >= step.workSeconds
   return heldIntensity && fullTime
 }
 
-export function hitCount(rows: readonly RunRow[], plan: IntervalPlan): number {
-  return rows.filter((row) => isOnTarget(row, plan)).length
+export function hitCount(rows: readonly RunRow[], program: IntervalProgram): number {
+  return rows.filter((row, index) => {
+    const step = program.steps[index]
+    return step !== undefined && isOnTarget(row, step)
+  }).length
+}
+
+/** Steps a hit can be scored against: those with a target. */
+export function targetedSteps(program: IntervalProgram): number {
+  return program.steps.filter((step) => step.target !== undefined).length
 }
 
 /** The runner's big button: Rest while working, Skip while resting. */
 export function pressRunButton(
   rows: readonly RunRow[],
-  plan: IntervalPlan,
+  program: IntervalProgram,
   now: number,
 ): RunAdvance {
   const row = openRow(rows)
   return row && isResting(row)
-    ? { rows: skipRest(rows, now), finished: false }
-    : endWork(rows, plan, now)
+    ? { rows: skipRest(rows, program, now), finished: false }
+    : endWork(rows, program, now)
 }
 
 export function togglePauseRun(
   rows: readonly RunRow[],
-  plan: IntervalPlan,
+  program: IntervalProgram,
   now: number,
 ): RunAdvance {
   return openRow(rows)?.paused
     ? { rows: resumeRun(rows, now), finished: false }
-    : pauseRun(rows, plan, now)
+    : pauseRun(rows, program, now)
 }

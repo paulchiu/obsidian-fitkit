@@ -8,10 +8,14 @@ export interface CuePlayer {
   release: () => void
 }
 
-const TONES: Record<RunCue, { hz: number; seconds: number; vibrateMs: number }> = {
-  count: { hz: 880, seconds: 0.12, vibrateMs: 40 },
-  go: { hz: 1320, seconds: 0.4, vibrateMs: 200 },
+const TONES: Record<RunCue, { hz: number; seconds: number; vibrateMs: number; times: number }> = {
+  count: { hz: 880, seconds: 0.12, vibrateMs: 40, times: 1 },
+  go: { hz: 1320, seconds: 0.4, vibrateMs: 200, times: 1 },
+  shift: { hz: 1100, seconds: 0.15, vibrateMs: 120, times: 2 },
 }
+
+/** Gap between the beeps of a cue that sounds more than once. */
+const REPEAT_GAP_SECONDS = 0.1
 
 /**
  * Beeps, vibration and the screen wake lock for the runner. All three are best
@@ -41,15 +45,18 @@ export function createCuePlayer(win: Window, beeps: boolean): CuePlayer {
       if (!audio) {
         return
       }
-      const oscillator = audio.createOscillator()
-      const gain = audio.createGain()
-      oscillator.frequency.value = tone.hz
-      gain.gain.setValueAtTime(0.25, audio.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + tone.seconds)
-      oscillator.connect(gain)
-      gain.connect(audio.destination)
-      oscillator.start()
-      oscillator.stop(audio.currentTime + tone.seconds)
+      for (let beep = 0; beep < tone.times; beep++) {
+        const start = audio.currentTime + beep * (tone.seconds + REPEAT_GAP_SECONDS)
+        const oscillator = audio.createOscillator()
+        const gain = audio.createGain()
+        oscillator.frequency.value = tone.hz
+        gain.gain.setValueAtTime(0.25, start)
+        gain.gain.exponentialRampToValueAtTime(0.001, start + tone.seconds)
+        oscillator.connect(gain)
+        gain.connect(audio.destination)
+        oscillator.start(start)
+        oscillator.stop(start + tone.seconds)
+      }
     },
     keepAwake: () => {
       wantAwake = true

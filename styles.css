@@ -1358,6 +1358,7 @@ body.is-mobile .fitkit-editor-root {
 
 .fitkit-runner-target,
 .fitkit-runner-stats,
+.fitkit-runner-rounds,
 .fitkit-runner-note {
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
@@ -1365,6 +1366,21 @@ body.is-mobile .fitkit-editor-root {
 
 .fitkit-runner-target {
   font-size: var(--font-ui-large);
+}
+
+.fitkit-runner-step {
+  font-size: clamp(28px, 9vw, 44px);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--interactive-accent);
+}
+
+.fitkit-runner-next {
+  padding: 6px 12px;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  font-size: var(--font-ui-medium);
 }
 
 .fitkit-runner-dots {
@@ -1389,6 +1405,10 @@ body.is-mobile .fitkit-editor-root {
 .fitkit-runner-dot.is-miss {
   background: var(--color-orange, var(--text-warning));
   border-color: var(--color-orange, var(--text-warning));
+}
+
+.fitkit-runner-dot.is-done {
+  background: var(--background-modifier-border);
 }
 
 .fitkit-runner-dot.is-current {
