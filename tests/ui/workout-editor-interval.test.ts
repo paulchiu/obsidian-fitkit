@@ -373,18 +373,18 @@ describe('WorkoutEditorView interval plans', () => {
     choose('Just this workout')
     await vi.waitFor(() => expect(openedModal().titleEl.textContent).toContain('Interval plan'))
     const modal = openedModal()
-    const reps = modal.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')
-    if (!reps) {
-      throw new Error('Reps not rendered')
+    const plan = modal.contentEl.querySelector<HTMLTextAreaElement>('textarea[aria-label="Plan"]')
+    if (!plan) {
+      throw new Error('Plan not rendered')
     }
-    reps.value = '6'
-    reps.dispatchEvent(new harnessWindow.Event('input', { bubbles: true }))
+    plan.value = '(x 6 (over 1m 300W) (under 2m 220W))'
+    plan.dispatchEvent(new harnessWindow.Event('input', { bubbles: true }))
     modal.contentEl.querySelector<HTMLButtonElement>('.fitkit-btn-primary')?.click()
 
     await savedBody(contents, [
       '## [[Exercise Bike]]',
       '',
-      '- [exercise:: [[Exercise Bike]]] [plan:: 6 x 30s @ 300W, 90s rest]',
+      '- [exercise:: [[Exercise Bike]]] [plan:: (x 6 (over 1m 300W) (under 2m 220W))]',
       '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 600]',
     ])
   })
@@ -517,7 +517,7 @@ describe('WorkoutEditorView interval plans', () => {
       await savedBody(contents, [
         '## [[Exercise Bike]]',
         '',
-        '- [exercise:: [[Exercise Bike]]] [plan:: 8 x 30s @ 300W, 90s rest]',
+        '- [exercise:: [[Exercise Bike]]] [plan:: (x 8 (work 30s 300W) (rest 90s))]',
         '- [exercise:: [[Exercise Bike]]] [duration:: 0]',
       ])
     })
@@ -568,7 +568,7 @@ describe('WorkoutEditorView interval plans', () => {
       await savedBody(contents, [
         '## [[Sled Push]]',
         '',
-        '- [exercise:: [[Sled Push]]] [plan:: 8 x 30s @ 300W, 90s rest]',
+        '- [exercise:: [[Sled Push]]] [plan:: (x 8 (work 30s 300W) (rest 90s))]',
         '- [exercise:: [[Sled Push]]] [duration:: 0]',
       ])
     })
@@ -1151,9 +1151,10 @@ describe('WorkoutEditorView interval plans', () => {
       choose('Just this workout')
       await vi.waitFor(() => expect(obsidian.modals.length).toBe(2))
 
-      expect(openedModal().contentEl.querySelector('.fitkit-plan-preview code')?.textContent).toBe(
-        '10 x 4m @ 300W, 1m rest',
-      )
+      expect(
+        openedModal().contentEl.querySelector<HTMLTextAreaElement>('textarea[aria-label="Plan"]')
+          ?.value,
+      ).toBe('10 x 4m @ 300W, 1m rest')
     })
   })
 

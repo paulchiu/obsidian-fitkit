@@ -560,36 +560,63 @@ body.is-mobile .fitkit-editor-root {
   gap: 6px;
 }
 
-.fitkit-plan-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 12px;
-}
-
-.fitkit-plan-field {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.fitkit-plan-field .fitkit-input,
-.fitkit-plan-field select {
-  width: 100%;
-  min-width: 0;
-}
-
-.fitkit-plan-work {
+.fitkit-plan-heading {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
-.fitkit-plan-open {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
+.fitkit-plan-info {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  font-family: var(--font-text);
+  font-style: italic;
+  font-weight: 700;
+  color: var(--interactive-accent);
+}
+
+.fitkit-plan-text {
+  width: 100%;
+  min-height: 72px;
+  font-family: var(--font-monospace);
   font-size: var(--font-ui-small);
+  resize: vertical;
+}
+
+.fitkit-plan-examples {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  font-size: var(--font-ui-small);
+}
+
+.fitkit-plan-examples[hidden] {
+  display: none;
+}
+
+.fitkit-plan-example {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: center;
+}
+
+.fitkit-plan-example code {
+  overflow-wrap: anywhere;
+}
+
+.fitkit-plan-example-about {
+  grid-column: 1;
+  color: var(--text-muted);
+}
+
+.fitkit-plan-example .fitkit-btn {
+  grid-column: 2;
+  grid-row: 1 / span 2;
 }
 
 .fitkit-plan-preview {

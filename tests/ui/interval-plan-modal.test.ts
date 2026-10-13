@@ -44,24 +44,18 @@ const open = (
   return { modal, onSave }
 }
 
-const field = <T extends HTMLElement>(modal: IntervalPlanModal, label: string): T => {
-  const found = modal.contentEl.querySelector<T>(`[aria-label="${label}"]`)
+const planField = (modal: IntervalPlanModal): HTMLTextAreaElement => {
+  const found = modal.contentEl.querySelector<HTMLTextAreaElement>('textarea[aria-label="Plan"]')
   if (!found) {
-    throw new Error(`${label} not rendered`)
+    throw new Error('Plan field not rendered')
   }
   return found
 }
 
-const type = (modal: IntervalPlanModal, label: string, value: string): void => {
-  const input = field<HTMLInputElement>(modal, label)
+const type = (modal: IntervalPlanModal, value: string): void => {
+  const input = planField(modal)
   input.value = value
   input.dispatchEvent(new harnessWindow.Event('input', { bubbles: true }))
-}
-
-const choose = (modal: IntervalPlanModal, label: string, value: string): void => {
-  const select = field<HTMLSelectElement>(modal, label)
-  select.value = value
-  select.dispatchEvent(new harnessWindow.Event('change', { bubbles: true }))
 }
 
 const saveButton = (modal: IntervalPlanModal): HTMLButtonElement => {
@@ -72,15 +66,8 @@ const saveButton = (modal: IntervalPlanModal): HTMLButtonElement => {
   return save
 }
 
-const values = (modal: IntervalPlanModal): Record<string, string | boolean> => ({
-  reps: field<HTMLInputElement>(modal, 'Reps').value,
-  intensity: field<HTMLSelectElement>(modal, 'Intensity').value,
-  target: field<HTMLInputElement>(modal, 'Target').value,
-  work: field<HTMLInputElement>(modal, 'Work').value,
-  open: field<HTMLInputElement>(modal, 'Open work').checked,
-  pace: field<HTMLSelectElement>(modal, 'Pace').value,
-  gap: field<HTMLInputElement>(modal, 'Rest or period').value,
-})
+const text = (modal: IntervalPlanModal, selector: string): string | null | undefined =>
+  modal.contentEl.querySelector(selector)?.textContent
 
 describe('interval plan modal', () => {
   beforeEach(() => {
@@ -91,61 +78,85 @@ describe('interval plan modal', () => {
     vi.unstubAllGlobals()
   })
 
-  it('opens with the fields of the plan already on the card', () => {
-    const { modal } = open('6 x open @ 120kg, every 2m')
+  it('opens on the plan already on the card, with how many reps it has and how long it takes', () => {
+    const { modal } = open('(x 8 (work 20s 400W) (rest 10s))')
 
-    expect([modal.titleEl.textContent, values(modal)]).toEqual([
+    expect([
+      modal.titleEl.textContent,
+      planField(modal).value,
+      text(modal, '.fitkit-plan-preview'),
+    ]).toEqual([
       'Interval plan for Exercise Bike',
-      {
-        reps: '6',
-        intensity: 'load',
-        target: '120',
-        work: '',
-        open: true,
-        pace: 'every',
-        gap: '2m',
-      },
+      '(x 8 (work 20s 400W) (rest 10s))',
+      '8 reps · 3m50s',
     ])
   })
 
-  it('saves the edited fields as a plan line', () => {
+  it('saves a nested plan as typed, on one line', () => {
     const { modal, onSave } = open('8 x 30s @ 300W, 90s rest')
 
-    type(modal, 'Reps', '10')
-    type(modal, 'Work', '40s')
-    choose(modal, 'Pace', 'every')
-    type(modal, 'Rest or period', '1:00')
+    type(modal, '(warmup 10m 150W)\n  (x 3 (over 1m 300W) (under 2m 220W))')
     saveButton(modal).click()
 
-    expect(onSave.mock.calls).toEqual([['10 x 40s @ 300W, every 1m']])
+    expect(onSave.mock.calls).toEqual([['(warmup 10m 150W) (x 3 (over 1m 300W) (under 2m 220W))']])
+  })
+
+  it('tidies a one-line plan into its usual spelling', () => {
+    const { modal, onSave } = open(undefined)
+
+    type(modal, ' 6 x OPEN @ 120KG ,  every 2:00 ')
+    saveButton(modal).click()
+
+    expect(onSave.mock.calls).toEqual([['6 x open @ 120kg, every 2m']])
   })
 
   it('explains a plan that cannot run and will not save it', () => {
-    const { modal, onSave } = open('8 x 30s @ 300W, 90s rest')
+    const { modal, onSave } = open('(x 3 (over 1m 300W))')
 
-    const openWork = field<HTMLInputElement>(modal, 'Open work')
-    openWork.checked = true
-    openWork.dispatchEvent(new harnessWindow.Event('change', { bubbles: true }))
+    type(modal, '(x 3 (over 1m 300W)')
     saveButton(modal).click()
 
     expect([
-      modal.contentEl.querySelector('.fitkit-plan-error')?.textContent,
+      text(modal, '.fitkit-plan-error'),
       saveButton(modal).disabled,
       onSave.mock.calls,
-    ]).toEqual([
-      'Open work needs a pace of every, so each rep has a start to rest against.',
-      true,
-      [],
-    ])
+    ]).toEqual(['Missing ) to close (x.', true, []])
   })
 
-  it('fills the form from a preset it was given', () => {
+  it('fills the plan from a preset it was given', () => {
     const { modal, onSave } = open(undefined)
 
     findButtons(modal.contentEl, 'Sled')[0]?.click()
     saveButton(modal).click()
 
     expect(onSave.mock.calls).toEqual([['6 x open @ 120kg, every 2m']])
+  })
+
+  it('shows examples behind the info button, each one ready to use', () => {
+    const { modal, onSave } = open(undefined)
+    const hiddenAtFirst = modal.contentEl
+      .querySelector('.fitkit-plan-examples')
+      ?.hasAttribute('hidden')
+
+    modal.contentEl.querySelector<HTMLButtonElement>('button[aria-label="Plan examples"]')?.click()
+    const examples = modal.contentEl.querySelector('.fitkit-plan-examples')
+    const pyramid = [...(examples?.querySelectorAll('.fitkit-plan-example') ?? [])].find(
+      (example) => example.textContent?.includes('(L8 L10 L12'),
+    )
+    pyramid?.querySelector<HTMLButtonElement>('button')?.click()
+    saveButton(modal).click()
+
+    expect({
+      hiddenAtFirst,
+      shown: !examples?.hasAttribute('hidden'),
+      docs: examples?.querySelector('a')?.getAttribute('href'),
+      saved: onSave.mock.calls,
+    }).toEqual({
+      hiddenAtFirst: true,
+      shown: true,
+      docs: 'https://github.com/paulchiu/obsidian-fitkit/blob/main/docs/note-format.md#interval-plans',
+      saved: [['(x 6 (climb 1m (L8 L10 L12 L14 L12 L10)) (rest 1m))']],
+    })
   })
 
   it('leaves out Start from when there are no presets', () => {
