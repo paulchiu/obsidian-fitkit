@@ -63,7 +63,7 @@ export function parseIntervalPlan(raw: string): IntervalPlanResult {
   return { ok: true, plan: { reps, workSeconds, intensity, pace } }
 }
 
-function parseTarget(raw: string): IntervalPlan['intensity'] | null {
+export function parseTarget(raw: string): IntervalPlan['intensity'] | null {
   const match = raw.match(TARGET)
   if (!match) {
     return null
@@ -109,6 +109,6 @@ export function formatTarget(intensity: IntervalPlan['intensity']): string {
 }
 
 /** `90s` rather than `1m30s`, so a rest reads the way people say it. */
-function formatPlanSeconds(value: number): string {
+export function formatPlanSeconds(value: number): string {
   return value > 0 && value % 60 === 0 ? `${value / 60}m` : `${value}s`
 }
