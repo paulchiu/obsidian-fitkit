@@ -3,12 +3,13 @@ import { normalizePath } from 'obsidian'
 
 import {
   createRegistry,
+  intervalMarker,
   kindForName,
   normalize,
   resolve,
   upsertEntry,
-  type ExerciseKind,
 } from '../domain/exercise-registry'
+import { exerciseTypeOf, kindOfType, type ExerciseType } from '../domain/exercise-type'
 import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
 import type { ExerciseEntry, WorkoutNoteModel } from '../domain/workout-note-model'
 import { parseWorkoutNote } from '../domain/workout-note-model'
@@ -23,7 +24,7 @@ export type ExerciseImportRowStatus = 'known' | 'missing' | 'ignored'
 
 export interface ExerciseImportPlanRow {
   name: string
-  kind: ExerciseKind
+  type: ExerciseType
   unit: WeightUnit
   status: ExerciseImportRowStatus
   registryName: string | null
@@ -84,21 +85,21 @@ export async function buildExerciseImportPlan(
   for (const candidate of candidates) {
     const key = normalize(candidate.name)
     const match = resolve(registry, candidate.name)
-    const matchedKind = match.kind === 'match' ? match.entry.kind : null
+    const matchedType = match.kind === 'match' ? exerciseTypeOf(match.entry) : null
     const matchedUnit = match.kind === 'match' ? match.entry.unit : null
     const registryName = match.kind === 'match' ? match.entry.name : null
     const note = noteByKey.get(key)
     const tombstoned = deletedKeys.has(key)
     const status: ExerciseImportRowStatus = tombstoned
       ? 'ignored'
-      : matchedKind || note
+      : matchedType || note
         ? 'known'
         : 'missing'
-    const kind = matchedKind ?? note?.kind ?? candidate.kind
+    const type = matchedType ?? (note ? exerciseTypeOf(note) : candidate.type)
     const unit = matchedUnit ?? note?.unit ?? DEFAULT_WEIGHT_UNIT
     rows.push({
       name: candidate.name,
-      kind,
+      type,
       unit,
       status,
       registryName,
@@ -148,10 +149,12 @@ export async function applyExerciseImportPlan(
     }
 
     if (row.createNoNoteEntry && kindForName(registry, row.name) === null) {
+      const kind = kindOfType(row.type)
       registry = upsertEntry(registry, {
         name: row.name,
-        kind: row.kind,
+        kind,
         unit: row.unit,
+        ...intervalMarker({ kind, interval: row.type === 'interval' }),
         aliases: [],
       })
       registryEntriesCreated += 1
@@ -168,7 +171,7 @@ export async function applyExerciseImportPlan(
     }
     try {
       await ensureParentFolder(app, path)
-      await app.vault.create(path, composeExerciseNote(row.name, row.kind, workouts, row.unit))
+      await app.vault.create(path, composeExerciseNote(row.name, row.type, workouts, row.unit))
     } catch (error) {
       throw new ExerciseImportApplyError(
         error instanceof Error ? error.message : `Failed to create ${path}`,
@@ -200,7 +203,7 @@ export async function applyExerciseImportPlan(
 
 interface Candidate {
   name: string
-  kind: ExerciseKind
+  type: ExerciseType
   sourcePaths: string[]
 }
 
@@ -228,22 +231,31 @@ function candidatesFromModels(models: WorkoutNoteModel[]): Candidate[] {
       if (key.length === 0) {
         continue
       }
+      const type = loggedType(exercise)
       const existing = byKey.get(key)
       if (existing) {
         if (!existing.sourcePaths.includes(model.sourcePath)) {
           existing.sourcePaths.push(model.sourcePath)
         }
+        if (type === 'interval' && existing.type === 'duration') {
+          existing.type = 'interval'
+        }
         continue
       }
       byKey.set(key, {
         name: exercise.exerciseName,
-        kind: exercise.kind,
+        type,
         sourcePaths: [model.sourcePath],
       })
     }
   }
 
   return [...byKey.values()]
+}
+
+/** A duration exercise logged with a plan is suggested as interval; the import table lets the user change it. */
+function loggedType(exercise: ExerciseEntry): ExerciseType {
+  return exercise.kind === 'duration' && exercise.plan !== undefined ? 'interval' : exercise.kind
 }
 
 function dedupeExercises(exercises: ExerciseEntry[]): ExerciseEntry[] {

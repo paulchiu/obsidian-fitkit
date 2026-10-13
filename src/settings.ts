@@ -15,6 +15,7 @@ import {
   removeEntry,
 } from './domain/exercise-registry'
 import { parseExerciseKind } from './domain/exercise-kind'
+import { exerciseTypeOf } from './domain/exercise-type'
 import { DEFAULT_INTERVAL_PRESETS, parseIntervalPresets } from './domain/interval-presets'
 import { parseWeightUnit } from './domain/weight-unit'
 import type FitKitPlugin from './main'
@@ -713,7 +714,7 @@ export class FitKitSettingTab extends PluginSettingTab {
       badge.setText('Registry')
     }
 
-    tr.createEl('td', { text: row.kind })
+    tr.createEl('td', { text: exerciseTypeOf(row) })
     tr.createEl('td', { text: row.kind === 'strength' ? (row.unit ?? '') : '' })
 
     const aliasCell = tr.createEl('td', { cls: 'fitkit-registry-aliases-cell' })
@@ -758,6 +759,7 @@ export class FitKitSettingTab extends PluginSettingTab {
               kind: row.kind,
               unit: row.unit,
               levels: row.levels ? [...row.levels] : undefined,
+              ...intervalMarker(row),
               aliases: row.aliases,
             },
           },

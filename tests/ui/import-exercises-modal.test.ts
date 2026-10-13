@@ -50,7 +50,7 @@ import { ImportExercisesModal } from '../../src/ui/import-exercises-modal'
 function row(overrides: Partial<ExerciseImportPlanRow>): ExerciseImportPlanRow {
   return {
     name: 'Foam roll thigh',
-    kind: 'duration',
+    type: 'duration',
     status: 'known',
     registryName: 'Foam roll thigh',
     notePath: null,
@@ -113,28 +113,29 @@ async function openModalWithRows(rows: ExerciseImportPlanRow[]): Promise<{
 }
 
 describe('ImportExercisesModal kind select', () => {
-  it('lists strength, duration then bodyweight with their current labels', async () => {
+  it('lists strength, duration, interval then bodyweight with their current labels', async () => {
     const { modal } = await openModalWithRows([row({ status: 'unknown', registryName: null })])
     const select = kindSelectForModal(modal)
     const options = [...select.querySelectorAll('option')]
 
-    expect(options.map((option) => option.value)).toEqual(['strength', 'duration', 'bodyweight'])
+    expect(options.map((option) => option.value)).toEqual(['strength', 'duration', 'interval', 'bodyweight'])
     expect(options.map((option) => option.textContent)).toEqual([
       'Strength',
       'Duration',
+      'Interval',
       'Bodyweight',
     ])
   })
 
-  it('keeps the row kind when the select reports an unrecognised value', async () => {
-    const target = row({ kind: 'duration', status: 'unknown', registryName: null })
+  it('keeps the row type when the select reports an unrecognised value', async () => {
+    const target = row({ type: 'duration', status: 'unknown', registryName: null })
     const { modal } = await openModalWithRows([target])
     const select = kindSelectForModal(modal)
 
     select.value = 'cardio'
     select.dispatchEvent(new harnessWindow.Event('change'))
 
-    expect(target.kind).toBe('duration')
+    expect(target.type).toBe('duration')
   })
 })
 

@@ -8,6 +8,7 @@ import type {
 } from '../domain/exercise-registry'
 import {
   createRegistry,
+  intervalMarker,
   normalize,
   renameEntry,
   sanitizeEntryDraft,
@@ -15,7 +16,14 @@ import {
   validateEntryDraft,
 } from '../domain/exercise-registry'
 import { DEFAULT_WEIGHT_UNIT, WEIGHT_UNITS, type WeightUnit } from '../domain/weight-unit'
-import { EXERCISE_KINDS, EXERCISE_KIND_LABELS, parseExerciseKind } from '../domain/exercise-kind'
+import {
+  EXERCISE_TYPES,
+  EXERCISE_TYPE_LABELS,
+  exerciseTypeOf,
+  kindOfType,
+  parseExerciseType,
+  type ExerciseType,
+} from '../domain/exercise-type'
 import type FitKitPlugin from '../main'
 
 export type RegistryEntryModalMode =
@@ -24,7 +32,7 @@ export type RegistryEntryModalMode =
 
 export class ExerciseRegistryEntryModal extends Modal {
   private name: string
-  private exerciseKind: ExerciseKind
+  private exerciseType: ExerciseType
   private weightUnit: WeightUnit
   /** True once the user interacts with the unit dropdown; gates whether buildDraft() may record a unit at all. */
   private unitTouched: boolean
@@ -48,13 +56,13 @@ export class ExerciseRegistryEntryModal extends Modal {
     super(plugin.app)
     if (mode.kind === 'edit') {
       this.name = mode.original.name
-      this.exerciseKind = mode.original.kind
+      this.exerciseType = exerciseTypeOf(mode.original)
       this.weightUnit = mode.original.unit ?? DEFAULT_WEIGHT_UNIT
       this.aliasesText = mode.original.aliases.join('\n')
       this.levels = mode.original.levels ? [...mode.original.levels] : undefined
     } else {
       this.name = mode.initial?.name ?? ''
-      this.exerciseKind = mode.initial?.kind ?? 'strength'
+      this.exerciseType = mode.initial?.kind ?? 'strength'
       this.weightUnit = DEFAULT_WEIGHT_UNIT
       this.aliasesText = ''
       this.levels = undefined
@@ -84,15 +92,15 @@ export class ExerciseRegistryEntryModal extends Modal {
     const kindField = contentEl.createDiv({ cls: 'fitkit-registry-field' })
     kindField.createEl('label', { text: 'Kind', cls: 'fitkit-registry-field-label' })
     this.kindSelect = kindField.createEl('select', { cls: 'fitkit-registry-select' })
-    for (const kind of EXERCISE_KINDS) {
+    for (const type of EXERCISE_TYPES) {
       this.kindSelect.createEl('option', {
-        value: kind,
-        text: EXERCISE_KIND_LABELS[kind],
+        value: type,
+        text: EXERCISE_TYPE_LABELS[type],
       })
     }
-    this.kindSelect.value = this.exerciseKind
+    this.kindSelect.value = this.exerciseType
     this.kindSelect.addEventListener('change', () => {
-      this.exerciseKind = parseExerciseKind(this.kindSelect.value) ?? this.exerciseKind
+      this.exerciseType = parseExerciseType(this.kindSelect.value) ?? this.exerciseType
       this.refreshUnitVisibility()
     })
 
@@ -146,7 +154,11 @@ export class ExerciseRegistryEntryModal extends Modal {
   private buildDraft(): RegistryEntryDraft {
     return sanitizeEntryDraft({
       name: this.name,
-      kind: this.exerciseKind,
+      kind: kindOfType(this.exerciseType),
+      ...intervalMarker({
+        kind: kindOfType(this.exerciseType),
+        interval: this.exerciseType === 'interval',
+      }),
       unit: this.resolveDraftUnit(),
       levels: this.levels ? [...this.levels] : undefined,
       aliases: this.aliasesText.split('\n'),
@@ -178,7 +190,7 @@ export class ExerciseRegistryEntryModal extends Modal {
   }
 
   private refreshUnitVisibility(): void {
-    this.unitField.hidden = this.exerciseKind === 'duration'
+    this.unitField.hidden = kindOfType(this.exerciseType) === 'duration'
   }
 
   /**
