@@ -22,7 +22,7 @@ export const DEFAULT_INTERVAL_PRESETS = [
   'Norwegian 4x4: (warmup 10m 150W) (x 4 (hard 4m 280W) (rest 3m))',
 ].join('\n')
 
-/** The defaults the first betas shipped, which a settings save stored as if someone had typed them. */
+/** Earlier defaults that a settings save stored verbatim; matched exactly, so presets someone wrote are kept. */
 const FIRST_DEFAULT_PRESETS = [
   'Tabata: 8 x 20s @ 400W, 10s rest',
   'EMOM: 10 x 40s @ 300W, every 1m',

@@ -14,9 +14,12 @@ import {
   type IntervalPlan,
 } from './interval-plan'
 
-export interface PlanTarget {
-  kind: IntensityKind
-  target: number
+export type PlanTarget = IntervalPlan['intensity']
+
+/** A step's place in one repeat: round 2 of 3. */
+export interface PlanRound {
+  round: number
+  of: number
 }
 
 export interface PlanStep {
@@ -33,7 +36,7 @@ export interface PlanStep {
    */
   everySeconds?: number
   /** This step's round in each enclosing repeat, outermost first. */
-  rounds: Array<{ round: number; of: number }>
+  rounds: PlanRound[]
 }
 
 export interface IntervalProgram {
@@ -47,6 +50,12 @@ export type IntervalProgramResult =
 
 export function parseIntervalProgram(raw: string): IntervalProgramResult {
   const text = raw.trim()
+  if (/[[\]]/.test(text)) {
+    return {
+      ok: false,
+      reason: 'A plan cannot hold square brackets, since the note keeps it inside [plan:: …].',
+    }
+  }
   if (!text.startsWith('(')) {
     const parsed = parseIntervalPlan(text)
     return parsed.ok ? { ok: true, program: programFromPlan(parsed.plan) } : parsed
@@ -116,7 +125,7 @@ function readLists(text: string): PlanNode[] {
 type PlanItem = { kind: 'work'; step: PlanStep } | { kind: 'rest'; seconds: number }
 
 interface CompileContext {
-  rounds: PlanStep['rounds']
+  rounds: PlanRound[]
   everySeconds?: number
 }
 

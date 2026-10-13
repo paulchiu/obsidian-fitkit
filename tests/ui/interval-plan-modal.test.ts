@@ -101,6 +101,15 @@ describe('interval plan modal', () => {
     expect(onSave.mock.calls).toEqual([['(warmup 10m 150W) (x 3 (over 1m 300W) (under 2m 220W))']])
   })
 
+  it('keeps the spacing inside a quoted name', () => {
+    const { modal, onSave } = open(undefined)
+
+    type(modal, '("big  gear" 2m 260W)\n   (spin 5m)')
+    saveButton(modal).click()
+
+    expect(onSave.mock.calls).toEqual([['("big  gear" 2m 260W) (spin 5m)']])
+  })
+
   it('tidies a one-line plan into its usual spelling', () => {
     const { modal, onSave } = open(undefined)
 
@@ -144,16 +153,20 @@ describe('interval plan modal', () => {
       (example) => example.textContent?.includes('(L8 L10 L12'),
     )
     pyramid?.querySelector<HTMLButtonElement>('button')?.click()
+    const shown = !examples?.hasAttribute('hidden')
+    modal.contentEl.querySelector<HTMLButtonElement>('button[aria-label="Plan examples"]')?.click()
     saveButton(modal).click()
 
     expect({
       hiddenAtFirst,
-      shown: !examples?.hasAttribute('hidden'),
+      shown,
+      hiddenAgain: examples?.hasAttribute('hidden'),
       docs: examples?.querySelector('a')?.getAttribute('href'),
       saved: onSave.mock.calls,
     }).toEqual({
       hiddenAtFirst: true,
       shown: true,
+      hiddenAgain: true,
       docs: 'https://github.com/paulchiu/obsidian-fitkit/blob/main/docs/note-format.md#interval-plans',
       saved: [['(x 6 (climb 1m (L8 L10 L12 L14 L12 L10)) (rest 1m))']],
     })

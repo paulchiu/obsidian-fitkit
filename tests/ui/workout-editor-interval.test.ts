@@ -987,6 +987,21 @@ describe('WorkoutEditorView interval plans', () => {
         expect(tones).toEqual([880, 880, 880, 1320])
       })
 
+      it('double-beeps when work runs straight into the next step', async () => {
+        const { view } = await openView(
+          workoutSource(
+            '## [[Exercise Bike]]',
+            '',
+            '- [exercise:: [[Exercise Bike]]] [plan:: (x 2 (on 30s 350W) (off 30s 150W))]',
+          ),
+        )
+        button(view, 'Start interval plan').click()
+
+        runTo('07:15:31')
+
+        expect(tones).toEqual([880, 880, 880, 1100, 1100])
+      })
+
       it('stays silent when interval beeps are off', async () => {
         const { view } = await openView(workoutSource(...BIKE), { intervalBeepsEnabled: false })
         button(view, 'Start interval plan').click()

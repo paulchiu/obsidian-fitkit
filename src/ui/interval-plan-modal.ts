@@ -160,9 +160,13 @@ export class IntervalPlanModal extends Modal {
   }
 }
 
-/** One line for the note: a one-line plan in its usual spelling, lists with their spacing collapsed. */
+/** One line for the note: a one-line plan in its usual spelling, lists with spacing collapsed outside quoted names. */
 function tidyPlan(raw: string): string {
-  const line = raw.trim().replace(/\s+/g, ' ')
+  const line = raw
+    .trim()
+    .split('"')
+    .map((part, index) => (index % 2 === 0 ? part.replace(/\s+/g, ' ') : part))
+    .join('"')
   const plan = parseIntervalPlan(line)
   return plan.ok ? formatIntervalPlan(plan.plan) : line
 }

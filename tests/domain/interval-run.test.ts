@@ -626,5 +626,54 @@ describe('interval run', () => {
         paused: false,
       })
     })
+
+    it('opens the step after those already done, under its own name', () => {
+      const done: RunRow[] = [{ set: 1, step: 'on', durationSeconds: 30, watts: 350 }]
+
+      expect(startRun(done, ON_OFF, at('07:16:00'))).toEqual([
+        { set: 1, step: 'on', durationSeconds: 30, watts: 350 },
+        { set: 2, step: 'off', durationSeconds: 0, startedAt: '2026-10-12T07:16:00+10:00' },
+      ])
+    })
+
+    it('catches up steps with no rest between them, each with its own target, after Obsidian was away', () => {
+      const rows = startRun([], ON_OFF, at('07:15:00'))
+
+      expect(catchUpRun(rows, ON_OFF, at('07:16:10'))).toEqual({
+        kind: 'caught-up',
+        filled: 2,
+        finished: false,
+        rows: [
+          {
+            set: 1,
+            step: 'on',
+            durationSeconds: 30,
+            watts: 350,
+            note: 'logged while Obsidian was closed',
+          },
+          {
+            set: 2,
+            step: 'off',
+            durationSeconds: 30,
+            watts: 150,
+            note: 'logged while Obsidian was closed',
+          },
+          { set: 3, step: 'on', durationSeconds: 0, startedAt: '2026-10-12T07:16:00+10:00' },
+        ],
+      })
+    })
+
+    it('runs a rep past the end of a plan shortened mid-run as its last step, and finishes on it', () => {
+      const shorter = plan('(x 1 (on 30s 350W))')
+      const rows: RunRow[] = [
+        { set: 1, step: 'on', durationSeconds: 30, watts: 350 },
+        { set: 2, step: 'off', durationSeconds: 0, startedAt: '2026-10-12T07:15:30+10:00' },
+      ]
+
+      expect([
+        runPhase(rows, shorter, at('07:15:40')),
+        endWork(rows, shorter, at('07:15:40')).finished,
+      ]).toEqual([{ kind: 'work', rep: 2, elapsed: 10, remaining: 20, paused: false }, true])
+    })
   })
 })

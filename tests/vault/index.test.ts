@@ -222,4 +222,33 @@ describe('rebuildIndex', () => {
       targetedDurationSeconds: 115,
     })
   })
+
+  it.each([
+    ['every step has a target', '(x 2 (hard 1m 300W) (rest 1m))'],
+    ['no step has a target', '(x 2 (spin 1m) (rest 1m))'],
+  ])('ranks a session on its full total when %s', async (_case, plan) => {
+    const path = 'Workouts/2026-10-14.md'
+    const source = [
+      '---',
+      'type: workout',
+      'date: 2026-10-14',
+      'name: Bike',
+      '---',
+      '',
+      '## [[Indoor Bike]]',
+      '',
+      `- [exercise:: [[Indoor Bike]]] [plan:: ${plan}]`,
+      '- [exercise:: [[Indoor Bike]]] [set:: 1] [duration:: 60] [rest:: 60]',
+      '- [exercise:: [[Indoor Bike]]] [set:: 2] [duration:: 55]',
+      '',
+    ].join('\n')
+    const tree = buildMockVaultFolderTree([{ path, stat: { mtime: 1000 } }])
+    const app = {
+      vault: { getFolderByPath: tree.getFolderByPath, read: async () => source },
+    } as unknown as App
+
+    const row = (await rebuildIndex(app, settings)).entries[0]?.exercises[0]
+
+    expect([row?.totalDurationSeconds, row?.targetedDurationSeconds]).toEqual([115, undefined])
+  })
 })

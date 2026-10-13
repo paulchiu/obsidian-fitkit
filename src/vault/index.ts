@@ -139,12 +139,16 @@ function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
   }
 }
 
-/** The time of the targeted steps, when the plan has others, such as a warm-up, that a PB should not count. */
+/**
+ * The time of the targeted steps, when the plan mixes them with untargeted ones, such as
+ * a warm-up, that a PB should not count. A plan with no targets at all ranks on its total.
+ */
 function targetedDuration(
   exercise: DurationExerciseEntry,
 ): Pick<ExerciseIndexRow, 'targetedDurationSeconds'> {
   const parsed = exercise.plan === undefined ? null : parseIntervalProgram(exercise.plan)
-  if (!parsed?.ok || parsed.program.steps.every((step) => step.target !== undefined)) {
+  const targeted = parsed?.ok ? parsed.program.steps.filter((step) => step.target) : []
+  if (!parsed?.ok || targeted.length === 0 || targeted.length === parsed.program.steps.length) {
     return {}
   }
   return { targetedDurationSeconds: targetedSeconds(exercise.durationEntries, parsed.program) }

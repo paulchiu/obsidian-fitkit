@@ -205,6 +205,14 @@ describe('parseIntervalProgram', () => {
     ['(a 30s 300W))', 'There is a ) with nothing to close.'],
     ['("big gear 2m 260W)', 'A quoted name needs its closing ".'],
     ['(rest 1m)', 'Write at least one step, like (over 1m 300W).'],
+    [
+      '(hard] 1m 300W)',
+      'A plan cannot hold square brackets, since the note keeps it inside [plan:: …].',
+    ],
+    [
+      '("big [gear]" 2m 260W)',
+      'A plan cannot hold square brackets, since the note keeps it inside [plan:: …].',
+    ],
     ['()', 'Empty brackets: write a step like (over 1m 300W).'],
     ['(a 30s 300W) b', 'Put each step in brackets, like (over 1m 300W), not "b" on its own.'],
     ['(a 30s 300W) ()', 'Empty brackets: write a step like (over 1m 300W).'],

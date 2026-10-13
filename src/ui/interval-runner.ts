@@ -8,6 +8,7 @@ import {
   repsWithWorkDone,
   restsAfter,
   runPhase,
+  stepAt,
   targetedSteps,
   type RunRow,
 } from '../domain/interval-run'
@@ -83,8 +84,11 @@ function renderRunning(
   handlers: RunnerHandlers,
 ): HTMLElement | null {
   const phase = runPhase(model.rows, model.program, model.now)
-  const step = model.program.steps[phase.kind === 'idle' ? -1 : phase.rep - 1]
-  if (phase.kind === 'idle' || !step) {
+  if (phase.kind === 'idle') {
+    return null
+  }
+  const step = stepAt(model.program, phase.rep - 1)
+  if (!step) {
     return null
   }
   const resting = phase.kind === 'rest'

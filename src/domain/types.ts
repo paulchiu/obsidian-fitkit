@@ -36,7 +36,7 @@ export interface ExerciseIndexRow {
   next?: NextPlan
   /** A duration session's `[plan::]` text as written. */
   plan?: string
-  /** Seconds of the steps with a target, set when the plan also has steps without one. */
+  /** Seconds of the steps with a target, set when the plan mixes them with steps without one. */
   targetedDurationSeconds?: number
 }
 

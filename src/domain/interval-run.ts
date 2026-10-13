@@ -43,9 +43,17 @@ function openedRep(program: IntervalProgram, index: number, now: number): RunRow
   }
 }
 
+/**
+ * The step the row at `index` runs. Rows match steps by position, and a row past the end
+ * of a plan shortened mid-run runs as the last step, so the run can still finish.
+ */
+export function stepAt(program: IntervalProgram, index: number): PlanStep | undefined {
+  return program.steps[Math.min(index, program.steps.length - 1)]
+}
+
 /** The step the open or last row runs. */
 function stepOf(rows: readonly RunRow[], program: IntervalProgram): PlanStep | undefined {
-  return program.steps[rows.length - 1]
+  return stepAt(program, rows.length - 1)
 }
 
 /** Whether a rest follows the step's work, rather than the next step starting at once. */
@@ -415,7 +423,7 @@ export function isOnTarget(row: RunRow, step: PlanStep): boolean {
 
 export function hitCount(rows: readonly RunRow[], program: IntervalProgram): number {
   return rows.filter((row, index) => {
-    const step = program.steps[index]
+    const step = stepAt(program, index)
     return step !== undefined && isOnTarget(row, step)
   }).length
 }
@@ -424,7 +432,7 @@ export function hitCount(rows: readonly RunRow[], program: IntervalProgram): num
 export function targetedSeconds(rows: readonly RunRow[], program: IntervalProgram): number {
   return rows.reduce(
     (total, row, index) =>
-      program.steps[index]?.target === undefined ? total : total + (row.durationSeconds ?? 0),
+      stepAt(program, index)?.target === undefined ? total : total + (row.durationSeconds ?? 0),
     0,
   )
 }

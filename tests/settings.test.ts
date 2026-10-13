@@ -142,9 +142,16 @@ describe('settings migration', () => {
   it('moves presets still on the first defaults to the current ones', () => {
     const stored = 'Tabata: 8 x 20s @ 400W, 10s rest\nEMOM: 10 x 40s @ 300W, every 1m'
 
-    expect(
-      settingsFromStored({ intervalPresets: stored, schemaVersion: 1 }).intervalPresets.split('\n'),
-    ).toHaveLength(6)
+    const upgraded = settingsFromStored({ intervalPresets: stored, schemaVersion: 1 })
+
+    expect(upgraded.intervalPresets.split('\n').map((line) => line.split(': ')[0])).toEqual([
+      'Tabata',
+      'EMOM',
+      'Over-unders',
+      'Pyramid',
+      '30/30',
+      'Norwegian 4x4',
+    ])
   })
 
   it('preserves stored deleted exercise tombstones', () => {
