@@ -191,16 +191,23 @@ const openView = async (
   source: string,
   settings: Partial<typeof DEFAULT_SETTINGS> = {},
   history: IndexEntry[] = [],
-): Promise<{ view: WorkoutEditorView; contents: Map<string, string> }> => {
-  const file = Object.assign(new TFile(), { path: WORKOUT_PATH, basename: '2026-10-12' })
-  const contents = new Map([[WORKOUT_PATH, source]])
+  otherNotes: Record<string, string> = {},
+): Promise<{ view: WorkoutEditorView; contents: Map<string, string>; plugin: FitKitPlugin }> => {
+  const files = [WORKOUT_PATH, ...Object.keys(otherNotes)].map((path) =>
+    Object.assign(new TFile(), {
+      path,
+      basename: path.slice(path.lastIndexOf('/') + 1).replace(/\.md$/, ''),
+    }),
+  )
+  const contents = new Map([[WORKOUT_PATH, source], ...Object.entries(otherNotes)])
   const vault = {
-    getFolderByPath: buildMockVaultFolderTree([file]).getFolderByPath,
+    getFolderByPath: buildMockVaultFolderTree(files).getFolderByPath,
     read: async (target: TFile): Promise<string> => contents.get(target.path) ?? '',
     process: async (target: TFile, callback: (text: string) => string): Promise<void> => {
       contents.set(target.path, callback(contents.get(target.path) ?? ''))
     },
-    getAbstractFileByPath: (path: string): TFile | null => (path === WORKOUT_PATH ? file : null),
+    getAbstractFileByPath: (path: string): TFile | null =>
+      files.find((candidate) => candidate.path === path) ?? null,
   }
   const app = {
     vault,
@@ -210,11 +217,12 @@ const openView = async (
   plugin.app = app as unknown as App
   plugin.settings = { ...DEFAULT_SETTINGS, ...settings }
   plugin.refreshIndexEntry = async (): Promise<void> => {}
+  plugin.saveData = async (): Promise<void> => {}
   plugin.cachedIndex = { schemaVersion: 1, builtAt: 0, entries: history, diagnostics: [] }
   const view = new WorkoutEditorView({ app } as unknown as WorkspaceLeaf, plugin)
   await view.onOpen()
   await view.setState({ file: WORKOUT_PATH }, { history: false })
-  return { view, contents }
+  return { view, contents, plugin }
 }
 
 const button = (view: WorkoutEditorView, label: string): HTMLButtonElement => {
@@ -231,6 +239,17 @@ const openedModal = (): { contentEl: HTMLElement; titleEl: HTMLElement } => {
     throw new Error('no modal opened')
   }
   return modal
+}
+
+/** Clicks a button in the choice the latest modal offers, by its text. */
+const choose = (text: string): void => {
+  const found = [...openedModal().contentEl.querySelectorAll('button')].find(
+    (candidate) => candidate.textContent === text,
+  )
+  if (!found) {
+    throw new Error(`${text} not offered`)
+  }
+  found.click()
 }
 
 const menuItem = (title: string): MockMenuItem => {
@@ -327,6 +346,8 @@ describe('WorkoutEditorView interval plans', () => {
       const { view } = await openView(source, settings)
       button(view, 'Exercise options').click()
       menuItem('Switch to interval').onClick?.()
+      choose('Just this workout')
+      await vi.waitFor(() => expect(openedModal().titleEl.textContent).toContain('Interval plan'))
       return [...openedModal().contentEl.querySelectorAll('.fitkit-plan-presets button')].map(
         (chip) => chip.textContent ?? '',
       )
@@ -349,6 +370,8 @@ describe('WorkoutEditorView interval plans', () => {
 
     button(view, 'Exercise options').click()
     menuItem('Switch to interval').onClick?.()
+    choose('Just this workout')
+    await vi.waitFor(() => expect(openedModal().titleEl.textContent).toContain('Interval plan'))
     const modal = openedModal()
     const reps = modal.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')
     if (!reps) {
@@ -481,6 +504,8 @@ describe('WorkoutEditorView interval plans', () => {
       button(view, 'Exercise options').click()
       const titles = menuTitles()
       menuItem('Switch to interval').onClick?.()
+      choose('Just this workout')
+      await vi.waitFor(() => expect(obsidian.modals.length).toBe(2))
       saveForm()
 
       expect(titles.filter((title) => title?.startsWith('Switch to'))).toEqual([
@@ -513,6 +538,7 @@ describe('WorkoutEditorView interval plans', () => {
       button(view, 'Exercise options').click()
       const titles = menuTitles()
       menuItem('Switch to duration').onClick?.()
+      choose('Just this workout')
 
       expect(titles).toContain('Edit interval plan')
       expect(titles.filter((title) => title?.startsWith('Switch to'))).toEqual([
@@ -530,11 +556,8 @@ describe('WorkoutEditorView interval plans', () => {
 
       button(view, 'Exercise options').click()
       menuItem('Switch to interval').onClick?.()
-      const choice = openedModal()
-      const title = choice.titleEl.textContent
-      ;[...choice.contentEl.querySelectorAll('button')]
-        .find((candidate) => candidate.textContent === 'Just this workout')
-        ?.click()
+      const title = openedModal().titleEl.textContent
+      choose('Just this workout')
       await vi.waitFor(() => expect(obsidian.modals.length).toBe(2))
       saveForm()
 
@@ -1036,10 +1059,120 @@ describe('WorkoutEditorView interval plans', () => {
 
       button(view, 'Exercise options').click()
       menuItem('Switch to interval').onClick?.()
+      choose('Just this workout')
+      await vi.waitFor(() => expect(obsidian.modals.length).toBe(2))
 
       expect(openedModal().contentEl.querySelector('.fitkit-plan-preview code')?.textContent).toBe(
         '10 x 4m @ 300W, 1m rest',
       )
+    })
+  })
+
+  describe('interval as a saved type', () => {
+    const BIKE_NOTE_PATH = 'Fitness/Exercises/Exercise Bike.md'
+    const bikeNote = (...frontmatter: string[]): Record<string, string> => ({
+      [BIKE_NOTE_PATH]: ['---', 'type: exercise', ...frontmatter, '---', '', 'Body.', ''].join('\n'),
+    })
+    const BIKE_IS_INTERVAL = {
+      exerciseRegistry: [
+        { name: 'Exercise Bike', kind: 'duration' as const, interval: true as const, aliases: [] },
+      ],
+    }
+    const bikeCard = workoutSource(
+      '## [[Exercise Bike]]',
+      '',
+      '- [exercise:: [[Exercise Bike]]] [duration:: 0]',
+    )
+
+    const addExercise = async (view: WorkoutEditorView, name: string): Promise<void> => {
+      ;[...view.contentEl.querySelectorAll('button')]
+        .find((candidate) => candidate.textContent === 'Add exercise')
+        ?.click()
+      await vi.waitFor(() => expect(obsidian.modals.at(-1)?.titleEl).toBeDefined())
+      const picker = obsidian.modals.at(-1) as unknown as { inputEl: HTMLInputElement }
+      picker.inputEl.value = name
+      picker.inputEl.dispatchEvent(
+        new (harnessWindow.KeyboardEvent as typeof KeyboardEvent)('keydown', { key: 'Enter' }),
+      )
+    }
+
+    it('opens the plan form with the starters when an interval exercise with no plan yet is added', async () => {
+      const { view } = await openView(workoutSource(), BIKE_IS_INTERVAL)
+
+      await addExercise(view, 'Exercise Bike')
+
+      await vi.waitFor(() =>
+        expect(openedModal().titleEl.textContent).toBe('Interval plan for Exercise Bike'),
+      )
+      expect(
+        [...openedModal().contentEl.querySelectorAll('.fitkit-plan-presets button')].map(
+          (preset) => preset.textContent,
+        ),
+      ).toEqual(['Tabata', 'EMOM'])
+    })
+
+    it('records the switch to interval in the exercise note and registry when asked', async () => {
+      const { view, contents, plugin } = await openView(
+        bikeCard,
+        { exerciseRegistry: [{ name: 'Exercise Bike', kind: 'duration', aliases: [] }] },
+        [],
+        bikeNote('kind: duration'),
+      )
+
+      button(view, 'Exercise options').click()
+      menuItem('Switch to interval').onClick?.()
+      const question = openedModal().contentEl.textContent
+      choose('Update registry too')
+
+      await vi.waitFor(() =>
+        expect(openedModal().titleEl.textContent).toBe('Interval plan for Exercise Bike'),
+      )
+      expect(question).toContain('The exercise registry currently records Exercise Bike as duration.')
+      expect(question).not.toContain('will be cleared')
+      expect(contents.get(BIKE_NOTE_PATH)).toContain('kind: duration\ninterval: true\n')
+      expect(plugin.settings.exerciseRegistry).toEqual([
+        { name: 'Exercise Bike', kind: 'duration', interval: true, aliases: [] },
+      ])
+    })
+
+    it('goes straight to the plan form when the registry already records interval', async () => {
+      const { view } = await openView(bikeCard, BIKE_IS_INTERVAL)
+
+      button(view, 'Exercise options').click()
+      menuItem('Switch to interval').onClick?.()
+
+      expect(obsidian.modals).toHaveLength(1)
+      expect(openedModal().titleEl.textContent).toBe('Interval plan for Exercise Bike')
+    })
+
+    it('clears the interval marker when an interval card switches back to duration for all workouts', async () => {
+      const { view, contents, plugin } = await openView(
+        workoutSource(
+          '## [[Exercise Bike]]',
+          '',
+          '- [exercise:: [[Exercise Bike]]] [plan:: 3 x 30s @ 300W, 90s rest]',
+          '- [exercise:: [[Exercise Bike]]] [duration:: 0]',
+        ),
+        BIKE_IS_INTERVAL,
+        [],
+        bikeNote('kind: duration', 'interval: true'),
+      )
+
+      button(view, 'Exercise options').click()
+      menuItem('Switch to duration').onClick?.()
+      choose('Update registry too')
+
+      await vi.waitFor(() =>
+        expect(plugin.settings.exerciseRegistry).toEqual([
+          { name: 'Exercise Bike', kind: 'duration', aliases: [] },
+        ]),
+      )
+      expect(contents.get(BIKE_NOTE_PATH)).not.toContain('interval')
+      await savedBody(contents, [
+        '## [[Exercise Bike]]',
+        '',
+        '- [exercise:: [[Exercise Bike]]] [duration:: 0]',
+      ])
     })
   })
 })

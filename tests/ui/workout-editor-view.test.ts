@@ -1818,7 +1818,7 @@ interface PersistRegistryKindView {
     }
     saveSettings: ReturnType<typeof vi.fn>
   }
-  persistRegistryKind(name: string, nextKind: 'strength' | 'duration'): Promise<void>
+  persistRegistryType(name: string, nextKind: 'strength' | 'duration'): Promise<void>
 }
 
 describe('WorkoutEditorView registry kind persistence', () => {
@@ -1842,7 +1842,7 @@ describe('WorkoutEditorView registry kind persistence', () => {
       { name: 'Squat', kind: 'strength', unit: 'kg', aliases: ['back squat'] },
     ])
 
-    await view.persistRegistryKind('squat', 'duration')
+    await view.persistRegistryType('squat', 'duration')
 
     expect(view.plugin.settings.exerciseRegistry).toHaveLength(1)
     expect(view.plugin.settings.exerciseRegistry[0]).toMatchObject({
@@ -1881,7 +1881,7 @@ interface PersistKindChangeView {
     }
     saveSettings: ReturnType<typeof vi.fn>
   }
-  persistKindChange(name: string, nextKind: ExerciseKind): Promise<void>
+  persistTypeChange(name: string, nextKind: ExerciseKind): Promise<void>
 }
 
 describe('WorkoutEditorView kind switch persistence', () => {
@@ -1956,7 +1956,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
       },
     ])
 
-    await view.persistKindChange('Squat', 'duration')
+    await view.persistTypeChange('Squat', 'duration')
 
     const written = contents.get('Fitness/Exercises/Squat.md') ?? ''
     expect(written).toContain('table without id file.link as Session, duration + "s" as Duration')
@@ -1977,7 +1977,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
       },
     ])
 
-    await view.persistKindChange('Squat', 'duration')
+    await view.persistTypeChange('Squat', 'duration')
 
     expect(contents.get('Fitness/Exercises/Squat.md')).toContain('L.rpe AS RPE')
     expect(obsidianMock.notices).toContain(
@@ -1994,7 +1994,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
       },
     ])
 
-    await view.persistKindChange('Squat', 'strength')
+    await view.persistTypeChange('Squat', 'strength')
 
     expect(view.app.vault.process).toHaveBeenCalledTimes(1)
     expect(contents.get('Fitness/Exercises/Squat.md')).toContain('kind: strength')
@@ -2020,7 +2020,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
       [{ name: 'Squat', kind: 'duration', aliases: [] }],
     )
 
-    await view.persistKindChange('Squat', 'strength')
+    await view.persistTypeChange('Squat', 'strength')
 
     expect(contents.get('Fitness/Exercises/Squat.md')).toContain('kind: strength')
     expect(view.plugin.settings.exerciseRegistry).toMatchObject([
@@ -2045,7 +2045,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
       [{ name: 'Push-up', kind: 'strength', levels: ['Wall push-up'], aliases: [] }],
     )
 
-    await view.persistKindChange('Push-up', 'bodyweight')
+    await view.persistTypeChange('Push-up', 'bodyweight')
 
     expect(view.plugin.settings.exerciseRegistry).toMatchObject([
       { name: 'Push-up', kind: 'bodyweight', levels: ['Wall push-up'] },
@@ -2061,7 +2061,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
       },
     ])
 
-    await view.persistKindChange('squat', 'strength')
+    await view.persistTypeChange('squat', 'strength')
 
     expect(contents.get('Fitness/Exercises/Squat.md')).toContain('kind: strength')
   })
@@ -2069,7 +2069,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
   it('falls back to the registry when no exercise note exists for the name', async () => {
     const { view } = createPersistKindChangeView([])
 
-    await view.persistKindChange('Air bike', 'duration')
+    await view.persistTypeChange('Air bike', 'duration')
 
     expect(view.app.vault.process).not.toHaveBeenCalled()
     expect(view.plugin.settings.exerciseRegistry).toMatchObject([
@@ -2089,7 +2089,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
     const malformed = '---\ntype: exercise\nkind: duration\n'
     contents.set('Fitness/Exercises/Squat.md', malformed)
 
-    await view.persistKindChange('Squat', 'strength')
+    await view.persistTypeChange('Squat', 'strength')
 
     expect(view.app.vault.process).toHaveBeenCalledTimes(1)
     expect(contents.get('Fitness/Exercises/Squat.md')).toBe(malformed)
@@ -2552,8 +2552,8 @@ describe('WorkoutEditorView kind switch persistence', () => {
             bodyweightSets: { set?: number; level?: number; reps?: number; load?: number }[]
           }[]
         }
-        chooseKindSwitch: () => Promise<string>
-        switchKind: (index: number, nextKind: 'bodyweight') => Promise<void>
+        chooseTypeSwitch: () => Promise<string>
+        switchCardType: (index: number, nextKind: 'bodyweight') => Promise<void>
       }
       switchView.render = vi.fn()
       switchView.markDirty = vi.fn()
@@ -2571,12 +2571,12 @@ describe('WorkoutEditorView kind switch persistence', () => {
           },
         ],
       }
-      switchView.chooseKindSwitch = async () => 'workout-and-registry'
+      switchView.chooseTypeSwitch = async () => 'workout-and-registry'
       const confirm = vi.fn(async () => true)
       switchView.confirmFirstLevelRelabel = confirm
       registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([])
 
-      await switchView.switchKind(0, 'bodyweight')
+      await switchView.switchCardType(0, 'bodyweight')
 
       const card = switchView.model.exercises[0]
       expect(card?.kind).toBe('bodyweight')
@@ -2618,8 +2618,8 @@ describe('WorkoutEditorView kind switch persistence', () => {
           }[]
         }
         exerciseHistory: Map<string, unknown>
-        chooseKindSwitch: () => Promise<string>
-        switchKind: (index: number, nextKind: 'bodyweight') => Promise<void>
+        chooseTypeSwitch: () => Promise<string>
+        switchCardType: (index: number, nextKind: 'bodyweight') => Promise<void>
         renderExerciseCard(list: HTMLElement, index: number): void
       }
       switchView.render = vi.fn()
@@ -2636,10 +2636,10 @@ describe('WorkoutEditorView kind switch persistence', () => {
         ],
       }
       switchView.exerciseHistory = new Map()
-      switchView.chooseKindSwitch = async () => 'workout-and-registry'
+      switchView.chooseTypeSwitch = async () => 'workout-and-registry'
       switchView.confirmFirstLevelRelabel = vi.fn(async () => false)
 
-      await switchView.switchKind(0, 'bodyweight')
+      await switchView.switchCardType(0, 'bodyweight')
 
       expect(contents.get('Fitness/Exercises/Push-up.md')).toContain('levels:\n  - Push-up\n')
       const list = new TestElement('div')
@@ -2670,8 +2670,8 @@ describe('WorkoutEditorView kind switch persistence', () => {
             bodyweightSets: { set?: number; level?: number; reps?: number; load?: number }[]
           }[]
         }
-        chooseKindSwitch: () => Promise<string>
-        switchKind: (index: number, nextKind: 'bodyweight') => Promise<void>
+        chooseTypeSwitch: () => Promise<string>
+        switchCardType: (index: number, nextKind: 'bodyweight') => Promise<void>
       }
       switchView.render = vi.fn()
       switchView.markDirty = vi.fn()
@@ -2686,11 +2686,11 @@ describe('WorkoutEditorView kind switch persistence', () => {
           },
         ],
       }
-      switchView.chooseKindSwitch = async () => 'workout'
+      switchView.chooseTypeSwitch = async () => 'workout'
       switchView.confirmFirstLevelRelabel = vi.fn(async () => false)
       registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([])
 
-      await switchView.switchKind(0, 'bodyweight')
+      await switchView.switchCardType(0, 'bodyweight')
 
       const card = switchView.model.exercises[0]
       expect(card?.kind).toBe('bodyweight')

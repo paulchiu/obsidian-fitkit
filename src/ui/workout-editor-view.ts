@@ -47,6 +47,7 @@ import {
 import {
   createRegistry,
   kindForName,
+  typeForName,
   levelsForName,
   normalize,
   unitForName,
@@ -61,6 +62,7 @@ import type {
   ExerciseNoteLevelsUpdateResult,
 } from '../domain/exercise-note-migrate'
 import { setExerciseNoteType, setExerciseNoteLevels } from '../domain/exercise-note-migrate'
+import { EXERCISE_TYPES, kindOfType, type ExerciseType } from '../domain/exercise-type'
 import { filterSuggestableNames } from '../domain/exercise-suggestions'
 import {
   formatNumber as formatPlanNumber,
@@ -1876,57 +1878,42 @@ export class WorkoutEditorView extends FileView {
   }
 
   /**
-   * Interval is a duration card with a plan rather than a stored kind, so switching to
-   * it sets up a duration card and opens the plan form, and switching an interval card
-   * to duration only drops its plan.
+   * Interval is stored as a duration card with a plan, so switching between
+   * duration and interval keeps the rows and only sets or drops the plan. The
+   * scope question is skipped when the registry already records the target
+   * and no rows would be lost, since there is nothing left to choose.
    */
-  private async switchCardType(index: number, target: CardType): Promise<void> {
+  private async switchCardType(index: number, target: ExerciseType): Promise<void> {
     const ex = this.model?.exercises[index]
-    if (!ex) {
+    const current = ex ? cardTypeOf(ex) : null
+    if (!ex || current === null || current === target) {
       return
     }
-    if (target === 'interval') {
-      if (ex.kind !== 'duration') {
-        await this.switchKind(index, 'duration', 'interval')
-      }
-      if (ex.kind === 'duration') {
-        this.openIntervalPlanModal(ex)
-      }
-      return
-    }
-    if (target === 'duration' && ex.kind === 'duration') {
-      ex.plan = undefined
-      this.markDirty()
-      this.render()
-      return
-    }
-    await this.switchKind(index, target)
-  }
-
-  private async switchKind(
-    index: number,
-    nextKind: ExerciseKind,
-    targetLabel?: string,
-  ): Promise<void> {
-    if (!this.model) {
-      return
-    }
-    const ex = this.model.exercises[index]
-    if (!ex || ex.kind === nextKind) {
-      return
-    }
-    const hadRows = hasRows(ex)
+    const nextKind = kindOfType(target)
+    const clearsRows = ex.kind !== nextKind && hasRows(ex)
     const registry = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
-    const registryKind = kindForName(registry, ex.name)
-    const choice = await this.chooseKindSwitch(ex, nextKind, registryKind, targetLabel)
+    const registryType = typeForName(registry, ex.name)
+    const choice =
+      registryType === target && !clearsRows
+        ? 'workout'
+        : await this.chooseTypeSwitch(ex, current, target, registryType, clearsRows)
     if (choice === 'cancel') {
       return
     }
     /** Captured before the switch clears the card; the relabel offer below marks these as level 1. */
     const relabelSource = nextKind === 'bodyweight' ? toWorkoutExercise(ex) : null
-    this.applyKindSwitch(index, nextKind, hadRows, targetLabel)
+    if (ex.kind !== nextKind) {
+      this.applyKindSwitch(index, nextKind, clearsRows, target)
+    } else if (target === 'duration') {
+      ex.plan = undefined
+      this.markDirty()
+      this.render()
+    }
     if (choice === 'workout-and-registry') {
-      await this.persistKindChange(ex.name, nextKind)
+      await this.persistTypeChange(ex.name, target)
+    }
+    if (target === 'interval') {
+      this.openIntervalPlanModal(ex)
     }
     if (nextKind === 'bodyweight' && relabelSource) {
       /** Workout-only leaves durable stores alone: a ladder seeded into a note whose kind was not switched would be unreadable, and a registry entry would leak past the chosen scope. */
@@ -1999,7 +1986,7 @@ export class WorkoutEditorView extends FileView {
    * (see buildExerciseRegistrySnapshot), so the note decides behaviour; the
    * registry copy keeps the settings table and its readers truthful.
    */
-  private async persistKindChange(name: string, nextKind: ExerciseKind): Promise<void> {
+  private async persistTypeChange(name: string, nextType: ExerciseType): Promise<void> {
     const trimmed = name.trim()
     if (!trimmed) {
       return
@@ -2009,7 +1996,7 @@ export class WorkoutEditorView extends FileView {
     if (noteFile instanceof TFile) {
       let result: ExerciseNoteKindUpdateResult | undefined
       await this.app.vault.process(noteFile, (text) => {
-        result = setExerciseNoteType(text, nextKind, {
+        result = setExerciseNoteType(text, nextType, {
           name: noteFile.basename,
           fitnessRoot: this.plugin.settings.fitnessRoot,
         })
@@ -2021,13 +2008,13 @@ export class WorkoutEditorView extends FileView {
         )
       }
       if (result?.changed) {
-        new Notice(`Exercise note now records ${trimmed} as ${nextKind}.`)
+        new Notice(`Exercise note now records ${trimmed} as ${nextType}.`)
         /**
          * The registry is read on its own by the settings table, so leaving
          * it behind would mislead the next reader and raise a conflict
          * against the note that just won. The note still wins on read.
          */
-        await this.persistRegistryKind(trimmed, nextKind)
+        await this.persistRegistryType(trimmed, nextType)
       } else {
         new Notice(
           `Could not update the exercise note for ${trimmed}; its frontmatter was left unchanged.`,
@@ -2035,32 +2022,26 @@ export class WorkoutEditorView extends FileView {
       }
       return
     }
-    await this.persistRegistryKind(trimmed, nextKind)
+    await this.persistRegistryType(trimmed, nextType)
   }
 
-  private chooseKindSwitch(
+  private chooseTypeSwitch(
     card: ExerciseCard,
-    nextKind: ExerciseKind,
-    registryKind: ExerciseKind | null,
-    targetLabel?: string,
+    currentType: ExerciseType,
+    nextType: ExerciseType,
+    registryType: ExerciseType | null,
+    clearsRows: boolean,
   ): Promise<KindSwitchChoice> {
     return new Promise((resolve) => {
       new KindSwitchChoiceModal(
         this.app,
-        {
-          exerciseName: card.name,
-          currentKind: card.kind,
-          nextKind,
-          hasRows: hasRows(card),
-          registryKind,
-          ...(targetLabel === undefined ? {} : { targetLabel }),
-        },
+        { exerciseName: card.name, currentType, nextType, clearsRows, registryType },
         resolve,
       ).open()
     })
   }
 
-  private async persistRegistryKind(name: string, nextKind: ExerciseKind): Promise<void> {
+  private async persistRegistryType(name: string, nextType: ExerciseType): Promise<void> {
     const settings = this.plugin.settings
     const trimmed = name.trim()
     if (!trimmed) {
@@ -2069,13 +2050,15 @@ export class WorkoutEditorView extends FileView {
     const current = createRegistry(settings.exerciseRegistry)
     const trimmedKey = normalize(trimmed)
     const existing = current.entries.find((entry) => normalize(entry.name) === trimmedKey)
+    const kind = kindOfType(nextType)
+    const marker = nextType === 'interval' ? { interval: true as const } : {}
     const nextEntry: ExerciseRegistryEntry = existing
-      ? { ...existing, aliases: [...existing.aliases], kind: nextKind }
-      : { name: trimmed, kind: nextKind, aliases: [] }
+      ? { ...existing, aliases: [...existing.aliases], kind, interval: undefined, ...marker }
+      : { name: trimmed, kind, aliases: [], ...marker }
     const updated = upsertEntry(current, nextEntry)
     settings.exerciseRegistry = updated.entries
     await this.plugin.saveSettings()
-    new Notice(`Registry now records ${trimmed} as ${nextKind}.`)
+    new Notice(`Registry now records ${trimmed} as ${nextType}.`)
   }
 
   private async confirmKindSwitch(card: ExerciseCard, nextKind: ExerciseKind): Promise<boolean> {
@@ -2305,7 +2288,7 @@ export class WorkoutEditorView extends FileView {
       this.addNextPlanMenuItems(menu, ex)
     }
     menu.addSeparator()
-    for (const target of CARD_TYPES) {
+    for (const target of EXERCISE_TYPES) {
       if (target === shownKind) {
         continue
       }
@@ -2617,8 +2600,8 @@ export class WorkoutEditorView extends FileView {
       return
     }
     const exerciseIndex = this.model.exercises.length
-    const registryKind = kindForName(registry, trimmed)
-    const kind: ExerciseKind = registryKind ?? 'strength'
+    const registryType = typeForName(registry, trimmed)
+    const kind = kindOfType(registryType ?? 'strength')
     const card: ExerciseCard = {
       name: trimmed,
       kind,
@@ -2635,8 +2618,11 @@ export class WorkoutEditorView extends FileView {
     this.render()
     const focusLabel = FOCUS_COLUMN_LABELS[kind]
     this.focusRowCell(exerciseIndex, 0, focusLabel)
+    if (registryType === 'interval' && card.plan === undefined) {
+      this.openIntervalPlanModal(card)
+    }
 
-    if (registryKind === null) {
+    if (registryType === null) {
       const wasDeleted = (this.plugin.settings.deletedExercises ?? []).some(
         (deletedName) => normalize(deletedName) === normalize(trimmed),
       )
@@ -3366,11 +3352,7 @@ function carriedIntervalFields(last: EditableDurationEntry | undefined): Editabl
   return carried
 }
 
-/** The types the card menu offers: the stored kinds, plus interval for a duration card with a plan. */
-type CardType = ExerciseKind | 'interval'
-
-const CARD_TYPES: readonly CardType[] = ['strength', 'duration', 'interval', 'bodyweight']
-
-function cardTypeOf(card: ExerciseCard): CardType {
+/** A duration card with a plan shows as interval, whatever the registry records. */
+function cardTypeOf(card: ExerciseCard): ExerciseType {
   return card.kind === 'duration' && card.plan !== undefined ? 'interval' : card.kind
 }
