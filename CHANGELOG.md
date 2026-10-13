@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The duration timer and the rest timer take over the tab like the interval runner, as a big clock that keeps the screen awake. The duration timer stays open after `Stop`, with `Next set`, `Resume`, `Reset` and `Done`, so a run of stretches is timed set after set without going back to the card.
+
 ### Fixed
 
 - An edit made while the workout editor was still saving the previous one could be dropped, and closing the tab during a save could lose the last edit.

@@ -906,11 +906,12 @@ describe('WorkoutEditorView interval plans', () => {
       ])
     })
 
-    it('stops a stopwatch running on another card before the run starts', async () => {
+    it('starts a run after a stopwatch on another card is done, keeping its time', async () => {
       const plank = ['## [[Plank]]', '', '- [exercise:: [[Plank]]] [set:: 1] [duration:: 0]']
       const { view, contents } = await openView(workoutSource(...plank, '', ...BIKE))
       button(view, 'Start timer').click()
       at('07:15:45')
+      button(view, 'Close timer').click()
 
       button(view, 'Start interval plan').click()
 

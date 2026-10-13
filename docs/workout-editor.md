@@ -47,7 +47,7 @@ The last row of a strength card is the one you are logging, so its fields are dr
 
 The first set of a new card prefills its weight from the plan you recorded for that exercise last session, applied to that session's top set. A proposed weight is drawn dashed until you type over it. Reps are never prefilled: weight is what you choose before a set, reps are what you count after it. A row holding a weight and no reps counts for nothing until you record them, so it cannot become a personal best or move your history while the set is still in progress.
 
-Duration cards work the same way, swapping weight and reps for a single `Duration` field, with `Add set`, `Repeat` (which copies the last duration, stopping a running timer first) and a play button beside it that fills the entry live and writes it on stop. Their set numbers are figures too, resequenced from the same `Renumber sets` item. The field accepts three shapes:
+Duration cards work the same way, swapping weight and reps for a single `Duration` field, with `Add set`, `Repeat` (which copies the last duration) and `Start timer` beside them. Their set numbers are figures too, resequenced from the same `Renumber sets` item. The field accepts three shapes:
 
 - Bare seconds, `90`.
 - Unit form, `1m30s` or `2h`.
@@ -55,7 +55,14 @@ Duration cards work the same way, swapping weight and reps for a single `Duratio
 
 Whatever you type is normalised to the unit form on blur, and stored in the note as seconds.
 
-While the timer runs, the row also records when it started (`[started:: ...]`), so a timer cut off by the phone closing Obsidian in the background picks up where it left off the next time the workout opens. Stopping the timer, or closing the tab yourself, adds the elapsed time to the duration and removes the start time.
+`Start timer` takes over the tab with a big clock that counts the last set up from whatever time it already holds (or adds a set when the card has none), and keeps the screen awake where the platform allows. Everything a stretch session needs is on that screen, so you never have to go back to the card between sets:
+
+- `Stop` writes the time into the set and leaves the screen open, marked `Stopped`.
+- `Next set` adds a set and starts timing it at once, whether the clock is running or stopped. The time of the set before shows beneath the clock.
+- `Resume` carries on adding to a stopped set, and `Reset` clears the set's time and times it again from zero.
+- `Done` stops the clock, writes the time, and returns to the workout where you left it.
+
+While the timer runs, the row also records when it started (`[started:: ...]`), so a timer cut off by the phone closing Obsidian in the background picks up where it left off, timer screen and all, the next time the workout opens. Stopping the timer, or closing the tab yourself, adds the elapsed time to the duration and removes the start time.
 
 Bodyweight cards show `Set`, `Level` and `Reps` per set, with a `Load` cell that appears only while some row in that exercise carries a load. The kebab on each row adds load to that row or removes it again.
 
@@ -91,7 +98,7 @@ This is a note to yourself, not an instruction the plugin acts on. It is written
 
 ## Rest timer
 
-The footer holds a rest timer that counts up from zero and shows `Last rest 90s` once you stop it. You start and stop it yourself; it never starts on its own, since only you know whether the set is over. It is a live aid only; rest is not written into the note. Turn it off under `Rest timer` in settings if you time rests elsewhere.
+The footer holds a rest timer. `Start rest` takes over the tab with a big clock counting up from zero, kept awake like the interval runner, and `Stop rest` returns to the workout where you left it, with `Last rest 90s` beside the button. You start and stop it yourself; it never starts on its own, since only you know whether the set is over. It is a live aid only; rest is not written into the note. Turn it off under `Rest timer` in settings if you time rests elsewhere.
 
 The timer on a duration card is a separate thing, and that one does write into the duration field.
 

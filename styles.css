@@ -498,10 +498,6 @@ body.is-mobile .fitkit-editor-root {
   white-space: nowrap;
 }
 
-.fitkit-row--timing {
-  background: var(--background-modifier-active-hover);
-}
-
 .fitkit-note-line {
   width: 100%;
   font-size: var(--font-ui-smaller);
@@ -1327,7 +1323,7 @@ body.is-mobile .fitkit-editor-root {
   padding: var(--size-4-1) var(--size-4-1);
 }
 
-/* Interval runner: takes over the editor tab while a plan runs. */
+/* Interval runner: takes over the editor tab while a plan runs; the set and rest timers reuse it. */
 .fitkit-runner {
   display: grid;
   grid-template-rows: auto 1fr auto auto;
@@ -1472,6 +1468,10 @@ body.is-mobile .fitkit-editor-root {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.fitkit-runner-controls.is-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .fitkit-runner-controls .fitkit-btn {
