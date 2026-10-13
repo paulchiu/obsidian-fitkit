@@ -21,7 +21,7 @@ vi.mock('obsidian', () => {
     }
   }
 
-  return { Modal }
+  return { Modal, setIcon: (): void => {} }
 })
 
 import type { IntervalPreset } from '../../src/domain/interval-presets'

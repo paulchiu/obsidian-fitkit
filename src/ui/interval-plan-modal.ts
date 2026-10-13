@@ -1,4 +1,4 @@
-import { Modal, type App } from 'obsidian'
+import { Modal, setIcon, type App } from 'obsidian'
 
 import { formatDurationInput } from '../domain/duration-input'
 import { formatIntervalPlan, parseIntervalPlan } from '../domain/interval-plan'
@@ -81,9 +81,9 @@ export class IntervalPlanModal extends Modal {
     heading.createSpan({ cls: 'fitkit-label', text: 'Plan' })
     const info = heading.createEl('button', {
       cls: 'fitkit-plan-info',
-      text: 'i',
       attr: { type: 'button', 'aria-label': 'Plan examples', 'aria-expanded': 'false' },
     })
+    setIcon(info, 'info')
     const field = contentEl.createEl('textarea', {
       cls: 'fitkit-input fitkit-plan-text',
       attr: { 'aria-label': 'Plan', rows: '3', spellcheck: 'false', autocapitalize: 'off' },
