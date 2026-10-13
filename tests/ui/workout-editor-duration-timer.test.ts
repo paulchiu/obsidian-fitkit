@@ -411,6 +411,39 @@ describe('WorkoutEditorView duration timer persistence', () => {
     const duration = view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Duration"]')
     expect(duration?.value).toBe('2m35s')
   })
+
+  it('keeps a reopened timer on its own row after stopping, not the last one', async () => {
+    vi.setSystemTime(new Date('2026-09-30T07:16:08+10:00'))
+    const { view, contents } = await openView(
+      workoutSource(
+        [
+          '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90] [started:: 2026-09-30T07:15:03+10:00]',
+          '- [exercise:: [[Rowing]]] [set:: 2] [duration:: 40]',
+        ].join('\n'),
+      ),
+    )
+
+    clickButton(view, 'Stop timer')
+
+    await savedRowingRow(contents, '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 155]')
+    expect(text(view, 'fitkit-runner-phase')).toBe('Set 1')
+    expect(text(view, 'fitkit-runner-clock')).toBe('2:35')
+  })
+
+  it('numbers the next set after the highest set, even with a gap', async () => {
+    const { view, contents } = await openView(
+      workoutSource('- [exercise:: [[Rowing]]] [set:: 2] [duration:: 90]'),
+    )
+    clickButton(view, 'Start timer')
+
+    clickButton(view, 'Next set')
+
+    await savedRowingRow(
+      contents,
+      '- [exercise:: [[Rowing]]] [set:: 3] [duration:: 0] [started:: 2026-09-30T07:15:03+10:00]',
+    )
+    expect(text(view, 'fitkit-runner-phase')).toBe('Set 3')
+  })
 })
 
 describe('WorkoutEditorView rest timer screen', () => {
@@ -530,6 +563,21 @@ describe('WorkoutEditorView timer screens keep the screen awake', () => {
     clickButton(view, 'Close timer')
 
     await vi.waitFor(() => expect(locks).toEqual(['acquire screen', 'release']))
+  })
+
+  it('keeps the set screen awake when the rest timer is turned off in settings', async () => {
+    const { view } = await openView(
+      workoutSource('- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90]'),
+    )
+    clickButton(view, 'Start timer')
+    await vi.waitFor(() => expect(locks).toEqual(['acquire screen']))
+
+    view.plugin.settings.strengthRestTimerEnabled = false
+    view.refreshSettingsDrivenUi()
+    await Promise.resolve()
+
+    expect(locks).toEqual(['acquire screen'])
+    expect(text(view, 'fitkit-runner-phase')).toBe('Set 1')
   })
 
   it('holds the screen on while resting, until the rest stops', async () => {

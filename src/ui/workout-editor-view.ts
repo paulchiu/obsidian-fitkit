@@ -144,6 +144,8 @@ interface ActiveTimer {
 /** A duration card's timer shown full-tab; it stays open after Stop so the next set starts from it. */
 interface SetTimerScreen {
   card: ExerciseCard
+  /** The set on the clock, kept after Stop so Resume and Reset act on it. */
+  entry: EditableDurationEntry
   returnScrollTop: number
 }
 
@@ -478,8 +480,8 @@ export class WorkoutEditorView extends FileView {
     if (!this.session) {
       return
     }
-    this.abortTimer()
     this.closeSetTimer()
+    this.abortTimer()
     this.stopRun()
     this.clearRestTimer()
     if (this.autoSaveTimer !== null) {
@@ -1542,19 +1544,27 @@ export class WorkoutEditorView extends FileView {
     if (card.durationEntries.length === 0) {
       card.durationEntries.push({})
     }
-    this.showSetTimer(card, this.contentEl.scrollTop)
-    this.timeSet(card, card.durationEntries.at(-1))
+    const entry = card.durationEntries.at(-1)
+    if (!entry) {
+      return
+    }
+    this.showSetTimer(card, entry, this.contentEl.scrollTop)
+    this.timeSet(card, entry)
     this.contentEl.scrollTop = 0
   }
 
-  private showSetTimer(card: ExerciseCard, returnScrollTop: number): void {
-    this.setTimerScreen = { card, returnScrollTop }
+  private showSetTimer(
+    card: ExerciseCard,
+    entry: EditableDurationEntry,
+    returnScrollTop: number,
+  ): void {
+    this.setTimerScreen = { card, entry, returnScrollTop }
     this.holdScreenAwake()
   }
 
   /** Starts the clock on a row, adding to any time it already has. */
-  private timeSet(card: ExerciseCard, entry: EditableDurationEntry | undefined): void {
-    if (!entry || this.activeTimer?.entry === entry) {
+  private timeSet(card: ExerciseCard, entry: EditableDurationEntry): void {
+    if (this.activeTimer?.entry === entry) {
       return
     }
     const startedAtMs = Date.now()
@@ -1565,17 +1575,16 @@ export class WorkoutEditorView extends FileView {
   }
 
   private renderSetTimerScreen(container: HTMLElement, screen: SetTimerScreen): void {
-    const { card } = screen
+    const { card, entry } = screen
     const entries = card.durationEntries
-    const timer = this.activeTimer?.card === card ? this.activeTimer : null
-    const entry = timer?.entry ?? entries.at(-1)
-    const index = entry ? entries.indexOf(entry) : -1
+    const timer = this.activeTimer?.entry === entry ? this.activeTimer : null
+    const index = entries.indexOf(entry)
     const clockEl = renderSetTimer(
       container,
       {
         exerciseName: card.name,
-        set: entry?.set ?? index + 1,
-        seconds: timer ? this.liveSeconds(timer) : (entry?.durationSeconds ?? 0),
+        set: entry.set ?? index + 1,
+        seconds: timer ? this.liveSeconds(timer) : (entry.durationSeconds ?? 0),
         running: timer !== null,
         previousSeconds: entries[index - 1]?.durationSeconds,
       },
@@ -1584,18 +1593,14 @@ export class WorkoutEditorView extends FileView {
         resume: () => this.timeSet(card, entry),
         reset: () => {
           this.stopTimer({ write: false, render: false })
-          if (entry) {
-            delete entry.durationSeconds
-          }
+          delete entry.durationSeconds
           this.timeSet(card, entry)
         },
         next: () => {
           this.stopTimer({ write: true, render: false })
-          const next = {
-            set: entries.length + 1,
-            ...carriedIntervalFields(entries.at(-1)),
-          }
+          const next = { set: nextSetNumber(entries), ...carriedIntervalFields(entries.at(-1)) }
           entries.push(next)
+          screen.entry = next
           this.timeSet(card, next)
         },
         done: () => {
@@ -1646,13 +1651,16 @@ export class WorkoutEditorView extends FileView {
       const startedAtMs = Date.parse(entry?.startedAt ?? '')
       if (entry && !Number.isNaN(startedAtMs)) {
         this.runTimer(card, entry, startedAtMs)
-        this.showSetTimer(card, 0)
+        this.showSetTimer(card, entry, 0)
         return
       }
     }
   }
 
   private runTimer(card: ExerciseCard, entry: EditableDurationEntry, startedAtMs: number): void {
+    if (this.activeTimer) {
+      window.clearInterval(this.activeTimer.intervalId)
+    }
     this.activeTimer = {
       card,
       entry,
@@ -3413,6 +3421,11 @@ function durationRowClasses(columns: IntervalColumns, base: string): string {
 }
 
 /** Intensity and rest a new row starts from, copied from the row before it. */
+/** One past the highest set number, so a set added after a deletion never repeats one. */
+function nextSetNumber(entries: readonly EditableDurationEntry[]): number {
+  return entries.reduce((high, entry, index) => Math.max(high, entry.set ?? index + 1), 0) + 1
+}
+
 function carriedIntervalFields(last: EditableDurationEntry | undefined): EditableDurationEntry {
   const carried: EditableDurationEntry = {}
   for (const kind of INTENSITY_KINDS) {
