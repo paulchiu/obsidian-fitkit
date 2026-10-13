@@ -326,21 +326,18 @@ function addEntryToDrafts(
     }
 
     /** Duration-only rule: duration rows feed the time statistics; other kinds contribute nothing here. */
-    if (
-      row.kind === 'duration' &&
-      row.totalDurationSeconds !== undefined &&
-      row.totalDurationSeconds > 0
-    ) {
+    const rankedSeconds = row.targetedDurationSeconds ?? row.totalDurationSeconds
+    if (row.kind === 'duration' && rankedSeconds !== undefined && rankedSeconds > 0) {
       hasMetric = true
       draft.durationPersonalBestSeconds =
         draft.durationPersonalBestSeconds !== undefined
-          ? Math.max(draft.durationPersonalBestSeconds, row.totalDurationSeconds)
-          : row.totalDurationSeconds
+          ? Math.max(draft.durationPersonalBestSeconds, rankedSeconds)
+          : rankedSeconds
       const candidate = {
         date: entryDate,
         mtime: entry.mtime,
         path: entry.path,
-        value: row.totalDurationSeconds,
+        value: rankedSeconds,
       }
       if (
         !draft.durationLastSessionMaxSeconds ||

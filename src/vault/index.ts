@@ -2,9 +2,12 @@ import type { App, TAbstractFile, TFile } from 'obsidian'
 
 import { pickBestBodyweightSet } from '../domain/bodyweight-levels'
 import { pickBestSet, pickHeaviestSet } from '../domain/epley'
+import { parseIntervalProgram } from '../domain/interval-program'
+import { targetedSeconds } from '../domain/interval-run'
 import type { ExerciseIndexRow, FitKitIndex, IndexDiagnostic, IndexEntry } from '../domain/types'
 import {
   parseWorkoutNote,
+  type DurationExerciseEntry,
   type ExerciseEntry,
   type WorkoutNoteModel,
 } from '../domain/workout-note-model'
@@ -122,6 +125,7 @@ function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
         ),
         next: exercise.next,
         plan: exercise.plan,
+        ...targetedDuration(exercise),
       }
     case 'strength':
       return {
@@ -133,6 +137,17 @@ function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
         next: exercise.next,
       }
   }
+}
+
+/** The time of the targeted steps, when the plan has others, such as a warm-up, that a PB should not count. */
+function targetedDuration(
+  exercise: DurationExerciseEntry,
+): Pick<ExerciseIndexRow, 'targetedDurationSeconds'> {
+  const parsed = exercise.plan === undefined ? null : parseIntervalProgram(exercise.plan)
+  if (!parsed?.ok || parsed.program.steps.every((step) => step.target !== undefined)) {
+    return {}
+  }
+  return { targetedDurationSeconds: targetedSeconds(exercise.durationEntries, parsed.program) }
 }
 
 function isInFolder(path: string, folder: string): boolean {

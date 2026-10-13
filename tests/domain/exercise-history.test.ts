@@ -379,6 +379,28 @@ describe('exercise history aggregation', () => {
     ])
   })
 
+  it('ranks interval sessions by the time of their targeted steps when the plan has others', () => {
+    const history = buildExerciseHistoryMap(
+      fitKitIndex([
+        entry('Fitness/Workouts/2026-10-14.md', '2026-10-14', [
+          {
+            exerciseName: 'Bike',
+            kind: 'duration',
+            plan: '(warmup 10m) (x 2 (hard 1m 300W) (rest 1m))',
+            totalDurationSeconds: 720,
+            targetedDurationSeconds: 120,
+          },
+        ]),
+      ]),
+      { sourcePath: 'Fitness/Workouts/2026-10-16.md', date: '2026-10-16' },
+    )
+
+    expect(formatExerciseHistoryBadges(history.get('Bike'), 'duration', 'kg')).toEqual([
+      { text: 'PB 2m', title: 'Longest session total duration: 2m' },
+      { text: 'last 2m', title: 'Latest prior session total duration: 2m (2026-10-14)' },
+    ])
+  })
+
   it('carries the most recent next-time plan forward', () => {
     const history = buildExerciseHistoryMap(
       fitKitIndex([

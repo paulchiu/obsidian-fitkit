@@ -36,6 +36,8 @@ export interface ExerciseIndexRow {
   next?: NextPlan
   /** A duration session's `[plan::]` text as written. */
   plan?: string
+  /** Seconds of the steps with a target, set when the plan also has steps without one. */
+  targetedDurationSeconds?: number
 }
 
 export interface IndexEntry {

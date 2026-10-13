@@ -420,6 +420,15 @@ export function hitCount(rows: readonly RunRow[], program: IntervalProgram): num
   }).length
 }
 
+/** Seconds the rows spent on steps with a target, matching each row to the step at its position. */
+export function targetedSeconds(rows: readonly RunRow[], program: IntervalProgram): number {
+  return rows.reduce(
+    (total, row, index) =>
+      program.steps[index]?.target === undefined ? total : total + (row.durationSeconds ?? 0),
+    0,
+  )
+}
+
 /** Steps a hit can be scored against: those with a target. */
 export function targetedSteps(program: IntervalProgram): number {
   return program.steps.filter((step) => step.target !== undefined).length

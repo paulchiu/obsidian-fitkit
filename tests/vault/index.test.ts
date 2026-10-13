@@ -192,4 +192,34 @@ describe('rebuildIndex', () => {
 
     expect(index.entries.map((entry) => entry.path)).toEqual([path])
   })
+
+  it('records the time of targeted steps apart from the total, so a warm-up never sets a PB', async () => {
+    const path = 'Workouts/2026-10-14.md'
+    const source = [
+      '---',
+      'type: workout',
+      'date: 2026-10-14',
+      'name: Bike',
+      '---',
+      '',
+      '## [[Indoor Bike]]',
+      '',
+      '- [exercise:: [[Indoor Bike]]] [plan:: (warmup 10m) (x 2 (hard 1m 300W) (rest 1m))]',
+      '- [exercise:: [[Indoor Bike]]] [set:: 1] [step:: warmup] [duration:: 600]',
+      '- [exercise:: [[Indoor Bike]]] [set:: 2] [step:: hard] [duration:: 60] [watts:: 300] [rest:: 60]',
+      '- [exercise:: [[Indoor Bike]]] [set:: 3] [step:: hard] [duration:: 55] [watts:: 290]',
+      '',
+    ].join('\n')
+    const tree = buildMockVaultFolderTree([{ path, stat: { mtime: 1000 } }])
+    const app = {
+      vault: { getFolderByPath: tree.getFolderByPath, read: async () => source },
+    } as unknown as App
+
+    const index = await rebuildIndex(app, settings)
+
+    expect(index.entries[0]?.exercises[0]).toMatchObject({
+      totalDurationSeconds: 715,
+      targetedDurationSeconds: 115,
+    })
+  })
 })
