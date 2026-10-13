@@ -11,8 +11,9 @@ on:
 permissions:
   contents: read
 
+# Per PR, so quick pushes collapse to the latest build without dropping another PR's pending run.
 concurrency:
-  group: beta
+  group: beta-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
@@ -21,7 +22,8 @@ jobs:
     if: >-
       contains(github.event.pull_request.labels.*.name, 'beta') &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      (github.event.action != 'labeled' || github.event.label.name == 'beta')
+      (github.event.action != 'labeled' ||
+        contains(fromJSON('["beta", "major", "minor", "patch"]'), github.event.label.name))
     runs-on: ubuntu-26.04
     permissions:
       contents: write
@@ -48,6 +50,10 @@ jobs:
           git fetch --quiet --tags origin main
           STABLE=$(git show origin/main:package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
           VERSION=$(STABLE="$STABLE" TAGS="$(git tag --list)" node scripts/beta-version.ts)
+          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" > /dev/null; then
+            echo "::error::$VERSION already exists, probably from another beta PR. Push again to take the next number."
+            exit 1
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies

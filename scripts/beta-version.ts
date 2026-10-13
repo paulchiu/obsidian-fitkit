@@ -8,35 +8,38 @@ import { pathToFileURL } from 'node:url'
 
 export type BetaVersionResult = { ok: true; version: string } | { ok: false; reason: string }
 
-type Bump = 'major' | 'minor' | 'patch'
+/** In release.yml's priority order. */
+const BUMPS = ['major', 'minor', 'patch'] as const
 
-function bumpVersion(stable: string, bump: Bump): string {
-  const [major = 0, minor = 0, patch = 0] = stable.split('.').map(Number)
+type Bump = (typeof BUMPS)[number]
+
+function bumpVersion([major = 0, minor = 0, patch = 0]: number[], bump: Bump): string {
   if (bump === 'major') return `${major + 1}.0.0`
   if (bump === 'minor') return `${major}.${minor + 1}.0`
   return `${major}.${minor}.${patch + 1}`
 }
 
-/** Picks the next `X.Y.Z-beta.N` for a PR, using release.yml's label priority for the bump. */
+/** Picks the next `X.Y.Z-beta.N` for a PR from main's stable version, its labels and the tags already published. */
 export function betaVersion(
   stable: string,
   labels: readonly string[],
   tags: readonly string[],
 ): BetaVersionResult {
-  const bump = (['major', 'minor', 'patch'] as const).find((b) => labels.includes(b))
+  if (!/^\d+\.\d+\.\d+$/.test(stable)) {
+    return { ok: false, reason: `Expected main to be on a plain X.Y.Z version, found "${stable}".` }
+  }
+  const bump = BUMPS.find((b) => labels.includes(b))
   if (!bump) {
     return {
       ok: false,
       reason: 'A beta needs one of the major, minor or patch labels to pick its version.',
     }
   }
-  const target = bumpVersion(stable, bump)
-  const prefix = `${target}-beta.`
-  const published = tags
-    .filter((tag) => tag.startsWith(prefix))
+  const prefix = `${bumpVersion(stable.split('.').map(Number), bump)}-beta.`
+  const betaNumbers = tags
+    .filter((tag) => tag.startsWith(prefix) && /^\d+$/.test(tag.slice(prefix.length)))
     .map((tag) => Number(tag.slice(prefix.length)))
-    .filter(Number.isInteger)
-  return { ok: true, version: `${prefix}${Math.max(0, ...published) + 1}` }
+  return { ok: true, version: `${prefix}${Math.max(0, ...betaNumbers) + 1}` }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
