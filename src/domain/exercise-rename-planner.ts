@@ -21,7 +21,12 @@
  * than silently leaving (or wrongly "fixing") a reference.
  */
 
-import { normalize, type ExerciseKind, type ExerciseRegistryEntry } from './exercise-registry'
+import {
+  intervalMarker,
+  normalize,
+  type ExerciseKind,
+  type ExerciseRegistryEntry,
+} from './exercise-registry'
 import { escapeRegExp } from './regex-utils'
 import type { WeightUnit } from './weight-unit'
 
@@ -100,6 +105,8 @@ export interface ExerciseRenamePlan {
   resultUnit?: WeightUnit
   /** Ladder surviving the rename, when either folded-in entry owned one. */
   resultLevels?: string[]
+  /** Set when the entry or note that decides `resultKind` is an interval exercise. */
+  resultInterval?: true
   workoutNotes: ExerciseRenameWorkoutNotePlan[]
   totalHeadingOccurrences: number
   totalFieldOccurrences: number
@@ -209,12 +216,9 @@ export function buildExerciseRenamePlan(input: ExerciseRenamePlanInput): Exercis
     isMerge && sourceNote !== null ? notesSectionHasProse(input.sourceNoteText ?? '') : false
 
   const aliasesToKeep = foldAliases(sourceEntry, distinctTargetEntry, oldName, resultName)
-  const resultKind =
-    distinctTargetEntry?.kind ??
-    sourceEntry?.kind ??
-    targetNote?.kind ??
-    sourceNote?.kind ??
-    DEFAULT_RESULT_KIND
+  const kindSource = distinctTargetEntry ?? sourceEntry ?? targetNote ?? sourceNote
+  const resultKind = kindSource?.kind ?? DEFAULT_RESULT_KIND
+  const { interval: resultInterval } = kindSource ? intervalMarker(kindSource) : {}
   const resultUnit = distinctTargetEntry?.unit ?? sourceEntry?.unit
   const survivingLevels = distinctTargetEntry?.levels ?? sourceEntry?.levels
   const resultLevels = survivingLevels ? [...survivingLevels] : undefined
@@ -255,6 +259,7 @@ export function buildExerciseRenamePlan(input: ExerciseRenamePlanInput): Exercis
     resultKind,
     resultUnit,
     resultLevels,
+    ...(resultInterval ? { resultInterval } : {}),
     workoutNotes,
     totalHeadingOccurrences,
     totalFieldOccurrences,

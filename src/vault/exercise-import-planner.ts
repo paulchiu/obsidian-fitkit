@@ -9,7 +9,12 @@ import {
   resolve,
   upsertEntry,
 } from '../domain/exercise-registry'
-import { exerciseTypeOf, kindOfType, type ExerciseType } from '../domain/exercise-type'
+import {
+  exerciseTypeOf,
+  kindOfType,
+  loggedTypeOf,
+  type ExerciseType,
+} from '../domain/exercise-type'
 import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
 import type { ExerciseEntry, WorkoutNoteModel } from '../domain/workout-note-model'
 import { parseWorkoutNote } from '../domain/workout-note-model'
@@ -231,7 +236,8 @@ function candidatesFromModels(models: WorkoutNoteModel[]): Candidate[] {
       if (key.length === 0) {
         continue
       }
-      const type = loggedType(exercise)
+      /** Only a suggestion: the import table lets the user change it. */
+      const type = loggedTypeOf(exercise)
       const existing = byKey.get(key)
       if (existing) {
         if (!existing.sourcePaths.includes(model.sourcePath)) {
@@ -251,11 +257,6 @@ function candidatesFromModels(models: WorkoutNoteModel[]): Candidate[] {
   }
 
   return [...byKey.values()]
-}
-
-/** A duration exercise logged with a plan is suggested as interval; the import table lets the user change it. */
-function loggedType(exercise: ExerciseEntry): ExerciseType {
-  return exercise.kind === 'duration' && exercise.plan !== undefined ? 'interval' : exercise.kind
 }
 
 function dedupeExercises(exercises: ExerciseEntry[]): ExerciseEntry[] {

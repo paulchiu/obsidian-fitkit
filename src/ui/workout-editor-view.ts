@@ -62,7 +62,12 @@ import type {
   ExerciseNoteLevelsUpdateResult,
 } from '../domain/exercise-note-migrate'
 import { setExerciseNoteType, setExerciseNoteLevels } from '../domain/exercise-note-migrate'
-import { EXERCISE_TYPES, kindOfType, type ExerciseType } from '../domain/exercise-type'
+import {
+  EXERCISE_TYPES,
+  kindOfType,
+  loggedTypeOf,
+  type ExerciseType,
+} from '../domain/exercise-type'
 import { filterSuggestableNames } from '../domain/exercise-suggestions'
 import {
   formatNumber as formatPlanNumber,
@@ -1885,7 +1890,7 @@ export class WorkoutEditorView extends FileView {
    */
   private async switchCardType(index: number, target: ExerciseType): Promise<void> {
     const ex = this.model?.exercises[index]
-    const current = ex ? cardTypeOf(ex) : null
+    const current = ex ? loggedTypeOf(ex) : null
     if (!ex || current === null || current === target) {
       return
     }
@@ -2274,7 +2279,7 @@ export class WorkoutEditorView extends FileView {
           .onClick(() => this.openEditLevelsModal(ex)),
       )
     }
-    const shownKind = cardTypeOf(ex)
+    const shownKind = loggedTypeOf(ex)
     if (shownKind === 'interval') {
       menu.addItem((item) =>
         item
@@ -3352,7 +3357,3 @@ function carriedIntervalFields(last: EditableDurationEntry | undefined): Editabl
   return carried
 }
 
-/** A duration card with a plan shows as interval, whatever the registry records. */
-function cardTypeOf(card: ExerciseCard): ExerciseType {
-  return card.kind === 'duration' && card.plan !== undefined ? 'interval' : card.kind
-}

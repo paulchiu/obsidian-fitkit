@@ -17,6 +17,11 @@ export function exerciseTypeOf(entry: { kind: ExerciseKind; interval?: boolean }
   return entry.kind === 'duration' && entry.interval === true ? 'interval' : entry.kind
 }
 
+/** A duration exercise logged with a plan in a workout is interval, whatever the registry records. */
+export function loggedTypeOf(entry: { kind: ExerciseKind; plan?: string }): ExerciseType {
+  return entry.kind === 'duration' && entry.plan !== undefined ? 'interval' : entry.kind
+}
+
 export function kindOfType(type: ExerciseType): ExerciseKind {
   return type === 'interval' ? 'duration' : type
 }

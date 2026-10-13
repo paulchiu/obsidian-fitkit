@@ -4,6 +4,7 @@ import {
   EXERCISE_TYPES,
   EXERCISE_TYPE_LABELS,
   exerciseTypeOf,
+  loggedTypeOf,
   kindOfType,
   parseExerciseType,
 } from '../../src/domain/exercise-type'
@@ -33,5 +34,11 @@ describe('exercise type', () => {
     expect(parseExerciseType('strength')).toBe('strength')
     expect(parseExerciseType('cardio')).toBeNull()
     expect(parseExerciseType(3)).toBeNull()
+  })
+
+  it('reads a logged duration exercise with a plan as interval', () => {
+    expect(loggedTypeOf({ kind: 'duration', plan: '8 x 30s, 90s rest' })).toBe('interval')
+    expect(loggedTypeOf({ kind: 'duration' })).toBe('duration')
+    expect(loggedTypeOf({ kind: 'strength' })).toBe('strength')
   })
 })
