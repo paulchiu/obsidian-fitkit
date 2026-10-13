@@ -127,7 +127,12 @@ interface EditableStrengthSet {
 interface EditableDurationEntry {
   set?: number
   durationSeconds?: number
+  watts?: number
+  load?: number
+  level?: number
+  restSeconds?: number
   startedAt?: string
+  paused?: boolean
   note?: string
 }
 
@@ -144,6 +149,8 @@ interface ExerciseCard {
   kind: ExerciseKind
   exerciseNotes?: string
   next?: NextPlan
+  /** Raw `[plan::]` text; only a duration card writes it back. */
+  plan?: string
   strengthSets: EditableStrengthSet[]
   durationEntries: EditableDurationEntry[]
   bodyweightSets: EditableBodyweightSet[]
@@ -2717,6 +2724,9 @@ export function toEditorExercise(exercise: ExerciseEntry): ExerciseCard {
         durationEntries: exercise.durationEntries.map(toEditorDurationEntry),
         bodyweightSets: [],
       }
+      if (exercise.plan !== undefined) {
+        card.plan = exercise.plan
+      }
       break
     default:
       return assertUnreachableKind(exercise)
@@ -2768,19 +2778,7 @@ function toEditorBodyweightSet(set: BodyweightSet): EditableBodyweightSet {
 }
 
 function toEditorDurationEntry(entry: DurationEntry): EditableDurationEntry {
-  const editable: EditableDurationEntry = {
-    durationSeconds: entry.durationSeconds,
-  }
-  if (entry.set !== undefined) {
-    editable.set = entry.set
-  }
-  if (entry.startedAt !== undefined) {
-    editable.startedAt = entry.startedAt
-  }
-  if (entry.note !== undefined) {
-    editable.note = entry.note
-  }
-  return editable
+  return { ...entry }
 }
 
 function toWorkoutNoteModel(model: EditorWorkoutModel): WorkoutNoteModel {
@@ -2833,6 +2831,9 @@ export function toWorkoutExercise(card: ExerciseCard): ExerciseEntry {
         kind: card.kind,
         durationEntries: card.durationEntries.map(toDurationEntry),
       }
+      if (card.plan !== undefined) {
+        entry.plan = card.plan
+      }
       return withNoteAndNext(entry, note, next)
     }
     case 'bodyweight': {
@@ -2883,19 +2884,7 @@ function toBodyweightSet(set: EditableBodyweightSet): BodyweightSet {
 }
 
 function toDurationEntry(entry: EditableDurationEntry): DurationEntry {
-  const durationEntry: DurationEntry = {
-    durationSeconds: entry.durationSeconds ?? 0,
-  }
-  if (entry.set !== undefined) {
-    durationEntry.set = entry.set
-  }
-  if (entry.startedAt !== undefined) {
-    durationEntry.startedAt = entry.startedAt
-  }
-  if (entry.note !== undefined) {
-    durationEntry.note = entry.note
-  }
-  return durationEntry
+  return { ...entry, durationSeconds: entry.durationSeconds ?? 0 }
 }
 
 function readCardIndex(card: HTMLElement): number | null {

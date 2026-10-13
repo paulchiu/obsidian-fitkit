@@ -263,6 +263,56 @@ describe('workout note model', () => {
     )
   })
 
+  it('round-trips an interval plan and interval rows byte for byte', () => {
+    const source = [
+      '---',
+      'type: workout',
+      'date: 2026-10-12',
+      'name: Intervals',
+      '---',
+      '',
+      '## [[Exercise Bike]]',
+      '',
+      '- [exercise:: [[Exercise Bike]]] [plan:: 8 x 30s @ 300W, 90s rest]',
+      '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 305] [rest:: 90]',
+      '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 22] [watts:: 280] [rest:: 90] [notes:: ended early]',
+      '- [exercise:: [[Exercise Bike]]] [set:: 3] [duration:: 30] [watts:: 300] [rest:: 41] [paused:: true]',
+      '- [exercise:: [[Exercise Bike]]] [set:: 4] [duration:: 0] [started:: 2026-10-12T07:24:48+10:00]',
+      '',
+      '## [[Sled Push]]',
+      '',
+      '- [exercise:: [[Sled Push]]] [notes:: turf] [plan:: 6 x open @ 120kg, every 2m]',
+      '- [exercise:: [[Sled Push]]] [set:: 1] [duration:: 18] [load:: 120] [rest:: 102]',
+      '',
+      '## [[Spin Bike]]',
+      '',
+      '- [exercise:: [[Spin Bike]]] [plan:: 10 x 20s @ L12, 40s rest]',
+      '- [exercise:: [[Spin Bike]]] [set:: 1] [duration:: 20] [level:: 12] [rest:: 40]',
+      '',
+    ].join('\n')
+
+    expect(serializeWorkoutNote(expectWorkoutModel(source, 'intervals.md'))).toBe(source)
+  })
+
+  it('keeps a plan line on its own as a duration exercise with no rows', () => {
+    const source = [
+      '---',
+      'type: workout',
+      'date: 2026-10-12',
+      'name: Intervals',
+      '---',
+      '',
+      '## [[Spin Bike]]',
+      '',
+      '- [exercise:: [[Spin Bike]]] [plan:: 10 x 20s @ L12, 40s rest]',
+      '',
+    ].join('\n')
+
+    const model = expectWorkoutModel(source, 'plan-only.md')
+
+    expect([model.exercises[0]?.kind, serializeWorkoutNote(model)]).toEqual(['duration', source])
+  })
+
   it('coerces strength rows to a duration entry carrying only the duration rows', () => {
     const result = parseWorkoutNote(
       [
