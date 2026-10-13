@@ -358,6 +358,27 @@ describe('exercise history aggregation', () => {
     ])
   })
 
+  it('counts sessions logged with an interval plan toward the duration PB and Last', () => {
+    const history = buildExerciseHistoryMap(
+      fitKitIndex([
+        entry('Fitness/Workouts/2026-04-20.md', '2026-04-20', [
+          {
+            exerciseName: 'Bike',
+            kind: 'duration',
+            plan: '3 x 1m @ 300W, 30s rest',
+            totalDurationSeconds: 180,
+          },
+        ]),
+      ]),
+      { sourcePath: 'Fitness/Workouts/2026-04-24.md', date: '2026-04-24' },
+    )
+
+    expect(formatExerciseHistoryBadges(history.get('Bike'), 'duration', 'kg')).toEqual([
+      { text: 'PB 3m', title: 'Longest session total duration: 3m' },
+      { text: 'last 3m', title: 'Latest prior session total duration: 3m (2026-04-20)' },
+    ])
+  })
+
   it('carries the most recent next-time plan forward', () => {
     const history = buildExerciseHistoryMap(
       fitKitIndex([
