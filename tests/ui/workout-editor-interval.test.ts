@@ -317,6 +317,27 @@ describe('WorkoutEditorView interval plans', () => {
     await savedBody(contents, body)
   })
 
+  it('offers the presets from settings, Tabata and EMOM unless changed', async () => {
+    const source = workoutSource(
+      '## [[Exercise Bike]]',
+      '',
+      '- [exercise:: [[Exercise Bike]]] [duration:: 0]',
+    )
+    const chips = async (settings: Partial<typeof DEFAULT_SETTINGS>): Promise<string[]> => {
+      const { view } = await openView(source, settings)
+      button(view, 'Exercise options').click()
+      menuItem('Switch to interval').onClick?.()
+      return [...openedModal().contentEl.querySelectorAll('.fitkit-plan-presets button')].map(
+        (chip) => chip.textContent ?? '',
+      )
+    }
+
+    expect([
+      await chips({}),
+      await chips({ intervalPresets: 'Bike: 10 x 4m @ 300W, 1m rest\nOops: lots' }),
+    ]).toEqual([['Tabata', 'EMOM'], ['Bike']])
+  })
+
   it('writes the plan line chosen through the plan form', async () => {
     const { view, contents } = await openView(
       workoutSource(

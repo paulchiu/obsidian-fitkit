@@ -9,12 +9,15 @@ import {
   type IntervalPlan,
   type IntervalPlanResult,
 } from '../domain/interval-plan'
+import type { IntervalPreset } from '../domain/interval-presets'
 
 export interface IntervalPlanModalOptions {
   exerciseName: string
   initial: string | undefined
   /** What the form starts from when there is no plan yet, before the built-in default. */
   suggested?: string
+  /** Plans offered under "Start from"; the row is left out when there are none. */
+  presets: readonly IntervalPreset[]
   onSave: (plan: string | undefined) => void
 }
 
@@ -27,13 +30,6 @@ const INTENSITY_OPTIONS: ReadonlyArray<{ value: IntensityKind; label: string }> 
 const PACE_OPTIONS: ReadonlyArray<{ value: IntervalPlan['pace']['kind']; label: string }> = [
   { value: 'rest', label: 'Rest after each rep' },
   { value: 'every', label: 'Start every (EMOM)' },
-]
-
-const PRESETS: ReadonlyArray<{ label: string; plan: string }> = [
-  { label: 'Bike 8 x 30', plan: '8 x 30s @ 300W, 90s rest' },
-  { label: 'Tabata', plan: '8 x 20s @ 400W, 10s rest' },
-  { label: 'EMOM 40 s', plan: '10 x 40s @ 300W, every 1m' },
-  { label: 'Sled every 2:00', plan: '6 x open @ 120kg, every 2m' },
 ]
 
 const DEFAULT_PLAN = '8 x 30s @ 300W, 90s rest'
@@ -64,8 +60,9 @@ export class IntervalPlanModal extends Modal {
     contentEl.addClass('fitkit-set-note-modal')
     this.setTitle(`Interval plan for ${this.options.exerciseName}`)
 
-    const presets = contentEl.createDiv({ cls: 'fitkit-plan-presets' })
-    presets.createSpan({ cls: 'fitkit-label', text: 'Start from' })
+    const presets =
+      this.options.presets.length > 0 ? contentEl.createDiv({ cls: 'fitkit-plan-presets' }) : null
+    presets?.createSpan({ cls: 'fitkit-label', text: 'Start from' })
     const grid = contentEl.createDiv({ cls: 'fitkit-plan-grid' })
     const fields: PlanFields = {
       reps: this.numberField(grid, 'Reps'),
@@ -111,12 +108,14 @@ export class IntervalPlanModal extends Modal {
     })
     grid.addEventListener('input', update)
     grid.addEventListener('change', update)
-    for (const preset of PRESETS) {
-      const button = presets.createEl('button', { cls: 'fitkit-btn', text: preset.label })
-      button.addEventListener('click', () => {
-        fill(fields, preset.plan)
-        update()
-      })
+    if (presets) {
+      for (const preset of this.options.presets) {
+        const button = presets.createEl('button', { cls: 'fitkit-btn', text: preset.label })
+        button.addEventListener('click', () => {
+          fill(fields, preset.plan)
+          update()
+        })
+      }
     }
 
     fill(fields, this.options.initial ?? this.options.suggested ?? DEFAULT_PLAN)

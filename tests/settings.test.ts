@@ -115,6 +115,13 @@ describe('settings migration', () => {
     expect(migrated.exerciseRegistry[1]?.levels).toBeUndefined()
   })
 
+  it('keeps stored interval presets, even none, and defaults them when missing', () => {
+    expect([
+      settingsFromStored({ intervalPresets: '', schemaVersion: 1 }).intervalPresets,
+      settingsFromStored({ schemaVersion: 1 }).intervalPresets,
+    ]).toEqual(['', 'Tabata: 8 x 20s @ 400W, 10s rest\nEMOM: 10 x 40s @ 300W, every 1m'])
+  })
+
   it('preserves stored deleted exercise tombstones', () => {
     expect(
       settingsFromStored({

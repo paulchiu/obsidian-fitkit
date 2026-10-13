@@ -24,13 +24,20 @@ vi.mock('obsidian', () => {
   return { Modal }
 })
 
+import type { IntervalPreset } from '../../src/domain/interval-presets'
 import { IntervalPlanModal } from '../../src/ui/interval-plan-modal'
 
-const open = (initial?: string): { modal: IntervalPlanModal; onSave: ReturnType<typeof vi.fn> } => {
+const SLED = { label: 'Sled', plan: '6 x open @ 120kg, every 2m' }
+
+const open = (
+  initial?: string,
+  presets: IntervalPreset[] = [SLED],
+): { modal: IntervalPlanModal; onSave: ReturnType<typeof vi.fn> } => {
   const onSave = vi.fn()
   const modal = new IntervalPlanModal({} as never, {
     exerciseName: 'Exercise Bike',
     initial,
+    presets,
     onSave,
   })
   modal.onOpen()
@@ -132,13 +139,19 @@ describe('interval plan modal', () => {
     ])
   })
 
-  it('fills the form from a preset', () => {
+  it('fills the form from a preset it was given', () => {
     const { modal, onSave } = open(undefined)
 
-    findButtons(modal.contentEl, 'Sled every 2:00')[0]?.click()
+    findButtons(modal.contentEl, 'Sled')[0]?.click()
     saveButton(modal).click()
 
     expect(onSave.mock.calls).toEqual([['6 x open @ 120kg, every 2m']])
+  })
+
+  it('leaves out Start from when there are no presets', () => {
+    const { modal } = open(undefined, [])
+
+    expect(modal.contentEl.querySelector('.fitkit-plan-presets')).toBeNull()
   })
 
   it('offers Clear plan only for a card that has one, and clears it', () => {

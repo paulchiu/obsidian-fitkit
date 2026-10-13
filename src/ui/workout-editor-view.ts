@@ -35,6 +35,7 @@ import {
   type RunPhase,
 } from '../domain/interval-run'
 import { parseIntervalPlan, type IntensityKind, type IntervalPlan } from '../domain/interval-plan'
+import { parseIntervalPresets } from '../domain/interval-presets'
 import { assertUnreachableKind } from '../domain/exercise-kind'
 import {
   formatExerciseHistoryBadges,
@@ -1263,6 +1264,7 @@ export class WorkoutEditorView extends FileView {
       exerciseName: ex.name,
       initial: ex.plan,
       suggested: this.lastIntervalPlan(ex.name),
+      presets: parseIntervalPresets(this.plugin.settings.intervalPresets).presets,
       onSave: (plan) => {
         ex.plan = plan
         this.markDirty()
