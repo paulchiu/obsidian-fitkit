@@ -17,6 +17,7 @@ import {
   ZERO_DURATION_DISPLAY,
 } from '../domain/duration-input'
 import { formatErrorMessage } from '../domain/error'
+import { cueBetween } from '../domain/interval-cues'
 import {
   advanceRun,
   catchUpRun,
@@ -30,6 +31,7 @@ import {
   runPhase,
   skipRest,
   startRun,
+  type RunPhase,
   type RunRow,
 } from '../domain/interval-run'
 import { parseIntervalPlan, type IntensityKind, type IntervalPlan } from '../domain/interval-plan'
@@ -99,6 +101,7 @@ import { markdownFilesInFolder } from '../vault/folder-scan'
 import { ensureParentFolder } from '../vault/vault-utils'
 import { ConfirmModal } from './confirm-modal'
 import { EditLevelsModal } from './edit-levels-modal'
+import { createCuePlayer, type CuePlayer } from './interval-cues'
 import { clockSeconds, formatClock, renderRunner, type RunnerScreen } from './interval-runner'
 import { IntervalPlanModal } from './interval-plan-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
@@ -134,6 +137,9 @@ interface ActiveRun {
   intervalId: number
   lastTickAt: number
   clockEl: HTMLElement | null
+  /** The phase the last tick saw, so the next one knows which cue it crossed. */
+  lastPhase: RunPhase
+  cues: CuePlayer
 }
 
 /** A tick this late means the app was suspended, so it catches up the way a reopen does. */
@@ -302,6 +308,12 @@ export class WorkoutEditorView extends FileView {
     this.updateNarrowState()
     this.registerDragLifetimeListeners()
     this.registerEvent(this.app.metadataCache.on('changed', (file) => this.onMetadataChanged(file)))
+    /** The OS drops a wake lock whenever the app is hidden, so take it again on return. */
+    this.registerDomEvent(activeDocument, 'visibilitychange', () => {
+      if (activeDocument.visibilityState === 'visible') {
+        this.activeRun?.cues.keepAwake()
+      }
+    })
     this.renderEmpty('Open a workout note to edit.')
   }
 
@@ -1609,11 +1621,14 @@ export class WorkoutEditorView extends FileView {
     this.clearRestTimer()
     card.durationEntries = startRun(card.durationEntries, Date.now())
     this.enterRun(card, plan, { kind: 'running' })
+    this.activeRun?.cues.prime()
     this.markDirty()
     this.render()
   }
 
   private enterRun(card: ExerciseCard, plan: IntervalPlan, screen: RunnerScreen): void {
+    const cues = createCuePlayer(activeWindow, this.plugin.settings.intervalBeepsEnabled !== false)
+    cues.keepAwake()
     this.activeRun = {
       card,
       plan,
@@ -1621,6 +1636,8 @@ export class WorkoutEditorView extends FileView {
       intervalId: window.setInterval(() => this.tickRun(), 500),
       lastTickAt: Date.now(),
       clockEl: null,
+      lastPhase: runPhase(card.durationEntries, plan, Date.now()),
+      cues,
     }
   }
 
@@ -1631,12 +1648,14 @@ export class WorkoutEditorView extends FileView {
       return
     }
     window.clearInterval(run.intervalId)
+    run.cues.release()
     this.activeRun = null
     this.render()
   }
 
   private renderRun(container: HTMLElement, run: ActiveRun): void {
     const now = Date.now()
+    /** Each runner tap may be the first gesture since a reload, and only a gesture unlocks audio on iOS. */
     run.clockEl = renderRunner(
       container,
       {
@@ -1648,6 +1667,7 @@ export class WorkoutEditorView extends FileView {
       },
       {
         primary: () => {
+          run.cues.prime()
           const rows = run.card.durationEntries
           if (runPhase(rows, run.plan, Date.now()).kind === 'rest') {
             this.applyRunRows(skipRest(rows, Date.now()), false)
@@ -1657,6 +1677,7 @@ export class WorkoutEditorView extends FileView {
           }
         },
         togglePause: () => {
+          run.cues.prime()
           const rows = run.card.durationEntries
           const phase = runPhase(rows, run.plan, Date.now())
           const paused = phase.kind !== 'idle' && phase.paused
@@ -1671,6 +1692,7 @@ export class WorkoutEditorView extends FileView {
         },
         adjust: (delta) => this.adjustLastRep(run, delta),
         resumeCut: () => {
+          run.cues.prime()
           run.screen = { kind: 'running' }
           this.applyRunRows(resumeCutRun(run.card.durationEntries, run.plan, Date.now()), false)
         },
@@ -1693,11 +1715,18 @@ export class WorkoutEditorView extends FileView {
     run.lastTickAt = now
     if (late) {
       this.catchUpRun(run, now)
+      run.lastPhase = runPhase(run.card.durationEntries, run.plan, now)
       this.render()
       return
     }
+    const before = run.lastPhase
     const result = advanceRun(run.card.durationEntries, run.plan, now)
-    if (!this.applyRunRows(result.rows, result.finished) && run.clockEl) {
+    const changed = this.applyRunRows(result.rows, result.finished)
+    const cue = result.finished ? 'go' : cueBetween(before, run.lastPhase)
+    if (cue) {
+      run.cues.play(cue)
+    }
+    if (!changed && run.clockEl) {
       run.clockEl.setText(formatClock(clockSeconds({ ...runnerContext(run), now })))
     }
   }
@@ -1716,6 +1745,7 @@ export class WorkoutEditorView extends FileView {
       run.card.durationEntries = rows
       this.markDirty()
     }
+    run.lastPhase = runPhase(rows, run.plan, Date.now())
     if (finished) {
       run.screen = { kind: 'finished', hits: hitCount(rows, run.plan) }
     }
@@ -1768,6 +1798,7 @@ export class WorkoutEditorView extends FileView {
       return
     }
     window.clearInterval(run.intervalId)
+    run.cues.release()
     this.activeRun = null
     if (run.screen.kind !== 'running') {
       return
@@ -1782,6 +1813,7 @@ export class WorkoutEditorView extends FileView {
   private dropRun(): void {
     if (this.activeRun) {
       window.clearInterval(this.activeRun.intervalId)
+      this.activeRun.cues.release()
       this.activeRun = null
     }
   }

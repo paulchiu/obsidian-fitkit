@@ -46,6 +46,31 @@ Dataview inline fields are the canonical format. The recognised ones are:
 | `load`     | Added weight on a bodyweight set, such as a vest.                                                                     |
 | `notes`    | Free text, on an exercise header row or on an individual set.                                                         |
 | `next`     | `up`, `down`, or `stay`, with an optional step (`up 2.5`): a weight change for strength, a rung count for bodyweight. |
+| `plan`     | An interval plan on a duration exercise's header row, such as `8 x 30s @ 300W, 90s rest` (see below).                 |
+| `watts`    | Power held on an interval rep.                                                                                        |
+| `rest`     | Seconds rested after an interval rep. The last rep of a run has none.                                                 |
+| `paused`   | `true` on the open rep of a paused interval run.                                                                      |
+
+### Interval plans
+
+A duration exercise can carry a plan on its header row, and each work bout is then one row:
+
+```markdown
+## [[Exercise Bike]]
+
+- [exercise:: [[Exercise Bike]]] [plan:: 8 x 30s @ 300W, 90s rest]
+- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 305] [rest:: 90]
+- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 22] [watts:: 280] [rest:: 90]
+
+## [[Sled Push]]
+
+- [exercise:: [[Sled Push]]] [plan:: 6 x open @ 120kg, every 2m]
+- [exercise:: [[Sled Push]]] [set:: 1] [duration:: 18] [load:: 120] [rest:: 102]
+```
+
+A plan reads `<reps> x <work> @ <target>, <pace>`. Work is a duration or `open` (the rep ends when you tap Rest). The target is watts (`300W`), load (`120kg`) or a level (`L12`), and the row records the same field. The pace is either `<duration> rest`, a fixed rest after each rep, or `every <duration>`, where each rep starts one period after the last one started and rest is whatever the rep left (EMOM). Open work needs an `every` pace, and timed work has to be shorter than the period.
+
+While a run is under way, its open rep carries a `started` stamp, which times the rest when the row has a `rest` field and the work otherwise. That stamp, the plan and the rows are the run's whole state, which is how a run survives Obsidian being closed.
 
 An `## [[Name]]` heading groups the rows beneath it. FitKit treats an H2 as an exercise heading only when the section it introduces contains at least one logged exercise row, which is what lets a `## Session notes` heading sit in a workout note without being mistaken for an exercise.
 

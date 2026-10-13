@@ -183,6 +183,7 @@ const runTo = (time: string): void => {
 /** A real WorkoutEditorView over an in-memory vault holding one workout note. */
 const openView = async (
   source: string,
+  settings: Partial<typeof DEFAULT_SETTINGS> = {},
 ): Promise<{ view: WorkoutEditorView; contents: Map<string, string> }> => {
   const file = Object.assign(new TFile(), { path: WORKOUT_PATH, basename: '2026-10-12' })
   const contents = new Map([[WORKOUT_PATH, source]])
@@ -200,7 +201,7 @@ const openView = async (
   }
   const plugin = Object.create(FitKitPlugin.prototype) as FitKitPlugin
   plugin.app = app as unknown as App
-  plugin.settings = { ...DEFAULT_SETTINGS }
+  plugin.settings = { ...DEFAULT_SETTINGS, ...settings }
   plugin.refreshIndexEntry = async (): Promise<void> => {}
   const view = new WorkoutEditorView({ app } as unknown as WorkspaceLeaf, plugin)
   await view.onOpen()
@@ -612,6 +613,84 @@ describe('WorkoutEditorView interval plans', () => {
         'Run finished',
         [],
       ])
+    })
+
+    describe('cues', () => {
+      /** Platform boundaries: tones started and screen locks held, as the device would see them. */
+      let tones: number[]
+      let locks: string[]
+
+      beforeEach(() => {
+        tones = []
+        locks = []
+        class FakeAudioContext {
+          currentTime = 0
+          destination = {}
+          state = 'running'
+          async resume(): Promise<void> {}
+          createGain(): unknown {
+            return {
+              gain: { setValueAtTime: () => {}, exponentialRampToValueAtTime: () => {} },
+              connect: () => {},
+            }
+          }
+          createOscillator(): unknown {
+            const oscillator = {
+              frequency: { value: 0 },
+              connect: () => {},
+              start: () => tones.push(oscillator.frequency.value),
+              stop: () => {},
+            }
+            return oscillator
+          }
+        }
+        Object.defineProperty(harnessWindow, 'AudioContext', {
+          configurable: true,
+          value: FakeAudioContext,
+        })
+        Object.defineProperty(harnessWindow.navigator, 'wakeLock', {
+          configurable: true,
+          value: {
+            request: async (type: string): Promise<unknown> => {
+              locks.push(`acquire ${type}`)
+              return { release: async () => void locks.push('release') }
+            },
+          },
+        })
+      })
+
+      afterEach(() => {
+        Reflect.deleteProperty(harnessWindow, 'AudioContext')
+        Reflect.deleteProperty(harnessWindow.navigator as object, 'wakeLock')
+      })
+
+      it('beeps the last three seconds of work and the change to rest', async () => {
+        const { view } = await openView(workoutSource(...BIKE))
+        button(view, 'Run interval plan').click()
+
+        runTo('07:15:31')
+
+        expect(tones).toEqual([880, 880, 880, 1320])
+      })
+
+      it('stays silent when interval beeps are off', async () => {
+        const { view } = await openView(workoutSource(...BIKE), { intervalBeepsEnabled: false })
+        button(view, 'Run interval plan').click()
+
+        runTo('07:15:31')
+
+        expect(tones).toEqual([])
+      })
+
+      it('keeps the screen awake while the runner is open and lets it sleep after', async () => {
+        const { view } = await openView(workoutSource(...BIKE))
+        button(view, 'Run interval plan').click()
+        await vi.waitFor(() => expect(locks).toEqual(['acquire screen']))
+
+        button(view, 'End run').click()
+
+        await vi.waitFor(() => expect(locks).toEqual(['acquire screen', 'release']))
+      })
     })
   })
 })

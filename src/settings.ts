@@ -29,6 +29,7 @@ export interface FitKitSettings {
   fitnessRoot: string
   autoOpenWorkoutEditor: boolean
   strengthRestTimerEnabled: boolean
+  intervalBeepsEnabled: boolean
   autosaveDebounceMs: number
   chartSessionsWindow: number
   exerciseRegistry: ExerciseRegistryEntry[]
@@ -41,6 +42,7 @@ export const DEFAULT_SETTINGS: FitKitSettings = {
   fitnessRoot: 'Fitness',
   autoOpenWorkoutEditor: true,
   strengthRestTimerEnabled: true,
+  intervalBeepsEnabled: true,
   autosaveDebounceMs: 600,
   chartSessionsWindow: 30,
   exerciseRegistry: [],
@@ -89,6 +91,7 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
     autoOpenWorkoutEditor: stored.autoOpenWorkoutEditor ?? DEFAULT_SETTINGS.autoOpenWorkoutEditor,
     strengthRestTimerEnabled:
       stored.strengthRestTimerEnabled ?? DEFAULT_SETTINGS.strengthRestTimerEnabled,
+    intervalBeepsEnabled: stored.intervalBeepsEnabled ?? DEFAULT_SETTINGS.intervalBeepsEnabled,
     autosaveDebounceMs: stored.autosaveDebounceMs ?? DEFAULT_SETTINGS.autosaveDebounceMs,
     chartSessionsWindow: stored.chartSessionsWindow ?? DEFAULT_SETTINGS.chartSessionsWindow,
     exerciseRegistry: normalizeStoredExerciseRegistry(
@@ -151,6 +154,7 @@ type FitKitSettingKey =
   | 'fitnessRoot'
   | 'autoOpenWorkoutEditor'
   | 'strengthRestTimerEnabled'
+  | 'intervalBeepsEnabled'
   | 'autosaveDebounceMs'
   | 'chartSessionsWindow'
 
@@ -297,6 +301,12 @@ export class FitKitSettingTab extends PluginSettingTab {
             name: 'Rest timer',
             desc: 'Show a rest timer in the workout editor footer that remembers your last rest after stopping.',
             control: { type: 'toggle', key: 'strengthRestTimerEnabled' },
+          },
+          {
+            kind: 'control',
+            name: 'Interval beeps',
+            desc: 'Beep through the last three seconds of each interval and when it changes, and vibrate where the device can.',
+            control: { type: 'toggle', key: 'intervalBeepsEnabled' },
           },
           {
             kind: 'control',
@@ -447,6 +457,9 @@ export class FitKitSettingTab extends PluginSettingTab {
         break
       case 'strengthRestTimerEnabled':
         settings.strengthRestTimerEnabled = Boolean(value)
+        break
+      case 'intervalBeepsEnabled':
+        settings.intervalBeepsEnabled = Boolean(value)
         break
       case 'autosaveDebounceMs':
         settings.autosaveDebounceMs = coerceAutosaveDebounceMs(value)

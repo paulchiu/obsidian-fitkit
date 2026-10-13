@@ -65,6 +65,24 @@ The card menu holds `Edit levels`, which edits the ladder one rung per line. An 
 
 A rung name too long for its cell shortens to a compact form (`L2`), and grows back into the full name when the cell has room again.
 
+## Interval training
+
+`Set interval plan` in a duration card's menu opens a form for a one-line plan: reps, an intensity (watts, load or level) and its target, the work time or `Open` for work that ends when you say so, and a `Pace`. `Rest after each rep` gives every rep the same rest; `Start every (EMOM)` starts each rep one period after the last one started, so a slow rep eats its own rest. Presets cover a bike 8 x 30, Tabata, EMOM and a sled every two minutes, and the form explains any plan that cannot run. The plan shows above the rows (tap it to edit), the rows gain intensity and rest columns, and `Add set` and `Repeat` carry both forward.
+
+A card with a plan swaps its play button for `Run`, which reads `Run from rep N` once some reps are logged. Run takes over the tab:
+
+- The clock counts the work down (or up, for open work) and then the rest.
+- The big button reads `Rest` while you work, ending the rep with the time you actually did, and `Skip` while you rest, starting the next rep at once. A phase whose time runs out ends by itself.
+- Each finished rep is written to the note straight away with the target filled in. During rest, the minus and plus buttons correct the rep you just did, from the machine's console.
+- Rep dots go green for reps on target (within 5% of the target, held for the full work time; open work counts intensity only) and amber otherwise, with the last and average intensity beneath them.
+- `Pause` banks the time so far, and `End run` returns to the card with the reps you finished. When the plan is done, the runner shows how many reps hit the target.
+
+With `Interval beeps` on (see [Settings](settings.md)), the last three seconds of each interval beep and the change between work and rest has its own tone, and the runner keeps the screen awake where the platform allows. Beeps cannot sound while the phone has Obsidian suspended.
+
+A run lives in the note, not in memory. Reopening a workout mid-run picks it up from the clock: reps that finished while Obsidian was closed are filled with the target, flagged `logged while Obsidian was closed`, and counted in a notice so you can check them. If the plan ended more than two minutes before you came back, FitKit does not invent reps; it shows `Run cut off at rep N` with `Resume rep N` and `End run here`. Closing the tab yourself pauses the run.
+
+A version of FitKit from before interval training reads a mid-run rep as a running stopwatch and drops the intensity, rest and plan fields on its next save, so finish or end a run before switching back to an older version.
+
 ## Planning your next session
 
 The card menu records how you want to load the exercise next session: `Plan: increase`, `Plan: keep`, or `Plan: decrease`. Choosing the direction that is already set clears it. With increase or decrease chosen, `Set plan step...` takes the step; it stays greyed out until there is a direction to attach a step to.

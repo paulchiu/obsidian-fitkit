@@ -83,6 +83,7 @@ describe('setting definitions', () => {
       ['folder', 'fitnessRoot'],
       ['toggle', 'autoOpenWorkoutEditor'],
       ['toggle', 'strengthRestTimerEnabled'],
+      ['toggle', 'intervalBeepsEnabled'],
       ['number', 'autosaveDebounceMs'],
       ['number', 'chartSessionsWindow'],
     ])
@@ -136,7 +137,7 @@ describe('setting definitions', () => {
   it('gives every searchable row a description so settings search can match it', () => {
     const searchable = allRows(createTab().tab).filter((row) => row.searchable !== false)
 
-    expect(searchable).toHaveLength(12)
+    expect(searchable).toHaveLength(13)
     for (const row of searchable) {
       expect(row.name.length).toBeGreaterThan(0)
       expect(typeof row.desc).toBe('string')
@@ -215,6 +216,14 @@ describe('setControlValue', () => {
     await tab.setControlValue('strengthRestTimerEnabled', false)
     expect(settings.strengthRestTimerEnabled).toBe(false)
     expect(refreshWorkoutEditorViews).toHaveBeenCalledTimes(1)
+  })
+
+  it('saves the interval beeps toggle', async () => {
+    const { tab, settings, saveSettings } = createTab()
+
+    await tab.setControlValue('intervalBeepsEnabled', false)
+
+    expect([settings.intervalBeepsEnabled, saveSettings.mock.calls.length]).toEqual([false, 1])
   })
 
   it('ignores a key the tab does not own', async () => {
