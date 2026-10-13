@@ -366,7 +366,7 @@ describe('WorkoutEditorView interval plans', () => {
     ])
   })
 
-  it('shows the plan, the intensity and rest of each rep, and where Run will pick up', async () => {
+  it('shows the plan, the intensity and rest of each rep, and where Start will pick up', async () => {
     const { view } = await openView(
       workoutSource(
         '## [[Exercise Bike]]',
@@ -383,12 +383,12 @@ describe('WorkoutEditorView interval plans', () => {
       )
     expect({
       plan: view.contentEl.querySelector('.fitkit-plan-line')?.textContent,
-      run: button(view, 'Run interval plan').textContent,
+      run: button(view, 'Start interval plan').textContent,
       watts: inputs('Watts'),
       rest: inputs('Rest'),
     }).toEqual({
       plan: '8 x 30s @ 300W, 90s rest',
-      run: 'Run from rep 3',
+      run: 'Start from rep 3',
       watts: ['305', '280'],
       rest: ['1m30s', '1m15s'],
     })
@@ -564,7 +564,7 @@ describe('WorkoutEditorView interval plans', () => {
     it('takes over the tab with a clock counting the work down and a Rest button', async () => {
       const { view } = await openView(workoutSource(...BIKE))
 
-      button(view, 'Run interval plan').click()
+      button(view, 'Start interval plan').click()
       at('07:15:10')
 
       expect({
@@ -587,7 +587,7 @@ describe('WorkoutEditorView interval plans', () => {
 
     it('writes the seconds done when Rest ends work early, and the rest taken when Skip ends rest', async () => {
       const { view, contents } = await openView(workoutSource(...BIKE))
-      button(view, 'Run interval plan').click()
+      button(view, 'Start interval plan').click()
 
       at('07:15:22')
       runnerButton(view, 'Rest').click()
@@ -603,7 +603,7 @@ describe('WorkoutEditorView interval plans', () => {
 
     it('ends work by itself when its time runs out and writes the rep with the target', async () => {
       const { view, contents } = await openView(workoutSource(...BIKE))
-      button(view, 'Run interval plan').click()
+      button(view, 'Start interval plan').click()
 
       runTo('07:15:31')
 
@@ -616,7 +616,7 @@ describe('WorkoutEditorView interval plans', () => {
 
     it('corrects the rep just done from the stepper during rest', async () => {
       const { view, contents } = await openView(workoutSource(...BIKE))
-      button(view, 'Run interval plan').click()
+      button(view, 'Start interval plan').click()
       at('07:15:20')
       runnerButton(view, 'Rest').click()
 
@@ -632,7 +632,7 @@ describe('WorkoutEditorView interval plans', () => {
 
     it('pauses with the time banked, and End run returns to the card with the rows kept', async () => {
       const { view, contents } = await openView(workoutSource(...BIKE))
-      button(view, 'Run interval plan').click()
+      button(view, 'Start interval plan').click()
       at('07:15:12')
 
       button(view, 'Pause run').click()
@@ -654,7 +654,7 @@ describe('WorkoutEditorView interval plans', () => {
 
     it('pauses the run when the tab closes mid-run', async () => {
       const { view, contents } = await openView(workoutSource(...BIKE))
-      button(view, 'Run interval plan').click()
+      button(view, 'Start interval plan').click()
       at('07:15:12')
 
       await view.onClose()
@@ -673,7 +673,7 @@ describe('WorkoutEditorView interval plans', () => {
           '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 30] [watts:: 250] [rest:: 90]',
         ),
       )
-      button(view, 'Run interval plan').click()
+      button(view, 'Start interval plan').click()
 
       runTo('07:15:31')
 
@@ -753,13 +753,13 @@ describe('WorkoutEditorView interval plans', () => {
       ])
     })
 
-    it('offers Run instead of the stopwatch on a card with a plan', async () => {
+    it('offers Start instead of the stopwatch on a card with a plan', async () => {
       const { view } = await openView(workoutSource(...BIKE))
 
       expect([
         view.contentEl.querySelector('button[aria-label="Start timer"]'),
-        button(view, 'Run interval plan').textContent,
-      ]).toEqual([null, 'Run'])
+        button(view, 'Start interval plan').textContent,
+      ]).toEqual([null, 'Start'])
     })
 
     it('styles every class the plan card, the runner screens and the plan form render', async () => {
@@ -777,7 +777,7 @@ describe('WorkoutEditorView interval plans', () => {
       button(view, 'Exercise options').click()
       menuItem('Edit interval plan').onClick?.()
       collect(openedModal().contentEl)
-      button(view, 'Run interval plan').click()
+      button(view, 'Start interval plan').click()
       collect(view.contentEl)
       at('07:15:20')
       runnerButton(view, 'Rest').click()
@@ -799,11 +799,11 @@ describe('WorkoutEditorView interval plans', () => {
         workoutSource(...BIKE, '- [exercise:: [[Exercise Bike]]] [duration:: 0]'),
       )
 
-      const label = button(view, 'Run interval plan').textContent
-      button(view, 'Run interval plan').click()
+      const label = button(view, 'Start interval plan').textContent
+      button(view, 'Start interval plan').click()
 
       expect([label, runnerText(view, '.fitkit-runner-phase')]).toEqual([
-        'Run',
+        'Start',
         'Work · rep 1 of 3',
       ])
       await savedBody(contents, [
@@ -812,7 +812,7 @@ describe('WorkoutEditorView interval plans', () => {
       ])
     })
 
-    it('runs from rep 1 when the first row has watts typed but no time or rest', async () => {
+    it('starts from rep 1 when the first row has watts typed but no time or rest', async () => {
       const { view, contents } = await openView(
         workoutSource(
           ...BIKE,
@@ -820,11 +820,11 @@ describe('WorkoutEditorView interval plans', () => {
         ),
       )
 
-      const label = button(view, 'Run interval plan').textContent
-      button(view, 'Run interval plan').click()
+      const label = button(view, 'Start interval plan').textContent
+      button(view, 'Start interval plan').click()
 
       expect([label, runnerText(view, '.fitkit-runner-phase')]).toEqual([
-        'Run',
+        'Start',
         'Work · rep 1 of 3',
       ])
       await savedBody(contents, [
@@ -859,7 +859,7 @@ describe('WorkoutEditorView interval plans', () => {
         '- [exercise:: [[Exercise Bike]]] [plan:: 3 x 40s @ 300W, every 1m]',
       ]
       const { view, contents } = await openView(workoutSource(...emom))
-      button(view, 'Run interval plan').click()
+      button(view, 'Start interval plan').click()
 
       runTo('07:15:30')
       runnerButton(view, 'Rest').click()
@@ -878,7 +878,7 @@ describe('WorkoutEditorView interval plans', () => {
       button(view, 'Start timer').click()
       at('07:15:45')
 
-      button(view, 'Run interval plan').click()
+      button(view, 'Start interval plan').click()
 
       await savedBody(contents, [
         '## [[Plank]]',
@@ -946,7 +946,7 @@ describe('WorkoutEditorView interval plans', () => {
 
       it('beeps the last three seconds of work and the change to rest', async () => {
         const { view } = await openView(workoutSource(...BIKE))
-        button(view, 'Run interval plan').click()
+        button(view, 'Start interval plan').click()
 
         runTo('07:15:31')
 
@@ -955,7 +955,7 @@ describe('WorkoutEditorView interval plans', () => {
 
       it('stays silent when interval beeps are off', async () => {
         const { view } = await openView(workoutSource(...BIKE), { intervalBeepsEnabled: false })
-        button(view, 'Run interval plan').click()
+        button(view, 'Start interval plan').click()
 
         runTo('07:15:31')
 
@@ -964,7 +964,7 @@ describe('WorkoutEditorView interval plans', () => {
 
       it('keeps the screen awake while the runner is open, then lets it sleep and frees the audio', async () => {
         const { view } = await openView(workoutSource(...BIKE))
-        button(view, 'Run interval plan').click()
+        button(view, 'Start interval plan').click()
         await vi.waitFor(() => expect(locks).toEqual(['acquire screen']))
 
         button(view, 'End run').click()
@@ -990,7 +990,7 @@ describe('WorkoutEditorView interval plans', () => {
       exerciseRegistry: [{ name: 'Exercise Bike', kind: 'duration' as const, aliases: [] }],
     }
 
-    it('starts an added exercise with the plan it last ran, ready to run from rep 1', async () => {
+    it('starts an added exercise with the plan it last ran, ready to start from rep 1', async () => {
       const { view, contents } = await openView(workoutSource(), BIKE_IS_DURATION, [LAST_BIKE])
 
       const add = [...view.contentEl.querySelectorAll('button')].find(
@@ -1004,7 +1004,7 @@ describe('WorkoutEditorView interval plans', () => {
         new (harnessWindow.KeyboardEvent as typeof KeyboardEvent)('keydown', { key: 'Enter' }),
       )
 
-      await vi.waitFor(() => expect(button(view, 'Run interval plan').textContent).toBe('Run'))
+      await vi.waitFor(() => expect(button(view, 'Start interval plan').textContent).toBe('Start'))
       await vi.waitFor(() =>
         expect(contents.get(WORKOUT_PATH)).toContain(
           '- [exercise:: [[Exercise Bike]]] [plan:: 10 x 4m @ 300W, 1m rest]',

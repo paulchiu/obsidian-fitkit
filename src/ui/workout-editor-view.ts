@@ -1078,8 +1078,8 @@ export class WorkoutEditorView extends FileView {
       const done = loggedReps(ex.durationEntries)
       const runBtn = actions.createEl('button', {
         cls: 'fitkit-btn fitkit-btn-primary fitkit-run-button',
-        text: done > 0 ? `Run from rep ${done + 1}` : 'Run',
-        attr: { 'aria-label': 'Run interval plan' },
+        text: done > 0 ? `Start from rep ${done + 1}` : 'Start',
+        attr: { 'aria-label': 'Start interval plan' },
       })
       runBtn.disabled = done >= columns.plan.reps
       const plan = columns.plan
