@@ -322,7 +322,7 @@ describe('exercise import planner', () => {
     expect(config.deletedExercises).toEqual([])
   })
 
-  it('suggests interval for a missing exercise logged with a plan, and keeps a known type', async () => {
+  it('keeps a known interval type and leaves a missing exercise logged with a plan as duration', async () => {
     const { app } = mockApp([
       {
         path: 'Fitness/Exercises/Sled.md',
@@ -349,13 +349,13 @@ describe('exercise import planner', () => {
     const plan = await buildExerciseImportPlan(app, settings())
 
     expect(plan.rows.map((row) => [row.name, row.type])).toEqual([
-      ['Bike', 'interval'],
+      ['Bike', 'duration'],
       ['Row', 'duration'],
       ['Sled', 'interval'],
     ])
   })
 
-  it('creates an interval note and registry entry as duration with the interval marker', async () => {
+  it('creates a row chosen as interval as duration with the interval marker', async () => {
     const config = settings()
     const { app, state } = mockApp([
       workout(
@@ -367,7 +367,11 @@ describe('exercise import planner', () => {
       ),
     ])
     const plan = await buildExerciseImportPlan(app, config)
-    const rows = plan.rows.map((row) => ({ ...row, createNoNoteEntry: true }))
+    const rows = plan.rows.map((row) => ({
+      ...row,
+      type: 'interval' as const,
+      createNoNoteEntry: true,
+    }))
 
     await applyExerciseImportPlan(app, config, rows)
 

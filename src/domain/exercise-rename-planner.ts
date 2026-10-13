@@ -21,12 +21,8 @@
  * than silently leaving (or wrongly "fixing") a reference.
  */
 
-import {
-  intervalMarker,
-  normalize,
-  type ExerciseKind,
-  type ExerciseRegistryEntry,
-} from './exercise-registry'
+import { exerciseTypeOf } from './exercise-type'
+import { normalize, type ExerciseKind, type ExerciseRegistryEntry } from './exercise-registry'
 import { escapeRegExp } from './regex-utils'
 import type { WeightUnit } from './weight-unit'
 
@@ -218,7 +214,12 @@ export function buildExerciseRenamePlan(input: ExerciseRenamePlanInput): Exercis
   const aliasesToKeep = foldAliases(sourceEntry, distinctTargetEntry, oldName, resultName)
   const kindSource = distinctTargetEntry ?? sourceEntry ?? targetNote ?? sourceNote
   const resultKind = kindSource?.kind ?? DEFAULT_RESULT_KIND
-  const { interval: resultInterval } = kindSource ? intervalMarker(kindSource) : {}
+  /** The surviving note wins on read, so its marker beats a saved entry an older FitKit may have stripped. */
+  const markerSource = targetNote ?? sourceNote ?? kindSource
+  const resultInterval =
+    resultKind === 'duration' &&
+    markerSource !== null &&
+    exerciseTypeOf(markerSource) === 'interval'
   const resultUnit = distinctTargetEntry?.unit ?? sourceEntry?.unit
   const survivingLevels = distinctTargetEntry?.levels ?? sourceEntry?.levels
   const resultLevels = survivingLevels ? [...survivingLevels] : undefined
@@ -259,7 +260,7 @@ export function buildExerciseRenamePlan(input: ExerciseRenamePlanInput): Exercis
     resultKind,
     resultUnit,
     resultLevels,
-    ...(resultInterval ? { resultInterval } : {}),
+    ...(resultInterval ? { resultInterval: true as const } : {}),
     workoutNotes,
     totalHeadingOccurrences,
     totalFieldOccurrences,

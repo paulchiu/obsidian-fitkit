@@ -8,12 +8,7 @@ import type {
 
 import { formatErrorMessage } from './domain/error'
 import type { ExerciseRegistryEntry } from './domain/exercise-registry'
-import {
-  createRegistry,
-  intervalMarker,
-  normalize,
-  removeEntry,
-} from './domain/exercise-registry'
+import { createRegistry, intervalMarker, normalize, removeEntry } from './domain/exercise-registry'
 import { parseExerciseKind } from './domain/exercise-kind'
 import { exerciseTypeOf } from './domain/exercise-type'
 import { DEFAULT_INTERVAL_PRESETS, parseIntervalPresets } from './domain/interval-presets'

@@ -38,10 +38,22 @@ describe('exercise file plan', () => {
       path: 'Fitness/Exercises/Jump rope.md',
       sourcePath: 'Fitness/Workouts/2026-06-15.md',
       name: 'Jump rope',
-      exerciseKind: 'duration',
+      exerciseType: 'duration',
       workoutsFolderPath: 'Fitness/Workouts',
       unit: 'kg',
     })
+  })
+
+  it('creates the note for an interval registry entry as interval', () => {
+    const plan = planExerciseFileOpen({
+      ...baseInput,
+      name: 'Bike',
+      kind: 'duration',
+      registryEntries: [{ name: 'Bike', kind: 'duration', interval: true, aliases: [] }],
+      noteExists: () => false,
+    })
+
+    expect(plan).toMatchObject({ kind: 'create', exerciseType: 'interval' })
   })
 
   it('uses the merged registry unit when creating a strength note', () => {
@@ -107,7 +119,7 @@ describe('exercise file plan', () => {
       path: 'Fitness/Exercises/Back squat.md',
       sourcePath: 'Fitness/Workouts/2026-06-15.md',
       name: 'Back squat',
-      exerciseKind: 'strength',
+      exerciseType: 'strength',
       workoutsFolderPath: 'Fitness/Workouts',
       unit: 'lbs',
     })

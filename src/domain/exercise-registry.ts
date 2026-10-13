@@ -92,10 +92,9 @@ function cloneEntry(entry: ExerciseRegistryEntry): ExerciseRegistryEntry {
 }
 
 /** The marker as a spreadable field, kept only on a duration entry. */
-export function intervalMarker(entry: {
-  kind: ExerciseKind
-  interval?: boolean
-}): { interval?: true } {
+export function intervalMarker(entry: { kind: ExerciseKind; interval?: boolean }): {
+  interval?: true
+} {
   return entry.kind === 'duration' && entry.interval === true ? { interval: true } : {}
 }
 

@@ -2,6 +2,7 @@ import { defaultBodyweightLevels, type BodyweightLadder } from './bodyweight-lev
 import { EXERCISE_KINDS, parseExerciseKind } from './exercise-kind'
 import {
   kindForName,
+  typeForName,
   unitForName,
   type ExerciseKind,
   type ExerciseRegistry,
@@ -206,10 +207,8 @@ function countListItemLines(lines: ReadonlyArray<string>, start: number): number
  * reporting on the fields the old kind logged. Switching to bodyweight also
  * drops metric:/unit: lines, which only belong to strength notes; the ladder
  * itself is left for the repair pass, which knows the exercise name.
- */
-/**
- * Records `type` in an exercise note's frontmatter: the stored kind, plus an
- * `interval: true` line after it for interval, which any other type drops.
+ * Interval is written as the duration kind plus an `interval: true` line,
+ * which every other type drops.
  */
 export function setExerciseNoteType(
   source: string,
@@ -291,6 +290,7 @@ function repairFrontmatter(
   options: ExerciseNoteMigrationOptions,
 ): FrontmatterRepairResult {
   const registryKind = kindForName(options.registry, options.name)
+  const registryInterval = typeForName(options.registry, options.name) === 'interval'
   const registryUnit = strengthUnitForName(options.registry, options.name)
   const bounds = findFrontmatterBounds(source)
   if (bounds.status === 'malformed') {
@@ -305,7 +305,7 @@ function repairFrontmatter(
   if (bounds.status === 'missing') {
     const fallbackKind = registryKind ?? inferExerciseKindFromContent(source) ?? 'strength'
     return {
-      markdown: `${frontmatterBlock(fallbackKind, options.name, registryUnit ?? DEFAULT_WEIGHT_UNIT)}${source}`,
+      markdown: `${frontmatterBlock(registryInterval ? 'interval' : fallbackKind, options.name, registryUnit ?? DEFAULT_WEIGHT_UNIT)}${source}`,
       kind: fallbackKind,
       unknownKind: registryKind === null,
       warnings: [],
@@ -354,6 +354,13 @@ function repairFrontmatter(
         nextFrontmatterLines,
         kindLineIndex,
         `kind: ${registryKind}`,
+      )
+    }
+    if (registryInterval && findFrontmatterKeyLine(nextFrontmatterLines, 'interval') < 0) {
+      nextFrontmatterLines = insertLines(
+        nextFrontmatterLines,
+        findFrontmatterKeyLine(nextFrontmatterLines, 'kind') + 1,
+        ['interval: true'],
       )
     }
     effectiveKind = registryKind
@@ -428,13 +435,17 @@ function strengthUnitForName(registry: ExerciseRegistry, name: string): WeightUn
 }
 
 function frontmatterBlock(
-  kind: ExerciseKind | null,
+  type: ExerciseType | null,
   exerciseName: string,
   unit: WeightUnit,
 ): string {
   const lines = ['---', 'type: exercise']
+  const kind = type === null ? null : kindOfType(type)
   if (kind) {
     lines.push(`kind: ${kind}`)
+    if (type === 'interval') {
+      lines.push('interval: true')
+    }
     if (kind === 'strength') {
       lines.push(`metric: ${DEFAULT_EXERCISE_METRIC}`)
       lines.push(`unit: ${unit}`)

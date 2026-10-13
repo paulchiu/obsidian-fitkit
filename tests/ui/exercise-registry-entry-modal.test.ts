@@ -89,7 +89,12 @@ describe('ExerciseRegistryEntryModal kind select', () => {
     const select = kindSelectIn(openModalWithKind('strength').modal)
     const options = [...select.querySelectorAll('option')]
 
-    expect(options.map((option) => option.value)).toEqual(['strength', 'duration', 'interval', 'bodyweight'])
+    expect(options.map((option) => option.value)).toEqual([
+      'strength',
+      'duration',
+      'interval',
+      'bodyweight',
+    ])
     expect(options.map((option) => option.textContent)).toEqual([
       'Strength',
       'Duration',
@@ -209,6 +214,7 @@ describe('ExerciseRegistryEntryModal unit preservation', () => {
 
     expect(plugin.settings.exerciseRegistry[0]?.levels).toEqual(['Wall push-up', 'Knee push-up'])
   })
+})
 
 describe('ExerciseRegistryEntryModal interval type', () => {
   it('saves Interval as duration with the interval marker', () => {
@@ -245,5 +251,4 @@ describe('ExerciseRegistryEntryModal interval type', () => {
     expect(shown).toBe('interval')
     expect(plugin.settings.exerciseRegistry[0]).toMatchObject({ kind: 'duration', interval: true })
   })
-})
 })

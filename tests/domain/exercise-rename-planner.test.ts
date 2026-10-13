@@ -520,6 +520,20 @@ TABLE WITHOUT ID file.link
     expect([plan.resultKind, plan.resultInterval]).toEqual(['duration', true])
   })
 
+  it('takes the interval marker from the note when a saved entry lost it', () => {
+    const plan = buildExerciseRenamePlan(
+      baseInput({
+        oldName: 'Bike',
+        newName: 'Air bike',
+        registry: [{ name: 'Bike', kind: 'duration', aliases: [] }],
+        catalog: [
+          { name: 'Bike', path: 'Fitness/Exercises/Bike.md', kind: 'duration', interval: true },
+        ],
+      }),
+    )
+    expect(plan.resultInterval).toBe(true)
+  })
+
   it('takes the interval marker from the surviving entry on a merge', () => {
     const plan = buildExerciseRenamePlan(
       baseInput({

@@ -1071,7 +1071,9 @@ describe('WorkoutEditorView interval plans', () => {
   describe('interval as a saved type', () => {
     const BIKE_NOTE_PATH = 'Fitness/Exercises/Exercise Bike.md'
     const bikeNote = (...frontmatter: string[]): Record<string, string> => ({
-      [BIKE_NOTE_PATH]: ['---', 'type: exercise', ...frontmatter, '---', '', 'Body.', ''].join('\n'),
+      [BIKE_NOTE_PATH]: ['---', 'type: exercise', ...frontmatter, '---', '', 'Body.', ''].join(
+        '\n',
+      ),
     })
     const BIKE_IS_INTERVAL = {
       exerciseRegistry: [
@@ -1127,7 +1129,9 @@ describe('WorkoutEditorView interval plans', () => {
       await vi.waitFor(() =>
         expect(openedModal().titleEl.textContent).toBe('Interval plan for Exercise Bike'),
       )
-      expect(question).toContain('The exercise registry currently records Exercise Bike as duration.')
+      expect(question).toContain(
+        'The exercise registry currently records Exercise Bike as duration.',
+      )
       expect(question).not.toContain('will be cleared')
       expect(contents.get(BIKE_NOTE_PATH)).toContain('kind: duration\ninterval: true\n')
       expect(plugin.settings.exerciseRegistry).toEqual([
@@ -1143,6 +1147,18 @@ describe('WorkoutEditorView interval plans', () => {
 
       expect(obsidian.modals).toHaveLength(1)
       expect(openedModal().titleEl.textContent).toBe('Interval plan for Exercise Bike')
+    })
+
+    it('still asks before a kind switch the registry already records', async () => {
+      const { view } = await openView(
+        workoutSource('## [[Sled Push]]', '', '- [exercise:: [[Sled Push]]] [notes:: heavy]'),
+        { exerciseRegistry: [{ name: 'Sled Push', kind: 'duration', aliases: [] }] },
+      )
+
+      button(view, 'Exercise options').click()
+      menuItem('Switch to duration').onClick?.()
+
+      expect(openedModal().titleEl.textContent).toBe('Switch Sled Push to duration?')
     })
 
     it('clears the interval marker when an interval card switches back to duration for all workouts', async () => {

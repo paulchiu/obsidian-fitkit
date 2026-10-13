@@ -7,6 +7,7 @@ import {
   type ExerciseKind,
   type ExerciseRegistryEntry,
 } from '../domain/exercise-registry'
+import { exerciseTypeOf, type ExerciseType } from '../domain/exercise-type'
 import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
 
 export interface ExerciseFilePlanInput {
@@ -31,7 +32,7 @@ export type ExerciseFilePlan =
       path: string
       sourcePath: string
       name: string
-      exerciseKind: ExerciseKind
+      exerciseType: ExerciseType
       workoutsFolderPath: string
       unit: WeightUnit
     }
@@ -76,7 +77,7 @@ export function planExerciseFileOpen(input: ExerciseFilePlanInput): ExerciseFile
     path,
     sourcePath: input.sourcePath,
     name: canonicalName,
-    exerciseKind: canonicalEntry?.kind ?? input.kind,
+    exerciseType: canonicalEntry ? exerciseTypeOf(canonicalEntry) : input.kind,
     workoutsFolderPath: input.workoutsFolderPath,
     unit: unitForName(registry, canonicalName) ?? DEFAULT_WEIGHT_UNIT,
   }

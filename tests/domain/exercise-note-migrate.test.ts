@@ -355,6 +355,20 @@ kind: duration
     expect(result.unknownKind).toBe(false)
   })
 
+  it('adds the interval marker when it fills in the kind of an interval exercise', () => {
+    const intervalRegistry = createRegistry([
+      { name: 'Bike', kind: 'duration', interval: true, aliases: [] },
+    ])
+    const noKind = migrate('---\ntype: exercise\n---\n\nBody.\n', {
+      name: 'Bike',
+      registry: intervalRegistry,
+    })
+    const noFrontmatter = migrate('Body.\n', { name: 'Bike', registry: intervalRegistry })
+
+    expect(noKind.markdown).toContain('type: exercise\nkind: duration\ninterval: true\n---')
+    expect(noFrontmatter.markdown).toContain('type: exercise\nkind: duration\ninterval: true\n---')
+  })
+
   it('leaves the interval marker on a complete duration note', () => {
     const source = completeDurationNote('Mystery').replace(
       'kind: duration\n',

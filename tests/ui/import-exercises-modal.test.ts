@@ -118,7 +118,12 @@ describe('ImportExercisesModal kind select', () => {
     const select = kindSelectForModal(modal)
     const options = [...select.querySelectorAll('option')]
 
-    expect(options.map((option) => option.value)).toEqual(['strength', 'duration', 'interval', 'bodyweight'])
+    expect(options.map((option) => option.value)).toEqual([
+      'strength',
+      'duration',
+      'interval',
+      'bodyweight',
+    ])
     expect(options.map((option) => option.textContent)).toEqual([
       'Strength',
       'Duration',

@@ -1882,12 +1882,7 @@ export class WorkoutEditorView extends FileView {
     return this.plugin.settings.strengthRestTimerEnabled !== false
   }
 
-  /**
-   * Interval is stored as a duration card with a plan, so switching between
-   * duration and interval keeps the rows and only sets or drops the plan. The
-   * scope question is skipped when the registry already records the target
-   * and no rows would be lost, since there is nothing left to choose.
-   */
+  /** Duration and interval share rows, so switching between them only sets or drops the plan; the scope question is skipped when there is nothing to choose. */
   private async switchCardType(index: number, target: ExerciseType): Promise<void> {
     const ex = this.model?.exercises[index]
     const current = ex ? loggedTypeOf(ex) : null
@@ -1899,7 +1894,7 @@ export class WorkoutEditorView extends FileView {
     const registry = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
     const registryType = typeForName(registry, ex.name)
     const choice =
-      registryType === target && !clearsRows
+      registryType === target && ex.kind === nextKind
         ? 'workout'
         : await this.chooseTypeSwitch(ex, current, target, registryType, clearsRows)
     if (choice === 'cancel') {
@@ -2279,8 +2274,8 @@ export class WorkoutEditorView extends FileView {
           .onClick(() => this.openEditLevelsModal(ex)),
       )
     }
-    const shownKind = loggedTypeOf(ex)
-    if (shownKind === 'interval') {
+    const shownType = loggedTypeOf(ex)
+    if (shownType === 'interval') {
       menu.addItem((item) =>
         item
           .setTitle('Edit interval plan')
@@ -2294,7 +2289,7 @@ export class WorkoutEditorView extends FileView {
     }
     menu.addSeparator()
     for (const target of EXERCISE_TYPES) {
-      if (target === shownKind) {
+      if (target === shownType) {
         continue
       }
       menu.addItem((item) =>
@@ -2432,7 +2427,7 @@ export class WorkoutEditorView extends FileView {
         await ensureParentFolder(this.app, plan.path)
         await this.app.vault.create(
           plan.path,
-          composeExerciseNote(plan.name, plan.exerciseKind, plan.workoutsFolderPath, plan.unit),
+          composeExerciseNote(plan.name, plan.exerciseType, plan.workoutsFolderPath, plan.unit),
         )
         new Notice(`Created exercise note for '${plan.name}'.`)
         shouldClearTombstone = true
@@ -3356,4 +3351,3 @@ function carriedIntervalFields(last: EditableDurationEntry | undefined): Editabl
   }
   return carried
 }
-
