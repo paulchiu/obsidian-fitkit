@@ -46,6 +46,13 @@ describe('parseIntervalPlan', () => {
     })
   })
 
+  it('rejects a zero target, which is what an empty target field produces', () => {
+    expect(parseIntervalPlan('8 x 30s @ 0W, 90s rest')).toEqual({
+      ok: false,
+      reason: 'The target has to be more than zero.',
+    })
+  })
+
   it('rejects a plan with no reps or no work time', () => {
     expect([
       parseIntervalPlan('0 x 30s @ 300W, 90s rest').ok,

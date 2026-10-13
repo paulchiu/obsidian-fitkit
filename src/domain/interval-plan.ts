@@ -33,6 +33,9 @@ export function parseIntervalPlan(raw: string): IntervalPlanResult {
   if (!intensity) {
     return { ok: false, reason: `"${rawTarget}" is not a target like 300W, 120kg or L12.` }
   }
+  if (intensity.target <= 0) {
+    return { ok: false, reason: 'The target has to be more than zero.' }
+  }
   const workSeconds = /^open$/i.test(rawWork) ? null : seconds(rawWork)
   if (workSeconds === undefined) {
     return { ok: false, reason: `"${rawWork}" is not a work time like 30s or open.` }

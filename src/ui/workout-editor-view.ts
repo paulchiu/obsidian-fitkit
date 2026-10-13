@@ -17,6 +17,7 @@ import {
   ZERO_DURATION_DISPLAY,
 } from '../domain/duration-input'
 import { formatErrorMessage } from '../domain/error'
+import { parseIntervalPlan, type IntensityKind, type IntervalPlan } from '../domain/interval-plan'
 import { assertUnreachableKind, EXERCISE_KINDS } from '../domain/exercise-kind'
 import {
   formatExerciseHistoryBadges,
@@ -83,6 +84,7 @@ import { markdownFilesInFolder } from '../vault/folder-scan'
 import { ensureParentFolder } from '../vault/vault-utils'
 import { ConfirmModal } from './confirm-modal'
 import { EditLevelsModal } from './edit-levels-modal'
+import { IntervalPlanModal } from './interval-plan-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
 import { KindSwitchChoiceModal, type KindSwitchChoice } from './kind-switch-choice-modal'
 import { menuAnchorForTrigger } from './menu-anchor'
@@ -966,15 +968,32 @@ export class WorkoutEditorView extends FileView {
   }
 
   private renderDurationTable(card: HTMLElement, ex: ExerciseCard, exerciseIndex: number): void {
+    const columns = intervalColumns(ex)
+    if (ex.plan !== undefined) {
+      const line = card.createDiv({
+        cls: 'fitkit-note-line fitkit-plan-line',
+        text: ex.plan,
+        attr: { role: 'button', tabindex: '0', 'aria-label': 'Edit interval plan' },
+      })
+      line.addEventListener('click', () => this.openIntervalPlanModal(ex))
+    }
     const wrap = card.createDiv({ cls: 'fitkit-set-area' })
 
-    const header = wrap.createDiv({ cls: 'fitkit-set-row fitkit-duration-row fitkit-set-head' })
+    const header = wrap.createDiv({
+      cls: durationRowClasses(columns, 'fitkit-set-row fitkit-duration-row fitkit-set-head'),
+    })
     // The set column is a figure now, too narrow for a label; the rows still name it.
     header.createSpan({ cls: 'fitkit-set-label fitkit-set-figure' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Duration' })
+    if (columns.intensity) {
+      header.createSpan({ cls: 'fitkit-set-label', text: INTENSITY_LABELS[columns.intensity] })
+    }
+    if (columns.rest) {
+      header.createSpan({ cls: 'fitkit-set-label', text: 'Rest' })
+    }
 
     for (let i = 0; i < ex.durationEntries.length; i++) {
-      this.renderDurationRow(wrap, ex, i, exerciseIndex)
+      this.renderDurationRow(wrap, ex, i, exerciseIndex, columns)
     }
 
     const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
@@ -983,7 +1002,7 @@ export class WorkoutEditorView extends FileView {
       if (this.activeTimer && this.activeTimer.card === ex) {
         this.stopTimer({ write: true })
       }
-      ex.durationEntries.push({})
+      ex.durationEntries.push(carriedIntervalFields(ex.durationEntries.at(-1)))
       this.markDirty()
       this.render()
     })
@@ -997,10 +1016,21 @@ export class WorkoutEditorView extends FileView {
       ex.durationEntries.push({
         set: ex.durationEntries.length + 1,
         durationSeconds: last?.durationSeconds,
+        ...carriedIntervalFields(last),
       })
       this.markDirty()
       this.render()
     })
+
+    if (columns.plan) {
+      const done = ex.durationEntries.length
+      const runBtn = actions.createEl('button', {
+        cls: 'fitkit-btn fitkit-btn-primary fitkit-run-button',
+        text: done > 0 ? `Run from rep ${done + 1}` : 'Run',
+        attr: { 'aria-label': 'Run interval plan' },
+      })
+      runBtn.disabled = done >= columns.plan.reps
+    }
 
     const isRunningHere = this.activeTimer?.card === ex
     const timerBtn = actions.createEl('button', {
@@ -1023,6 +1053,7 @@ export class WorkoutEditorView extends FileView {
     ex: ExerciseCard,
     i: number,
     exerciseIndex: number,
+    columns: IntervalColumns = intervalColumns(ex),
   ): void {
     const durationEntry = ex.durationEntries[i]
     if (!durationEntry) {
@@ -1034,7 +1065,9 @@ export class WorkoutEditorView extends FileView {
     })
     container.dataset.fitkitTimerRow = `${exerciseIndex}:${i}`
     const body = container.createDiv({ cls: 'fitkit-row-body' })
-    const row = body.createDiv({ cls: 'fitkit-set-row fitkit-duration-row' })
+    const row = body.createDiv({
+      cls: durationRowClasses(columns, 'fitkit-set-row fitkit-duration-row'),
+    })
 
     const setCell = this.createCell(row, 'Set', 'fitkit-set-figure')
     setCell.setText(String(durationEntry.set ?? i + 1))
@@ -1050,6 +1083,23 @@ export class WorkoutEditorView extends FileView {
       this.activeTimer.inputEl = durationInput
     } else {
       this.renderDurationInput(durationCell, durationEntry)
+    }
+    const intensity = columns.intensity
+    if (intensity) {
+      const label = INTENSITY_LABELS[intensity]
+      const input = this.createInputCell(row, label, {
+        type: 'number',
+        step: '0.1',
+        inputmode: 'decimal',
+      })
+      input.value = durationEntry[intensity] === undefined ? '' : String(durationEntry[intensity])
+      input.addEventListener('input', () => {
+        durationEntry[intensity] = parseNumberInput(input.value)
+        this.markDirty()
+      })
+    }
+    if (columns.rest) {
+      this.renderRestInput(this.createCell(row, 'Rest'), durationEntry)
     }
 
     this.renderRowActions(container, body, {
@@ -1117,12 +1167,44 @@ export class WorkoutEditorView extends FileView {
     })
   }
 
+  private renderRestInput(cell: HTMLElement, durationEntry: EditableDurationEntry): void {
+    const input = cell.createEl('input', {
+      cls: 'fitkit-input fitkit-duration-input',
+      attr: { type: 'text', 'aria-label': 'Rest', placeholder: ZERO_DURATION_DISPLAY },
+    })
+    input.value = formatDurationInput(durationEntry.restSeconds)
+    input.addEventListener('input', () => {
+      const parsed = parseDurationInput(input.value)
+      setAriaInvalid(input, parsed === null)
+      if (parsed !== null) {
+        durationEntry.restSeconds = parsed.seconds
+        this.markDirty()
+      }
+    })
+    input.addEventListener('blur', () => {
+      setAriaInvalid(input, false)
+      input.value = formatDurationInput(durationEntry.restSeconds)
+    })
+  }
+
   private openExerciseNoteModal(ex: ExerciseCard): void {
     new SetNoteModal(this.app, {
       title: `Note for ${ex.name}`,
       initial: ex.exerciseNotes ?? '',
       onSave: (next) => {
         ex.exerciseNotes = next && next.length > 0 ? next : undefined
+        this.markDirty()
+        this.render()
+      },
+    }).open()
+  }
+
+  private openIntervalPlanModal(ex: ExerciseCard): void {
+    new IntervalPlanModal(this.app, {
+      exerciseName: ex.name,
+      initial: ex.plan,
+      onSave: (plan) => {
+        ex.plan = plan
         this.markDirty()
         this.render()
       },
@@ -1905,6 +1987,14 @@ export class WorkoutEditorView extends FileView {
           .onClick(() => this.openEditLevelsModal(ex)),
       )
     }
+    if (ex.kind === 'duration') {
+      menu.addItem((item) =>
+        item
+          .setTitle('Set interval plan')
+          .setIcon('timer')
+          .onClick(() => this.openIntervalPlanModal(ex)),
+      )
+    }
     if (ex.kind === 'strength' || ex.kind === 'bodyweight') {
       menu.addSeparator()
       this.addNextPlanMenuItems(menu, ex)
@@ -2510,7 +2600,8 @@ export class WorkoutEditorView extends FileView {
         this.render()
         return
       }
-      this.dirty = false
+      /** An edit made while this write was in flight is not in `nextText`, so it stays dirty for the requeued save. */
+      this.dirty = this.autoSaveRequeued
       this.updateMetaText()
       /** A refresh failure is a cache-staleness problem, not a save failure; never let it surface as an unhandled rejection or block the finally below. */
       await this.plugin.refreshIndexEntry(path).catch(() => undefined)
@@ -2898,4 +2989,52 @@ function readCardIndex(card: HTMLElement): number | null {
 
 function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+const INTENSITY_LABELS: Record<IntensityKind, string> = {
+  watts: 'Watts',
+  load: 'Load',
+  level: 'Level',
+}
+
+const INTENSITY_KINDS: readonly IntensityKind[] = ['watts', 'load', 'level']
+
+interface IntervalColumns {
+  plan: IntervalPlan | null
+  intensity: IntensityKind | null
+  rest: boolean
+}
+
+/** Which interval columns a duration card shows: the plan's intensity, or whichever its rows already log. */
+function intervalColumns(card: ExerciseCard): IntervalColumns {
+  const parsed = card.plan === undefined ? null : parseIntervalPlan(card.plan)
+  const plan = parsed?.ok ? parsed.plan : null
+  const logged = INTENSITY_KINDS.find((kind) =>
+    card.durationEntries.some((entry) => entry[kind] !== undefined),
+  )
+  return {
+    plan,
+    intensity: plan?.intensity.kind ?? logged ?? null,
+    rest: plan !== null || card.durationEntries.some((entry) => entry.restSeconds !== undefined),
+  }
+}
+
+function durationRowClasses(columns: IntervalColumns, base: string): string {
+  return [base, columns.intensity ? 'has-intensity' : '', columns.rest ? 'has-rest' : '']
+    .filter(Boolean)
+    .join(' ')
+}
+
+/** Intensity and rest a new row starts from, copied from the row before it. */
+function carriedIntervalFields(last: EditableDurationEntry | undefined): EditableDurationEntry {
+  const carried: EditableDurationEntry = {}
+  for (const kind of INTENSITY_KINDS) {
+    if (last?.[kind] !== undefined) {
+      carried[kind] = last[kind]
+    }
+  }
+  if (last?.restSeconds !== undefined) {
+    carried.restSeconds = last.restSeconds
+  }
+  return carried
 }

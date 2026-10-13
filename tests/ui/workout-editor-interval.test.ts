@@ -186,6 +186,22 @@ const openView = async (
   return { view, contents }
 }
 
+const button = (view: WorkoutEditorView, label: string): HTMLButtonElement => {
+  const found = view.contentEl.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
+  if (!found) {
+    throw new Error(`${label} button not rendered`)
+  }
+  return found
+}
+
+const menuItem = (title: string): MockMenuItem => {
+  const item = obsidian.menus.at(-1)?.items.find((candidate) => candidate.title === title)
+  if (!item) {
+    throw new Error(`${title} menu item not offered`)
+  }
+  return item
+}
+
 /** Waits for autosave to leave the note's body lines (after the frontmatter) equal to `expected`. */
 const savedBody = async (contents: Map<string, string>, expected: string[]): Promise<void> => {
   await vi.waitFor(() => {
@@ -259,5 +275,85 @@ describe('WorkoutEditorView interval plans', () => {
       expect(contents.get(WORKOUT_PATH)).toContain('name: Bike intervals')
     })
     await savedBody(contents, body)
+  })
+
+  it('writes the plan line chosen through Set interval plan', async () => {
+    const { view, contents } = await openView(
+      workoutSource(
+        '## [[Exercise Bike]]',
+        '',
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 600]',
+      ),
+    )
+
+    button(view, 'Exercise options').click()
+    menuItem('Set interval plan').onClick?.()
+    const modal = obsidian.modals.at(-1)
+    modal?.contentEl.querySelector<HTMLButtonElement>('.fitkit-btn-primary')?.click()
+
+    await savedBody(contents, [
+      '## [[Exercise Bike]]',
+      '',
+      '- [exercise:: [[Exercise Bike]]] [plan:: 8 x 30s @ 300W, 90s rest]',
+      '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 600]',
+    ])
+  })
+
+  it('shows the plan, the intensity and rest of each rep, and where Run will pick up', async () => {
+    const { view } = await openView(
+      workoutSource(
+        '## [[Exercise Bike]]',
+        '',
+        '- [exercise:: [[Exercise Bike]]] [plan:: 8 x 30s @ 300W, 90s rest]',
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 305] [rest:: 90]',
+        '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 22] [watts:: 280] [rest:: 75]',
+      ),
+    )
+
+    const inputs = (label: string): string[] =>
+      [...view.contentEl.querySelectorAll<HTMLInputElement>(`input[aria-label="${label}"]`)].map(
+        (input) => input.value,
+      )
+    expect({
+      plan: view.contentEl.querySelector('.fitkit-plan-line')?.textContent,
+      run: button(view, 'Run interval plan').textContent,
+      watts: inputs('Watts'),
+      rest: inputs('Rest'),
+    }).toEqual({
+      plan: '8 x 30s @ 300W, 90s rest',
+      run: 'Run from rep 3',
+      watts: ['305', '280'],
+      rest: ['1m30s', '1m15s'],
+    })
+  })
+
+  it('carries intensity and rest into the rows Add set and Repeat create', async () => {
+    const { view, contents } = await openView(
+      workoutSource(
+        '## [[Spin Bike]]',
+        '',
+        '- [exercise:: [[Spin Bike]]] [set:: 1] [duration:: 20] [level:: 12] [rest:: 40] [notes:: easy]',
+      ),
+    )
+    const actionButton = (text: string): HTMLButtonElement => {
+      const found = [...view.contentEl.querySelectorAll<HTMLButtonElement>('button')].find(
+        (candidate) => candidate.textContent === text,
+      )
+      if (!found) {
+        throw new Error(`${text} not rendered`)
+      }
+      return found
+    }
+
+    actionButton('Repeat').click()
+    actionButton('Add set').click()
+
+    await savedBody(contents, [
+      '## [[Spin Bike]]',
+      '',
+      '- [exercise:: [[Spin Bike]]] [set:: 1] [duration:: 20] [level:: 12] [rest:: 40] [notes:: easy]',
+      '- [exercise:: [[Spin Bike]]] [set:: 2] [duration:: 20] [level:: 12] [rest:: 40]',
+      '- [exercise:: [[Spin Bike]]] [duration:: 0] [level:: 12] [rest:: 40]',
+    ])
   })
 })

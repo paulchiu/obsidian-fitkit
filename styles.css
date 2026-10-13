@@ -414,6 +414,19 @@ body.is-mobile .fitkit-editor-root {
   grid-template-columns: 20px minmax(0, 1fr);
 }
 
+.fitkit-duration-row.has-intensity,
+.fitkit-duration-row.has-rest {
+  grid-template-columns: 20px repeat(2, minmax(0, 1fr));
+}
+
+.fitkit-duration-row.has-intensity.has-rest {
+  grid-template-columns: 20px repeat(3, minmax(0, 1fr));
+}
+
+.fitkit-plan-line {
+  font-variant-numeric: tabular-nums;
+}
+
 .fitkit-cell {
   min-width: 0;
 }
@@ -538,6 +551,55 @@ body.is-mobile .fitkit-editor-root {
   display: grid;
   gap: 4px;
   min-height: 0;
+}
+
+.fitkit-plan-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.fitkit-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.fitkit-plan-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fitkit-plan-field .fitkit-input,
+.fitkit-plan-field select {
+  width: 100%;
+  min-width: 0;
+}
+
+.fitkit-plan-work {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fitkit-plan-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: var(--font-ui-small);
+}
+
+.fitkit-plan-preview {
+  min-height: 1.6em;
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+}
+
+.fitkit-plan-error {
+  color: var(--text-warning);
 }
 
 .fitkit-set-note-textarea {
