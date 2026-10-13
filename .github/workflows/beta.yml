@@ -1,0 +1,97 @@
+name: Beta
+
+# Publishes a BRAT-only prerelease from an open PR labelled `beta`. Nothing is committed to main,
+# so the community store (which reads manifest.json on main) never sees the beta.
+on:
+  pull_request:
+    types: [labeled, synchronize, reopened]
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beta
+  cancel-in-progress: false
+
+jobs:
+  beta:
+    name: Publish BRAT beta
+    if: >-
+      contains(github.event.pull_request.labels.*.name, 'beta') &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.event.action != 'labeled' || github.event.label.name == 'beta')
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Pick beta version
+        id: version
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          git fetch --quiet --tags origin main
+          STABLE=$(git show origin/main:package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
+          VERSION=$(STABLE="$STABLE" TAGS="$(git tag --list)" node scripts/beta-version.ts)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Stamp version
+        # Runs version-bump.mjs through the `version` hook, so the attached manifest.json carries the beta version.
+        run: npm version "${{ steps.version.outputs.version }}" --no-git-tag-version
+
+      - name: Build
+        run: npm run build
+
+      - name: Write release notes
+        id: notes
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          NOTES_PATH: ${{ runner.temp }}/beta-notes.md
+        run: |
+          printf 'BRAT beta of #%s: %s\n\nInstall with BRAT using this repository and version `%s`. Store users are not affected.\n' \
+            "$PR_NUMBER" "$PR_TITLE" "${{ steps.version.outputs.version }}" > "$NOTES_PATH"
+          echo "path=$NOTES_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            main.js
+            styles.css
+
+      - name: Publish prerelease
+        uses: softprops/action-gh-release@v3
+        with:
+          body_path: ${{ steps.notes.outputs.path }}
+          name: ${{ steps.version.outputs.version }}
+          tag_name: ${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.event.pull_request.head.sha }}
+          draft: false
+          prerelease: true
+          make_latest: false
+          files: |
+            main.js
+            manifest.json
+            styles.css

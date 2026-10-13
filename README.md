@@ -99,6 +99,8 @@ The local gate is `npm test`, `npm run lint`, and `npm run format`. Run all thre
 
 On merge to `main`, the Release workflow stamps a version using the PR's label (`major`, `minor`, `patch`, or `norelease`) and publishes a GitHub release with `main.js`, `manifest.json`, and `styles.css` attached.
 
+To test a change through BRAT first, label its open PR `beta`. Each push then publishes a prerelease that only BRAT installs, and the store keeps the stable release until the PR merges. See [CONTRIBUTING.md](CONTRIBUTING.md#beta-builds-for-brat-testers).
+
 See `AGENTS.md` for project conventions.
 
 ## License
