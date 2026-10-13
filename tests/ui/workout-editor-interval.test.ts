@@ -508,7 +508,10 @@ describe('WorkoutEditorView interval plans', () => {
       await vi.waitFor(() => expect(obsidian.modals.length).toBe(2))
       saveForm()
 
-      expect(title).toBe('Switch Sled Push to interval?')
+      expect([title, obsidian.notices.at(-1)]).toEqual([
+        'Switch Sled Push to interval?',
+        'Switched to interval. Previous strength rows were cleared.',
+      ])
       await savedBody(contents, [
         '## [[Sled Push]]',
         '',

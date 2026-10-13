@@ -1910,7 +1910,7 @@ export class WorkoutEditorView extends FileView {
     }
     /** Captured before the switch clears the card; the relabel offer below marks these as level 1. */
     const relabelSource = nextKind === 'bodyweight' ? toWorkoutExercise(ex) : null
-    this.applyKindSwitch(index, nextKind, hadRows)
+    this.applyKindSwitch(index, nextKind, hadRows, targetLabel)
     if (choice === 'workout-and-registry') {
       await this.persistKindChange(ex.name, nextKind)
     }
@@ -2082,7 +2082,12 @@ export class WorkoutEditorView extends FileView {
     })
   }
 
-  private applyKindSwitch(index: number, nextKind: ExerciseKind, clearedRows: boolean): void {
+  private applyKindSwitch(
+    index: number,
+    nextKind: ExerciseKind,
+    clearedRows: boolean,
+    targetLabel: string = nextKind,
+  ): void {
     if (!this.model) {
       return
     }
@@ -2103,7 +2108,7 @@ export class WorkoutEditorView extends FileView {
     this.markDirty()
     this.render()
     if (clearedRows) {
-      new Notice(`Switched to ${nextKind}. Previous ${previousKind} rows were cleared.`)
+      new Notice(`Switched to ${targetLabel}. Previous ${previousKind} rows were cleared.`)
     }
   }
 
