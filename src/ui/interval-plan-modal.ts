@@ -73,7 +73,7 @@ export class IntervalPlanModal extends Modal {
       pace: this.selectField(grid, 'Pace', PACE_OPTIONS),
       gap: this.textField(grid, 'Rest', 'Rest or period'),
     }
-    const gapLabel = fields.gap.parentElement?.querySelector('.fitkit-label')
+    const gapLabel = fields.gap.previousElementSibling
     const preview = contentEl.createDiv({ cls: 'fitkit-plan-preview' })
 
     const actions = contentEl.createDiv({ cls: 'fitkit-confirm-actions fitkit-set-note-actions' })

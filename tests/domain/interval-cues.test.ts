@@ -30,4 +30,16 @@ describe('cueBetween', () => {
   it('stays quiet for open work, which has no countdown', () => {
     expect(cueBetween(work(1, null), work(1, null))).toBeNull()
   })
+
+  it('counts down the end of rest too', () => {
+    const rest = (remaining: number): RunPhase => ({
+      kind: 'rest',
+      rep: 1,
+      elapsed: 0,
+      remaining,
+      paused: false,
+    })
+
+    expect([cueBetween(rest(4), rest(3)), cueBetween(rest(1), rest(0))]).toEqual(['count', null])
+  })
 })

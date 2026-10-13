@@ -1,7 +1,13 @@
 import { setIcon } from 'obsidian'
 
 import { formatTarget, type IntensityKind, type IntervalPlan } from '../domain/interval-plan'
-import { isOnTarget, runPhase, type RunRow } from '../domain/interval-run'
+import {
+  hasOpenRep,
+  isOnTarget,
+  repsWithWorkDone,
+  runPhase,
+  type RunRow,
+} from '../domain/interval-run'
 
 export type RunnerScreen =
   | { kind: 'running' }
@@ -137,16 +143,15 @@ function renderRunning(
 /** One dot per planned rep: on target, short of it, the rep under way, or still to come. */
 function renderDots(parent: HTMLElement, model: RunnerModel): void {
   const dots = parent.createDiv({ cls: 'fitkit-runner-dots' })
-  const open = model.rows.length - 1
-  const phase = runPhase(model.rows, model.plan, model.now)
+  const done = repsWithWorkDone(model.rows)
+  const working = hasOpenRep(model.rows) && done.length < model.rows.length
   for (let i = 0; i < model.plan.reps; i++) {
-    const row = model.rows[i]
-    const workDone = row !== undefined && (i < open || phase.kind === 'rest')
-    const state = workDone
+    const row = done[i]
+    const state = row
       ? isOnTarget(row, model.plan)
         ? 'is-hit'
         : 'is-miss'
-      : i === open
+      : working && i === done.length
         ? 'is-current'
         : ''
     dots.createSpan({ cls: `fitkit-runner-dot ${state}`.trim() })
@@ -155,9 +160,7 @@ function renderDots(parent: HTMLElement, model: RunnerModel): void {
 
 function renderStats(parent: HTMLElement, model: RunnerModel): void {
   const kind = model.plan.intensity.kind
-  const phase = runPhase(model.rows, model.plan, model.now)
-  const done = model.rows
-    .filter((_, i) => i < model.rows.length - 1 || phase.kind === 'rest')
+  const done = repsWithWorkDone(model.rows)
     .map((row) => row[kind])
     .filter((value): value is number => value !== undefined)
   const last = done[done.length - 1]

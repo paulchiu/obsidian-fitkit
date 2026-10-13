@@ -217,6 +217,14 @@ const button = (view: WorkoutEditorView, label: string): HTMLButtonElement => {
   return found
 }
 
+const openedModal = (): { contentEl: HTMLElement } => {
+  const modal = obsidian.modals.at(-1)
+  if (!modal) {
+    throw new Error('no modal opened')
+  }
+  return modal
+}
+
 const menuItem = (title: string): MockMenuItem => {
   const item = obsidian.menus.at(-1)?.items.find((candidate) => candidate.title === title)
   if (!item) {
@@ -311,13 +319,19 @@ describe('WorkoutEditorView interval plans', () => {
 
     button(view, 'Exercise options').click()
     menuItem('Set interval plan').onClick?.()
-    const modal = obsidian.modals.at(-1)
-    modal?.contentEl.querySelector<HTMLButtonElement>('.fitkit-btn-primary')?.click()
+    const modal = openedModal()
+    const reps = modal.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')
+    if (!reps) {
+      throw new Error('Reps not rendered')
+    }
+    reps.value = '6'
+    reps.dispatchEvent(new harnessWindow.Event('input', { bubbles: true }))
+    modal.contentEl.querySelector<HTMLButtonElement>('.fitkit-btn-primary')?.click()
 
     await savedBody(contents, [
       '## [[Exercise Bike]]',
       '',
-      '- [exercise:: [[Exercise Bike]]] [plan:: 8 x 30s @ 300W, 90s rest]',
+      '- [exercise:: [[Exercise Bike]]] [plan:: 6 x 30s @ 300W, 90s rest]',
       '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 600]',
     ])
   })
@@ -378,6 +392,39 @@ describe('WorkoutEditorView interval plans', () => {
       '- [exercise:: [[Spin Bike]]] [set:: 2] [duration:: 20] [level:: 12] [rest:: 40]',
       '- [exercise:: [[Spin Bike]]] [duration:: 0] [level:: 12] [rest:: 40]',
     ])
+  })
+
+  it('saves an edit made during a write once its debounce fires after the write', async () => {
+    const { view, contents } = await openView(
+      workoutSource(...['## [[Plank]]', '', '- [exercise:: [[Plank]]] [duration:: 60]']),
+    )
+    const timeouts: Array<() => void> = []
+    vi.stubGlobal('window', {
+      setTimeout: (callback: () => void): number => timeouts.push(callback),
+      clearTimeout: (): void => {},
+      setInterval: (): number => 0,
+      clearInterval: (): void => {},
+    })
+    const rename = (value: string): void => {
+      const name = view.contentEl.querySelector<HTMLInputElement>(
+        'input[aria-label="Workout name"]',
+      )
+      if (!name) {
+        throw new Error('name input not rendered')
+      }
+      name.value = value
+      name.dispatchEvent(new harnessWindow.Event('input'))
+    }
+
+    rename('First')
+    timeouts.shift()?.()
+    rename('Second')
+    await vi.waitFor(() => expect(contents.get(WORKOUT_PATH)).toContain('name: First'))
+    for (const fire of timeouts.splice(0)) {
+      fire()
+    }
+
+    await vi.waitFor(() => expect(contents.get(WORKOUT_PATH)).toContain('name: Second'))
   })
 
   describe('run', () => {
@@ -506,10 +553,18 @@ describe('WorkoutEditorView interval plans', () => {
 
       runTo('07:15:31')
 
+      const dots = [...view.contentEl.querySelectorAll('.fitkit-runner-dot')].map((dot) =>
+        dot.classList.contains('is-hit')
+          ? 'hit'
+          : dot.classList.contains('is-miss')
+            ? 'miss'
+            : 'open',
+      )
       expect([
         runnerText(view, '.fitkit-runner-phase'),
         runnerText(view, '.fitkit-runner-hits'),
-      ]).toEqual(['Run finished', '2/3'])
+        dots,
+      ]).toEqual(['Run finished', '2/3', ['hit', 'miss', 'hit']])
     })
 
     it('catches up reps that ended while Obsidian was closed and says how many', async () => {
@@ -577,7 +632,10 @@ describe('WorkoutEditorView interval plans', () => {
     it('offers Run instead of the stopwatch on a card with a plan', async () => {
       const { view } = await openView(workoutSource(...BIKE))
 
-      expect(view.contentEl.querySelector('button[aria-label="Start timer"]')).toBeNull()
+      expect([
+        view.contentEl.querySelector('button[aria-label="Start timer"]'),
+        button(view, 'Run interval plan').textContent,
+      ]).toEqual([null, 'Run'])
     })
 
     it('styles every class the plan card, the runner screens and the plan form render', async () => {
@@ -594,10 +652,7 @@ describe('WorkoutEditorView interval plans', () => {
       collect(view.contentEl)
       button(view, 'Exercise options').click()
       menuItem('Set interval plan').onClick?.()
-      const modal = obsidian.modals.at(-1)
-      if (modal) {
-        collect(modal.contentEl)
-      }
+      collect(openedModal().contentEl)
       button(view, 'Run interval plan').click()
       collect(view.contentEl)
       at('07:15:20')
@@ -615,19 +670,81 @@ describe('WorkoutEditorView interval plans', () => {
       ])
     })
 
+    it('removes the plan line when Clear plan is chosen', async () => {
+      const { view, contents } = await openView(
+        workoutSource(...BIKE, '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30]'),
+      )
+
+      button(view, 'Exercise options').click()
+      menuItem('Set interval plan').onClick?.()
+      const clear = [...openedModal().contentEl.querySelectorAll('button')].find(
+        (candidate) => candidate.textContent === 'Clear plan',
+      )
+      clear?.click()
+
+      await savedBody(contents, [
+        '## [[Exercise Bike]]',
+        '',
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30]',
+      ])
+    })
+
+    it('rests for what is left of the period on an every pace', async () => {
+      const emom = [
+        '## [[Exercise Bike]]',
+        '',
+        '- [exercise:: [[Exercise Bike]]] [plan:: 3 x 40s @ 300W, every 1m]',
+      ]
+      const { view, contents } = await openView(workoutSource(...emom))
+      button(view, 'Run interval plan').click()
+
+      runTo('07:15:30')
+      runnerButton(view, 'Rest').click()
+      runTo('07:16:01')
+
+      await savedBody(contents, [
+        ...emom,
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 30]',
+        '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 0] [started:: 2026-10-12T07:16:00+10:00]',
+      ])
+    })
+
+    it('stops a stopwatch running on another card before the run starts', async () => {
+      const plank = ['## [[Plank]]', '', '- [exercise:: [[Plank]]] [set:: 1] [duration:: 0]']
+      const { view, contents } = await openView(workoutSource(...plank, '', ...BIKE))
+      button(view, 'Start timer').click()
+      at('07:15:45')
+
+      button(view, 'Run interval plan').click()
+
+      await savedBody(contents, [
+        '## [[Plank]]',
+        '',
+        '- [exercise:: [[Plank]]] [set:: 1] [duration:: 45]',
+        '',
+        ...BIKE,
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 0] [started:: 2026-10-12T07:15:45+10:00]',
+      ])
+    })
+
     describe('cues', () => {
       /** Platform boundaries: tones started and screen locks held, as the device would see them. */
       let tones: number[]
       let locks: string[]
+      let closed: string[]
 
       beforeEach(() => {
         tones = []
         locks = []
+        closed = []
         class FakeAudioContext {
           currentTime = 0
           destination = {}
           state = 'running'
           async resume(): Promise<void> {}
+          async close(): Promise<void> {
+            closed.push('audio')
+          }
           createGain(): unknown {
             return {
               gain: { setValueAtTime: () => {}, exponentialRampToValueAtTime: () => {} },
@@ -682,14 +799,16 @@ describe('WorkoutEditorView interval plans', () => {
         expect(tones).toEqual([])
       })
 
-      it('keeps the screen awake while the runner is open and lets it sleep after', async () => {
+      it('keeps the screen awake while the runner is open, then lets it sleep and frees the audio', async () => {
         const { view } = await openView(workoutSource(...BIKE))
         button(view, 'Run interval plan').click()
         await vi.waitFor(() => expect(locks).toEqual(['acquire screen']))
 
         button(view, 'End run').click()
 
-        await vi.waitFor(() => expect(locks).toEqual(['acquire screen', 'release']))
+        await vi.waitFor(() =>
+          expect([locks, closed]).toEqual([['acquire screen', 'release'], ['audio']]),
+        )
       })
     })
   })

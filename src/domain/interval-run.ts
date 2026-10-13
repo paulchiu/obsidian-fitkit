@@ -55,6 +55,17 @@ export function runPhase(rows: readonly RunRow[], plan: IntervalPlan, now: numbe
   }
 }
 
+/** True while the note holds a run under way: its last row is timed or paused. */
+export function hasOpenRep(rows: readonly RunRow[]): boolean {
+  return openRow(rows) !== undefined
+}
+
+/** Reps whose work is over: every row except an open rep still working. */
+export function repsWithWorkDone(rows: readonly RunRow[]): RunRow[] {
+  const open = openRow(rows)
+  return open && !isResting(open) ? rows.slice(0, -1) : [...rows]
+}
+
 /** The last row, while it is still being timed or is paused mid-run. */
 function openRow(rows: readonly RunRow[]): RunRow | undefined {
   const last = rows[rows.length - 1]
@@ -65,11 +76,15 @@ function isResting(row: RunRow): boolean {
   return row.restSeconds !== undefined
 }
 
+/** Seconds the open phase has banked on the row, before any time since its stamp. */
+function bankedSeconds(row: RunRow): number {
+  return (isResting(row) ? row.restSeconds : row.durationSeconds) ?? 0
+}
+
 /** Seconds in the open phase: what the row has banked plus the time since its stamp. */
 function liveSeconds(row: RunRow, now: number): number {
-  const banked = (isResting(row) ? row.restSeconds : row.durationSeconds) ?? 0
   const started = Date.parse(row.startedAt ?? '')
-  return banked + (Number.isNaN(started) ? 0 : Math.max(0, (now - started) / 1000))
+  return bankedSeconds(row) + (Number.isNaN(started) ? 0 : Math.max(0, (now - started) / 1000))
 }
 
 /**
@@ -102,21 +117,21 @@ function advance(
   plan: IntervalPlan,
   now: number,
   note?: string,
-): RunAdvance & { closed: number; endedAt: number } {
+): RunAdvance & { closed: number; endedAt?: number } {
   const next = rows.map((row) => ({ ...row }))
   let closed = 0
   for (;;) {
     const row = next[next.length - 1]
     if (!row || row.startedAt === undefined || row.paused) {
-      return { rows: next, finished: false, closed, endedAt: 0 }
+      return { rows: next, finished: false, closed }
     }
     const target = phaseTarget(row, plan)
     if (target === null) {
-      return { rows: next, finished: false, closed, endedAt: 0 }
+      return { rows: next, finished: false, closed }
     }
     const boundary = phaseStartMs(row) + target * 1000
     if (now < boundary) {
-      return { rows: next, finished: false, closed, endedAt: 0 }
+      return { rows: next, finished: false, closed }
     }
     if (isResting(row)) {
       row.restSeconds = target
@@ -156,8 +171,7 @@ function closeWork(rows: RunRow[], plan: IntervalPlan, seconds: number, endMs: n
 
 /** When the open phase would have started had it never been paused: its stamp minus what it banked. */
 function phaseStartMs(row: RunRow): number {
-  const banked = (isResting(row) ? row.restSeconds : row.durationSeconds) ?? 0
-  return Date.parse(row.startedAt ?? '') - banked * 1000
+  return Date.parse(row.startedAt ?? '') - bankedSeconds(row) * 1000
 }
 
 /** The Rest button: ends the open rep's work now, with the time actually done. */
@@ -182,16 +196,19 @@ export function skipRest(rows: readonly RunRow[], now: number): RunRow[] {
   return startRun(next, now)
 }
 
-/** Banks the open phase's time on the row and swaps its stamp for `[paused:: true]`. */
-export function pauseRun(rows: readonly RunRow[], now: number): RunRow[] {
-  const next = rows.map((row) => ({ ...row }))
+/**
+ * Closes any boundary that has already passed, then banks the open phase's time on the
+ * row and swaps its stamp for `[paused:: true]`, so a late pause never stretches a phase.
+ */
+export function pauseRun(rows: readonly RunRow[], plan: IntervalPlan, now: number): RunAdvance {
+  const { rows: next, finished } = advanceRun(rows, plan, now)
   const row = openRow(next)
-  if (!row || row.paused) {
-    return next
+  if (finished || !row || row.paused) {
+    return { rows: next, finished }
   }
   bankLiveSeconds(row, now)
   row.paused = true
-  return next
+  return { rows: next, finished: false }
 }
 
 export function resumeRun(rows: readonly RunRow[], now: number): RunRow[] {
@@ -239,16 +256,29 @@ const CUT_OFF_GRACE_MS = 2 * 60 * 1000
 
 /**
  * Picks a run back up after the app was away. Reps whose end passed in the meantime are
- * filled with the target and flagged. A plan that ended more than a grace period ago
- * means the athlete stopped, so it reports a cut-off and leaves the rows alone.
+ * filled with the target and flagged. A plan that ended, or open work that ran a whole
+ * period, more than a grace period ago means the athlete stopped, so it reports a
+ * cut-off and leaves the rows alone.
  */
 export function catchUpRun(rows: readonly RunRow[], plan: IntervalPlan, now: number): RunCatchUp {
   const result = advance(rows, plan, now, CAUGHT_UP_NOTE)
   const row = openRow(rows)
-  if (result.finished && now - result.endedAt > CUT_OFF_GRACE_MS && row?.startedAt !== undefined) {
+  const stoppedBy = result.endedAt ?? (row && openWorkLimit(row, plan))
+  if (
+    stoppedBy !== undefined &&
+    now - stoppedBy > CUT_OFF_GRACE_MS &&
+    row?.startedAt !== undefined
+  ) {
     return { kind: 'cut-off', rep: rows.length, resting: isResting(row), startedAt: row.startedAt }
   }
   return { kind: 'caught-up', rows: result.rows, filled: result.closed, finished: result.finished }
+}
+
+/** Open work has no planned end, so a rep still going a whole period after it began was abandoned. */
+function openWorkLimit(row: RunRow, plan: IntervalPlan): number | undefined {
+  return plan.workSeconds === null && !isResting(row)
+    ? phaseStartMs(row) + plan.pace.seconds * 1000
+    : undefined
 }
 
 /** Resume after a cut-off: a rep cut off in work starts over, and a cut-off rest counts as taken in full. */
@@ -296,4 +326,26 @@ export function isOnTarget(row: RunRow, plan: IntervalPlan): boolean {
 
 export function hitCount(rows: readonly RunRow[], plan: IntervalPlan): number {
   return rows.filter((row) => isOnTarget(row, plan)).length
+}
+
+/** The runner's big button: Rest while working, Skip while resting. */
+export function pressRunButton(
+  rows: readonly RunRow[],
+  plan: IntervalPlan,
+  now: number,
+): RunAdvance {
+  const row = openRow(rows)
+  return row && isResting(row)
+    ? { rows: skipRest(rows, now), finished: false }
+    : endWork(rows, plan, now)
+}
+
+export function togglePauseRun(
+  rows: readonly RunRow[],
+  plan: IntervalPlan,
+  now: number,
+): RunAdvance {
+  return openRow(rows)?.paused
+    ? { rows: resumeRun(rows, now), finished: false }
+    : pauseRun(rows, plan, now)
 }

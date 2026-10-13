@@ -9,11 +9,13 @@ import {
   endWork,
   hitCount,
   pauseRun,
+  pressRunButton,
   resumeCutRun,
   resumeRun,
   runPhase,
   skipRest,
   startRun,
+  togglePauseRun,
   type RunRow,
 } from '../../src/domain/interval-run'
 
@@ -209,7 +211,9 @@ describe('interval run', () => {
   it('banks the elapsed time and marks the row paused when the run pauses', () => {
     const rows = startRun([], at('07:15:00'))
 
-    expect(pauseRun(rows, at('07:15:12'))).toEqual([{ set: 1, durationSeconds: 12, paused: true }])
+    expect(pauseRun(rows, BIKE, at('07:15:12')).rows).toEqual([
+      { set: 1, durationSeconds: 12, paused: true },
+    ])
   })
 
   it('carries on from the banked time when a paused run resumes', () => {
@@ -407,5 +411,100 @@ describe('interval run', () => {
     ]
 
     expect(catchUpRun(rows, BIKE, at('07:21:31')).kind).toBe('cut-off')
+  })
+
+  it('makes the big button end work while working and skip rest while resting', () => {
+    const working = startRun([], at('07:15:00'))
+    const resting = endWork(working, BIKE, at('07:15:20')).rows
+
+    expect([
+      pressRunButton(working, BIKE, at('07:15:20')).rows,
+      pressRunButton(resting, BIKE, at('07:15:50')).rows,
+    ]).toEqual([resting, skipRest(resting, at('07:15:50'))])
+  })
+
+  it('toggles between paused and running, banking rest time when paused during rest', () => {
+    const resting: RunRow[] = [
+      {
+        set: 1,
+        durationSeconds: 30,
+        watts: 300,
+        restSeconds: 0,
+        startedAt: '2026-10-12T07:15:30+10:00',
+      },
+    ]
+    const paused = togglePauseRun(resting, BIKE, at('07:15:45')).rows
+
+    expect([paused, togglePauseRun(paused, BIKE, at('07:20:00')).rows]).toEqual([
+      [{ set: 1, durationSeconds: 30, watts: 300, restSeconds: 15, paused: true }],
+      [
+        {
+          set: 1,
+          durationSeconds: 30,
+          watts: 300,
+          restSeconds: 15,
+          startedAt: '2026-10-12T07:20:00+10:00',
+        },
+      ],
+    ])
+  })
+
+  it('rounds part seconds to the nearest whole second when Rest ends work', () => {
+    const rows = startRun([], at('07:15:00'))
+
+    expect(endWork(rows, BIKE, at('07:15:00') + 22_600).rows[0]?.durationSeconds).toBe(23)
+  })
+
+  it('rests for what a short rep left of the period, not what the plan expected it to leave', () => {
+    const worked = endWork(startRun([], at('07:15:00')), EMOM, at('07:15:30')).rows
+
+    expect(runPhase(worked, EMOM, at('07:15:30'))).toEqual({
+      kind: 'rest',
+      rep: 1,
+      elapsed: 0,
+      remaining: 30,
+      paused: false,
+    })
+  })
+
+  it('still finishes a run whose plan ended exactly two minutes ago', () => {
+    const rows: RunRow[] = [
+      { set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 },
+      { set: 2, durationSeconds: 30, watts: 300, restSeconds: 90 },
+      { set: 3, durationSeconds: 0, startedAt: '2026-10-12T07:19:00+10:00' },
+    ]
+
+    expect(catchUpRun(rows, BIKE, at('07:21:30')).kind).toBe('caught-up')
+  })
+
+  it('closes a boundary that passed before pausing, so the pause banks only the current phase', () => {
+    const rows = startRun([], at('07:15:00'))
+
+    expect(pauseRun(rows, BIKE, at('07:15:45'))).toEqual({
+      finished: false,
+      rows: [{ set: 1, durationSeconds: 30, watts: 300, restSeconds: 15, paused: true }],
+    })
+  })
+
+  it('finishes instead of pausing when the last rep ended before the pause', () => {
+    const rows: RunRow[] = [
+      { set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 },
+      { set: 2, durationSeconds: 30, watts: 300, restSeconds: 90 },
+      { set: 3, durationSeconds: 0, startedAt: '2026-10-12T07:19:00+10:00' },
+    ]
+
+    expect(pauseRun(rows, BIKE, at('07:19:40')).finished).toBe(true)
+  })
+
+  it('cuts off open work left running past a whole period and the grace', () => {
+    const rows = startRun([], at('07:15:00'))
+
+    expect([
+      catchUpRun(rows, SLED, at('07:17:59')).kind,
+      catchUpRun(rows, SLED, at('07:18:01')),
+    ]).toEqual([
+      'caught-up',
+      { kind: 'cut-off', rep: 1, resting: false, startedAt: '2026-10-12T07:15:00+10:00' },
+    ])
   })
 })

@@ -24,11 +24,11 @@ export function createCuePlayer(win: Window, beeps: boolean): CuePlayer {
 
   return {
     prime: () => {
-      const Audio = (win as Window & { AudioContext?: typeof AudioContext }).AudioContext
-      if (!beeps || audio || !Audio) {
+      const AudioContextCtor = (win as Window & { AudioContext?: typeof AudioContext }).AudioContext
+      if (!beeps || audio || !AudioContextCtor) {
         return
       }
-      const context = new Audio()
+      const context = new AudioContextCtor()
       audio = context
       void context.resume()
     },
@@ -73,6 +73,8 @@ export function createCuePlayer(win: Window, beeps: boolean): CuePlayer {
       wantAwake = false
       void lock?.release()
       lock = null
+      void audio?.close()
+      audio = null
     },
   }
 }

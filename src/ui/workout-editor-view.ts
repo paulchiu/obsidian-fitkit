@@ -23,16 +23,15 @@ import {
   catchUpRun,
   endCutRun,
   endRun,
-  endWork,
+  hasOpenRep,
   hitCount,
   pauseRun,
+  pressRunButton,
   resumeCutRun,
-  resumeRun,
   runPhase,
-  skipRest,
   startRun,
+  togglePauseRun,
   type RunPhase,
-  type RunRow,
 } from '../domain/interval-run'
 import { parseIntervalPlan, type IntensityKind, type IntervalPlan } from '../domain/interval-plan'
 import { assertUnreachableKind, EXERCISE_KINDS } from '../domain/exercise-kind'
@@ -235,6 +234,8 @@ export class WorkoutEditorView extends FileView {
   private autoSaveInflight = false
   private autoSaveRequeued = false
   private inflightSave?: Promise<void>
+  /** Bumped by every edit, so a finished write can tell whether it saved the latest one. */
+  private editCount?: number
   private dragSession: DragSession | null = null
   private activeTimer: ActiveTimer | null = null
   private activeRestTimer: ActiveRestTimer | null = null
@@ -450,7 +451,7 @@ export class WorkoutEditorView extends FileView {
       return
     }
     this.abortTimer()
-    this.dropRun()
+    this.stopRun()
     this.clearRestTimer()
     if (this.autoSaveTimer !== null) {
       window.clearTimeout(this.autoSaveTimer)
@@ -1550,11 +1551,10 @@ export class WorkoutEditorView extends FileView {
   private resumeSavedTimer(): void {
     for (const card of this.model?.exercises ?? []) {
       const plan = intervalColumns(card).plan
-      const last = card.durationEntries.at(-1)
-      if (plan && last && (last.startedAt !== undefined || last.paused)) {
+      if (plan && hasOpenRep(card.durationEntries)) {
         this.enterRun(card, plan, { kind: 'running' })
-        if (this.activeRun && last.startedAt !== undefined) {
-          this.catchUpRun(this.activeRun, Date.now())
+        if (this.activeRun && card.durationEntries.at(-1)?.startedAt !== undefined) {
+          this.catchUpActiveRun(this.activeRun, Date.now())
         }
         return
       }
@@ -1641,63 +1641,56 @@ export class WorkoutEditorView extends FileView {
     }
   }
 
-  /** Stops the runner and returns to the card list; the rows already hold everything. */
-  private leaveRun(): void {
+  /** Stops the run's clock, cues and wake lock without touching the rows. */
+  private stopRun(): ActiveRun | null {
     const run = this.activeRun
-    if (!run) {
-      return
+    if (run) {
+      window.clearInterval(run.intervalId)
+      run.cues.release()
+      this.activeRun = null
     }
-    window.clearInterval(run.intervalId)
-    run.cues.release()
-    this.activeRun = null
-    this.render()
+    return run
+  }
+
+  /** Returns to the card list; the rows already hold everything. */
+  private leaveRun(): void {
+    if (this.stopRun()) {
+      this.render()
+    }
   }
 
   private renderRun(container: HTMLElement, run: ActiveRun): void {
-    const now = Date.now()
-    /** Each runner tap may be the first gesture since a reload, and only a gesture unlocks audio on iOS. */
+    const rows = (): EditableDurationEntry[] => run.card.durationEntries
     run.clockEl = renderRunner(
       container,
       {
         exerciseName: run.card.name,
         plan: run.plan,
-        rows: run.card.durationEntries,
-        now,
+        rows: rows(),
+        now: Date.now(),
         screen: run.screen,
       },
       {
         primary: () => {
           run.cues.prime()
-          const rows = run.card.durationEntries
-          if (runPhase(rows, run.plan, Date.now()).kind === 'rest') {
-            this.applyRunRows(skipRest(rows, Date.now()), false)
-          } else {
-            const result = endWork(rows, run.plan, Date.now())
-            this.applyRunRows(result.rows, result.finished)
-          }
+          this.applyRunRows(pressRunButton(rows(), run.plan, Date.now()))
         },
         togglePause: () => {
           run.cues.prime()
-          const rows = run.card.durationEntries
-          const phase = runPhase(rows, run.plan, Date.now())
-          const paused = phase.kind !== 'idle' && phase.paused
-          this.applyRunRows(
-            paused ? resumeRun(rows, Date.now()) : pauseRun(rows, Date.now()),
-            false,
-          )
+          this.applyRunRows(togglePauseRun(rows(), run.plan, Date.now()))
         },
         end: () => {
-          this.applyRunRows(endRun(run.card.durationEntries, Date.now()), false)
+          this.applyRunRows({ rows: endRun(rows(), Date.now()) })
           this.leaveRun()
         },
         adjust: (delta) => this.adjustLastRep(run, delta),
         resumeCut: () => {
           run.cues.prime()
           run.screen = { kind: 'running' }
-          this.applyRunRows(resumeCutRun(run.card.durationEntries, run.plan, Date.now()), false)
+          this.applyRunRows({ rows: resumeCutRun(rows(), run.plan, Date.now()) })
         },
         endCut: () => {
-          this.applyRunRows(endCutRun(run.card.durationEntries), false)
+          this.applyRunRows({ rows: endCutRun(rows()) })
           this.leaveRun()
         },
         back: () => this.leaveRun(),
@@ -1714,45 +1707,47 @@ export class WorkoutEditorView extends FileView {
     const late = now - run.lastTickAt > LATE_TICK_MS
     run.lastTickAt = now
     if (late) {
-      this.catchUpRun(run, now)
+      this.catchUpActiveRun(run, now)
       run.lastPhase = runPhase(run.card.durationEntries, run.plan, now)
       this.render()
       return
     }
     const before = run.lastPhase
     const result = advanceRun(run.card.durationEntries, run.plan, now)
-    const changed = this.applyRunRows(result.rows, result.finished)
+    const redrawn = this.applyRunRows(result)
     const cue = result.finished ? 'go' : cueBetween(before, run.lastPhase)
     if (cue) {
       run.cues.play(cue)
     }
-    if (!changed && run.clockEl) {
-      run.clockEl.setText(formatClock(clockSeconds({ ...runnerContext(run), now })))
+    if (!redrawn && run.clockEl) {
+      const clock = { exerciseName: run.card.name, plan: run.plan, rows: run.card.durationEntries }
+      run.clockEl.setText(formatClock(clockSeconds({ ...clock, now })))
     }
   }
 
   /**
-   * Swaps in the run's next rows when they differ, marking the note dirty and
-   * redrawing. Returns whether anything changed, so a plain tick only moves the clock.
+   * Takes the run's next rows, marking the note dirty when they differ, and redraws
+   * on a change or a finish. Returns whether it redrew, so a plain tick only moves the clock.
    */
-  private applyRunRows(rows: EditableDurationEntry[], finished: boolean): boolean {
+  private applyRunRows(next: { rows: EditableDurationEntry[]; finished?: boolean }): boolean {
     const run = this.activeRun
     if (!run) {
       return false
     }
-    const changed = JSON.stringify(rows) !== JSON.stringify(run.card.durationEntries)
+    const changed = JSON.stringify(next.rows) !== JSON.stringify(run.card.durationEntries)
     if (changed) {
-      run.card.durationEntries = rows
+      run.card.durationEntries = next.rows
       this.markDirty()
     }
-    run.lastPhase = runPhase(rows, run.plan, Date.now())
-    if (finished) {
-      run.screen = { kind: 'finished', hits: hitCount(rows, run.plan) }
+    run.lastPhase = runPhase(next.rows, run.plan, Date.now())
+    if (next.finished) {
+      run.screen = { kind: 'finished', hits: hitCount(next.rows, run.plan) }
     }
-    if (changed || finished) {
+    const redraw = changed || next.finished === true
+    if (redraw) {
       this.render()
     }
-    return changed || finished
+    return redraw
   }
 
   private adjustLastRep(run: ActiveRun, delta: number): void {
@@ -1766,11 +1761,11 @@ export class WorkoutEditorView extends FileView {
       0,
       Math.round(((last[kind] ?? run.plan.intensity.target) + delta) * 10) / 10,
     )
-    this.applyRunRows(rows, false)
+    this.applyRunRows({ rows })
   }
 
   /** Picks a run back up from the note after the app was away: catch up, or report a cut-off. */
-  private catchUpRun(run: ActiveRun, now: number): void {
+  private catchUpActiveRun(run: ActiveRun, now: number): void {
     const result = catchUpRun(run.card.durationEntries, run.plan, now)
     if (result.kind === 'cut-off') {
       run.screen = { kind: 'cut-off', rep: result.rep, resting: result.resting }
@@ -1793,28 +1788,14 @@ export class WorkoutEditorView extends FileView {
 
   /** Closing the tab pauses a run, banking the time so far the way the duration timer does. */
   private pauseRunForClose(): void {
-    const run = this.activeRun
-    if (!run) {
+    const run = this.stopRun()
+    if (!run || run.screen.kind !== 'running') {
       return
     }
-    window.clearInterval(run.intervalId)
-    run.cues.release()
-    this.activeRun = null
-    if (run.screen.kind !== 'running') {
-      return
-    }
-    const rows = pauseRun(run.card.durationEntries, Date.now())
+    const { rows } = pauseRun(run.card.durationEntries, run.plan, Date.now())
     if (JSON.stringify(rows) !== JSON.stringify(run.card.durationEntries)) {
       run.card.durationEntries = rows
       this.markDirty()
-    }
-  }
-
-  private dropRun(): void {
-    if (this.activeRun) {
-      window.clearInterval(this.activeRun.intervalId)
-      this.activeRun.cues.release()
-      this.activeRun = null
     }
   }
 
@@ -2787,6 +2768,7 @@ export class WorkoutEditorView extends FileView {
 
   private markDirty(): void {
     this.dirty = true
+    this.editCount = (this.editCount ?? 0) + 1
     this.updateMetaText()
     this.scheduleAutoSave()
   }
@@ -2877,6 +2859,7 @@ export class WorkoutEditorView extends FileView {
     const session = this.session
     const path = session.file.path
     try {
+      const savedEdit = this.editCount
       const nextText = serializeWorkoutNote(toWorkoutNoteModel(this.model))
       const result = await session.saveIfUnchanged(nextText)
       if (!result.ok) {
@@ -2885,8 +2868,8 @@ export class WorkoutEditorView extends FileView {
         this.render()
         return
       }
-      /** An edit made while this write was in flight is not in `nextText`, so it stays dirty for the requeued save. */
-      this.dirty = this.autoSaveRequeued
+      /** An edit made while this write was in flight is not in `nextText`, so it keeps the note dirty. */
+      this.dirty = this.editCount !== savedEdit
       this.updateMetaText()
       /** A refresh failure is a cache-staleness problem, not a save failure; never let it surface as an unhandled rejection or block the finally below. */
       await this.plugin.refreshIndexEntry(path).catch(() => undefined)
@@ -3322,12 +3305,4 @@ function carriedIntervalFields(last: EditableDurationEntry | undefined): Editabl
     carried.restSeconds = last.restSeconds
   }
   return carried
-}
-
-function runnerContext(run: ActiveRun): {
-  exerciseName: string
-  plan: IntervalPlan
-  rows: RunRow[]
-} {
-  return { exerciseName: run.card.name, plan: run.plan, rows: run.card.durationEntries }
 }
