@@ -101,7 +101,12 @@ vi.mock('obsidian', async () => {
       ;(this as { onClose?: () => void }).onClose?.()
     }
   }
-  class SuggestModal extends Modal {}
+  class SuggestModal extends Modal {
+    inputEl = obsidian.createRoot().createEl('input')
+    setPlaceholder(): void {}
+    async onOpen(): Promise<void> {}
+    onClose(): void {}
+  }
   class PluginSettingTab {}
   class Setting {}
   class MarkdownView {}
@@ -142,6 +147,7 @@ vi.mock('obsidian', async () => {
 import { TFile } from 'obsidian'
 import type { App, WorkspaceLeaf } from 'obsidian'
 
+import type { IndexEntry } from '../../src/domain/types'
 import FitKitPlugin from '../../src/main'
 import { DEFAULT_SETTINGS } from '../../src/settings'
 import { WorkoutEditorView } from '../../src/ui/workout-editor-view'
@@ -184,6 +190,7 @@ const runTo = (time: string): void => {
 const openView = async (
   source: string,
   settings: Partial<typeof DEFAULT_SETTINGS> = {},
+  history: IndexEntry[] = [],
 ): Promise<{ view: WorkoutEditorView; contents: Map<string, string> }> => {
   const file = Object.assign(new TFile(), { path: WORKOUT_PATH, basename: '2026-10-12' })
   const contents = new Map([[WORKOUT_PATH, source]])
@@ -203,6 +210,7 @@ const openView = async (
   plugin.app = app as unknown as App
   plugin.settings = { ...DEFAULT_SETTINGS, ...settings }
   plugin.refreshIndexEntry = async (): Promise<void> => {}
+  plugin.cachedIndex = { schemaVersion: 1, builtAt: 0, entries: history, diagnostics: [] }
   const view = new WorkoutEditorView({ app } as unknown as WorkspaceLeaf, plugin)
   await view.onOpen()
   await view.setState({ file: WORKOUT_PATH }, { history: false })
@@ -251,6 +259,7 @@ describe('WorkoutEditorView interval plans', () => {
     obsidian.modals.length = 0
     obsidian.notices.length = 0
     vi.stubGlobal('HTMLElement', harnessWindow.HTMLElement)
+    vi.stubGlobal('HTMLInputElement', harnessWindow.HTMLInputElement)
     vi.stubGlobal('activeWindow', harnessWindow)
     let nextId = 1
     /** Run the skeleton delay and autosave debounce at once; intervals run only on `tick()`. */
@@ -943,6 +952,62 @@ describe('WorkoutEditorView interval plans', () => {
           expect([locks, closed]).toEqual([['acquire screen', 'release'], ['audio']]),
         )
       })
+    })
+  })
+
+  describe('remembering the interval plan', () => {
+    const LAST_BIKE: IndexEntry = {
+      path: 'Fitness/Workouts/2026-10-05.md',
+      mtime: 1,
+      date: '2026-10-05',
+      name: 'Intervals',
+      exercises: [
+        { exerciseName: 'Exercise Bike', kind: 'duration', plan: '10 x 4m @ 300W, 1m rest' },
+      ],
+    }
+    const BIKE_IS_DURATION = {
+      exerciseRegistry: [{ name: 'Exercise Bike', kind: 'duration' as const, aliases: [] }],
+    }
+
+    it('starts an added exercise with the plan it last ran, ready to run from rep 1', async () => {
+      const { view, contents } = await openView(workoutSource(), BIKE_IS_DURATION, [LAST_BIKE])
+
+      const add = [...view.contentEl.querySelectorAll('button')].find(
+        (candidate) => candidate.textContent === 'Add exercise',
+      )
+      add?.click()
+      await vi.waitFor(() => expect(obsidian.modals.at(-1)?.titleEl).toBeDefined())
+      const picker = obsidian.modals.at(-1) as unknown as { inputEl: HTMLInputElement }
+      picker.inputEl.value = 'Exercise Bike'
+      picker.inputEl.dispatchEvent(
+        new (harnessWindow.KeyboardEvent as typeof KeyboardEvent)('keydown', { key: 'Enter' }),
+      )
+
+      await vi.waitFor(() => expect(button(view, 'Run interval plan').textContent).toBe('Run'))
+      await vi.waitFor(() =>
+        expect(contents.get(WORKOUT_PATH)).toContain(
+          '- [exercise:: [[Exercise Bike]]] [plan:: 10 x 4m @ 300W, 1m rest]',
+        ),
+      )
+    })
+
+    it('fills the plan form with the last plan when a card switches to interval', async () => {
+      const { view } = await openView(
+        workoutSource(
+          '## [[Exercise Bike]]',
+          '',
+          '- [exercise:: [[Exercise Bike]]] [duration:: 0]',
+        ),
+        BIKE_IS_DURATION,
+        [LAST_BIKE],
+      )
+
+      button(view, 'Exercise options').click()
+      menuItem('Switch to interval').onClick?.()
+
+      expect(openedModal().contentEl.querySelector('.fitkit-plan-preview code')?.textContent).toBe(
+        '10 x 4m @ 300W, 1m rest',
+      )
     })
   })
 })

@@ -1253,10 +1253,16 @@ export class WorkoutEditorView extends FileView {
     }).open()
   }
 
+  /** The plan this exercise's latest prior session ran, which a new or newly interval card starts from. */
+  private lastIntervalPlan(name: string): string | undefined {
+    return this.exerciseHistory?.get(name)?.intervalPlan?.value
+  }
+
   private openIntervalPlanModal(ex: ExerciseCard): void {
     new IntervalPlanModal(this.app, {
       exerciseName: ex.name,
       initial: ex.plan,
+      suggested: this.lastIntervalPlan(ex.name),
       onSave: (plan) => {
         ex.plan = plan
         this.markDirty()
@@ -2611,6 +2617,9 @@ export class WorkoutEditorView extends FileView {
       strengthSets: [],
       durationEntries: [],
       bodyweightSets: [],
+    }
+    if (kind === 'duration') {
+      card.plan = this.lastIntervalPlan(trimmed)
     }
     this.markSeededWeight(seedEmptyRow(card, this.exerciseHistory?.get(trimmed)))
     this.model.exercises.push(card)

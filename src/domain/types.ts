@@ -34,6 +34,8 @@ export interface ExerciseIndexRow {
   /** Best bodyweight set of the session: highest level, then reps, then load. */
   maxBodyweightSet?: BodyweightBestSet
   next?: NextPlan
+  /** A duration session's `[plan::]` text as written. */
+  plan?: string
 }
 
 export interface IndexEntry {

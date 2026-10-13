@@ -13,6 +13,8 @@ import {
 export interface IntervalPlanModalOptions {
   exerciseName: string
   initial: string | undefined
+  /** What the form starts from when there is no plan yet, before the built-in default. */
+  suggested?: string
   onSave: (plan: string | undefined) => void
 }
 
@@ -117,7 +119,7 @@ export class IntervalPlanModal extends Modal {
       })
     }
 
-    fill(fields, this.options.initial ?? DEFAULT_PLAN)
+    fill(fields, this.options.initial ?? this.options.suggested ?? DEFAULT_PLAN)
     update()
   }
 

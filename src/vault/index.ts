@@ -121,6 +121,7 @@ function toRow(exercise: ExerciseEntry): ExerciseIndexRow {
           0,
         ),
         next: exercise.next,
+        plan: exercise.plan,
       }
     case 'strength':
       return {

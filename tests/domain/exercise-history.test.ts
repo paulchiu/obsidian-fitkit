@@ -580,3 +580,42 @@ describe('exercise history aggregation', () => {
     ).toBe('2026-04-27')
   })
 })
+
+describe('interval plan history', () => {
+  const anchor = { sourcePath: 'Fitness/Workouts/2026-10-14.md', date: '2026-10-14' }
+
+  it('carries the plan of the latest prior duration session', () => {
+    const history = buildExerciseHistoryMap(
+      fitKitIndex([
+        entry('Fitness/Workouts/2026-10-06.md', '2026-10-06', [
+          { exerciseName: 'Indoor Bike Push', kind: 'duration', plan: '8 x 30s @ 300W, 90s rest' },
+        ]),
+        entry('Fitness/Workouts/2026-10-13.md', '2026-10-13', [
+          { exerciseName: 'Indoor Bike Push', kind: 'duration', plan: '10 x 4m @ 300W, 1m rest' },
+        ]),
+      ]),
+      anchor,
+    )
+
+    expect(history.get('Indoor Bike Push')?.intervalPlan).toEqual({
+      value: '10 x 4m @ 300W, 1m rest',
+      date: '2026-10-13',
+    })
+  })
+
+  it('drops the plan once a later duration session was logged without one', () => {
+    const history = buildExerciseHistoryMap(
+      fitKitIndex([
+        entry('Fitness/Workouts/2026-10-06.md', '2026-10-06', [
+          { exerciseName: 'Indoor Bike Push', kind: 'duration', plan: '8 x 30s @ 300W, 90s rest' },
+        ]),
+        entry('Fitness/Workouts/2026-10-13.md', '2026-10-13', [
+          { exerciseName: 'Indoor Bike Push', kind: 'duration', totalDurationSeconds: 1200 },
+        ]),
+      ]),
+      anchor,
+    )
+
+    expect(history.get('Indoor Bike Push')?.intervalPlan).toBeUndefined()
+  })
+})

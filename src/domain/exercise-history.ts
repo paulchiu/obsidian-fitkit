@@ -45,6 +45,8 @@ export interface ExerciseHistorySummary {
   bodyweight?: BodyweightExerciseHistory
   /** Most recent plan the user recorded for this exercise, at any point in the past. */
   nextPlan?: LastSessionMax<NextPlan>
+  /** The interval plan of the latest prior duration session, absent when that session had none. */
+  intervalPlan?: LastSessionMax<string>
 }
 
 export interface ExerciseHistoryBadge {
@@ -80,6 +82,7 @@ interface ExerciseHistoryDraft {
   bodyweightPersonalBest?: BodyweightBestSet
   bodyweightLastSessionMax?: SessionMetric<BodyweightBestSet>
   nextPlan?: SessionMetric<NextPlan>
+  lastDurationPlan?: SessionMetric<string | undefined>
 }
 
 const ISO_DATE_PREFIX = /^(\d{4}-\d{2}-\d{2})/
@@ -347,6 +350,14 @@ function addEntryToDrafts(
       }
     }
 
+    if (row.kind === 'duration') {
+      hasMetric ||= row.plan !== undefined
+      const candidate = { date: entryDate, mtime: entry.mtime, path: entry.path, value: row.plan }
+      if (!draft.lastDurationPlan || isLaterSession(candidate, draft.lastDurationPlan)) {
+        draft.lastDurationPlan = candidate
+      }
+    }
+
     /** Bodyweight-only rule: highest rung wins outright, then reps, then load. */
     if (row.kind === 'bodyweight' && row.maxBodyweightSet) {
       hasMetric = true
@@ -392,6 +403,12 @@ function finalizeDrafts(drafts: Map<string, ExerciseHistoryDraft>): ExerciseHist
     }
     if (draft.nextPlan) {
       summary.nextPlan = { value: draft.nextPlan.value, date: draft.nextPlan.date }
+    }
+    if (draft.lastDurationPlan?.value !== undefined) {
+      summary.intervalPlan = {
+        value: draft.lastDurationPlan.value,
+        date: draft.lastDurationPlan.date,
+      }
     }
     if (
       draft.durationPersonalBestSeconds !== undefined ||
