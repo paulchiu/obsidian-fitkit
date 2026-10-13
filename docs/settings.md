@@ -19,7 +19,7 @@ Changing the root does not move existing files. Move them yourself first, then p
 - `Auto-open workout editor` switches a `type: workout` note into the structured editor when you open it. Turn it off to land in Markdown by default and open the editor deliberately from the command palette.
 - `Rest timer` shows the rest timer in the editor footer. It counts up from zero and remembers your last rest after you stop it.
 - `Interval beeps` beeps the last three seconds of each interval and the change between work and rest in the interval runner, and vibrates where the device can.
-- `Interval presets` lists the plans the interval plan form offers under `Start from`, one per line as `Label: plan` (for example `Tabata: 8 x 20s @ 400W, 10s rest`). It starts with Tabata and EMOM. A line whose plan cannot run is flagged and left out, and clearing the box hides `Start from`.
+- `Interval presets` lists the plans the interval plan form offers under `Start from`, one per line as `Label: plan` (for example `Tabata: (x 8 (work 20s 400W) (rest 10s))`). It starts with Tabata, EMOM, Over-unders, Pyramid, 30/30 and Norwegian 4x4, and a list still holding the first betas' Tabata and EMOM moves to these. A line whose plan cannot run is flagged and left out, and clearing the box hides `Start from`.
 - `Autosave debounce (ms)` is how long the editor waits after your last edit before writing. It defaults to 600, and anything below zero or unparseable resets to that.
 
 ## Charts

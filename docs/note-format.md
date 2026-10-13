@@ -46,29 +46,51 @@ Dataview inline fields are the canonical format. The recognised ones are:
 | `load`     | Added weight on a bodyweight set, such as a vest.                                                                     |
 | `notes`    | Free text, on an exercise header row or on an individual set.                                                         |
 | `next`     | `up`, `down`, or `stay`, with an optional step (`up 2.5`): a weight change for strength, a rung count for bodyweight. |
-| `plan`     | An interval plan on a duration exercise's header row, such as `8 x 30s @ 300W, 90s rest` (see below).                 |
+| `plan`     | An interval plan on a duration exercise's header row, such as `(x 8 (work 30s 300W) (rest 90s))` (see below).         |
+| `step`     | The plan step an interval row ran, such as `over`.                                                                    |
 | `watts`    | Power held on an interval rep.                                                                                        |
 | `rest`     | Seconds rested after an interval rep. The last rep of a run has none.                                                 |
 | `paused`   | `true` on the open rep of a paused interval run.                                                                      |
 
 ### Interval plans
 
-A duration exercise can carry a plan on its header row, and each work bout is then one row:
+A duration exercise can carry a plan on its header row, and each work step is then one row:
 
 ```markdown
-## [[Exercise Bike]]
+## [[Indoor Bike]]
 
-- [exercise:: [[Exercise Bike]]] [plan:: 8 x 30s @ 300W, 90s rest]
-- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 305] [rest:: 90]
-- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 22] [watts:: 280] [rest:: 90]
+- [exercise:: [[Indoor Bike]]] [plan:: (warmup 10m 150W) (x 3 (over 1m 300W) (under 2m 220W)) (cooldown 5m 120W)]
+- [exercise:: [[Indoor Bike]]] [set:: 1] [step:: warmup] [duration:: 600] [watts:: 152]
+- [exercise:: [[Indoor Bike]]] [set:: 2] [step:: over] [duration:: 60] [watts:: 304]
+- [exercise:: [[Indoor Bike]]] [set:: 3] [step:: under] [duration:: 120] [watts:: 221]
 
 ## [[Sled Push]]
 
-- [exercise:: [[Sled Push]]] [plan:: 6 x open @ 120kg, every 2m]
-- [exercise:: [[Sled Push]]] [set:: 1] [duration:: 18] [load:: 120] [rest:: 102]
+- [exercise:: [[Sled Push]]] [plan:: (x 6 (every 2m (push open 120kg)))]
+- [exercise:: [[Sled Push]]] [set:: 1] [step:: push] [duration:: 18] [load:: 120] [rest:: 102]
 ```
 
-A plan reads `<reps> x <work> @ <target>, <pace>`. Work is a duration or `open` (the rep ends when you tap Rest). The target is watts (`300W`), load (`120kg`) or a level (`L12`), and the row records the same field. The pace is either `<duration> rest`, a fixed rest after each rep, or `every <duration>`, where each rep starts one period after the last one started and rest is whatever the rep left (EMOM). Open work needs an `every` pace, and timed work has to be shorter than the period.
+A plan is a run of bracketed lists, played left to right:
+
+| List                      | Meaning                                                                                                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `(over 1m 300W)`          | A step: its name, its work time, then an optional target. Work is a duration (`30s`, `2m`, `1:30`) or `open`, which ends when you tap Rest.                                     |
+| `(rest 90s)`              | A rest after the step before it. Steps with no rest between them run straight on, and a rest at the end of the plan is dropped.                                                 |
+| `(x 3 …)`                 | Repeats what follows. Repeats nest, and a rest at the end of a repeat goes between its rounds, not after the last.                                                              |
+| `(every 2m …)`            | Starts each step inside one period after the last one started, resting for whatever the step left (EMOM). Open work needs it, and timed work has to be shorter than the period. |
+| `(climb 1m (L8 L10 L12))` | A list of targets takes the next one each round of the repeat around it.                                                                                                        |
+
+The target is watts (`300W`), load (`120kg`) or a level (`L12`), one kind per plan, and each row records the same field. A step with no target, such as `(spin 5m)`, is timed but not scored, and its time does not count towards the duration PB. Quote a name with spaces: `("big gear" 2m 260W)`.
+
+Some sessions written out:
+
+- Tabata: `(x 8 (work 20s 400W) (rest 10s))`
+- 30/30 with no rest between steps: `(x 10 (on 30s 350W) (off 30s 150W))`
+- Three sets of over-unders: `(warmup 10m 150W) (x 3 (x 3 (over 1m 300W) (under 2m 220W)) (rest 4m)) (cooldown 5m 120W)`
+- A level pyramid: `(x 6 (climb 1m (L8 L10 L12 L14 L12 L10)) (rest 1m))`
+- EMOM: `(x 10 (every 1m (work 40s 300W)))`
+
+The earlier one-line form still works for a single repeat: `8 x 30s @ 300W, 90s rest` or `6 x open @ 120kg, every 2m`, read as `<reps> x <work> @ <target>, <pace>`.
 
 While a run is under way, its open rep carries a `started` stamp, which times the rest when the row has a `rest` field and the work otherwise. That stamp, the plan and the rows are the run's whole state, which is how a run survives Obsidian being closed.
 
