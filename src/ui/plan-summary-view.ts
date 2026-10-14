@@ -26,11 +26,11 @@ export function renderPlanSummary(parent: HTMLElement, summary: PlanSummary, pla
     const width = String(Math.max(gap, bar.seconds - gap))
     const height = bar.height * PROFILE_HEIGHT
     profile.createSvg('rect', {
-      cls: `fitkit-plan-bar is-key-${bar.key}`,
+      cls: ['fitkit-plan-bar', `is-key-${bar.key}`],
       attr: { x: bar.start, y: PROFILE_HEIGHT - height, width, height },
     })
     strip.createSvg('rect', {
-      cls: `fitkit-plan-progress is-${bar.state}`,
+      cls: ['fitkit-plan-progress', `is-${bar.state}`],
       attr: { x: bar.start, y: 0, width, height: STRIP_HEIGHT },
     })
   }

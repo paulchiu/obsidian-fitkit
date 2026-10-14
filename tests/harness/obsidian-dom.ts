@@ -121,8 +121,13 @@ function applySvgOptions(child: Element, options?: SvgElementInfo | string): voi
     return
   }
   const resolved: SvgElementInfo = typeof options === 'string' ? { cls: options } : options
+  /** Obsidian adds a string `cls` as one token, so a space in it throws there and must here. */
   if (resolved.cls !== undefined) {
-    child.classList.add(...splitClasses(resolved.cls))
+    if (Array.isArray(resolved.cls)) {
+      child.classList.add(...resolved.cls)
+    } else {
+      child.classList.add(resolved.cls)
+    }
   }
   if (resolved.attr !== undefined) {
     for (const [name, value] of Object.entries(resolved.attr)) {
