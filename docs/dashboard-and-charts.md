@@ -21,7 +21,7 @@ The generated note has four kinds of section:
 
 ## How a PB is chosen
 
-For a duration exercise, the PB line is the total seconds logged and the number of sessions it spans.
+For a duration exercise, the PB line is the total seconds logged and the number of sessions it spans. On an interval exercise whose plan mixes steps with targets and steps without, such as a warm-up, only the steps with targets count; a plan with no targets at all counts in full.
 
 For a strength exercise, FitKit picks the best set in three tiers:
 

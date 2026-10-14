@@ -198,7 +198,7 @@ describe('interval plan modal', () => {
       hiddenAtFirst: true,
       shown: true,
       hiddenAgain: true,
-      docs: 'https://github.com/paulchiu/obsidian-fitkit/blob/main/docs/note-format.md#interval-plans',
+      docs: 'https://github.com/paulchiu/obsidian-fitkit/blob/main/docs/interval-training.md#plan-syntax',
       saved: [['(x 6 (climb 1m (L8 L10 L12 L14 L12 L10)) (rest 1m))']],
     })
   })

@@ -1,6 +1,6 @@
 # FitKit
 
-FitKit is a workout tracker for Obsidian. Your sets, reps, weight, durations, and bodyweight rungs are stored as plain Markdown in your vault, edited through a form built for use during workouts, with a rolled-up dashboard and per-exercise progression charts when you need it.
+FitKit is a workout tracker for Obsidian. Your sets, reps, weight, durations, interval sessions, and bodyweight rungs are stored as plain Markdown in your vault, edited through a form built for use during workouts, with a rolled-up dashboard and per-exercise progression charts when you need it.
 
 Every workout is a normal note with Dataview inline fields. If you uninstall FitKit tomorrow, your training history is still plain text in your vault. You choose where to store the notes and how you use your data.
 
@@ -70,6 +70,7 @@ Renaming from here renames the exercise note, rewrites every reference across yo
 | Page                                                 | What it covers                                                                   |
 | ---------------------------------------------------- | -------------------------------------------------------------------------------- |
 | [Workout editor](docs/workout-editor.md)             | Cards, sets, durations, the rest timer, next-session plans, autosave.            |
+| [Interval training](docs/interval-training.md)       | Planning interval sessions, common sessions to start from, and running a plan.   |
 | [Exercise registry](docs/exercise-registry.md)       | Where exercises come from, rebuilding, renaming, consolidating, kinds and units. |
 | [Dashboard and charts](docs/dashboard-and-charts.md) | What the dashboard generates, how a PB is chosen, `fitkit-chart` options.        |
 | [Note format](docs/note-format.md)                   | Frontmatter, inline fields, and exactly what survives a save.                    |

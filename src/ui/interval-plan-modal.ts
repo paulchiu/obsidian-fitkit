@@ -24,7 +24,7 @@ export interface IntervalPlanModalOptions {
 const DEFAULT_PLAN = '(x 8 (work 30s 300W) (rest 90s))'
 
 const DOCS_URL =
-  'https://github.com/paulchiu/obsidian-fitkit/blob/main/docs/note-format.md#interval-plans'
+  'https://github.com/paulchiu/obsidian-fitkit/blob/main/docs/interval-training.md#plan-syntax'
 
 /** What the info button shows: each example with the one rule it teaches. */
 const PLAN_EXAMPLES: ReadonlyArray<{ plan: string; about: string }> = [

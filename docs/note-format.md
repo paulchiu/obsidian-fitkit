@@ -70,27 +70,9 @@ A duration exercise can carry a plan on its header row, and each work step is th
 - [exercise:: [[Sled Push]]] [set:: 1] [step:: push] [duration:: 18] [load:: 120] [rest:: 102]
 ```
 
-A plan is a run of bracketed lists, played left to right:
+A plan is a run of bracketed lists, played left to right: a step such as `(over 1m 300W)`, a rest such as `(rest 90s)`, a repeat such as `(x 3 …)`, and `(every 2m …)` for steps that start on the clock. The full syntax, with common sessions written out, is in [Interval training](interval-training.md#plan-syntax).
 
-| List                      | Meaning                                                                                                                                                                         |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `(over 1m 300W)`          | A step: its name, its work time, then an optional target. Work is a duration (`30s`, `2m`, `1:30`) or `open`, which ends when you tap Rest.                                     |
-| `(rest 90s)`              | A rest after the step before it. Steps with no rest between them run straight on, and a rest at the end of the plan is dropped.                                                 |
-| `(x 3 …)`                 | Repeats what follows. Repeats nest, and a rest at the end of a repeat goes between its rounds, not after the last.                                                              |
-| `(every 2m …)`            | Starts each step inside one period after the last one started, resting for whatever the step left (EMOM). Open work needs it, and timed work has to be shorter than the period. |
-| `(climb 1m (L8 L10 L12))` | A list of targets takes the next one each round of the repeat around it.                                                                                                        |
-
-The target is watts (`300W`), load (`120kg`) or a level (`L12`), one kind per plan, and each row records the same field. A step with no target, such as `(spin 5m)`, is timed but not scored, and its time does not count towards the duration PB. Quote a name with spaces: `("big gear" 2m 260W)`.
-
-Some sessions written out:
-
-- Tabata: `(x 8 (work 20s 400W) (rest 10s))`
-- 30/30 with no rest between steps: `(x 10 (on 30s 350W) (off 30s 150W))`
-- Three sets of over-unders: `(warmup 10m 150W) (x 3 (x 3 (over 1m 300W) (under 2m 220W)) (rest 4m)) (cooldown 5m 120W)`
-- A level pyramid: `(x 6 (climb 1m (L8 L10 L12 L14 L12 L10)) (rest 1m))`
-- EMOM: `(x 10 (every 1m (work 40s 300W)))`
-
-The earlier one-line form still works for a single repeat: `8 x 30s @ 300W, 90s rest` or `6 x open @ 120kg, every 2m`, read as `<reps> x <work> @ <target>, <pace>`.
+Each row records the plan's target in the same field: `watts` for a `300W` target, `load` for `120kg`, or `level` for `L12`.
 
 While a run is under way, its open rep carries a `started` stamp, which times the rest when the row has a `rest` field and the work otherwise. That stamp, the plan and the rows are the run's whole state, which is how a run survives Obsidian being closed.
 
@@ -137,7 +119,7 @@ exercise: Squat
 Your own training notes live here.
 ````
 
-`kind:` is `strength`, `duration`, or `bodyweight`. `unit:` is `kg` or `lbs` and applies to strength exercises only, as does `metric:`, which selects what the progress chart plots. A bodyweight note carries neither; it carries a `levels:` ladder instead, see [Dashboard and charts](dashboard-and-charts.md#chart-blocks).
+`kind:` is `strength`, `duration`, or `bodyweight`. An interval exercise is `kind: duration` with an `interval: true` line, so a version of FitKit from before interval training reads it as an ordinary duration exercise. `unit:` is `kg` or `lbs` and applies to strength exercises only, as does `metric:`, which selects what the progress chart plots. A bodyweight note carries neither; it carries a `levels:` ladder instead, see [Dashboard and charts](dashboard-and-charts.md#chart-blocks).
 
 FitKit seeds the three sections when it creates a note, and `Sync and repair exercise notes` refreshes them in notes you already have. The `Notes` section is yours; nothing regenerates over it.
 

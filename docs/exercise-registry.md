@@ -64,7 +64,9 @@ Splitting one exercise into two is not implemented. Consolidation has unambiguou
 
 ## Kinds and units
 
-Every exercise is `strength` (weight and reps), `duration` (seconds), or `bodyweight` (a rung on a progression ladder, with reps and optional added weight). New cards in the workout editor default their kind from the registry.
+Every exercise is `strength` (weight and reps), `duration` (seconds), `interval` (a duration with a plan, see [Interval training](interval-training.md)), or `bodyweight` (a rung on a progression ladder, with reps and optional added weight). New cards in the workout editor default their kind from the registry, and a new interval card opens the plan form when its exercise has no plan from a past session.
+
+Interval is stored as the duration kind plus a marker: `interval: true` in the exercise note's frontmatter, or the same flag on a registry entry. Older versions of FitKit ignore the marker and treat the exercise as duration, with its history intact.
 
 The kind switch in the editor's card menu writes the store that wins on read, so a note-backed exercise has its note frontmatter updated rather than a registry entry that would be discarded on the next read. If the note's frontmatter cannot be parsed, the notice tells you so and the file is left byte-for-byte as it was.
 
