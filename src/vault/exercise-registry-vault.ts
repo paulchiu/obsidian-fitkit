@@ -1,6 +1,11 @@
 import type { App } from 'obsidian'
 
-import { createRegistry, levelsForName, normalize } from '../domain/exercise-registry'
+import {
+  createRegistry,
+  intervalMarker,
+  levelsForName,
+  normalize,
+} from '../domain/exercise-registry'
 import type { ExerciseRegistryEntry } from '../domain/exercise-registry'
 import type { FitKitSettings } from '../settings'
 import { readExerciseCatalog, type ExerciseCatalogSnapshot } from './exercise-catalog'
@@ -129,6 +134,8 @@ export function buildExerciseRegistrySnapshot(
           : saved?.levels !== undefined
             ? [...saved.levels]
             : undefined,
+      /** The note alone decides: an older FitKit drops the marker from saved settings but leaves the note alone. */
+      ...intervalMarker(note),
       aliases: saved ? [...saved.aliases] : [],
     })
   }
@@ -143,6 +150,7 @@ export function buildExerciseRegistrySnapshot(
       kind: entry.kind,
       unit: entry.unit,
       levels: entry.levels !== undefined ? [...entry.levels] : undefined,
+      ...intervalMarker(entry),
       aliases: [...entry.aliases],
     })
   }

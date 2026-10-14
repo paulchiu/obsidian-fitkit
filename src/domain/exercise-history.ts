@@ -45,6 +45,8 @@ export interface ExerciseHistorySummary {
   bodyweight?: BodyweightExerciseHistory
   /** Most recent plan the user recorded for this exercise, at any point in the past. */
   nextPlan?: LastSessionMax<NextPlan>
+  /** The interval plan of the latest prior duration session, absent when that session had none. */
+  intervalPlan?: LastSessionMax<string>
 }
 
 export interface ExerciseHistoryBadge {
@@ -80,6 +82,7 @@ interface ExerciseHistoryDraft {
   bodyweightPersonalBest?: BodyweightBestSet
   bodyweightLastSessionMax?: SessionMetric<BodyweightBestSet>
   nextPlan?: SessionMetric<NextPlan>
+  lastDurationPlan?: SessionMetric<string | undefined>
 }
 
 const ISO_DATE_PREFIX = /^(\d{4}-\d{2}-\d{2})/
@@ -191,9 +194,8 @@ export function formatNextPlanBadge(
   current?: CurrentExercisePlan,
   levels?: BodyweightLadder,
 ): NextPlanBadge | null {
-  /** Plans are recorded for strength and bodyweight sets; duration has no plan badge. */
-  if (kind !== 'strength' && kind !== 'bodyweight') {
-    return null
+  if (kind === 'duration') {
+    return formatDurationNextPlanBadge(summary, current)
   }
   if (kind === 'bodyweight') {
     return formatBodyweightNextPlanBadge(summary, current, levels)
@@ -219,6 +221,20 @@ export function formatNextPlanBadge(
     title: `${planned}: ${change}${from}`,
     icon: nextPlanIcon(plan),
   }
+}
+
+/** Badge for an interval plan's next-time direction; there is no one weight to step from. */
+function formatDurationNextPlanBadge(
+  summary: ExerciseHistorySummary | undefined,
+  current: CurrentExercisePlan | undefined,
+): NextPlanBadge | null {
+  const plan = current?.plan ?? summary?.nextPlan?.value
+  if (!plan) {
+    return null
+  }
+  const planned = current?.plan ? 'Planned for next time' : `Planned on ${summary?.nextPlan?.date}`
+  const label = formatNextPlanLabel(plan, 'duration').toLowerCase()
+  return { text: `Next: ${label}`, title: `${planned}: ${label}`, icon: nextPlanIcon(plan) }
 }
 
 /**
@@ -323,27 +339,32 @@ function addEntryToDrafts(
     }
 
     /** Duration-only rule: duration rows feed the time statistics; other kinds contribute nothing here. */
-    if (
-      row.kind === 'duration' &&
-      row.totalDurationSeconds !== undefined &&
-      row.totalDurationSeconds > 0
-    ) {
+    const rankedSeconds = row.targetedDurationSeconds ?? row.totalDurationSeconds
+    if (row.kind === 'duration' && rankedSeconds !== undefined && rankedSeconds > 0) {
       hasMetric = true
       draft.durationPersonalBestSeconds =
         draft.durationPersonalBestSeconds !== undefined
-          ? Math.max(draft.durationPersonalBestSeconds, row.totalDurationSeconds)
-          : row.totalDurationSeconds
+          ? Math.max(draft.durationPersonalBestSeconds, rankedSeconds)
+          : rankedSeconds
       const candidate = {
         date: entryDate,
         mtime: entry.mtime,
         path: entry.path,
-        value: row.totalDurationSeconds,
+        value: rankedSeconds,
       }
       if (
         !draft.durationLastSessionMaxSeconds ||
         isLaterSession(candidate, draft.durationLastSessionMaxSeconds)
       ) {
         draft.durationLastSessionMaxSeconds = candidate
+      }
+    }
+
+    if (row.kind === 'duration') {
+      hasMetric ||= row.plan !== undefined
+      const candidate = { date: entryDate, mtime: entry.mtime, path: entry.path, value: row.plan }
+      if (!draft.lastDurationPlan || isLaterSession(candidate, draft.lastDurationPlan)) {
+        draft.lastDurationPlan = candidate
       }
     }
 
@@ -392,6 +413,12 @@ function finalizeDrafts(drafts: Map<string, ExerciseHistoryDraft>): ExerciseHist
     }
     if (draft.nextPlan) {
       summary.nextPlan = { value: draft.nextPlan.value, date: draft.nextPlan.date }
+    }
+    if (draft.lastDurationPlan?.value !== undefined) {
+      summary.intervalPlan = {
+        value: draft.lastDurationPlan.value,
+        date: draft.lastDurationPlan.date,
+      }
     }
     if (
       draft.durationPersonalBestSeconds !== undefined ||

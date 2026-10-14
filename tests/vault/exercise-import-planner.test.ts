@@ -136,7 +136,7 @@ describe('exercise import planner', () => {
 
     const plan = await buildExerciseImportPlan(app, config)
 
-    expect(plan.rows.map((row) => [row.name, row.status, row.kind, row.createNote])).toEqual([
+    expect(plan.rows.map((row) => [row.name, row.status, row.type, row.createNote])).toEqual([
       ['Deleted lift', 'ignored', 'strength', false],
       ['Plank', 'missing', 'duration', true],
       ['Squat', 'known', 'strength', false],
@@ -320,5 +320,66 @@ describe('exercise import planner', () => {
     expect([...state.createdFiles.keys()]).toEqual(['Fitness/Exercises/First lift.md'])
     expect(config.exerciseRegistry).toEqual([])
     expect(config.deletedExercises).toEqual([])
+  })
+
+  it('keeps a known interval type and leaves a missing exercise logged with a plan as duration', async () => {
+    const { app } = mockApp([
+      {
+        path: 'Fitness/Exercises/Sled.md',
+        basename: 'Sled',
+        frontmatter: { type: 'exercise', kind: 'duration', interval: true },
+      },
+      workout(
+        'Fitness/Workouts/2026-05-08.md',
+        workoutNote(`## [[Bike]]
+
+- [exercise:: [[Bike]]] [plan:: 3 x 1m @ 300W, 30s rest]
+- [exercise:: [[Bike]]] [duration:: 60]
+
+## [[Row]]
+
+- [exercise:: [[Row]]] [duration:: 600]
+
+## [[Sled]]
+
+- [exercise:: [[Sled]]] [duration:: 30]`),
+      ),
+    ])
+
+    const plan = await buildExerciseImportPlan(app, settings())
+
+    expect(plan.rows.map((row) => [row.name, row.type])).toEqual([
+      ['Bike', 'duration'],
+      ['Row', 'duration'],
+      ['Sled', 'interval'],
+    ])
+  })
+
+  it('creates a row chosen as interval as duration with the interval marker', async () => {
+    const config = settings()
+    const { app, state } = mockApp([
+      workout(
+        'Fitness/Workouts/2026-05-08.md',
+        workoutNote(`## [[Bike]]
+
+- [exercise:: [[Bike]]] [plan:: 3 x 1m @ 300W, 30s rest]
+- [exercise:: [[Bike]]] [duration:: 60]`),
+      ),
+    ])
+    const plan = await buildExerciseImportPlan(app, config)
+    const rows = plan.rows.map((row) => ({
+      ...row,
+      type: 'interval' as const,
+      createNoNoteEntry: true,
+    }))
+
+    await applyExerciseImportPlan(app, config, rows)
+
+    expect(state.createdFiles.get('Fitness/Exercises/Bike.md')).toContain(
+      'kind: duration\ninterval: true\n',
+    )
+    expect(config.exerciseRegistry).toEqual([
+      { name: 'Bike', kind: 'duration', unit: 'kg', interval: true, aliases: [] },
+    ])
   })
 })

@@ -15,7 +15,8 @@ export interface LoadResult {
 export type SaveResult = { ok: true; hash: string; mtime: number } | { ok: false; reason: 'hash' }
 
 /**
- * Tracks the last-known text hash and mtime of a TFile so stale writes can be blocked.
+ * Tracks the last-known text hash and mtime of a TFile. A save is blocked when the text
+ * changed since it was last read or written, whatever the mtime says.
  */
 export class FileSession {
   private lastHash: string | null = null
@@ -45,17 +46,8 @@ export class FileSession {
 
   async saveIfUnchanged(nextText: string): Promise<SaveResult> {
     const currentText = await this.app.vault.read(this.file)
-    const currentMtime = this.file.stat.mtime
-    if (this.lastMtime !== null && currentMtime !== this.lastMtime) {
-      const currentHash = fnv1a32(currentText)
-      if (this.lastHash !== null && currentHash !== this.lastHash) {
-        return { ok: false, reason: 'hash' }
-      }
-    } else {
-      const currentHash = fnv1a32(currentText)
-      if (this.lastHash !== null && currentHash !== this.lastHash) {
-        return { ok: false, reason: 'hash' }
-      }
+    if (this.lastHash !== null && fnv1a32(currentText) !== this.lastHash) {
+      return { ok: false, reason: 'hash' }
     }
 
     await this.app.vault.process(this.file, () => nextText)

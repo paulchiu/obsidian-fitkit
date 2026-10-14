@@ -2,6 +2,7 @@ import { defaultBodyweightLevels, type BodyweightLadder } from './bodyweight-lev
 import { EXERCISE_KINDS, parseExerciseKind } from './exercise-kind'
 import {
   kindForName,
+  typeForName,
   unitForName,
   type ExerciseKind,
   type ExerciseRegistry,
@@ -13,6 +14,7 @@ import {
   type ExerciseMetric,
 } from './exercise-metric'
 import { buildNotesBlock, buildRecentSessionsBlock } from './exercise-note-template'
+import { kindOfType, type ExerciseType } from './exercise-type'
 import { DEFAULT_WEIGHT_UNIT, parseWeightUnit, type WeightUnit } from './weight-unit'
 
 const FENCE_OPEN = /^(`{3,})([^`]*)$/
@@ -205,10 +207,12 @@ function countListItemLines(lines: ReadonlyArray<string>, start: number): number
  * reporting on the fields the old kind logged. Switching to bodyweight also
  * drops metric:/unit: lines, which only belong to strength notes; the ladder
  * itself is left for the repair pass, which knows the exercise name.
+ * Interval is written as the duration kind plus an `interval: true` line,
+ * which every other type drops.
  */
-export function setExerciseNoteKind(
+export function setExerciseNoteType(
   source: string,
-  kind: ExerciseKind,
+  type: ExerciseType,
   options: ExerciseNoteQueryOptions,
 ): ExerciseNoteKindUpdateResult {
   const normalizedSource = normalizeMarkdownSource(source)
@@ -217,33 +221,46 @@ export function setExerciseNoteKind(
     return { markdown: source, changed: false, warnings: [] }
   }
 
+  const kind = kindOfType(type)
   const lines = normalizedSource.markdown.split('\n')
   const frontmatterLines = lines.slice(bounds.start + 1, bounds.end)
-  if (frontmatterKind(frontmatterLines) === kind) {
-    return { markdown: source, changed: false, warnings: [] }
-  }
+  const kindChanged = frontmatterKind(frontmatterLines) !== kind
 
   const kindLineIndex = findFrontmatterKeyLine(frontmatterLines, 'kind')
-  const withKind =
-    kindLineIndex < 0
+  const withKind = !kindChanged
+    ? frontmatterLines
+    : kindLineIndex < 0
       ? insertLines(frontmatterLines, findFrontmatterKeyLine(frontmatterLines, 'type') + 1, [
           `kind: ${kind}`,
         ])
       : replaceLine(frontmatterLines, kindLineIndex, `kind: ${kind}`)
+  const withoutMarker = withKind.filter(
+    (line) =>
+      !(kind === 'bodyweight' && isStrengthOnlyFrontmatterKey(line)) && !isIntervalMarkerLine(line),
+  )
   const nextFrontmatterLines =
-    kind === 'bodyweight'
-      ? withKind.filter((line) => !isStrengthOnlyFrontmatterKey(line))
-      : withKind
+    type === 'interval'
+      ? insertLines(withoutMarker, findFrontmatterKeyLine(withoutMarker, 'kind') + 1, [
+          'interval: true',
+        ])
+      : withoutMarker
 
   const withFrontmatter = [
     ...lines.slice(0, bounds.start + 1),
     ...nextFrontmatterLines,
     ...lines.slice(bounds.end),
   ].join('\n')
-  const recent = rewriteRecentSessionsForKind(withFrontmatter, options, kind)
+  const recent = kindChanged
+    ? rewriteRecentSessionsForKind(withFrontmatter, options, kind)
+    : { markdown: withFrontmatter, warnings: [] }
   const markdown = restoreMarkdownSource(recent.markdown, normalizedSource)
 
   return { markdown, changed: markdown !== source, warnings: recent.warnings }
+}
+
+function isIntervalMarkerLine(line: string): boolean {
+  const colon = line.indexOf(':')
+  return colon >= 0 && line.slice(0, colon).trim().toLowerCase() === 'interval'
 }
 
 /**
@@ -273,6 +290,7 @@ function repairFrontmatter(
   options: ExerciseNoteMigrationOptions,
 ): FrontmatterRepairResult {
   const registryKind = kindForName(options.registry, options.name)
+  const registryInterval = typeForName(options.registry, options.name) === 'interval'
   const registryUnit = strengthUnitForName(options.registry, options.name)
   const bounds = findFrontmatterBounds(source)
   if (bounds.status === 'malformed') {
@@ -287,7 +305,7 @@ function repairFrontmatter(
   if (bounds.status === 'missing') {
     const fallbackKind = registryKind ?? inferExerciseKindFromContent(source) ?? 'strength'
     return {
-      markdown: `${frontmatterBlock(fallbackKind, options.name, registryUnit ?? DEFAULT_WEIGHT_UNIT)}${source}`,
+      markdown: `${frontmatterBlock(registryInterval ? 'interval' : fallbackKind, options.name, registryUnit ?? DEFAULT_WEIGHT_UNIT)}${source}`,
       kind: fallbackKind,
       unknownKind: registryKind === null,
       warnings: [],
@@ -336,6 +354,13 @@ function repairFrontmatter(
         nextFrontmatterLines,
         kindLineIndex,
         `kind: ${registryKind}`,
+      )
+    }
+    if (registryInterval && findFrontmatterKeyLine(nextFrontmatterLines, 'interval') < 0) {
+      nextFrontmatterLines = insertLines(
+        nextFrontmatterLines,
+        findFrontmatterKeyLine(nextFrontmatterLines, 'kind') + 1,
+        ['interval: true'],
       )
     }
     effectiveKind = registryKind
@@ -410,13 +435,17 @@ function strengthUnitForName(registry: ExerciseRegistry, name: string): WeightUn
 }
 
 function frontmatterBlock(
-  kind: ExerciseKind | null,
+  type: ExerciseType | null,
   exerciseName: string,
   unit: WeightUnit,
 ): string {
   const lines = ['---', 'type: exercise']
+  const kind = type === null ? null : kindOfType(type)
   if (kind) {
     lines.push(`kind: ${kind}`)
+    if (type === 'interval') {
+      lines.push('interval: true')
+    }
     if (kind === 'strength') {
       lines.push(`metric: ${DEFAULT_EXERCISE_METRIC}`)
       lines.push(`unit: ${unit}`)

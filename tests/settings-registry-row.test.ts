@@ -88,4 +88,10 @@ describe('FitKitSettingTab registry row provenance', () => {
     expect(findButtons(table, 'Add to registry')).toHaveLength(1)
     expect(findButtons(table, 'Delete')).toHaveLength(1)
   })
+
+  it('shows an interval entry as interval in the kind column', () => {
+    const table = renderRow(baseRow({ name: 'Bike', kind: 'duration', interval: true }))
+
+    expect([...table.querySelectorAll('td')].map((cell) => cell.textContent)).toContain('interval')
+  })
 })

@@ -13,8 +13,12 @@
  *  - Exercise-level note: has `[exercise::]` and optional `[notes::]` /
  *    `[next::]` only.
  *  - Strength row: has `[set::]`, optional `[weight::]`, optional `[reps::]`, optional `[notes::]`.
- *  - Duration row: has `[duration::]` (seconds), optional `[set::]`, optional `[started::]`
- *    (the ISO start time of a timer still running on that row), optional `[notes::]`.
+ *  - Duration row: has `[duration::]` (seconds), optional `[set::]`, optional `[step::]`
+ *    (the interval plan step it ran), optional intensity
+ *    (`[watts::]`, `[load::]` or `[level::]`), optional `[rest::]` (seconds rested after it),
+ *    optional `[started::]` (the ISO start time of a timer still running on that row),
+ *    optional `[paused:: true]`, optional `[notes::]`. A duration exercise's note row may
+ *    also carry `[plan::]`, an interval plan kept as written (see `interval-program.ts`).
  *  - Bodyweight row: has `[level::]`, optional `[set::]`, optional `[reps::]`, optional `[load::]`, optional `[notes::]`.
  *
  * A round-trip (parse then serialize) is content-preserving for anything the
@@ -33,6 +37,7 @@
  */
 
 import { assertUnreachableKind, EXERCISE_KINDS, type ExerciseKind } from './exercise-kind'
+import type { IntensityFields } from './interval-plan'
 import { formatNextPlan, parseNextPlan, type NextPlan } from './next-plan'
 
 export type { ExerciseKind }
@@ -44,11 +49,15 @@ export interface StrengthSet {
   note?: string
 }
 
-export interface DurationEntry {
+export interface DurationEntry extends IntensityFields {
   set?: number
   durationSeconds: number
+  restSeconds?: number
   startedAt?: string
+  paused?: boolean
   note?: string
+  /** The plan step this row ran, from `[step::]`. */
+  step?: string
 }
 
 export interface BodyweightSet {
@@ -73,6 +82,8 @@ export interface StrengthExerciseEntry extends ExerciseEntryBase {
 
 export interface DurationExerciseEntry extends ExerciseEntryBase {
   kind: 'duration'
+  /** The `[plan::]` text as written, so a plan the parser cannot read still round-trips. */
+  plan?: string
   durationEntries: DurationEntry[]
 }
 
@@ -205,6 +216,14 @@ const BULLET = /^[-*]\s+(.*)$/
 const INLINE_FIELD = /\[([a-zA-Z][\w-]*)::\s*((?:\[\[[^\]]*\]\]|[^\]])*)\]/g
 const WIKILINK = /^\[\[([^\]]+)\]\]$/
 
+/** Optional numeric duration-row fields, in the order they are written after `[duration::]`. */
+const DURATION_NUMBER_FIELDS = [
+  ['watts', 'watts'],
+  ['load', 'load'],
+  ['level', 'level'],
+  ['rest', 'restSeconds'],
+] as const
+
 /**
  * Warning for an exercise coerced from one row shape to another. The pair is
  * named in `EXERCISE_KINDS` order, which keeps the long-shipped strength and
@@ -230,8 +249,14 @@ function mixedKindWarning(
  * anchor to a row count the edited exercise still has).
  */
 function rowCountOf(exercise: ExerciseEntry): number {
+  return (hasNoteRow(exercise) ? 1 : 0) + setRowCount(exercise)
+}
+
+function hasNoteRow(exercise: ExerciseEntry): boolean {
   return (
-    (exercise.note !== undefined || exercise.next !== undefined ? 1 : 0) + setRowCount(exercise)
+    exercise.note !== undefined ||
+    exercise.next !== undefined ||
+    (exercise.kind === 'duration' && exercise.plan !== undefined)
   )
 }
 
@@ -341,13 +366,15 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
     const hasLevel = fields.has('level')
     const hasLoad = fields.has('load')
     const note = fields.get('notes')
+    const plan = fields.get('plan')
     if (!current || current.exerciseName !== inlineName) {
       flush()
-      current = hasDuration
-        ? { exerciseName: inlineName, kind: 'duration', durationEntries: [] }
-        : hasLevel
-          ? { exerciseName: inlineName, kind: 'bodyweight', bodyweightSets: [] }
-          : { exerciseName: inlineName, kind: 'strength', strengthSets: [] }
+      current =
+        hasDuration || plan !== undefined
+          ? { exerciseName: inlineName, kind: 'duration', durationEntries: [] }
+          : hasLevel
+            ? { exerciseName: inlineName, kind: 'bodyweight', bodyweightSets: [] }
+            : { exerciseName: inlineName, kind: 'strength', strengthSets: [] }
     }
 
     if (!hasSet && !hasDuration && !hasWeight && !hasReps && !hasLevel) {
@@ -358,6 +385,9 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
       const next = parseNextPlan(fields.get('next'))
       if (next) {
         current.next = next
+      }
+      if (plan !== undefined && current.kind === 'duration') {
+        current.plan = plan
       }
       continue
     }
@@ -378,9 +408,22 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
       if (hasSet) {
         entry.set = Number(fields.get('set'))
       }
+      const step = fields.get('step')
+      if (step !== undefined) {
+        entry.step = step
+      }
+      for (const [field, key] of DURATION_NUMBER_FIELDS) {
+        const raw = fields.get(field)
+        if (raw !== undefined) {
+          entry[key] = Number(raw)
+        }
+      }
       const startedAt = fields.get('started')
       if (startedAt !== undefined) {
         entry.startedAt = startedAt
+      }
+      if (fields.get('paused') === 'true') {
+        entry.paused = true
       }
       if (note !== undefined) {
         entry.note = note
@@ -572,13 +615,16 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
     bodyLines.push('')
     let rowCount = 0
     insertBucket(`${i}:${rowCount}`)
-    if (exercise.note !== undefined || exercise.next !== undefined) {
+    if (hasNoteRow(exercise)) {
       const parts = [`[exercise:: [[${exercise.exerciseName}]]]`]
       if (exercise.note !== undefined) {
         parts.push(`[notes:: ${exercise.note}]`)
       }
       if (exercise.next !== undefined) {
         parts.push(`[next:: ${formatNextPlan(exercise.next)}]`)
+      }
+      if (exercise.kind === 'duration' && exercise.plan !== undefined) {
+        parts.push(`[plan:: ${exercise.plan}]`)
       }
       bodyLines.push(`- ${parts.join(' ')}`)
       rowCount += 1
@@ -626,9 +672,21 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
         if (entry.set !== undefined) {
           parts.push(`[set:: ${entry.set}]`)
         }
+        if (entry.step !== undefined) {
+          parts.push(`[step:: ${entry.step}]`)
+        }
         parts.push(`[duration:: ${formatNumber(entry.durationSeconds)}]`)
+        for (const [field, key] of DURATION_NUMBER_FIELDS) {
+          const value = entry[key]
+          if (value !== undefined) {
+            parts.push(`[${field}:: ${formatNumber(value)}]`)
+          }
+        }
         if (entry.startedAt !== undefined) {
           parts.push(`[started:: ${entry.startedAt}]`)
+        }
+        if (entry.paused) {
+          parts.push('[paused:: true]')
         }
         if (entry.note !== undefined) {
           parts.push(`[notes:: ${entry.note}]`)
@@ -666,33 +724,49 @@ export function canonicalizeForEquality(model: WorkoutNoteModel): unknown {
       kind: ex.kind,
       note: ex.note,
       next: ex.next,
+      plan: ex.kind === 'duration' ? ex.plan : undefined,
       strengthSets:
         ex.kind === 'strength'
-          ? ex.strengthSets.map((set) => ({
-              set: set.set,
-              weight: set.weight,
-              reps: set.reps,
-              note: set.note,
-            }))
+          ? ex.strengthSets.map(
+              (set) =>
+                ({
+                  set: set.set,
+                  weight: set.weight,
+                  reps: set.reps,
+                  note: set.note,
+                }) satisfies Record<keyof StrengthSet, unknown>,
+            )
           : undefined,
       durationEntries:
         ex.kind === 'duration'
-          ? ex.durationEntries.map((entry) => ({
-              set: entry.set,
-              durationSeconds: entry.durationSeconds,
-              startedAt: entry.startedAt,
-              note: entry.note,
-            }))
+          ? ex.durationEntries.map(
+              (entry) =>
+                ({
+                  set: entry.set,
+                  durationSeconds: entry.durationSeconds,
+                  watts: entry.watts,
+                  load: entry.load,
+                  level: entry.level,
+                  restSeconds: entry.restSeconds,
+                  startedAt: entry.startedAt,
+                  paused: entry.paused,
+                  note: entry.note,
+                  step: entry.step,
+                }) satisfies Record<keyof DurationEntry, unknown>,
+            )
           : undefined,
       bodyweightSets:
         ex.kind === 'bodyweight'
-          ? ex.bodyweightSets.map((set) => ({
-              set: set.set,
-              level: set.level,
-              reps: set.reps,
-              load: set.load,
-              note: set.note,
-            }))
+          ? ex.bodyweightSets.map(
+              (set) =>
+                ({
+                  set: set.set,
+                  level: set.level,
+                  reps: set.reps,
+                  load: set.load,
+                  note: set.note,
+                }) satisfies Record<keyof BodyweightSet, unknown>,
+            )
           : undefined,
     })),
   }

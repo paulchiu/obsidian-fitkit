@@ -8,8 +8,14 @@ import type {
 
 import { formatErrorMessage } from './domain/error'
 import type { ExerciseRegistryEntry } from './domain/exercise-registry'
-import { createRegistry, normalize, removeEntry } from './domain/exercise-registry'
+import { createRegistry, intervalMarker, normalize, removeEntry } from './domain/exercise-registry'
 import { parseExerciseKind } from './domain/exercise-kind'
+import { exerciseTypeOf } from './domain/exercise-type'
+import {
+  DEFAULT_INTERVAL_PRESETS,
+  parseIntervalPresets,
+  upgradeIntervalPresets,
+} from './domain/interval-presets'
 import { parseWeightUnit } from './domain/weight-unit'
 import type FitKitPlugin from './main'
 import { DeleteRegistryEntryModal } from './ui/delete-registry-entry-modal'
@@ -29,6 +35,9 @@ export interface FitKitSettings {
   fitnessRoot: string
   autoOpenWorkoutEditor: boolean
   strengthRestTimerEnabled: boolean
+  intervalBeepsEnabled: boolean
+  /** The plan form's presets, one `Label: plan` per line. */
+  intervalPresets: string
   autosaveDebounceMs: number
   chartSessionsWindow: number
   exerciseRegistry: ExerciseRegistryEntry[]
@@ -41,6 +50,8 @@ export const DEFAULT_SETTINGS: FitKitSettings = {
   fitnessRoot: 'Fitness',
   autoOpenWorkoutEditor: true,
   strengthRestTimerEnabled: true,
+  intervalBeepsEnabled: true,
+  intervalPresets: DEFAULT_INTERVAL_PRESETS,
   autosaveDebounceMs: 600,
   chartSessionsWindow: 30,
   exerciseRegistry: [],
@@ -72,14 +83,6 @@ export function addDeletedExerciseTombstone(
   return normalizeDeletedExerciseTombstones([...(deletedExercises ?? []), name])
 }
 
-export function removeDeletedExerciseTombstone(
-  deletedExercises: readonly string[] | undefined,
-  name: string,
-): string[] {
-  const targetKey = normalize(name)
-  return normalizeDeletedExerciseTombstones(deletedExercises).filter((key) => key !== targetKey)
-}
-
 export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitKitSettings {
   if (!stored) {
     return { ...DEFAULT_SETTINGS }
@@ -89,6 +92,10 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
     autoOpenWorkoutEditor: stored.autoOpenWorkoutEditor ?? DEFAULT_SETTINGS.autoOpenWorkoutEditor,
     strengthRestTimerEnabled:
       stored.strengthRestTimerEnabled ?? DEFAULT_SETTINGS.strengthRestTimerEnabled,
+    intervalBeepsEnabled: stored.intervalBeepsEnabled ?? DEFAULT_SETTINGS.intervalBeepsEnabled,
+    intervalPresets: upgradeIntervalPresets(
+      stored.intervalPresets ?? DEFAULT_SETTINGS.intervalPresets,
+    ),
     autosaveDebounceMs: stored.autosaveDebounceMs ?? DEFAULT_SETTINGS.autosaveDebounceMs,
     chartSessionsWindow: stored.chartSessionsWindow ?? DEFAULT_SETTINGS.chartSessionsWindow,
     exerciseRegistry: normalizeStoredExerciseRegistry(
@@ -106,13 +113,17 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
 function normalizeStoredExerciseRegistry(
   entries: readonly ExerciseRegistryEntry[] = [],
 ): ExerciseRegistryEntry[] {
-  return entries.map((entry) => ({
-    name: entry.name,
-    kind: parseExerciseKind(entry.kind) ?? 'strength',
-    unit: parseWeightUnit(entry.unit) ?? undefined,
-    levels: normalizeStoredLevels(entry.levels),
-    aliases: [...entry.aliases],
-  }))
+  return entries.map((entry) => {
+    const kind = parseExerciseKind(entry.kind) ?? 'strength'
+    return {
+      name: entry.name,
+      kind,
+      unit: parseWeightUnit(entry.unit) ?? undefined,
+      levels: normalizeStoredLevels(entry.levels),
+      ...intervalMarker({ kind, interval: entry.interval }),
+      aliases: [...entry.aliases],
+    }
+  })
 }
 
 /**
@@ -151,6 +162,8 @@ type FitKitSettingKey =
   | 'fitnessRoot'
   | 'autoOpenWorkoutEditor'
   | 'strengthRestTimerEnabled'
+  | 'intervalBeepsEnabled'
+  | 'intervalPresets'
   | 'autosaveDebounceMs'
   | 'chartSessionsWindow'
 
@@ -181,6 +194,11 @@ type SettingRow =
     }
   | { kind: 'action'; name: string; desc: string; buttonText: string; onClick: () => void }
   | { kind: 'block'; name: string; render: (containerEl: HTMLElement) => void }
+
+function validateIntervalPresets(value: string): string | undefined {
+  const { invalid } = parseIntervalPresets(value)
+  return invalid.length === 0 ? undefined : `Cannot read: ${invalid.join('; ')}`
+}
 
 export function coerceAutosaveDebounceMs(value: unknown): number {
   const parsed = typeof value === 'number' ? value : Number.parseInt(String(value), 10)
@@ -297,6 +315,23 @@ export class FitKitSettingTab extends PluginSettingTab {
             name: 'Rest timer',
             desc: 'Show a rest timer in the workout editor footer that remembers your last rest after stopping.',
             control: { type: 'toggle', key: 'strengthRestTimerEnabled' },
+          },
+          {
+            kind: 'control',
+            name: 'Interval beeps',
+            desc: 'Beep through the last three seconds of each interval and when it changes, and vibrate where the device can.',
+            control: { type: 'toggle', key: 'intervalBeepsEnabled' },
+          },
+          {
+            kind: 'control',
+            name: 'Interval presets',
+            desc: 'The plans the interval plan form offers to start from, one per line as "Label: plan", for example "Tabata: 8 x 20s @ 400W, 10s rest".',
+            control: {
+              type: 'textarea',
+              key: 'intervalPresets',
+              rows: 4,
+              validate: validateIntervalPresets,
+            },
           },
           {
             kind: 'control',
@@ -448,6 +483,12 @@ export class FitKitSettingTab extends PluginSettingTab {
       case 'strengthRestTimerEnabled':
         settings.strengthRestTimerEnabled = Boolean(value)
         break
+      case 'intervalBeepsEnabled':
+        settings.intervalBeepsEnabled = Boolean(value)
+        break
+      case 'intervalPresets':
+        settings.intervalPresets = String(value)
+        break
       case 'autosaveDebounceMs':
         settings.autosaveDebounceMs = coerceAutosaveDebounceMs(value)
         break
@@ -506,6 +547,16 @@ export class FitKitSettingTab extends PluginSettingTab {
         text.setValue(String(current)).onChange(async (value) => {
           await this.setControlValue(key, value)
           text.setValue(String(this.plugin.settings[key]))
+        })
+      })
+      return
+    }
+
+    if (control.type === 'textarea') {
+      setting.addTextArea((area) => {
+        area.inputEl.rows = control.rows ?? 4
+        area.setValue(String(current)).onChange((value) => {
+          void this.setControlValue(key, value)
         })
       })
       return
@@ -656,7 +707,7 @@ export class FitKitSettingTab extends PluginSettingTab {
       badge.setText('Registry')
     }
 
-    tr.createEl('td', { text: row.kind })
+    tr.createEl('td', { text: exerciseTypeOf(row) })
     tr.createEl('td', { text: row.kind === 'strength' ? (row.unit ?? '') : '' })
 
     const aliasCell = tr.createEl('td', { cls: 'fitkit-registry-aliases-cell' })
@@ -701,6 +752,7 @@ export class FitKitSettingTab extends PluginSettingTab {
               kind: row.kind,
               unit: row.unit,
               levels: row.levels ? [...row.levels] : undefined,
+              ...intervalMarker(row),
               aliases: row.aliases,
             },
           },

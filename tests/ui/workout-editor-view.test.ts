@@ -204,10 +204,13 @@ vi.mock('../../src/vault/exercise-registry-vault', async (importOriginal) => {
 
 import { TFile, type App } from 'obsidian'
 import {
+  ensureKnownNotice,
   formatLadderChangesWarning,
+  ladderRecordNotice,
   shouldShortenLevelLabel,
   toEditorExercise,
   toWorkoutExercise,
+  typeRecordNotices,
   WorkoutEditorView,
 } from '../../src/ui/workout-editor-view'
 import { buildMockVaultFolderTree, type MockVaultFolder } from '../fixtures/mock-vault-folder-tree'
@@ -545,7 +548,7 @@ describe('WorkoutEditorView row actions', () => {
     )
   })
 
-  it('adds Open exercise file to the exercise card menu before kind and move actions', () => {
+  it('lists the card actions, leaving opening the file to the name and moving to the drag handle', () => {
     vi.stubGlobal('HTMLElement', TestElement)
     const view = createCardMenuView()
     view.model = {
@@ -565,23 +568,21 @@ describe('WorkoutEditorView row actions', () => {
 
     expect(obsidianMock.menus).toHaveLength(1)
     expect(obsidianMock.menus[0]?.items.map((item) => item.title)).toEqual([
-      'Open exercise file',
       'Rename exercise',
       'Add exercise note',
       'Plan: increase',
       'Plan: keep',
       'Plan: decrease',
       'Set plan step...',
-      'Switch to duration',
-      'Switch to bodyweight',
-      'Move up',
-      'Move down',
+      'Change type...',
       'Remove exercise',
     ])
   })
 
-  it('offers a switch item for every kind other than the current one, never the current kind', () => {
+  it('offers every type other than the current one, interval included, behind Change type...', async () => {
     vi.stubGlobal('HTMLElement', TestElement)
+    // eslint-disable-next-line obsidianmd/no-global-this -- The type menu opens on a `window` timer, which the node environment lacks.
+    vi.stubGlobal('window', globalThis)
     for (const kind of EXERCISE_KINDS) {
       const view = createCardMenuView()
       view.model = {
@@ -589,42 +590,25 @@ describe('WorkoutEditorView row actions', () => {
           { name: 'Squat', kind, strengthSets: [], durationEntries: [], bodyweightSets: [] },
         ],
       }
-
       view.openCardMenu({ currentTarget: new TestElement('button') } as unknown as MouseEvent, 0)
+      const cardMenu = obsidianMock.menus[obsidianMock.menus.length - 1]
+      cardMenu?.items.find((item) => item.title === 'Change type...')?.onClick?.()
+      await vi.waitFor(() => expect(obsidianMock.menus.at(-1)).not.toBe(cardMenu))
 
-      const items = obsidianMock.menus[obsidianMock.menus.length - 1]?.items ?? []
-      const titles = items.map((item) => item.title)
-      const switchItems = items.filter((item) => item.title?.startsWith('Switch to ') === true)
-      const expected = EXERCISE_KINDS.filter((other) => other !== kind).map(
-        (other) => `Switch to ${other}`,
-      )
-      expect(switchItems.map((item) => item.title)).toEqual(expected)
-      expect(switchItems.map((item) => item.icon)).toEqual(expected.map(() => 'repeat'))
-      for (const item of switchItems) {
-        expect(titles.indexOf(item.title)).toBeGreaterThan(titles.indexOf('Add exercise note'))
-        expect(titles.indexOf(item.title)).toBeLessThan(titles.indexOf('Move up'))
-      }
+      const typeMenu = obsidianMock.menus.at(-1)
+      const expected = ['strength', 'duration', 'interval', 'bodyweight']
+        .filter((other) => other !== kind)
+        .map((other) => `Switch to ${other}`)
+      expect({
+        titles: typeMenu?.items.map((item) => item.title),
+        icons: typeMenu?.items.map((item) => item.icon),
+        position: typeMenu?.position,
+      }).toEqual({
+        titles: expected,
+        icons: expected.map(() => 'repeat'),
+        position: cardMenu?.position,
+      })
     }
-  })
-
-  it('routes the card menu Open exercise file item through the shared handler', () => {
-    vi.stubGlobal('HTMLElement', TestElement)
-    const view = createCardMenuView()
-    const exercise = {
-      name: 'Squat',
-      kind: 'strength',
-      strengthSets: [],
-      durationEntries: [],
-      bodyweightSets: [],
-    }
-    view.model = { exercises: [exercise] }
-    view.openOrCreateExerciseFile = vi.fn(() => Promise.resolve())
-    const button = new TestElement('button')
-
-    view.openCardMenu({ currentTarget: button } as unknown as MouseEvent, 0)
-    obsidianMock.menus[0]?.items[0]?.onClick?.()
-
-    expect(view.openOrCreateExerciseFile).toHaveBeenCalledWith(exercise)
   })
 
   it('renders the exercise name as an open-file link and moves rename to the pencil', () => {
@@ -1683,96 +1667,32 @@ interface PersistUnknownExerciseView {
   plugin: {
     settings: {
       fitnessRoot: string
-      exerciseRegistry: {
-        name: string
-        kind: 'strength' | 'duration'
-        unit: 'kg' | 'lbs'
-        aliases: string[]
-      }[]
-      deletedExercises?: string[]
+      exerciseRegistry: ExerciseRegistryEntry[]
+      deletedExercises: string[]
     }
     saveSettings: ReturnType<typeof vi.fn>
   }
-  persistUnknownExercise(
-    name: string,
-    kind: 'strength' | 'duration',
-    createNote: boolean,
-  ): Promise<void>
+  persistUnknownExercise(name: string, kind: ExerciseKind, createNote: boolean): Promise<void>
 }
 
 describe('WorkoutEditorView unknown exercise persistence', () => {
-  const resetEnsureParentFolderMock = (): void => {
+  beforeEach(() => {
+    obsidianMock.notices = []
     vaultUtilsMock.ensureParentFolder.mockClear()
-    vaultUtilsMock.ensureParentFolder.mockResolvedValue(undefined)
-  }
+  })
 
-  const createPersistUnknownExerciseView = (
-    options: {
-      existingNote?: boolean
-      deletedExercises?: string[]
-      createRejects?: Error
-    } = {},
-  ): PersistUnknownExerciseView => {
+  it('creates the note through the store and notices it', async () => {
     const view = Object.create(WorkoutEditorView.prototype) as PersistUnknownExerciseView
     view.app = {
       vault: {
-        getAbstractFileByPath: vi.fn((path: string) =>
-          options.existingNote && path === 'Fitness/Exercises/Squat.md' ? { path } : null,
-        ),
-        create: vi.fn((_path: string, _contents: string) => {
-          if (options.createRejects) {
-            return Promise.reject(options.createRejects)
-          }
-          return Promise.resolve({ path: _path })
-        }),
+        getAbstractFileByPath: vi.fn(() => null),
+        create: vi.fn((path: string) => Promise.resolve({ path })),
       },
     }
     view.plugin = {
-      settings: {
-        fitnessRoot: 'Fitness',
-        exerciseRegistry: [],
-        deletedExercises: options.deletedExercises,
-      },
+      settings: { fitnessRoot: 'Fitness', exerciseRegistry: [], deletedExercises: ['squat'] },
       saveSettings: vi.fn(() => Promise.resolve()),
     }
-    return view
-  }
-
-  beforeEach(() => {
-    obsidianMock.notices = []
-    resetEnsureParentFolderMock()
-  })
-
-  afterEach(() => {
-    resetEnsureParentFolderMock()
-  })
-
-  it('notices when note creation reuses an existing exercise note without a tombstone', async () => {
-    const view = createPersistUnknownExerciseView({ existingNote: true })
-
-    await view.persistUnknownExercise('Squat', 'strength', true)
-
-    expect(view.app.vault.create).not.toHaveBeenCalled()
-    expect(view.plugin.saveSettings).not.toHaveBeenCalled()
-    expect(obsidianMock.notices).toEqual(["Using existing exercise note for 'Squat'."])
-  })
-
-  it('notices and clears the tombstone when note creation restores an existing exercise note', async () => {
-    const view = createPersistUnknownExerciseView({
-      existingNote: true,
-      deletedExercises: ['squat', 'bench'],
-    })
-
-    await view.persistUnknownExercise('Squat', 'strength', true)
-
-    expect(view.app.vault.create).not.toHaveBeenCalled()
-    expect(view.plugin.settings.deletedExercises).toEqual(['bench'])
-    expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
-    expect(obsidianMock.notices).toEqual(["Restored 'Squat' using the existing exercise note."])
-  })
-
-  it('adds a registry entry alongside a newly created exercise note', async () => {
-    const view = createPersistUnknownExerciseView()
 
     await view.persistUnknownExercise('Squat', 'strength', true)
 
@@ -1780,75 +1700,69 @@ describe('WorkoutEditorView unknown exercise persistence', () => {
     expect(view.plugin.settings.exerciseRegistry).toEqual([
       { name: 'Squat', kind: 'strength', aliases: [] },
     ])
+    expect(view.plugin.settings.deletedExercises).toEqual([])
     expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
     expect(obsidianMock.notices).toEqual(["Created exercise note for 'Squat'."])
   })
-
-  it('notices and does not save settings when parent folder creation fails', async () => {
-    vaultUtilsMock.ensureParentFolder.mockRejectedValue(new Error('no folder'))
-    const view = createPersistUnknownExerciseView()
-
-    await view.persistUnknownExercise('Squat', 'strength', true)
-
-    expect(view.app.vault.create).not.toHaveBeenCalled()
-    expect(view.plugin.saveSettings).not.toHaveBeenCalled()
-    expect(obsidianMock.notices).toEqual(["Could not create exercise note for 'Squat': no folder."])
-  })
-
-  it('notices and does not save settings when vault.create fails', async () => {
-    const view = createPersistUnknownExerciseView({ createRejects: new Error('read only') })
-
-    await view.persistUnknownExercise('Squat', 'strength', true)
-
-    expect(vaultUtilsMock.ensureParentFolder).toHaveBeenCalledWith(
-      view.app,
-      'Fitness/Exercises/Squat.md',
-    )
-    expect(view.app.vault.create).toHaveBeenCalledTimes(1)
-    expect(view.plugin.saveSettings).not.toHaveBeenCalled()
-    expect(obsidianMock.notices).toEqual(["Could not create exercise note for 'Squat': read only."])
-  })
 })
 
-interface PersistRegistryKindView {
-  plugin: {
-    settings: {
-      exerciseRegistry: ExerciseRegistryEntry[]
-    }
-    saveSettings: ReturnType<typeof vi.fn>
-  }
-  persistRegistryKind(name: string, nextKind: 'strength' | 'duration'): Promise<void>
-}
-
-describe('WorkoutEditorView registry kind persistence', () => {
-  const createPersistRegistryKindView = (
-    exerciseRegistry: ExerciseRegistryEntry[],
-  ): PersistRegistryKindView => {
-    const view = Object.create(WorkoutEditorView.prototype) as PersistRegistryKindView
-    view.plugin = {
-      settings: { exerciseRegistry },
-      saveSettings: vi.fn(() => Promise.resolve()),
-    }
-    return view
-  }
-
-  beforeEach(() => {
-    obsidianMock.notices = []
+describe('WorkoutEditorView exercise store notices', () => {
+  it.each([
+    {
+      result: { name: 'Squat', wrote: 'note', customRecentSessions: false },
+      notices: [
+        'Exercise note now records Squat as strength.',
+        'Registry now records Squat as strength.',
+      ],
+    },
+    {
+      result: { name: 'Squat', wrote: 'registry', customRecentSessions: false },
+      notices: ['Registry now records Squat as strength.'],
+    },
+    {
+      result: { name: 'Squat', wrote: 'note-unchanged', customRecentSessions: false },
+      notices: [
+        'Could not update the exercise note for Squat; its frontmatter was left unchanged.',
+      ],
+    },
+    {
+      result: { name: 'Squat', wrote: 'note', customRecentSessions: true },
+      notices: [
+        "The Recent sessions query in the note for Squat looks customised, so it was left as it is and still reads the old kind's fields.",
+        'Exercise note now records Squat as strength.',
+        'Registry now records Squat as strength.',
+      ],
+    },
+  ] as const)('words a type record that wrote $result.wrote', ({ result, notices }) => {
+    expect(typeRecordNotices(result, 'strength')).toEqual(notices)
   })
 
-  it('updates the existing entry for a case-variant name instead of duplicating it', async () => {
-    const view = createPersistRegistryKindView([
-      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: ['back squat'] },
-    ])
+  it.each([
+    { wrote: 'note', notice: 'Exercise note now records levels for Push-up.' },
+    { wrote: 'registry', notice: 'Registry now records levels for Push-up.' },
+    { wrote: 'note-unchanged', notice: null },
+  ] as const)('words a ladder record that wrote $wrote', ({ wrote, notice }) => {
+    expect(ladderRecordNotice({ name: 'Push-up', wrote })).toBe(notice)
+  })
 
-    await view.persistRegistryKind('squat', 'duration')
-
-    expect(view.plugin.settings.exerciseRegistry).toHaveLength(1)
-    expect(view.plugin.settings.exerciseRegistry[0]).toMatchObject({
-      name: 'Squat',
-      kind: 'duration',
-      aliases: ['back squat'],
-    })
+  it.each([
+    { result: { outcome: 'note-created' }, notice: "Created exercise note for 'Squat'." },
+    {
+      result: { outcome: 'note-reused', restored: false },
+      notice: "Using existing exercise note for 'Squat'.",
+    },
+    {
+      result: { outcome: 'note-reused', restored: true },
+      notice: "Restored 'Squat' using the existing exercise note.",
+    },
+    { result: { outcome: 'registry-added' }, notice: "Added 'Squat' as a no-note registry entry." },
+    { result: { outcome: 'already-known' }, notice: null },
+    {
+      result: { outcome: 'note-failed', message: 'read only' },
+      notice: "Could not create exercise note for 'Squat': read only.",
+    },
+  ] as const)('words an unknown exercise outcome of $result.outcome', ({ result, notice }) => {
+    expect(ensureKnownNotice('Squat', result)).toBe(notice)
   })
 })
 
@@ -1856,8 +1770,6 @@ interface PersistKindChangeMarkdownFile {
   path: string
   basename: string
   frontmatter?: Record<string, unknown>
-  /** Markdown after the frontmatter; the default note is frontmatter only. */
-  body?: string
 }
 
 interface PersistKindChangeView {
@@ -1880,7 +1792,7 @@ interface PersistKindChangeView {
     }
     saveSettings: ReturnType<typeof vi.fn>
   }
-  persistKindChange(name: string, nextKind: ExerciseKind): Promise<void>
+  persistTypeChange(name: string, nextKind: ExerciseKind): Promise<void>
 }
 
 describe('WorkoutEditorView kind switch persistence', () => {
@@ -1891,7 +1803,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
     const contents = new Map(
       markdownFiles.map((file) => {
         const kind = typeof file.frontmatter?.kind === 'string' ? file.frontmatter.kind : 'strength'
-        return [file.path, `---\ntype: exercise\nkind: ${kind}\n---\n${file.body ?? ''}`] as const
+        return [file.path, `---\ntype: exercise\nkind: ${kind}\n---\n`] as const
       }),
     )
     const filesByPath = new Map(markdownFiles.map((file) => [file.path, new TFile()]))
@@ -1926,64 +1838,6 @@ describe('WorkoutEditorView kind switch persistence', () => {
     obsidianMock.notices = []
   })
 
-  const strengthRecentSessionsBody = [
-    '',
-    '## Recent sessions',
-    '',
-    '```dataview',
-    'TABLE WITHOUT ID',
-    '  file.link AS Workout,',
-    '  L.set AS Set,',
-    '  L.weight AS Weight,',
-    '  L.reps AS Reps',
-    'FROM "Fitness/Workouts"',
-    'FLATTEN file.lists AS L',
-    'WHERE L.exercise = link("Squat") AND L.set',
-    'SORT file.name DESC, L.set ASC',
-    'LIMIT 10',
-    '```',
-    '',
-  ].join('\n')
-
-  it('retargets the Recent sessions query at the switched kind', async () => {
-    const { view, contents } = createPersistKindChangeView([
-      {
-        path: 'Fitness/Exercises/Squat.md',
-        basename: 'Squat',
-        frontmatter: { type: 'exercise', kind: 'strength' },
-        body: strengthRecentSessionsBody,
-      },
-    ])
-
-    await view.persistKindChange('Squat', 'duration')
-
-    const written = contents.get('Fitness/Exercises/Squat.md') ?? ''
-    expect(written).toContain('table without id file.link as Session, duration + "s" as Duration')
-    expect(written).not.toContain('L.weight AS Weight')
-  })
-
-  it('tells the user when a customised Recent sessions query was left alone', async () => {
-    const customised = strengthRecentSessionsBody.replace(
-      '  L.weight AS Weight,\n  L.reps AS Reps',
-      '  L.weight AS Weight,\n  L.rpe AS RPE',
-    )
-    const { view, contents } = createPersistKindChangeView([
-      {
-        path: 'Fitness/Exercises/Squat.md',
-        basename: 'Squat',
-        frontmatter: { type: 'exercise', kind: 'strength' },
-        body: customised,
-      },
-    ])
-
-    await view.persistKindChange('Squat', 'duration')
-
-    expect(contents.get('Fitness/Exercises/Squat.md')).toContain('L.rpe AS RPE')
-    expect(obsidianMock.notices).toContain(
-      "The Recent sessions query in the note for Squat looks customised, so it was left as it is and still reads the old kind's fields.",
-    )
-  })
-
   it('writes the switched kind into the exercise note and records it in the registry', async () => {
     const { view, contents } = createPersistKindChangeView([
       {
@@ -1993,7 +1847,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
       },
     ])
 
-    await view.persistKindChange('Squat', 'strength')
+    await view.persistTypeChange('Squat', 'strength')
 
     expect(view.app.vault.process).toHaveBeenCalledTimes(1)
     expect(contents.get('Fitness/Exercises/Squat.md')).toContain('kind: strength')
@@ -2007,97 +1861,6 @@ describe('WorkoutEditorView kind switch persistence', () => {
     ])
   })
 
-  it('also updates the registry on the note path, so the option keeps its promise', async () => {
-    const { view, contents } = createPersistKindChangeView(
-      [
-        {
-          path: 'Fitness/Exercises/Squat.md',
-          basename: 'Squat',
-          frontmatter: { type: 'exercise', kind: 'duration' },
-        },
-      ],
-      [{ name: 'Squat', kind: 'duration', aliases: [] }],
-    )
-
-    await view.persistKindChange('Squat', 'strength')
-
-    expect(contents.get('Fitness/Exercises/Squat.md')).toContain('kind: strength')
-    expect(view.plugin.settings.exerciseRegistry).toMatchObject([
-      { name: 'Squat', kind: 'strength' },
-    ])
-    expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
-    expect(obsidianMock.notices).toEqual([
-      'Exercise note now records Squat as strength.',
-      'Registry now records Squat as strength.',
-    ])
-  })
-
-  it('keeps the registry ladder when the note path records a kind switch', async () => {
-    const { view } = createPersistKindChangeView(
-      [
-        {
-          path: 'Fitness/Exercises/Push-up.md',
-          basename: 'Push-up',
-          frontmatter: { type: 'exercise', kind: 'strength' },
-        },
-      ],
-      [{ name: 'Push-up', kind: 'strength', levels: ['Wall push-up'], aliases: [] }],
-    )
-
-    await view.persistKindChange('Push-up', 'bodyweight')
-
-    expect(view.plugin.settings.exerciseRegistry).toMatchObject([
-      { name: 'Push-up', kind: 'bodyweight', levels: ['Wall push-up'] },
-    ])
-  })
-
-  it('matches the note case-insensitively', async () => {
-    const { view, contents } = createPersistKindChangeView([
-      {
-        path: 'Fitness/Exercises/Squat.md',
-        basename: 'Squat',
-        frontmatter: { type: 'exercise', kind: 'duration' },
-      },
-    ])
-
-    await view.persistKindChange('squat', 'strength')
-
-    expect(contents.get('Fitness/Exercises/Squat.md')).toContain('kind: strength')
-  })
-
-  it('falls back to the registry when no exercise note exists for the name', async () => {
-    const { view } = createPersistKindChangeView([])
-
-    await view.persistKindChange('Air bike', 'duration')
-
-    expect(view.app.vault.process).not.toHaveBeenCalled()
-    expect(view.plugin.settings.exerciseRegistry).toMatchObject([
-      { name: 'Air bike', kind: 'duration' },
-    ])
-    expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
-    expect(obsidianMock.notices).toEqual(['Registry now records Air bike as duration.'])
-  })
-
-  it('routes a matching unreadable note through the note writer without changing the registry', async () => {
-    const { view, contents } = createPersistKindChangeView([
-      {
-        path: 'Fitness/Exercises/Squat.md',
-        basename: 'Squat',
-      },
-    ])
-    const malformed = '---\ntype: exercise\nkind: duration\n'
-    contents.set('Fitness/Exercises/Squat.md', malformed)
-
-    await view.persistKindChange('Squat', 'strength')
-
-    expect(view.app.vault.process).toHaveBeenCalledTimes(1)
-    expect(contents.get('Fitness/Exercises/Squat.md')).toBe(malformed)
-    expect(view.plugin.settings.exerciseRegistry).toEqual([])
-    expect(view.plugin.saveSettings).not.toHaveBeenCalled()
-    expect(obsidianMock.notices).toEqual([
-      'Could not update the exercise note for Squat; its frontmatter was left unchanged.',
-    ])
-  })
   interface PersistLadderView extends PersistKindChangeView {
     render: ReturnType<typeof vi.fn>
     persistLadder(name: string, levels: string[]): Promise<void>
@@ -2121,29 +1884,6 @@ describe('WorkoutEditorView kind switch persistence', () => {
     afterEach(() => {
       obsidianMock.menus = []
       vi.unstubAllGlobals()
-    })
-
-    it('writes the edited ladder into the exercise note and leaves the registry untouched', async () => {
-      const { view, contents } = createPersistLadderView([
-        {
-          path: 'Fitness/Exercises/Push-up.md',
-          basename: 'Push-up',
-          frontmatter: { type: 'exercise', kind: 'bodyweight' },
-        },
-      ])
-      contents.set(
-        'Fitness/Exercises/Push-up.md',
-        '---\ntype: exercise\nkind: bodyweight\nlevels:\n  - Wall push-up\n---\n',
-      )
-
-      await view.persistLadder('Push-up', ['Incline push-up', 'Knee push-up'])
-
-      expect(contents.get('Fitness/Exercises/Push-up.md')).toContain('  - Incline push-up\n')
-      expect(contents.get('Fitness/Exercises/Push-up.md')).toContain('  - Knee push-up\n')
-      expect(contents.get('Fitness/Exercises/Push-up.md')).not.toContain('Wall push-up')
-      expect(view.plugin.settings.exerciseRegistry).toEqual([])
-      expect(view.plugin.saveSettings).not.toHaveBeenCalled()
-      expect(obsidianMock.notices).toEqual(['Exercise note now records levels for Push-up.'])
     })
 
     it('re-renders after writing the ladder into the exercise note', async () => {
@@ -2551,8 +2291,8 @@ describe('WorkoutEditorView kind switch persistence', () => {
             bodyweightSets: { set?: number; level?: number; reps?: number; load?: number }[]
           }[]
         }
-        chooseKindSwitch: () => Promise<string>
-        switchKind: (index: number, nextKind: 'bodyweight') => Promise<void>
+        chooseTypeSwitch: () => Promise<string>
+        switchCardType: (index: number, nextKind: 'bodyweight') => Promise<void>
       }
       switchView.render = vi.fn()
       switchView.markDirty = vi.fn()
@@ -2570,12 +2310,12 @@ describe('WorkoutEditorView kind switch persistence', () => {
           },
         ],
       }
-      switchView.chooseKindSwitch = async () => 'workout-and-registry'
+      switchView.chooseTypeSwitch = async () => 'workout-and-registry'
       const confirm = vi.fn(async () => true)
       switchView.confirmFirstLevelRelabel = confirm
       registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([])
 
-      await switchView.switchKind(0, 'bodyweight')
+      await switchView.switchCardType(0, 'bodyweight')
 
       const card = switchView.model.exercises[0]
       expect(card?.kind).toBe('bodyweight')
@@ -2617,8 +2357,8 @@ describe('WorkoutEditorView kind switch persistence', () => {
           }[]
         }
         exerciseHistory: Map<string, unknown>
-        chooseKindSwitch: () => Promise<string>
-        switchKind: (index: number, nextKind: 'bodyweight') => Promise<void>
+        chooseTypeSwitch: () => Promise<string>
+        switchCardType: (index: number, nextKind: 'bodyweight') => Promise<void>
         renderExerciseCard(list: HTMLElement, index: number): void
       }
       switchView.render = vi.fn()
@@ -2635,10 +2375,10 @@ describe('WorkoutEditorView kind switch persistence', () => {
         ],
       }
       switchView.exerciseHistory = new Map()
-      switchView.chooseKindSwitch = async () => 'workout-and-registry'
+      switchView.chooseTypeSwitch = async () => 'workout-and-registry'
       switchView.confirmFirstLevelRelabel = vi.fn(async () => false)
 
-      await switchView.switchKind(0, 'bodyweight')
+      await switchView.switchCardType(0, 'bodyweight')
 
       expect(contents.get('Fitness/Exercises/Push-up.md')).toContain('levels:\n  - Push-up\n')
       const list = new TestElement('div')
@@ -2669,8 +2409,8 @@ describe('WorkoutEditorView kind switch persistence', () => {
             bodyweightSets: { set?: number; level?: number; reps?: number; load?: number }[]
           }[]
         }
-        chooseKindSwitch: () => Promise<string>
-        switchKind: (index: number, nextKind: 'bodyweight') => Promise<void>
+        chooseTypeSwitch: () => Promise<string>
+        switchCardType: (index: number, nextKind: 'bodyweight') => Promise<void>
       }
       switchView.render = vi.fn()
       switchView.markDirty = vi.fn()
@@ -2685,11 +2425,11 @@ describe('WorkoutEditorView kind switch persistence', () => {
           },
         ],
       }
-      switchView.chooseKindSwitch = async () => 'workout'
+      switchView.chooseTypeSwitch = async () => 'workout'
       switchView.confirmFirstLevelRelabel = vi.fn(async () => false)
       registryVaultMock.exerciseRegistryWithVaultNotes.mockReturnValue([])
 
-      await switchView.switchKind(0, 'bodyweight')
+      await switchView.switchCardType(0, 'bodyweight')
 
       const card = switchView.model.exercises[0]
       expect(card?.kind).toBe('bodyweight')
@@ -2747,6 +2487,98 @@ describe('WorkoutEditorView kind switch persistence', () => {
       ])
     })
   })
+
+  describe('WorkoutEditorView rename onto a registry type', () => {
+    interface RenameCard {
+      name: string
+      kind: 'strength' | 'duration'
+      plan?: string
+      strengthSets: { set?: number; weight?: number; reps?: number }[]
+      durationEntries: { set?: number; durationSeconds?: number }[]
+      bodyweightSets: never[]
+    }
+    interface RenameView extends PersistKindChangeView {
+      model: { exercises: RenameCard[] }
+      render: ReturnType<typeof vi.fn>
+      markDirty: ReturnType<typeof vi.fn>
+      openIntervalPlanModal: ReturnType<typeof vi.fn>
+      confirmKindSwitch: () => Promise<boolean>
+      applyRename: (index: number, name: string, registry: unknown) => Promise<void>
+    }
+    const createRenameView = (card: RenameCard): RenameView => {
+      const { view } = createPersistKindChangeView([], [])
+      const renameView = view as unknown as RenameView
+      renameView.render = vi.fn()
+      renameView.markDirty = vi.fn()
+      renameView.openIntervalPlanModal = vi.fn()
+      renameView.confirmKindSwitch = async () => true
+      renameView.model = { exercises: [card] }
+      return renameView
+    }
+    const card = (overrides: Partial<RenameCard>): RenameCard => ({
+      name: 'Squat',
+      kind: 'strength',
+      strengthSets: [],
+      durationEntries: [],
+      bodyweightSets: [],
+      ...overrides,
+    })
+
+    beforeEach(() => {
+      obsidianMock.notices = []
+    })
+
+    it('lands a strength card renamed onto an interval name as plain duration', async () => {
+      const view = createRenameView(card({ strengthSets: [{ set: 1, weight: 10, reps: 8 }] }))
+      const registry = createRegistry([
+        { name: 'Rower', kind: 'duration', interval: true, aliases: [] },
+      ])
+
+      await view.applyRename(0, 'Rower', registry)
+
+      const renamed = view.model.exercises[0]
+      expect(renamed).toMatchObject({ name: 'Rower', kind: 'duration', strengthSets: [] })
+      expect(renamed?.plan).toBeUndefined()
+      expect(view.openIntervalPlanModal).not.toHaveBeenCalled()
+      expect(view.plugin.saveSettings).not.toHaveBeenCalled()
+      expect(obsidianMock.notices).toEqual([
+        'Switched to duration. Previous strength rows were cleared.',
+      ])
+    })
+
+    it('keeps the plan when an interval card takes a plain duration name', async () => {
+      const view = createRenameView(
+        card({ name: 'Bike', kind: 'duration', plan: '8 x 30s, 90s rest' }),
+      )
+      const registry = createRegistry([{ name: 'Rower', kind: 'duration', aliases: [] }])
+
+      await view.applyRename(0, 'Rower', registry)
+
+      expect(view.model.exercises[0]).toMatchObject({
+        name: 'Rower',
+        kind: 'duration',
+        plan: '8 x 30s, 90s rest',
+      })
+      expect(view.openIntervalPlanModal).not.toHaveBeenCalled()
+    })
+
+    it('only renames a plain duration card that takes an interval name', async () => {
+      const view = createRenameView(
+        card({ name: 'Bike', kind: 'duration', durationEntries: [{ durationSeconds: 60 }] }),
+      )
+      const registry = createRegistry([
+        { name: 'Rower', kind: 'duration', interval: true, aliases: [] },
+      ])
+
+      await view.applyRename(0, 'Rower', registry)
+
+      const renamed = view.model.exercises[0]
+      expect(renamed).toMatchObject({ name: 'Rower', durationEntries: [{ durationSeconds: 60 }] })
+      expect(renamed?.plan).toBeUndefined()
+      expect(view.openIntervalPlanModal).not.toHaveBeenCalled()
+      expect(obsidianMock.notices).toEqual([])
+    })
+  })
 })
 
 interface TimerExerciseCard {
@@ -2779,11 +2611,11 @@ interface TimerView {
   file: unknown
   model: { exercises: TimerExerciseCard[] }
   exerciseHistory: unknown
-  activeTimer: unknown
   contentEl: TestElement
   render: ReturnType<typeof vi.fn>
   markDirty: ReturnType<typeof vi.fn>
   focusRowCell: ReturnType<typeof vi.fn>
+  runningSetTimer(): RunningSetTimer | null
   renderDurationTable(card: HTMLElement, ex: TimerExerciseCard, index: number): void
   renderDurationRow(
     wrap: HTMLElement,
@@ -2791,10 +2623,17 @@ interface TimerView {
     i: number,
     exerciseIndex: number,
   ): void
-  startCardTimer(card: TimerExerciseCard): void
+  openSetTimer(card: TimerExerciseCard): void
   stopTimer(opts: { write: boolean; render?: boolean }): void
   abortTimer(): void
-  liveSeconds(timer: { accumulator: number; startedAtMs: number }): number
+  liveSeconds(stopwatch: { accumulator: number; startedAtMs: number }): number
+}
+
+/** The set timer screen as the view holds it while its set is timed. */
+interface RunningSetTimer {
+  card: unknown
+  entry: unknown
+  stopwatch: { accumulator: number; startedAtMs: number }
 }
 
 interface RestTimerView {
@@ -2803,13 +2642,14 @@ interface RestTimerView {
   session: unknown
   model: RestTimerWorkoutModel
   exerciseHistory: unknown
-  activeTimer: unknown
-  activeRestTimer: unknown
   lastRestSeconds: number | null
   contentEl: TestElement
   render: ReturnType<typeof vi.fn>
   markDirty: ReturnType<typeof vi.fn>
   focusRowCell: ReturnType<typeof vi.fn>
+  screens: { current(): unknown }
+  runningSetTimer(): RunningSetTimer | null
+  openSetTimer(card: RestTimerExerciseCard): void
   startRestTimer: (() => void) | ReturnType<typeof vi.fn>
   refreshSettingsDrivenUi(): void
   renderFooterRestTimer(footer: HTMLElement): void
@@ -2826,8 +2666,6 @@ interface RestTimerRenderView {
   session: { file: { basename: string; path: string } }
   model: RestTimerWorkoutModel
   exerciseHistory: unknown
-  activeTimer: unknown
-  activeRestTimer: unknown
   lastRestSeconds: number | null
   contentEl: TestElement
   render(): void
@@ -2850,8 +2688,6 @@ describe('WorkoutEditorView rest timer', () => {
     view.file = { path: 'Workouts/A.md' }
     view.model = createRestTimerModel([ex])
     view.exerciseHistory = null
-    view.activeTimer = null
-    view.activeRestTimer = null
     view.lastRestSeconds = null
     view.contentEl = new TestElement('div')
     view.render = vi.fn()
@@ -2869,8 +2705,6 @@ describe('WorkoutEditorView rest timer', () => {
     view.session = { file: { basename: 'A', path: 'Workouts/A.md' } }
     view.model = createRestTimerModel(exercises)
     view.exerciseHistory = null
-    view.activeTimer = null
-    view.activeRestTimer = null
     view.lastRestSeconds = null
     view.contentEl = new TestElement('div')
     return view
@@ -2885,6 +2719,8 @@ describe('WorkoutEditorView rest timer', () => {
      */
     // eslint-disable-next-line obsidianmd/no-global-this -- The test realm's global object is the only handle available for stubbing.
     vi.stubGlobal('window', globalThis)
+
+    vi.stubGlobal('activeWindow', { navigator: {} })
   })
 
   afterEach(() => {
@@ -2961,7 +2797,7 @@ describe('WorkoutEditorView rest timer', () => {
     reps!.listenersFor('blur').forEach((listener) => listener({}))
 
     expect(view.startRestTimer).not.toHaveBeenCalled()
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
   })
 
   it('marks only the last strength row as the live row', () => {
@@ -3026,7 +2862,7 @@ describe('WorkoutEditorView rest timer', () => {
 
     view.startRestTimer()
 
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
     expect(view.render).not.toHaveBeenCalled()
   })
 
@@ -3043,38 +2879,11 @@ describe('WorkoutEditorView rest timer', () => {
 
     view.startRestTimer()
 
-    expect(view.activeRestTimer).toMatchObject({ startedAtMs: Date.now() })
+    expect(view.screens.current()).toMatchObject({ kind: 'rest', startedAtMs: Date.now() })
     expect(set).toEqual({ set: 1, weight: 80, reps: 5 })
     expect(view.lastRestSeconds).toBeNull()
     expect(view.markDirty).not.toHaveBeenCalled()
     expect(view.render).toHaveBeenCalled()
-  })
-
-  it('updates the visible footer rest timer label while running', () => {
-    const set = { set: 1, weight: 80, reps: 5 }
-    const ex: RestTimerExerciseCard = {
-      name: 'Squat',
-      kind: 'strength',
-      strengthSets: [set],
-      durationEntries: [],
-      bodyweightSets: [],
-    }
-    const view = createRestTimerView(ex)
-
-    view.startRestTimer()
-    vi.setSystemTime(new Date('2026-05-03T00:00:03Z'))
-    const footer = new TestElement('div')
-    view.renderFooterRestTimer(footer as unknown as HTMLElement)
-
-    const label = footer.findByClass('fitkit-rest-timer-label')
-    expect(label?.textContent).toBe('Stop 3s')
-
-    vi.setSystemTime(new Date('2026-05-03T00:00:07Z'))
-    view.tickRestTimer()
-
-    expect(label?.textContent).toBe('Stop 7s')
-    expect(set).toEqual({ set: 1, weight: 80, reps: 5 })
-    expect(view.markDirty).not.toHaveBeenCalled()
   })
 
   it('stopping captures the elapsed rest duration for the footer readout', () => {
@@ -3094,7 +2903,7 @@ describe('WorkoutEditorView rest timer', () => {
     const footer = new TestElement('div')
     view.renderFooterRestTimer(footer as unknown as HTMLElement)
 
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
     expect(view.lastRestSeconds).toBe(12)
     expect(footer.findByClass('fitkit-rest-timer-label')?.textContent).toBe('Start rest')
     expect(footer.findByClass('fitkit-rest-timer-last')?.textContent).toBe('Last rest 12s')
@@ -3121,7 +2930,6 @@ describe('WorkoutEditorView rest timer', () => {
     view.renderFooterRestTimer(footer as unknown as HTMLElement)
 
     expect(view.lastRestSeconds).toBeNull()
-    expect(footer.findByClass('fitkit-rest-timer-label')?.textContent).toBe('Stop 0s')
     expect(footer.findByClass('fitkit-rest-timer-last')).toBeNull()
   })
 
@@ -3145,7 +2953,7 @@ describe('WorkoutEditorView rest timer', () => {
     view.plugin.settings.strengthRestTimerEnabled = false
     view.refreshSettingsDrivenUi()
 
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
     expect(view.lastRestSeconds).toBeNull()
     expect(view.render).toHaveBeenCalled()
 
@@ -3154,7 +2962,7 @@ describe('WorkoutEditorView rest timer', () => {
     view.plugin.settings.strengthRestTimerEnabled = false
     view.refreshSettingsDrivenUi()
 
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
     expect(view.lastRestSeconds).toBeNull()
   })
 
@@ -3176,14 +2984,14 @@ describe('WorkoutEditorView rest timer', () => {
       .loadFile({ path: 'Workouts/B.md', extension: 'md', basename: 'B', stat: { mtime: 0 } })
       .catch(() => undefined)
 
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
     expect(view.lastRestSeconds).toBeNull()
     expect(set).toEqual({ set: 1, weight: 80, reps: 5 })
 
     view.startRestTimer()
     await view.onClose().catch(() => undefined)
 
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
     expect(view.lastRestSeconds).toBeNull()
     expect(set).toEqual({ set: 1, weight: 80, reps: 5 })
   })
@@ -3220,16 +3028,12 @@ describe('WorkoutEditorView rest timer', () => {
         isWorkout: true,
       }),
     }
+    view.startRestTimer()
     view.lastRestSeconds = 12
-    view.activeRestTimer = {
-      startedAtMs: Date.now(),
-      intervalId: window.setInterval(() => undefined, 1000),
-      labelEl: null,
-    }
 
     await view.reloadFromDisk()
 
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
     expect(view.lastRestSeconds).toBe(12)
     expect(view.model.exercises[0]?.strengthSets[0]?.weight).toBe(90)
   })
@@ -3244,21 +3048,16 @@ describe('WorkoutEditorView rest timer', () => {
       bodyweightSets: [],
     }
     const view = createRestTimerView(ex)
-    view.activeTimer = {
-      card: ex,
-      entry: durationEntry,
-      startedAtMs: Date.now(),
-      accumulator: 30,
-      intervalId: 0,
-      inputEl: null,
-    }
+    view.openSetTimer(ex)
+    view.render.mockClear()
+    view.markDirty.mockClear()
 
     vi.setSystemTime(new Date('2026-05-03T00:00:08Z'))
     view.startRestTimer()
 
     expect(durationEntry.durationSeconds).toBe(38)
-    expect(view.activeTimer).toBeNull()
-    expect(view.activeRestTimer).toMatchObject({ startedAtMs: Date.now() })
+    expect(view.runningSetTimer()).toBeNull()
+    expect(view.screens.current()).toMatchObject({ kind: 'rest', startedAtMs: Date.now() })
     expect(view.markDirty).toHaveBeenCalled()
     expect(view.render).toHaveBeenCalledTimes(1)
   })
@@ -3270,7 +3069,6 @@ describe('WorkoutEditorView duration timer', () => {
     view.file = { path: 'Workouts/A.md' }
     view.model = { exercises: [ex] }
     view.exerciseHistory = null
-    view.activeTimer = null
     view.contentEl = new TestElement('div')
     view.render = vi.fn()
     view.markDirty = vi.fn()
@@ -3287,6 +3085,8 @@ describe('WorkoutEditorView duration timer', () => {
      */
     // eslint-disable-next-line obsidianmd/no-global-this -- The test realm's global object is the only handle available for stubbing.
     vi.stubGlobal('window', globalThis)
+
+    vi.stubGlobal('activeWindow', { navigator: {} })
   })
 
   afterEach(() => {
@@ -3361,34 +3161,7 @@ describe('WorkoutEditorView duration timer', () => {
     expect(view.markDirty).toHaveBeenCalled()
   })
 
-  it('renders Stop timer with square icon when the card is the active timer', () => {
-    const ex: TimerExerciseCard = {
-      name: 'Plank',
-      kind: 'duration',
-      strengthSets: [],
-      durationEntries: [{}],
-      bodyweightSets: [],
-    }
-    const view = createTimerView(ex)
-    view.activeTimer = {
-      card: ex,
-      entry: ex.durationEntries[0],
-      startedAtMs: Date.now(),
-      accumulator: 0,
-      intervalId: 0,
-      inputEl: null,
-    }
-    const card = new TestElement('div')
-
-    view.renderDurationTable(card as unknown as HTMLElement, ex, 0)
-
-    const actions = card.findByClass('fitkit-row-actions')
-    const buttons = actions?.children.filter((c) => c.tagName === 'button') ?? []
-    expect(buttons.map((b) => b.textContent)).toEqual(['Add set', 'Repeat', 'Stop timer'])
-    expect(buttons[2]?.attributes.get('data-icon')).toBe('square')
-  })
-
-  it('startCardTimer auto-creates a row when none exist and sets the active timer', () => {
+  it('openSetTimer auto-creates a row when none exist and sets the active timer', () => {
     const ex: TimerExerciseCard = {
       name: 'Plank',
       kind: 'duration',
@@ -3398,18 +3171,18 @@ describe('WorkoutEditorView duration timer', () => {
     }
     const view = createTimerView(ex)
 
-    view.startCardTimer(ex)
+    view.openSetTimer(ex)
 
     expect(ex.durationEntries).toHaveLength(1)
-    const timer = view.activeTimer as { card: unknown; entry: unknown; accumulator: number }
-    expect(timer.card).toBe(ex)
-    expect(timer.entry).toBe(ex.durationEntries[0])
-    expect(timer.accumulator).toBe(0)
+    const timer = view.runningSetTimer()
+    expect(timer?.card).toBe(ex)
+    expect(timer?.entry).toBe(ex.durationEntries[0])
+    expect(timer?.stopwatch.accumulator).toBe(0)
     expect(view.markDirty).toHaveBeenCalled()
     expect(view.render).toHaveBeenCalled()
   })
 
-  it('startCardTimer accumulates from the existing duration value', () => {
+  it('openSetTimer accumulates from the existing duration value', () => {
     const ex: TimerExerciseCard = {
       name: 'Plank',
       kind: 'duration',
@@ -3419,10 +3192,9 @@ describe('WorkoutEditorView duration timer', () => {
     }
     const view = createTimerView(ex)
 
-    view.startCardTimer(ex)
+    view.openSetTimer(ex)
 
-    const timer = view.activeTimer as { accumulator: number }
-    expect(timer.accumulator).toBe(30)
+    expect(view.runningSetTimer()?.stopwatch.accumulator).toBe(30)
   })
 
   it('liveSeconds returns accumulator plus elapsed wall-clock seconds', () => {
@@ -3435,10 +3207,10 @@ describe('WorkoutEditorView duration timer', () => {
     }
     const view = createTimerView(ex)
 
-    view.startCardTimer(ex)
+    view.openSetTimer(ex)
     vi.setSystemTime(new Date('2026-04-28T00:00:05Z'))
-    const timer = view.activeTimer as { accumulator: number; startedAtMs: number }
-    expect(view.liveSeconds(timer)).toBe(35)
+    const timer = view.runningSetTimer()
+    expect(timer && view.liveSeconds(timer.stopwatch)).toBe(35)
   })
 
   it('stopTimer writes accumulator + elapsed back into the row and clears the timer', () => {
@@ -3451,12 +3223,12 @@ describe('WorkoutEditorView duration timer', () => {
     }
     const view = createTimerView(ex)
 
-    view.startCardTimer(ex)
+    view.openSetTimer(ex)
     vi.setSystemTime(new Date('2026-04-28T00:00:12Z'))
     view.stopTimer({ write: true })
 
     expect(ex.durationEntries[0]?.durationSeconds).toBe(42)
-    expect(view.activeTimer).toBeNull()
+    expect(view.runningSetTimer()).toBeNull()
   })
 
   it('abortTimer clears the timer without writing back', () => {
@@ -3469,13 +3241,13 @@ describe('WorkoutEditorView duration timer', () => {
     }
     const view = createTimerView(ex)
 
-    view.startCardTimer(ex)
+    view.openSetTimer(ex)
     view.render.mockClear()
     vi.setSystemTime(new Date('2026-04-28T00:00:05Z'))
     view.abortTimer()
 
     expect(ex.durationEntries[0]?.durationSeconds).toBe(10)
-    expect(view.activeTimer).toBeNull()
+    expect(view.runningSetTimer()).toBeNull()
     expect(view.render).toHaveBeenCalledTimes(1)
   })
 
@@ -3510,7 +3282,7 @@ describe('WorkoutEditorView duration timer', () => {
     }
     const view = createTimerView(ex)
 
-    view.startCardTimer(ex)
+    view.openSetTimer(ex)
     vi.setSystemTime(new Date('2026-04-28T00:00:08Z'))
 
     const card = new TestElement('div')
@@ -3523,7 +3295,7 @@ describe('WorkoutEditorView duration timer', () => {
 
     expect(ex.durationEntries[0]?.durationSeconds).toBe(8)
     expect(ex.durationEntries).toHaveLength(2)
-    expect(view.activeTimer).toBeNull()
+    expect(view.runningSetTimer()).toBeNull()
   })
 
   it('clicking Repeat while a timer is running writes back, then copies the timed duration', () => {
@@ -3536,7 +3308,7 @@ describe('WorkoutEditorView duration timer', () => {
     }
     const view = createTimerView(ex)
 
-    view.startCardTimer(ex)
+    view.openSetTimer(ex)
     vi.setSystemTime(new Date('2026-04-28T00:00:08Z'))
 
     const card = new TestElement('div')
@@ -3547,7 +3319,7 @@ describe('WorkoutEditorView duration timer', () => {
       ?.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
 
     expect(ex.durationEntries).toEqual([{ durationSeconds: 8 }, { set: 2, durationSeconds: 8 }])
-    expect(view.activeTimer).toBeNull()
+    expect(view.runningSetTimer()).toBeNull()
   })
 
   it('deleting the active row aborts the timer without writing back', () => {
@@ -3569,7 +3341,7 @@ describe('WorkoutEditorView duration timer', () => {
     }
     const originalEntry = ex.durationEntries[0]
 
-    view.startCardTimer(ex)
+    view.openSetTimer(ex)
     vi.setSystemTime(new Date('2026-04-28T00:00:05Z'))
 
     const wrap = new TestElement('div')
@@ -3583,7 +3355,7 @@ describe('WorkoutEditorView duration timer', () => {
 
     expect(originalEntry?.durationSeconds).toBe(30)
     expect(ex.durationEntries).toHaveLength(0)
-    expect(view.activeTimer).toBeNull()
+    expect(view.runningSetTimer()).toBeNull()
   })
 
   it('loadFile flushes a running timer (writes elapsed seconds) before swapping to a new file', async () => {
@@ -3595,7 +3367,7 @@ describe('WorkoutEditorView duration timer', () => {
       bodyweightSets: [],
     }
     const view = createTimerView(ex)
-    view.startCardTimer(ex)
+    view.openSetTimer(ex)
     vi.setSystemTime(new Date('2026-04-28T00:00:12Z'))
 
     /** loadFile reaches FileSession.load after the timer flush; allow the unmocked vault call to throw and assert the flush effect. */
@@ -3604,7 +3376,7 @@ describe('WorkoutEditorView duration timer', () => {
       .catch(() => undefined)
 
     expect(ex.durationEntries[0]?.durationSeconds).toBe(42)
-    expect(view.activeTimer).toBeNull()
+    expect(view.runningSetTimer()).toBeNull()
   })
 
   it('onClose flushes a running timer (writes elapsed seconds) before tearing down', async () => {
@@ -3616,14 +3388,14 @@ describe('WorkoutEditorView duration timer', () => {
       bodyweightSets: [],
     }
     const view = createTimerView(ex)
-    view.startCardTimer(ex)
+    view.openSetTimer(ex)
     vi.setSystemTime(new Date('2026-04-28T00:00:12Z'))
 
     /** onClose calls contentEl.empty() after the timer flush; TestElement does not implement empty so absorb the throw and assert the flush effect. */
     await (view as unknown as { onClose: () => Promise<void> }).onClose().catch(() => undefined)
 
     expect(ex.durationEntries[0]?.durationSeconds).toBe(42)
-    expect(view.activeTimer).toBeNull()
+    expect(view.runningSetTimer()).toBeNull()
   })
 
   it('renderDurationRow displays stored seconds in one formatted duration text input', () => {
@@ -3730,37 +3502,12 @@ describe('WorkoutEditorView duration timer', () => {
     expect(input?.attributes.has('aria-invalid')).toBe(false)
     expect((input as unknown as { value?: string } | undefined)?.value).toBe('1m30s')
   })
-
-  it('renderDurationRow shows the live counter, disables the input, and adds the timing class', () => {
-    const ex: TimerExerciseCard = {
-      name: 'Plank',
-      kind: 'duration',
-      strengthSets: [],
-      durationEntries: [{ durationSeconds: 59 }],
-      bodyweightSets: [],
-    }
-    const view = createTimerView(ex)
-    view.startCardTimer(ex)
-    vi.setSystemTime(new Date('2026-04-28T00:00:02Z'))
-
-    const wrap = new TestElement('div')
-    view.renderDurationRow(wrap as unknown as HTMLElement, ex, 0, 0)
-
-    const row = wrap.findByClass('fitkit-row')
-    expect(row?.classes.has('fitkit-row--timing')).toBe(true)
-    expect(row?.dataset.fitkitTimerRow).toBe('0:0')
-    const durationCell = row
-      ?.findAllByClass('fitkit-cell')
-      .find((c) => c.dataset.label === 'Duration')
-    const input = durationCell?.children[0]
-    expect(input?.attributes.has('disabled')).toBe(true)
-    expect((input as unknown as { value?: string } | undefined)?.value).toBe('1m1s')
-  })
 })
 
 interface NextPlanExerciseCard {
   name: string
   kind: 'strength' | 'duration'
+  plan?: string
   next?: { direction: 'up' | 'down' | 'stay'; step?: number }
   strengthSets: Array<{ set?: number; weight?: number; reps?: number }>
   durationEntries: Array<{ durationSeconds?: number }>
@@ -3781,7 +3528,6 @@ interface NextPlanView {
 interface SeedView {
   model: { exercises: RestTimerExerciseCard[] }
   exerciseHistory: unknown
-  activeTimer: unknown
   markDirty: ReturnType<typeof vi.fn>
   render: ReturnType<typeof vi.fn>
   applyKindSwitch(index: number, nextKind: 'strength' | 'duration', clearedRows: boolean): void
@@ -3803,7 +3549,6 @@ describe('WorkoutEditorView set seeding', () => {
       ],
     }
     view.exerciseHistory = history
-    view.activeTimer = null
     view.markDirty = vi.fn()
     view.render = vi.fn()
     view.applyKindSwitch(0, 'strength', false)
@@ -3893,7 +3638,6 @@ describe('WorkoutEditorView set seeding', () => {
         }[]
       }
       exerciseHistory: unknown
-      activeTimer: unknown
       markDirty: ReturnType<typeof vi.fn>
       render: ReturnType<typeof vi.fn>
       applyKindSwitch(index: number, nextKind: 'bodyweight', clearedRows: boolean): void
@@ -3910,7 +3654,6 @@ describe('WorkoutEditorView set seeding', () => {
       ],
     }
     view.exerciseHistory = null
-    view.activeTimer = null
     view.markDirty = vi.fn()
     view.render = vi.fn()
 
@@ -3971,6 +3714,33 @@ describe('WorkoutEditorView next-time plan', () => {
     })
 
     expect(items).toEqual([])
+  })
+
+  it('offers increase, keep, and decrease without a step on interval cards', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
+    const ex: NextPlanExerciseCard = {
+      name: 'Exercise Bike',
+      kind: 'duration',
+      plan: '(x 3 (over 1m 300W))',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 60 }],
+      bodyweightSets: [],
+    }
+    const view = createNextPlanView(ex)
+    view.openCardMenu({ currentTarget: new TestElement('button') } as unknown as MouseEvent, 0)
+    const titles = (obsidianMock.menus.at(-1)?.items ?? []).map((item) => item.title)
+
+    planItems(ex, view)[0]?.onClick?.()
+
+    expect({
+      plan: titles.filter((title) => title?.startsWith('Plan') === true),
+      step: titles.includes('Set plan step...'),
+      next: ex.next,
+    }).toEqual({
+      plan: ['Plan: increase', 'Plan: keep', 'Plan: decrease'],
+      step: false,
+      next: { direction: 'up' },
+    })
   })
 
   it('checks the recorded direction', () => {
@@ -4455,6 +4225,32 @@ describe('WorkoutEditorView repeat set', () => {
 
     expect(ex.durationEntries[1]).toEqual({ set: 2, durationSeconds: 45 })
   })
+
+  it.each([
+    { button: 'Add set', kind: 'strength' as const, rows: 'strengthSets' as const },
+    { button: 'Repeat', kind: 'strength' as const, rows: 'strengthSets' as const },
+    { button: 'Add set', kind: 'bodyweight' as const, rows: 'bodyweightSets' as const },
+    { button: 'Repeat', kind: 'bodyweight' as const, rows: 'bodyweightSets' as const },
+    { button: 'Repeat', kind: 'duration' as const, rows: 'durationEntries' as const },
+  ])(
+    'numbers a set made by $button on a $kind card after the highest, so a deleted set is not reused',
+    ({ button, kind, rows }) => {
+      const ex = {
+        ...emptyCard(kind),
+        [rows]: [
+          { set: 1, level: 1 },
+          { set: 3, level: 1 },
+        ],
+      }
+
+      renderCard(ex)
+        .findByClass('fitkit-row-actions')
+        ?.children.find((child) => child.tagName === 'button' && child.textContent === button)
+        ?.listenersFor('click')[0]?.({})
+
+      expect(ex[rows].map((row) => (row as { set?: number }).set)).toEqual([1, 3, 4])
+    },
+  )
 
   it.each(['strength', 'bodyweight', 'duration'] as const)(
     'disables Repeat on an empty %s card, since there is no set to copy',

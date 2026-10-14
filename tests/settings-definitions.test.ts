@@ -83,6 +83,8 @@ describe('setting definitions', () => {
       ['folder', 'fitnessRoot'],
       ['toggle', 'autoOpenWorkoutEditor'],
       ['toggle', 'strengthRestTimerEnabled'],
+      ['toggle', 'intervalBeepsEnabled'],
+      ['textarea', 'intervalPresets'],
       ['number', 'autosaveDebounceMs'],
       ['number', 'chartSessionsWindow'],
     ])
@@ -136,7 +138,7 @@ describe('setting definitions', () => {
   it('gives every searchable row a description so settings search can match it', () => {
     const searchable = allRows(createTab().tab).filter((row) => row.searchable !== false)
 
-    expect(searchable).toHaveLength(12)
+    expect(searchable).toHaveLength(14)
     for (const row of searchable) {
       expect(row.name.length).toBeGreaterThan(0)
       expect(typeof row.desc).toBe('string')
@@ -215,6 +217,37 @@ describe('setControlValue', () => {
     await tab.setControlValue('strengthRestTimerEnabled', false)
     expect(settings.strengthRestTimerEnabled).toBe(false)
     expect(refreshWorkoutEditorViews).toHaveBeenCalledTimes(1)
+  })
+
+  it('saves the interval beeps toggle', async () => {
+    const { tab, settings, saveSettings } = createTab()
+
+    await tab.setControlValue('intervalBeepsEnabled', false)
+
+    expect([settings.intervalBeepsEnabled, saveSettings.mock.calls.length]).toEqual([false, 1])
+  })
+
+  it('saves the interval presets as written', async () => {
+    const { tab, settings, saveSettings } = createTab()
+
+    await tab.setControlValue('intervalPresets', 'Bike: 10 x 4m @ 300W, 1m rest')
+
+    expect([settings.intervalPresets, saveSettings.mock.calls.length]).toEqual([
+      'Bike: 10 x 4m @ 300W, 1m rest',
+      1,
+    ])
+  })
+
+  it('rejects interval presets naming each line it cannot read', () => {
+    const control = allRows(createTab().tab).find(
+      (row) => row.control?.key === 'intervalPresets',
+    )?.control
+    const validate = control?.validate as unknown as ((value: string) => string | void) | undefined
+
+    expect([
+      validate?.(DEFAULT_SETTINGS.intervalPresets),
+      validate?.('Tabata: 8 x 20s @ 400W, 10s rest\nOops: lots of reps'),
+    ]).toEqual([undefined, 'Cannot read: Oops: lots of reps'])
   })
 
   it('ignores a key the tab does not own', async () => {

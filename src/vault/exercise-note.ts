@@ -1,5 +1,5 @@
 import { defaultBodyweightLevels } from '../domain/bodyweight-levels'
-import type { ExerciseKind } from '../domain/exercise-registry'
+import { kindOfType, type ExerciseType } from '../domain/exercise-type'
 import { buildNotesBlock, buildRecentSessionsBlock } from '../domain/exercise-note-template'
 import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
 
@@ -14,14 +14,18 @@ import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
  */
 export function composeExerciseNote(
   exerciseName: string,
-  kind: ExerciseKind,
+  type: ExerciseType,
   workoutsFolderPath: string,
   unit: WeightUnit = DEFAULT_WEIGHT_UNIT,
 ): string {
+  const kind = kindOfType(type)
   const lines: string[] = []
   lines.push('---')
   lines.push('type: exercise')
   lines.push(`kind: ${kind}`)
+  if (type === 'interval') {
+    lines.push('interval: true')
+  }
   /** Strength-only rule: metric and unit are strength concerns; other kinds need neither. */
   if (kind === 'strength') {
     lines.push('metric: e1rm')

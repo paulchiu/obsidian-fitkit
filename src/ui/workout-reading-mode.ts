@@ -1,6 +1,7 @@
 import { TFile, type MarkdownPostProcessorContext } from 'obsidian'
 
-import { EXERCISE_KIND_LABELS, assertUnreachableKind } from '../domain/exercise-kind'
+import { assertUnreachableKind } from '../domain/exercise-kind'
+import { EXERCISE_TYPE_LABELS, loggedTypeOf } from '../domain/exercise-type'
 import { bodyweightLevelName, type BodyweightLadder } from '../domain/bodyweight-levels'
 import { formatDurationInput } from '../domain/duration-input'
 import { createRegistry, levelsForName, unitForName } from '../domain/exercise-registry'
@@ -76,10 +77,10 @@ function isWorkoutContext(plugin: FitKitPlugin, ctx: MarkdownPostProcessorContex
 }
 
 function frontmatterIsWorkout(frontmatter: unknown): boolean {
-  if (!frontmatter || typeof frontmatter !== 'object') {
+  if (!frontmatter || typeof frontmatter !== 'object' || !('type' in frontmatter)) {
     return false
   }
-  const type = (frontmatter as Record<string, unknown>).type
+  const { type } = frontmatter
   return typeof type === 'string' && type.toLowerCase() === 'workout'
 }
 
@@ -107,7 +108,7 @@ function workoutSourceRowCount(sectionText: string): number {
 }
 
 function hideRecognisedSourceRows(el: HTMLElement, sourceRowCount: number): number {
-  const listItems = Array.from(el.querySelectorAll('li')) as HTMLElement[]
+  const listItems = Array.from(el.querySelectorAll('li'))
   if (listItems.length === 0) {
     return 0
   }
@@ -147,12 +148,16 @@ function renderExercisePreview(
   const summary = wrap.createDiv({ cls: 'fitkit-reading-summary' })
   summary.createSpan({
     cls: 'fitkit-reading-kind',
-    text: EXERCISE_KIND_LABELS[exercise.kind],
+    text: EXERCISE_TYPE_LABELS[loggedTypeOf(exercise)],
   })
   summary.createSpan({ cls: 'fitkit-reading-count', text: exerciseCountText(exercise) })
 
   if (exercise.note) {
     wrap.createDiv({ cls: 'fitkit-reading-note', text: exercise.note })
+  }
+
+  if (exercise.kind === 'duration' && exercise.plan !== undefined) {
+    wrap.createDiv({ cls: 'fitkit-reading-plan', text: `Plan: ${exercise.plan}` })
   }
 
   if (exercise.next) {
@@ -278,7 +283,9 @@ function formatSet(value: number): string {
 
 function formatReadingPlanStepSuffix(exercise: ExerciseEntry, unit: WeightUnit): string {
   const step = exercise.next?.step
-  return step === undefined ? '' : ` ${planStepUnit(exercise.kind, step, unit)}`
+  return step === undefined || exercise.kind === 'duration'
+    ? ''
+    : ` ${planStepUnit(exercise.kind, step, unit)}`
 }
 
 function formatNumber(value: number): string {

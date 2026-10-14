@@ -34,18 +34,47 @@ tags:
 
 Dataview inline fields are the canonical format. The recognised ones are:
 
-| Field      | Meaning                                                                                                               |
-| ---------- | --------------------------------------------------------------------------------------------------------------------- |
-| `exercise` | Wikilink to the exercise. Required on every row.                                                                      |
-| `set`      | Set number within the exercise.                                                                                       |
-| `weight`   | Weight lifted, in the exercise's unit.                                                                                |
-| `reps`     | Repetitions.                                                                                                          |
-| `duration` | Seconds. Always seconds, whatever you typed into the editor.                                                          |
-| `started`  | Local time a duration timer started, such as `2026-09-30T07:15:03+10:00`. Present only while that timer runs.         |
-| `level`    | Rung reached, as a 1-based position in the exercise's `levels:` ladder.                                               |
-| `load`     | Added weight on a bodyweight set, such as a vest.                                                                     |
-| `notes`    | Free text, on an exercise header row or on an individual set.                                                         |
-| `next`     | `up`, `down`, or `stay`, with an optional step (`up 2.5`): a weight change for strength, a rung count for bodyweight. |
+| Field      | Meaning                                                                                                                                                               |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `exercise` | Wikilink to the exercise. Required on every row.                                                                                                                      |
+| `set`      | Set number within the exercise.                                                                                                                                       |
+| `weight`   | Weight lifted, in the exercise's unit.                                                                                                                                |
+| `reps`     | Repetitions.                                                                                                                                                          |
+| `duration` | Seconds. Always seconds, whatever you typed into the editor.                                                                                                          |
+| `started`  | Local time a duration timer started, such as `2026-09-30T07:15:03+10:00`. Present only while that timer runs.                                                         |
+| `level`    | Rung reached, as a 1-based position in the exercise's `levels:` ladder.                                                                                               |
+| `load`     | Added weight on a bodyweight set, such as a vest.                                                                                                                     |
+| `notes`    | Free text, on an exercise header row or on an individual set.                                                                                                         |
+| `next`     | `up`, `down`, or `stay`, with an optional step (`up 2.5`): a weight change for strength, a rung count for bodyweight. An interval exercise takes the direction alone. |
+| `plan`     | An interval plan on a duration exercise's header row, such as `(x 8 (work 30s 300W) (rest 90s))` (see below).                                                         |
+| `step`     | The plan step an interval row ran, such as `over`.                                                                                                                    |
+| `watts`    | Power held on an interval rep.                                                                                                                                        |
+| `rest`     | Seconds rested after an interval rep. The last rep of a run has none.                                                                                                 |
+| `paused`   | `true` on the open rep of a paused interval run.                                                                                                                      |
+
+### Interval plans
+
+A duration exercise can carry a plan on its header row, and each work step is then one row:
+
+```markdown
+## [[Indoor Bike]]
+
+- [exercise:: [[Indoor Bike]]] [plan:: (warmup 10m 150W) (x 3 (over 1m 300W) (under 2m 220W)) (cooldown 5m 120W)]
+- [exercise:: [[Indoor Bike]]] [set:: 1] [step:: warmup] [duration:: 600] [watts:: 152]
+- [exercise:: [[Indoor Bike]]] [set:: 2] [step:: over] [duration:: 60] [watts:: 304]
+- [exercise:: [[Indoor Bike]]] [set:: 3] [step:: under] [duration:: 120] [watts:: 221]
+
+## [[Sled Push]]
+
+- [exercise:: [[Sled Push]]] [plan:: (x 6 (every 2m (push open 120kg)))]
+- [exercise:: [[Sled Push]]] [set:: 1] [step:: push] [duration:: 18] [load:: 120] [rest:: 102]
+```
+
+A plan is a run of bracketed lists, played left to right: a step such as `(over 1m 300W)`, a rest such as `(rest 90s)`, a repeat such as `(x 3 …)`, and `(every 2m …)` for steps that start on the clock. The full syntax, with common sessions written out, is in [Interval training](interval-training.md#plan-syntax).
+
+Each row records the plan's target in the same field: `watts` for a `300W` target, `load` for `120kg`, or `level` for `L12`.
+
+While a run is under way, its open rep carries a `started` stamp, which times the rest when the row has a `rest` field and the work otherwise. That stamp, the plan and the rows are the run's whole state, which is how a run survives Obsidian being closed.
 
 An `## [[Name]]` heading groups the rows beneath it. FitKit treats an H2 as an exercise heading only when the section it introduces contains at least one logged exercise row, which is what lets a `## Session notes` heading sit in a workout note without being mistaken for an exercise.
 
@@ -90,7 +119,7 @@ exercise: Squat
 Your own training notes live here.
 ````
 
-`kind:` is `strength`, `duration`, or `bodyweight`. `unit:` is `kg` or `lbs` and applies to strength exercises only, as does `metric:`, which selects what the progress chart plots. A bodyweight note carries neither; it carries a `levels:` ladder instead, see [Dashboard and charts](dashboard-and-charts.md#chart-blocks).
+`kind:` is `strength`, `duration`, or `bodyweight`. An interval exercise is `kind: duration` with an `interval: true` line, so a version of FitKit from before interval training reads it as an ordinary duration exercise. `unit:` is `kg` or `lbs` and applies to strength exercises only, as does `metric:`, which selects what the progress chart plots. A bodyweight note carries neither; it carries a `levels:` ladder instead, see [Dashboard and charts](dashboard-and-charts.md#chart-blocks).
 
 FitKit seeds the three sections when it creates a note, and `Sync and repair exercise notes` refreshes them in notes you already have. The `Notes` section is yours; nothing regenerates over it.
 

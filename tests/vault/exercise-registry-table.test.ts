@@ -164,6 +164,22 @@ describe('buildRegistryTableRows', () => {
     ])
   })
 
+  it('carries the interval marker from the note onto its row', async () => {
+    const app = mockApp([
+      {
+        path: 'Fitness/Exercises/Bike.md',
+        basename: 'Bike',
+        frontmatter: { type: 'exercise', kind: 'duration', interval: true },
+      },
+    ])
+
+    const rows = await buildRegistryTableRows(app, settings())
+
+    expect(rows.map((row) => [row.name, row.kind, row.interval])).toEqual([
+      ['Bike', 'duration', true],
+    ])
+  })
+
   it('keeps an overlay entry layered on a note as note-backed, carrying its saved aliases', async () => {
     const app = mockApp([
       {
