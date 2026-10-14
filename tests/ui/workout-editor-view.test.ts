@@ -2519,11 +2519,11 @@ interface TimerView {
   file: unknown
   model: { exercises: TimerExerciseCard[] }
   exerciseHistory: unknown
-  activeTimer: unknown
   contentEl: TestElement
   render: ReturnType<typeof vi.fn>
   markDirty: ReturnType<typeof vi.fn>
   focusRowCell: ReturnType<typeof vi.fn>
+  runningSetTimer(): RunningSetTimer | null
   renderDurationTable(card: HTMLElement, ex: TimerExerciseCard, index: number): void
   renderDurationRow(
     wrap: HTMLElement,
@@ -2534,7 +2534,14 @@ interface TimerView {
   openSetTimer(card: TimerExerciseCard): void
   stopTimer(opts: { write: boolean; render?: boolean }): void
   abortTimer(): void
-  liveSeconds(timer: { accumulator: number; startedAtMs: number }): number
+  liveSeconds(stopwatch: { accumulator: number; startedAtMs: number }): number
+}
+
+/** The set timer screen as the view holds it while its set is timed. */
+interface RunningSetTimer {
+  card: unknown
+  entry: unknown
+  stopwatch: { accumulator: number; startedAtMs: number }
 }
 
 interface RestTimerView {
@@ -2543,13 +2550,14 @@ interface RestTimerView {
   session: unknown
   model: RestTimerWorkoutModel
   exerciseHistory: unknown
-  activeTimer: unknown
-  activeRestTimer: unknown
   lastRestSeconds: number | null
   contentEl: TestElement
   render: ReturnType<typeof vi.fn>
   markDirty: ReturnType<typeof vi.fn>
   focusRowCell: ReturnType<typeof vi.fn>
+  screens: { current(): unknown }
+  runningSetTimer(): RunningSetTimer | null
+  openSetTimer(card: RestTimerExerciseCard): void
   startRestTimer: (() => void) | ReturnType<typeof vi.fn>
   refreshSettingsDrivenUi(): void
   renderFooterRestTimer(footer: HTMLElement): void
@@ -2566,8 +2574,6 @@ interface RestTimerRenderView {
   session: { file: { basename: string; path: string } }
   model: RestTimerWorkoutModel
   exerciseHistory: unknown
-  activeTimer: unknown
-  activeRestTimer: unknown
   lastRestSeconds: number | null
   contentEl: TestElement
   render(): void
@@ -2590,8 +2596,6 @@ describe('WorkoutEditorView rest timer', () => {
     view.file = { path: 'Workouts/A.md' }
     view.model = createRestTimerModel([ex])
     view.exerciseHistory = null
-    view.activeTimer = null
-    view.activeRestTimer = null
     view.lastRestSeconds = null
     view.contentEl = new TestElement('div')
     view.render = vi.fn()
@@ -2609,8 +2613,6 @@ describe('WorkoutEditorView rest timer', () => {
     view.session = { file: { basename: 'A', path: 'Workouts/A.md' } }
     view.model = createRestTimerModel(exercises)
     view.exerciseHistory = null
-    view.activeTimer = null
-    view.activeRestTimer = null
     view.lastRestSeconds = null
     view.contentEl = new TestElement('div')
     return view
@@ -2703,7 +2705,7 @@ describe('WorkoutEditorView rest timer', () => {
     reps!.listenersFor('blur').forEach((listener) => listener({}))
 
     expect(view.startRestTimer).not.toHaveBeenCalled()
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
   })
 
   it('marks only the last strength row as the live row', () => {
@@ -2768,7 +2770,7 @@ describe('WorkoutEditorView rest timer', () => {
 
     view.startRestTimer()
 
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
     expect(view.render).not.toHaveBeenCalled()
   })
 
@@ -2785,7 +2787,7 @@ describe('WorkoutEditorView rest timer', () => {
 
     view.startRestTimer()
 
-    expect(view.activeRestTimer).toMatchObject({ startedAtMs: Date.now() })
+    expect(view.screens.current()).toMatchObject({ kind: 'rest', startedAtMs: Date.now() })
     expect(set).toEqual({ set: 1, weight: 80, reps: 5 })
     expect(view.lastRestSeconds).toBeNull()
     expect(view.markDirty).not.toHaveBeenCalled()
@@ -2809,7 +2811,7 @@ describe('WorkoutEditorView rest timer', () => {
     const footer = new TestElement('div')
     view.renderFooterRestTimer(footer as unknown as HTMLElement)
 
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
     expect(view.lastRestSeconds).toBe(12)
     expect(footer.findByClass('fitkit-rest-timer-label')?.textContent).toBe('Start rest')
     expect(footer.findByClass('fitkit-rest-timer-last')?.textContent).toBe('Last rest 12s')
@@ -2859,7 +2861,7 @@ describe('WorkoutEditorView rest timer', () => {
     view.plugin.settings.strengthRestTimerEnabled = false
     view.refreshSettingsDrivenUi()
 
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
     expect(view.lastRestSeconds).toBeNull()
     expect(view.render).toHaveBeenCalled()
 
@@ -2868,7 +2870,7 @@ describe('WorkoutEditorView rest timer', () => {
     view.plugin.settings.strengthRestTimerEnabled = false
     view.refreshSettingsDrivenUi()
 
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
     expect(view.lastRestSeconds).toBeNull()
   })
 
@@ -2890,14 +2892,14 @@ describe('WorkoutEditorView rest timer', () => {
       .loadFile({ path: 'Workouts/B.md', extension: 'md', basename: 'B', stat: { mtime: 0 } })
       .catch(() => undefined)
 
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
     expect(view.lastRestSeconds).toBeNull()
     expect(set).toEqual({ set: 1, weight: 80, reps: 5 })
 
     view.startRestTimer()
     await view.onClose().catch(() => undefined)
 
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
     expect(view.lastRestSeconds).toBeNull()
     expect(set).toEqual({ set: 1, weight: 80, reps: 5 })
   })
@@ -2934,17 +2936,12 @@ describe('WorkoutEditorView rest timer', () => {
         isWorkout: true,
       }),
     }
+    view.startRestTimer()
     view.lastRestSeconds = 12
-    view.activeRestTimer = {
-      startedAtMs: Date.now(),
-      intervalId: window.setInterval(() => undefined, 1000),
-      clockEl: null,
-      returnScrollTop: 0,
-    }
 
     await view.reloadFromDisk()
 
-    expect(view.activeRestTimer).toBeNull()
+    expect(view.screens.current()).toBeNull()
     expect(view.lastRestSeconds).toBe(12)
     expect(view.model.exercises[0]?.strengthSets[0]?.weight).toBe(90)
   })
@@ -2959,21 +2956,16 @@ describe('WorkoutEditorView rest timer', () => {
       bodyweightSets: [],
     }
     const view = createRestTimerView(ex)
-    view.activeTimer = {
-      card: ex,
-      entry: durationEntry,
-      startedAtMs: Date.now(),
-      accumulator: 30,
-      intervalId: 0,
-      clockEl: null,
-    }
+    view.openSetTimer(ex)
+    view.render.mockClear()
+    view.markDirty.mockClear()
 
     vi.setSystemTime(new Date('2026-05-03T00:00:08Z'))
     view.startRestTimer()
 
     expect(durationEntry.durationSeconds).toBe(38)
-    expect(view.activeTimer).toBeNull()
-    expect(view.activeRestTimer).toMatchObject({ startedAtMs: Date.now() })
+    expect(view.runningSetTimer()).toBeNull()
+    expect(view.screens.current()).toMatchObject({ kind: 'rest', startedAtMs: Date.now() })
     expect(view.markDirty).toHaveBeenCalled()
     expect(view.render).toHaveBeenCalledTimes(1)
   })
@@ -2985,7 +2977,6 @@ describe('WorkoutEditorView duration timer', () => {
     view.file = { path: 'Workouts/A.md' }
     view.model = { exercises: [ex] }
     view.exerciseHistory = null
-    view.activeTimer = null
     view.contentEl = new TestElement('div')
     view.render = vi.fn()
     view.markDirty = vi.fn()
@@ -3091,10 +3082,10 @@ describe('WorkoutEditorView duration timer', () => {
     view.openSetTimer(ex)
 
     expect(ex.durationEntries).toHaveLength(1)
-    const timer = view.activeTimer as { card: unknown; entry: unknown; accumulator: number }
-    expect(timer.card).toBe(ex)
-    expect(timer.entry).toBe(ex.durationEntries[0])
-    expect(timer.accumulator).toBe(0)
+    const timer = view.runningSetTimer()
+    expect(timer?.card).toBe(ex)
+    expect(timer?.entry).toBe(ex.durationEntries[0])
+    expect(timer?.stopwatch.accumulator).toBe(0)
     expect(view.markDirty).toHaveBeenCalled()
     expect(view.render).toHaveBeenCalled()
   })
@@ -3111,8 +3102,7 @@ describe('WorkoutEditorView duration timer', () => {
 
     view.openSetTimer(ex)
 
-    const timer = view.activeTimer as { accumulator: number }
-    expect(timer.accumulator).toBe(30)
+    expect(view.runningSetTimer()?.stopwatch.accumulator).toBe(30)
   })
 
   it('liveSeconds returns accumulator plus elapsed wall-clock seconds', () => {
@@ -3127,8 +3117,8 @@ describe('WorkoutEditorView duration timer', () => {
 
     view.openSetTimer(ex)
     vi.setSystemTime(new Date('2026-04-28T00:00:05Z'))
-    const timer = view.activeTimer as { accumulator: number; startedAtMs: number }
-    expect(view.liveSeconds(timer)).toBe(35)
+    const timer = view.runningSetTimer()
+    expect(timer && view.liveSeconds(timer.stopwatch)).toBe(35)
   })
 
   it('stopTimer writes accumulator + elapsed back into the row and clears the timer', () => {
@@ -3146,7 +3136,7 @@ describe('WorkoutEditorView duration timer', () => {
     view.stopTimer({ write: true })
 
     expect(ex.durationEntries[0]?.durationSeconds).toBe(42)
-    expect(view.activeTimer).toBeNull()
+    expect(view.runningSetTimer()).toBeNull()
   })
 
   it('abortTimer clears the timer without writing back', () => {
@@ -3165,7 +3155,7 @@ describe('WorkoutEditorView duration timer', () => {
     view.abortTimer()
 
     expect(ex.durationEntries[0]?.durationSeconds).toBe(10)
-    expect(view.activeTimer).toBeNull()
+    expect(view.runningSetTimer()).toBeNull()
     expect(view.render).toHaveBeenCalledTimes(1)
   })
 
@@ -3213,7 +3203,7 @@ describe('WorkoutEditorView duration timer', () => {
 
     expect(ex.durationEntries[0]?.durationSeconds).toBe(8)
     expect(ex.durationEntries).toHaveLength(2)
-    expect(view.activeTimer).toBeNull()
+    expect(view.runningSetTimer()).toBeNull()
   })
 
   it('clicking Repeat while a timer is running writes back, then copies the timed duration', () => {
@@ -3237,7 +3227,7 @@ describe('WorkoutEditorView duration timer', () => {
       ?.listenersFor('click')[0]?.({ stopPropagation: vi.fn() })
 
     expect(ex.durationEntries).toEqual([{ durationSeconds: 8 }, { set: 2, durationSeconds: 8 }])
-    expect(view.activeTimer).toBeNull()
+    expect(view.runningSetTimer()).toBeNull()
   })
 
   it('deleting the active row aborts the timer without writing back', () => {
@@ -3273,7 +3263,7 @@ describe('WorkoutEditorView duration timer', () => {
 
     expect(originalEntry?.durationSeconds).toBe(30)
     expect(ex.durationEntries).toHaveLength(0)
-    expect(view.activeTimer).toBeNull()
+    expect(view.runningSetTimer()).toBeNull()
   })
 
   it('loadFile flushes a running timer (writes elapsed seconds) before swapping to a new file', async () => {
@@ -3294,7 +3284,7 @@ describe('WorkoutEditorView duration timer', () => {
       .catch(() => undefined)
 
     expect(ex.durationEntries[0]?.durationSeconds).toBe(42)
-    expect(view.activeTimer).toBeNull()
+    expect(view.runningSetTimer()).toBeNull()
   })
 
   it('onClose flushes a running timer (writes elapsed seconds) before tearing down', async () => {
@@ -3313,7 +3303,7 @@ describe('WorkoutEditorView duration timer', () => {
     await (view as unknown as { onClose: () => Promise<void> }).onClose().catch(() => undefined)
 
     expect(ex.durationEntries[0]?.durationSeconds).toBe(42)
-    expect(view.activeTimer).toBeNull()
+    expect(view.runningSetTimer()).toBeNull()
   })
 
   it('renderDurationRow displays stored seconds in one formatted duration text input', () => {
@@ -3446,7 +3436,6 @@ interface NextPlanView {
 interface SeedView {
   model: { exercises: RestTimerExerciseCard[] }
   exerciseHistory: unknown
-  activeTimer: unknown
   markDirty: ReturnType<typeof vi.fn>
   render: ReturnType<typeof vi.fn>
   applyKindSwitch(index: number, nextKind: 'strength' | 'duration', clearedRows: boolean): void
@@ -3468,7 +3457,6 @@ describe('WorkoutEditorView set seeding', () => {
       ],
     }
     view.exerciseHistory = history
-    view.activeTimer = null
     view.markDirty = vi.fn()
     view.render = vi.fn()
     view.applyKindSwitch(0, 'strength', false)
@@ -3558,7 +3546,6 @@ describe('WorkoutEditorView set seeding', () => {
         }[]
       }
       exerciseHistory: unknown
-      activeTimer: unknown
       markDirty: ReturnType<typeof vi.fn>
       render: ReturnType<typeof vi.fn>
       applyKindSwitch(index: number, nextKind: 'bodyweight', clearedRows: boolean): void
@@ -3575,7 +3562,6 @@ describe('WorkoutEditorView set seeding', () => {
       ],
     }
     view.exerciseHistory = null
-    view.activeTimer = null
     view.markDirty = vi.fn()
     view.render = vi.fn()
 

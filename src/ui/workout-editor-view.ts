@@ -100,6 +100,7 @@ import { EditLevelsModal } from './edit-levels-modal'
 import { createCuePlayer, type CuePlayer } from './interval-cues'
 import { clockSeconds, formatClock, renderRunner } from './interval-runner'
 import { renderRestTimer, renderSetTimer } from './timer-screen'
+import { createTabScreens, type ScreenStop, type TabScreens, type WakeHold } from './tab-screens'
 import { IntervalPlanModal } from './interval-plan-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
 import { KindSwitchChoiceModal, type KindSwitchChoice } from './kind-switch-choice-modal'
@@ -119,39 +120,40 @@ interface DragSession {
   indicator: HTMLElement
 }
 
-interface ActiveTimer {
-  card: ExerciseCard
-  entry: EditableDurationEntry
+interface Stopwatch {
   startedAtMs: number
+  /** Seconds the set already had when this stretch of timing started. */
   accumulator: number
-  intervalId: number
-  clockEl: HTMLElement | null
 }
 
 /** A duration card's timer shown full-tab; it stays open after Stop so the next set starts from it. */
 interface SetTimerScreen {
+  kind: 'set'
   card: ExerciseCard
   /** The set on the clock, kept after Stop so Resume and Reset act on it. */
   entry: EditableDurationEntry
-  returnScrollTop: number
+  /** Null while the set is stopped. */
+  stopwatch: Stopwatch | null
+  clockEl: HTMLElement | null
 }
 
-interface ActiveRun {
+interface RunScreen {
+  kind: 'run'
   card: ExerciseCard
   session: RunSession
-  intervalId: number
   clockEl: HTMLElement | null
+  /** Also the screen's wake lock. */
   cues: CuePlayer
-  /** Where the card list was scrolled when the run took over the tab, restored on the way back. */
-  returnScrollTop: number
 }
 
-interface ActiveRestTimer {
+interface RestScreen {
+  kind: 'rest'
   startedAtMs: number
-  intervalId: number
   clockEl: HTMLElement | null
-  returnScrollTop: number
 }
+
+/** A screen that takes over the whole tab in place of the card list. */
+type EditorScreen = SetTimerScreen | RunScreen | RestScreen
 
 export const VIEW_TYPE_FITKIT_WORKOUT_EDITOR = 'fitkit-workout-editor'
 
@@ -222,15 +224,10 @@ export class WorkoutEditorView extends FileView {
   private exerciseHistory: ExerciseHistoryByName | null = null
   private resizeObserver: ResizeObserver | null = null
   private dragSession: DragSession | null = null
-  private activeTimer: ActiveTimer | null = null
-  private activeRestTimer: ActiveRestTimer | null = null
-  private setTimerScreen: SetTimerScreen | null = null
-  /** Keeps the screen on while a timer screen is open. */
-  private timerWake: CuePlayer | null = null
-  private activeRun: ActiveRun | null = null
   private seededWeightsStore?: WeakSet<EditableStrengthSet>
   private exerciseStoreInstance?: ExerciseStore
   private autosaverInstance?: Autosaver
+  private screensInstance?: TabScreens<EditorScreen>
   private lastRestSeconds: number | null = null
   /**
    * One store per view, so its ladder overlay spans the session. Lazily
@@ -256,6 +253,16 @@ export class WorkoutEditorView extends FileView {
       },
     })
     return this.autosaverInstance
+  }
+
+  /** Lazily created for the same reason as exerciseStore. */
+  private get screens(): TabScreens<EditorScreen> {
+    this.screensInstance ??= createTabScreens<EditorScreen>({
+      scroller: () => this.contentEl,
+      render: () => this.render(),
+      stop: (screen, how) => this.stopScreen(screen, how),
+    })
+    return this.screensInstance
   }
 
   constructor(
@@ -316,8 +323,7 @@ export class WorkoutEditorView extends FileView {
     /** The OS drops a wake lock whenever the app is hidden, so take it again on return. */
     this.registerDomEvent(activeDocument, 'visibilitychange', () => {
       if (activeDocument.visibilityState === 'visible') {
-        this.activeRun?.cues.keepAwake()
-        this.timerWake?.keepAwake()
+        this.screens.wakeAgain()
       }
     })
     this.renderEmpty('Open a workout note to edit.')
@@ -353,10 +359,8 @@ export class WorkoutEditorView extends FileView {
   }
 
   async onClose(): Promise<void> {
-    this.pauseRunForClose()
-    this.stopTimer({ write: true, render: false })
-    this.closeSetTimer()
-    this.clearRestTimerState()
+    this.screens.teardown('bank')
+    this.lastRestSeconds = null
     await this.autosaver.settle()
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
@@ -409,10 +413,8 @@ export class WorkoutEditorView extends FileView {
   }
 
   async onUnloadFile(): Promise<void> {
-    this.pauseRunForClose()
-    this.stopTimer({ write: true, render: false })
-    this.closeSetTimer()
-    this.clearRestTimerState()
+    this.screens.teardown('bank')
+    this.lastRestSeconds = null
     await this.autosaver.settle()
   }
 
@@ -446,10 +448,7 @@ export class WorkoutEditorView extends FileView {
     if (!this.session) {
       return
     }
-    this.closeSetTimer()
-    this.abortTimer()
-    this.stopRun()
-    this.clearRestTimer()
+    this.screens.teardown('discard')
     this.autosaver.reset()
     const { model, isWorkout } = await this.session.load()
     this.model = toEditorWorkoutModel(model, isWorkout, this.session.file.path)
@@ -489,17 +488,17 @@ export class WorkoutEditorView extends FileView {
     }
     this.contentEl.empty()
     const container = this.contentEl.createDiv({ cls: 'fitkit-container' })
-    if (this.activeRun) {
-      this.renderRun(container, this.activeRun)
+    const screen = this.screens.current()
+    if (screen?.kind === 'run') {
+      this.renderRun(container, screen)
       return
     }
-    if (this.setTimerScreen) {
-      this.renderSetTimerScreen(container, this.setTimerScreen)
+    if (screen?.kind === 'set') {
+      this.renderSetTimerScreen(container, screen)
       return
     }
-    if (this.activeRestTimer) {
-      const timer = this.activeRestTimer
-      timer.clockEl = renderRestTimer(container, this.liveRestSeconds(timer), {
+    if (screen?.kind === 'rest') {
+      screen.clockEl = renderRestTimer(container, this.liveRestSeconds(screen), {
         stop: () => this.stopRestTimer(),
       })
       return
@@ -1041,7 +1040,7 @@ export class WorkoutEditorView extends FileView {
     const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
     const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
     addBtn.addEventListener('click', () => {
-      if (this.activeTimer && this.activeTimer.card === ex) {
+      if (this.runningSetTimer()?.card === ex) {
         this.stopTimer({ write: true })
       }
       ex.durationEntries.push(carriedIntervalFields(ex.durationEntries.at(-1)))
@@ -1051,7 +1050,7 @@ export class WorkoutEditorView extends FileView {
     const repeatBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Repeat' })
     repeatBtn.disabled = ex.durationEntries.length === 0
     repeatBtn.addEventListener('click', () => {
-      if (this.activeTimer && this.activeTimer.card === ex) {
+      if (this.runningSetTimer()?.card === ex) {
         this.stopTimer({ write: true })
       }
       const last = ex.durationEntries[ex.durationEntries.length - 1]
@@ -1130,7 +1129,7 @@ export class WorkoutEditorView extends FileView {
       label: `duration entry ${i + 1}`,
       currentNote: durationEntry.note,
       onDelete: () => {
-        if (this.activeTimer?.entry === durationEntry) {
+        if (this.runningSetTimer()?.entry === durationEntry) {
           this.abortTimer()
         }
         ex.durationEntries.splice(i, 1)
@@ -1444,8 +1443,6 @@ export class WorkoutEditorView extends FileView {
 
   /** Takes over the tab with the card's timer, timing its last set (or a new one when it has none). */
   private openSetTimer(card: ExerciseCard): void {
-    this.clearRestTimer()
-    this.stopTimer({ write: true, render: false })
     if (card.durationEntries.length === 0) {
       card.durationEntries.push({})
     }
@@ -1453,87 +1450,77 @@ export class WorkoutEditorView extends FileView {
     if (!entry) {
       return
     }
-    this.showSetTimer(card, entry, this.contentEl.scrollTop)
-    this.timeSet(card, entry)
-    this.contentEl.scrollTop = 0
+    const screen: SetTimerScreen = { kind: 'set', card, entry, stopwatch: null, clockEl: null }
+    this.screens.enter(screen, { wake: this.screenWake() })
+    this.timeSet(screen)
   }
 
-  private showSetTimer(
-    card: ExerciseCard,
-    entry: EditableDurationEntry,
-    returnScrollTop: number,
-  ): void {
-    this.setTimerScreen = { card, entry, returnScrollTop }
-    this.holdScreenAwake()
-  }
-
-  /** Starts the clock on a row, adding to any time it already has. */
-  private timeSet(card: ExerciseCard, entry: EditableDurationEntry): void {
-    if (this.activeTimer?.entry === entry) {
+  /** Starts the clock on the screen's set, adding to any time it already has. */
+  private timeSet(screen: SetTimerScreen): void {
+    if (screen.stopwatch) {
       return
     }
     const startedAtMs = Date.now()
-    entry.startedAt = formatLocalTimestamp(new Date(startedAtMs))
-    this.runTimer(card, entry, startedAtMs)
+    screen.entry.startedAt = formatLocalTimestamp(new Date(startedAtMs))
+    this.runStopwatch(screen, startedAtMs)
     this.markDirty()
     this.render()
   }
 
   private renderSetTimerScreen(container: HTMLElement, screen: SetTimerScreen): void {
-    const { card, entry } = screen
+    const { card, entry, stopwatch } = screen
     const entries = card.durationEntries
-    const timer = this.activeTimer?.entry === entry ? this.activeTimer : null
     const index = entries.indexOf(entry)
-    const clockEl = renderSetTimer(
+    screen.clockEl = renderSetTimer(
       container,
       {
         exerciseName: card.name,
         set: entry.set ?? index + 1,
-        seconds: timer ? this.liveSeconds(timer) : (entry.durationSeconds ?? 0),
-        running: timer !== null,
+        seconds: stopwatch ? this.liveSeconds(stopwatch) : (entry.durationSeconds ?? 0),
+        running: stopwatch !== null,
         previousSeconds: entries[index - 1]?.durationSeconds,
       },
       {
         stop: () => this.stopTimer({ write: true }),
-        resume: () => this.timeSet(card, entry),
+        resume: () => this.timeSet(screen),
         reset: () => {
           this.stopTimer({ write: false, render: false })
           delete entry.durationSeconds
-          this.timeSet(card, entry)
+          this.timeSet(screen)
         },
         next: () => {
           this.stopTimer({ write: true, render: false })
           const next = { set: nextSetNumber(entries), ...carriedIntervalFields(entries.at(-1)) }
           entries.push(next)
           screen.entry = next
-          this.timeSet(card, next)
+          this.timeSet(screen)
         },
         done: () => {
           this.stopTimer({ write: true, render: false })
-          this.closeSetTimer()
-          this.render()
-          this.contentEl.scrollTop = screen.returnScrollTop
+          this.screens.leave()
         },
       },
     )
-    if (timer) {
-      timer.clockEl = clockEl
+  }
+
+  /** The beep-free wake lock the set and rest timers hold. */
+  private screenWake(): WakeHold {
+    return createCuePlayer(activeWindow, false)
+  }
+
+  /** What ending each screen from outside keeps: a banked stop saves the set or run so far. */
+  private stopScreen(screen: EditorScreen, how: ScreenStop): void {
+    if (screen.kind === 'set') {
+      this.stopTimer({ write: how === 'bank', render: false })
+    } else if (screen.kind === 'run' && how === 'bank') {
+      this.bankRun(screen)
     }
   }
 
-  private closeSetTimer(): void {
-    this.setTimerScreen = null
-    this.releaseScreenAwake()
-  }
-
-  private holdScreenAwake(): void {
-    this.timerWake ??= createCuePlayer(activeWindow, false)
-    this.timerWake.keepAwake()
-  }
-
-  private releaseScreenAwake(): void {
-    this.timerWake?.release()
-    this.timerWake = null
+  /** The set timer screen while its set is being timed. */
+  private runningSetTimer(): SetTimerScreen | null {
+    const screen = this.screens.current()
+    return screen?.kind === 'set' && screen.stopwatch ? screen : null
   }
 
   /** Picks up a timer the note records as running, such as one cut off when the app was killed. */
@@ -1543,7 +1530,7 @@ export class WorkoutEditorView extends FileView {
       const now = Date.now()
       const resumed = plan && resumeSession(card.durationEntries, plan, now)
       if (resumed) {
-        this.applyRun(this.enterRun(card, resumed.session), resumed, now)
+        this.applyRun(this.enterRun(card, resumed.session, { keepScroll: true }), resumed, now)
         return
       }
     }
@@ -1554,39 +1541,36 @@ export class WorkoutEditorView extends FileView {
       const entry = card.durationEntries.find((candidate) => candidate.startedAt !== undefined)
       const startedAtMs = Date.parse(entry?.startedAt ?? '')
       if (entry && !Number.isNaN(startedAtMs)) {
-        this.runTimer(card, entry, startedAtMs)
-        this.showSetTimer(card, entry, 0)
+        const screen: SetTimerScreen = { kind: 'set', card, entry, stopwatch: null, clockEl: null }
+        this.screens.enter(screen, {
+          wake: this.screenWake(),
+          returnScrollTop: 0,
+          keepScroll: true,
+        })
+        this.runStopwatch(screen, startedAtMs)
         return
       }
     }
   }
 
-  private runTimer(card: ExerciseCard, entry: EditableDurationEntry, startedAtMs: number): void {
-    if (this.activeTimer) {
-      window.clearInterval(this.activeTimer.intervalId)
-    }
-    this.activeTimer = {
-      card,
-      entry,
-      startedAtMs,
-      accumulator: entry.durationSeconds ?? 0,
-      intervalId: window.setInterval(() => this.tickTimer(), 1000),
-      clockEl: null,
-    }
+  private runStopwatch(screen: SetTimerScreen, startedAtMs: number): void {
+    screen.stopwatch = { startedAtMs, accumulator: screen.entry.durationSeconds ?? 0 }
+    this.screens.startClock(() => this.tickTimer(), 1000)
   }
 
   private stopTimer(opts: { write: boolean; render?: boolean }): void {
-    const timer = this.activeTimer
-    if (!timer) {
+    const screen = this.runningSetTimer()
+    const stopwatch = screen?.stopwatch
+    if (!screen || !stopwatch) {
       return
     }
-    window.clearInterval(timer.intervalId)
-    delete timer.entry.startedAt
+    this.screens.stopClock()
+    delete screen.entry.startedAt
     if (opts.write) {
-      timer.entry.durationSeconds = this.liveSeconds(timer)
+      screen.entry.durationSeconds = this.liveSeconds(stopwatch)
       this.markDirty()
     }
-    this.activeTimer = null
+    screen.stopwatch = null
     if (opts.render !== false) {
       this.render()
     }
@@ -1597,65 +1581,42 @@ export class WorkoutEditorView extends FileView {
   }
 
   private tickTimer(): void {
-    const timer = this.activeTimer
-    if (!timer?.clockEl) {
+    const screen = this.runningSetTimer()
+    if (!screen?.stopwatch || !screen.clockEl) {
       return
     }
-    timer.clockEl.setText(formatClock(this.liveSeconds(timer)))
+    screen.clockEl.setText(formatClock(this.liveSeconds(screen.stopwatch)))
   }
 
-  private liveSeconds(timer: ActiveTimer): number {
-    return timer.accumulator + Math.max(0, Math.floor((Date.now() - timer.startedAtMs) / 1000))
+  private liveSeconds(stopwatch: Stopwatch): number {
+    return (
+      stopwatch.accumulator + Math.max(0, Math.floor((Date.now() - stopwatch.startedAtMs) / 1000))
+    )
   }
 
   private startIntervalRun(card: ExerciseCard, program: IntervalProgram): void {
-    this.stopTimer({ write: true, render: false })
-    this.closeSetTimer()
-    this.clearRestTimer()
+    /** Bank what holds the tab before reading the rows the run starts from. */
+    this.screens.teardown('bank')
     const now = Date.now()
     const started = startSession(card.durationEntries, program, now)
     const run = this.enterRun(card, started.session)
     run.cues.prime()
     this.applyRun(run, started, now)
-    this.contentEl.scrollTop = 0
   }
 
-  private enterRun(card: ExerciseCard, session: RunSession): ActiveRun {
+  private enterRun(
+    card: ExerciseCard,
+    session: RunSession,
+    { keepScroll = false }: { keepScroll?: boolean } = {},
+  ): RunScreen {
     const cues = createCuePlayer(activeWindow, this.plugin.settings.intervalBeepsEnabled !== false)
-    cues.keepAwake()
-    const run: ActiveRun = {
-      card,
-      session,
-      intervalId: window.setInterval(() => this.sendRun({ kind: 'tick' }), 500),
-      clockEl: null,
-      cues,
-      returnScrollTop: this.contentEl.scrollTop,
-    }
-    this.activeRun = run
+    const run: RunScreen = { kind: 'run', card, session, clockEl: null, cues }
+    this.screens.enter(run, { wake: cues, keepScroll })
+    this.screens.startClock(() => this.sendRun({ kind: 'tick' }), 500)
     return run
   }
 
-  /** Stops the run's clock, cues and wake lock without touching the rows. */
-  private stopRun(): ActiveRun | null {
-    const run = this.activeRun
-    if (run) {
-      window.clearInterval(run.intervalId)
-      run.cues.release()
-      this.activeRun = null
-    }
-    return run
-  }
-
-  /** Returns to the card list; the rows already hold everything. */
-  private leaveRun(): void {
-    const run = this.stopRun()
-    if (run) {
-      this.render()
-      this.contentEl.scrollTop = run.returnScrollTop
-    }
-  }
-
-  private renderRun(container: HTMLElement, run: ActiveRun): void {
+  private renderRun(container: HTMLElement, run: RunScreen): void {
     const { session } = run
     const primed = (event: RunEvent) => (): void => {
       run.cues.prime()
@@ -1683,15 +1644,15 @@ export class WorkoutEditorView extends FileView {
   }
 
   private sendRun(event: RunEvent): void {
-    const run = this.activeRun
-    if (run) {
+    const run = this.screens.current()
+    if (run?.kind === 'run') {
       const now = Date.now()
       this.applyRun(run, stepSession(run.session, event, now), now)
     }
   }
 
   /** Carries out what a run transition asks of the view. */
-  private applyRun(run: ActiveRun, { session, effects }: RunTransition, now: number): void {
+  private applyRun(run: RunScreen, { session, effects }: RunTransition, now: number): void {
     run.session = session
     if (effects.rows) {
       run.card.durationEntries = effects.rows
@@ -1701,7 +1662,8 @@ export class WorkoutEditorView extends FileView {
       new Notice(effects.notice)
     }
     if (effects.leave) {
-      this.leaveRun()
+      /** The rows already hold everything, so the card list is all that is left to show. */
+      this.screens.leave()
       return
     }
     if (effects.redraw === 'full') {
@@ -1716,12 +1678,8 @@ export class WorkoutEditorView extends FileView {
     }
   }
 
-  /** Closing the tab pauses a run, banking the time so far the way the duration timer does. */
-  private pauseRunForClose(): void {
-    const run = this.stopRun()
-    if (!run) {
-      return
-    }
+  /** Pauses a run with the time so far kept in its rows, the way the set timer banks a set. */
+  private bankRun(run: RunScreen): void {
     const { rows } = stepSession(run.session, { kind: 'close' }, Date.now()).effects
     if (rows) {
       run.card.durationEntries = rows
@@ -1733,63 +1691,42 @@ export class WorkoutEditorView extends FileView {
     if (!this.isRestTimerEnabled()) {
       return
     }
-    if (this.activeRestTimer) {
+    if (this.screens.current()?.kind === 'rest') {
       return
     }
     this.lastRestSeconds = null
-    if (this.activeTimer) {
-      this.stopTimer({ write: true, render: false })
-    }
-    this.closeSetTimer()
-    const intervalId = window.setInterval(() => this.tickRestTimer(), 1000)
-    this.activeRestTimer = {
-      startedAtMs: Date.now(),
-      intervalId,
-      clockEl: null,
-      returnScrollTop: this.contentEl.scrollTop,
-    }
-    this.holdScreenAwake()
+    const rest: RestScreen = { kind: 'rest', startedAtMs: Date.now(), clockEl: null }
+    this.screens.enter(rest, { wake: this.screenWake() })
+    this.screens.startClock(() => this.tickRestTimer(), 1000)
     this.render()
-    this.contentEl.scrollTop = 0
   }
 
   private stopRestTimer(): void {
-    const timer = this.activeRestTimer
-    if (!timer) {
+    const rest = this.screens.current()
+    if (rest?.kind !== 'rest') {
       return
     }
-    const restSeconds = this.liveRestSeconds(timer)
-    this.clearRestTimer()
-    this.lastRestSeconds = restSeconds
-    this.render()
-    this.contentEl.scrollTop = timer.returnScrollTop
-  }
-
-  private clearRestTimer(): void {
-    const timer = this.activeRestTimer
-    if (!timer) {
-      return
-    }
-    window.clearInterval(timer.intervalId)
-    this.activeRestTimer = null
-    this.releaseScreenAwake()
+    this.lastRestSeconds = this.liveRestSeconds(rest)
+    this.screens.leave()
   }
 
   private clearRestTimerState(): void {
-    this.clearRestTimer()
+    if (this.screens.current()?.kind === 'rest') {
+      this.screens.teardown('discard')
+    }
     this.lastRestSeconds = null
   }
 
   private tickRestTimer(): void {
-    const timer = this.activeRestTimer
-    if (!timer?.clockEl) {
+    const rest = this.screens.current()
+    if (rest?.kind !== 'rest' || !rest.clockEl) {
       return
     }
-    timer.clockEl.setText(formatClock(this.liveRestSeconds(timer)))
+    rest.clockEl.setText(formatClock(this.liveRestSeconds(rest)))
   }
 
-  private liveRestSeconds(timer: ActiveRestTimer): number {
-    return Math.max(0, Math.floor((Date.now() - timer.startedAtMs) / 1000))
+  private liveRestSeconds(rest: RestScreen): number {
+    return Math.max(0, Math.floor((Date.now() - rest.startedAtMs) / 1000))
   }
 
   private isRestTimerEnabled(): boolean {
@@ -1948,7 +1885,7 @@ export class WorkoutEditorView extends FileView {
     if (!ex || ex.kind === nextKind) {
       return
     }
-    if (this.activeTimer?.card === ex) {
+    if (this.runningSetTimer()?.card === ex) {
       this.abortTimer()
     }
     const previousKind = ex.kind
@@ -2019,7 +1956,7 @@ export class WorkoutEditorView extends FileView {
       return
     }
     const ex = this.model.exercises[index]
-    if (ex && this.activeTimer?.card === ex) {
+    if (ex && this.runningSetTimer()?.card === ex) {
       this.abortTimer()
     }
     this.model.exercises.splice(index, 1)

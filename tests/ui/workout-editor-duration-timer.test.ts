@@ -592,3 +592,123 @@ describe('WorkoutEditorView timer screens keep the screen awake', () => {
     await vi.waitFor(() => expect(locks).toEqual(['acquire screen', 'release']))
   })
 })
+
+describe('WorkoutEditorView screens give the tab back on every teardown', () => {
+  let locks: string[]
+
+  beforeEach(() => {
+    vi.stubEnv('TZ', 'Australia/Brisbane')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-30T07:15:03+10:00'))
+    vi.stubGlobal('HTMLElement', harnessWindow.HTMLElement)
+    vi.stubGlobal('activeWindow', harnessWindow)
+    intervals.clear()
+    let nextId = 1
+    vi.stubGlobal('window', {
+      setTimeout: (callback: () => void): number => {
+        callback()
+        return 0
+      },
+      clearTimeout: (): void => {},
+      setInterval: (callback: () => void): number => {
+        const id = nextId++
+        intervals.set(id, callback)
+        return id
+      },
+      clearInterval: (id: number): void => {
+        intervals.delete(id)
+      },
+    })
+    vi.stubGlobal('activeDocument', harnessDocument)
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(): void {}
+        disconnect(): void {}
+      },
+    )
+    locks = []
+    Object.defineProperty(harnessWindow.navigator, 'wakeLock', {
+      configurable: true,
+      value: {
+        request: async (): Promise<unknown> => {
+          locks.push('acquire')
+          return { release: async () => void locks.push('release') }
+        },
+      },
+    })
+  })
+
+  afterEach(() => {
+    Reflect.deleteProperty(harnessWindow.navigator as object, 'wakeLock')
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
+  })
+
+  const SCREENS = [
+    {
+      screen: 'set timer',
+      row: '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90]',
+      open: 'Start timer',
+      leave: 'Close timer',
+    },
+    {
+      screen: 'rest timer',
+      row: '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90]',
+      open: 'Start rest timer',
+      leave: 'Stop rest timer',
+    },
+    {
+      screen: 'interval run',
+      row: '- [exercise:: [[Rowing]]] [plan:: 3 x 30s @ 300W, 90s rest]',
+      open: 'Start interval plan',
+      leave: 'End run',
+    },
+  ]
+
+  const TEARDOWNS: ReadonlyArray<{
+    teardown: string
+    run: (view: WorkoutEditorView, contents: Map<string, string>, source: string) => Promise<void>
+  }> = [
+    { teardown: 'the tab closes', run: (view) => view.onClose() },
+    { teardown: 'the tab swaps to another note', run: (view) => view.onUnloadFile() },
+    {
+      teardown: 'the note reloads with nothing running on disk',
+      run: async (view, contents, source) => {
+        contents.set(WORKOUT_PATH, source)
+        await view.reloadFromDisk()
+      },
+    },
+  ]
+
+  describe.each(SCREENS)('$screen', ({ row, open, leave }) => {
+    it('shows from the top and returns the list to where it was scrolled', async () => {
+      const { view } = await openView(workoutSource(row))
+      view.contentEl.scrollTop = 420
+
+      clickButton(view, open)
+      const screenScroll = view.contentEl.scrollTop
+      clickButton(view, leave)
+
+      expect([screenScroll, view.contentEl.scrollTop]).toEqual([0, 420])
+      await vi.waitFor(() => expect(locks).toEqual(['acquire', 'release']))
+      expect(intervals.size).toBe(0)
+    })
+
+    it.each(TEARDOWNS)(
+      'stops its clock and lets the screen sleep when $teardown',
+      async ({ run }) => {
+        const source = workoutSource(row)
+        const { view, contents } = await openView(source)
+        clickButton(view, open)
+        await vi.waitFor(() => expect(locks).toEqual(['acquire']))
+
+        await run(view, contents, source)
+
+        await vi.waitFor(() => expect(locks).toEqual(['acquire', 'release']))
+        expect(intervals.size).toBe(0)
+      },
+    )
+  })
+})
