@@ -2273,7 +2273,8 @@ export class WorkoutEditorView extends FileView {
 
   /**
    * The plan the user records for next session. Choosing the active direction
-   * again clears it, matching the segmented control this replaced.
+   * again clears it, matching the segmented control this replaced. An interval
+   * card records the direction alone, so it has no step to set.
    */
   private addNextPlanMenuItems(menu: Menu, ex: ExerciseCard): void {
     for (const option of NEXT_PLAN_OPTIONS) {
@@ -2291,6 +2292,9 @@ export class WorkoutEditorView extends FileView {
       )
     }
 
+    if (ex.kind === 'duration') {
+      return
+    }
     const canSetStep = ex.next !== undefined && ex.next.direction !== 'stay'
     menu.addItem((item) =>
       item
@@ -2363,7 +2367,7 @@ export class WorkoutEditorView extends FileView {
           .onClick(() => this.openIntervalPlanModal(ex)),
       )
     }
-    if (ex.kind === 'strength' || ex.kind === 'bodyweight') {
+    if (ex.kind === 'strength' || ex.kind === 'bodyweight' || shownType === 'interval') {
       menu.addSeparator()
       this.addNextPlanMenuItems(menu, ex)
     }

@@ -283,7 +283,9 @@ function formatSet(value: number): string {
 
 function formatReadingPlanStepSuffix(exercise: ExerciseEntry, unit: WeightUnit): string {
   const step = exercise.next?.step
-  return step === undefined ? '' : ` ${planStepUnit(exercise.kind, step, unit)}`
+  return step === undefined || exercise.kind === 'duration'
+    ? ''
+    : ` ${planStepUnit(exercise.kind, step, unit)}`
 }
 
 function formatNumber(value: number): string {

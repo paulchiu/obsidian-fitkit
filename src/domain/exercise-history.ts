@@ -194,9 +194,8 @@ export function formatNextPlanBadge(
   current?: CurrentExercisePlan,
   levels?: BodyweightLadder,
 ): NextPlanBadge | null {
-  /** Plans are recorded for strength and bodyweight sets; duration has no plan badge. */
-  if (kind !== 'strength' && kind !== 'bodyweight') {
-    return null
+  if (kind === 'duration') {
+    return formatDurationNextPlanBadge(summary, current)
   }
   if (kind === 'bodyweight') {
     return formatBodyweightNextPlanBadge(summary, current, levels)
@@ -222,6 +221,20 @@ export function formatNextPlanBadge(
     title: `${planned}: ${change}${from}`,
     icon: nextPlanIcon(plan),
   }
+}
+
+/** Badge for an interval plan's next-time direction; there is no one weight to step from. */
+function formatDurationNextPlanBadge(
+  summary: ExerciseHistorySummary | undefined,
+  current: CurrentExercisePlan | undefined,
+): NextPlanBadge | null {
+  const plan = current?.plan ?? summary?.nextPlan?.value
+  if (!plan) {
+    return null
+  }
+  const planned = current?.plan ? 'Planned for next time' : `Planned on ${summary?.nextPlan?.date}`
+  const label = formatNextPlanLabel(plan, 'duration').toLowerCase()
+  return { text: `Next: ${label}`, title: `${planned}: ${label}`, icon: nextPlanIcon(plan) }
 }
 
 /**

@@ -158,6 +158,21 @@ describe('workout reading mode rendering', () => {
     )
   })
 
+  it('shows the next-time direction on an interval exercise, without a step', () => {
+    const lines = [
+      '[exercise:: [[Exercise Bike]]] [next:: stay 5] [plan:: (x 3 (over 1m 300W))]',
+      '[exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 60] [watts:: 305]',
+    ]
+    const section = ['## [[Exercise Bike]]', '', ...lines.map((line) => `- ${line}`)].join('\n')
+    const root = createRenderedSection(lines)
+
+    renderWorkoutReadingModeSection(createPlugin(), root, createContext(section))
+
+    expect(
+      [...root.querySelectorAll('.fitkit-reading-plan')].map((line) => line.textContent),
+    ).toEqual(['Plan: (x 3 (over 1m 300W))', 'Next time: same target'])
+  })
+
   it('states the plan step in the same unit as the set table beneath it', () => {
     const section = [
       '## [[Squat]]',

@@ -43,13 +43,24 @@ export function formatNextPlan(plan: NextPlan): string {
   return plan.step === undefined ? plan.direction : `${plan.direction} ${formatNumber(plan.step)}`
 }
 
-/** Sentence-case description for badges and previews, without the unit. */
+const SAME_LABELS: Record<ExerciseKind, string> = {
+  strength: 'Same weight',
+  bodyweight: 'Same level',
+  duration: 'Same target',
+}
+
+/**
+ * Sentence-case description for badges and previews, without the unit. A duration plan
+ * is a direction alone, since an interval plan's steps each have their own target.
+ */
 export function formatNextPlanLabel(plan: NextPlan, kind: ExerciseKind): string {
   if (plan.direction === 'stay') {
-    return kind === 'bodyweight' ? 'Same level' : 'Same weight'
+    return SAME_LABELS[kind]
   }
   const direction = plan.direction === 'up' ? 'Up' : 'Down'
-  return plan.step === undefined ? direction : `${direction} ${formatNumber(plan.step)}`
+  return plan.step === undefined || kind === 'duration'
+    ? direction
+    : `${direction} ${formatNumber(plan.step)}`
 }
 
 /**

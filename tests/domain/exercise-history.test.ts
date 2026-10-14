@@ -509,6 +509,24 @@ describe('exercise history aggregation', () => {
     })
   })
 
+  it('shows only the direction for a duration exercise, saying same target for keep', () => {
+    const lastTime = {
+      nextPlan: { value: { direction: 'up' as const, step: 10 }, date: '2026-10-12' },
+    }
+
+    expect([
+      formatNextPlanBadge(lastTime, 'duration', 'kg'),
+      formatNextPlanBadge(lastTime, 'duration', 'kg', { plan: { direction: 'stay' } }),
+    ]).toEqual([
+      { text: 'Next: up', title: 'Planned on 2026-10-12: up', icon: 'arrow-up' },
+      {
+        text: 'Next: same target',
+        title: 'Planned for next time: same target',
+        icon: 'minus',
+      },
+    ])
+  })
+
   it('falls back to the direction when the plan carries no step', () => {
     const badge = formatNextPlanBadge(
       {
@@ -581,13 +599,8 @@ describe('exercise history aggregation', () => {
     })
   })
 
-  it('has no plan badge for duration exercises or absent plans', () => {
-    expect(
-      formatNextPlanBadge(
-        { nextPlan: { value: { direction: 'up' }, date: '2026-08-10' } },
-        'duration',
-      ),
-    ).toBeNull()
+  it('has no plan badge when no plan was recorded', () => {
+    expect(formatNextPlanBadge({}, 'duration')).toBeNull()
     expect(formatNextPlanBadge({}, 'strength')).toBeNull()
     expect(formatNextPlanBadge(undefined, 'strength')).toBeNull()
   })

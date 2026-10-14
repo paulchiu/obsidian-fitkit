@@ -3686,6 +3686,7 @@ describe('WorkoutEditorView duration timer', () => {
 interface NextPlanExerciseCard {
   name: string
   kind: 'strength' | 'duration'
+  plan?: string
   next?: { direction: 'up' | 'down' | 'stay'; step?: number }
   strengthSets: Array<{ set?: number; weight?: number; reps?: number }>
   durationEntries: Array<{ durationSeconds?: number }>
@@ -3896,6 +3897,33 @@ describe('WorkoutEditorView next-time plan', () => {
     })
 
     expect(items).toEqual([])
+  })
+
+  it('offers increase, keep, and decrease without a step on interval cards', () => {
+    vi.stubGlobal('HTMLElement', TestElement)
+    const ex: NextPlanExerciseCard = {
+      name: 'Exercise Bike',
+      kind: 'duration',
+      plan: '(x 3 (over 1m 300W))',
+      strengthSets: [],
+      durationEntries: [{ durationSeconds: 60 }],
+      bodyweightSets: [],
+    }
+    const view = createNextPlanView(ex)
+    view.openCardMenu({ currentTarget: new TestElement('button') } as unknown as MouseEvent, 0)
+    const titles = (obsidianMock.menus.at(-1)?.items ?? []).map((item) => item.title)
+
+    planItems(ex, view)[0]?.onClick?.()
+
+    expect({
+      plan: titles.filter((title) => title?.startsWith('Plan') === true),
+      step: titles.includes('Set plan step...'),
+      next: ex.next,
+    }).toEqual({
+      plan: ['Plan: increase', 'Plan: keep', 'Plan: decrease'],
+      step: false,
+      next: { direction: 'up' },
+    })
   })
 
   it('checks the recorded direction', () => {
