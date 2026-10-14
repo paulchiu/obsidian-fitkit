@@ -2244,26 +2244,6 @@ export class WorkoutEditorView extends FileView {
     }
   }
 
-  private moveExercise(index: number, delta: number): void {
-    if (!this.model) {
-      return
-    }
-    const target = index + delta
-    if (target < 0 || target >= this.model.exercises.length) {
-      return
-    }
-    const arr = this.model.exercises
-    const a = arr[index]
-    const b = arr[target]
-    if (!a || !b) {
-      return
-    }
-    arr[index] = b
-    arr[target] = a
-    this.markDirty()
-    this.render()
-  }
-
   private removeExercise(index: number): void {
     if (!this.model) {
       return
@@ -2334,15 +2314,7 @@ export class WorkoutEditorView extends FileView {
     if (!ex) {
       return
     }
-    const lastIndex = this.model.exercises.length - 1
-
     const menu = new Menu()
-    menu.addItem((item) =>
-      item
-        .setTitle('Open exercise file')
-        .setIcon('file-text')
-        .onClick(() => void this.openOrCreateExerciseFile(ex)),
-    )
     menu.addItem((item) =>
       item
         .setTitle('Rename exercise')
@@ -2378,6 +2350,28 @@ export class WorkoutEditorView extends FileView {
       this.addNextPlanMenuItems(menu, ex)
     }
     menu.addSeparator()
+    const show = showCardMenuAt(evt)
+    menu.addItem((item) =>
+      item
+        .setTitle('Change type...')
+        .setIcon('repeat')
+        /** Obsidian has no public submenu, so the types open as a second menu once this one closes. */
+        .onClick(() => window.setTimeout(() => show(this.typeMenu(index, shownType)), 0)),
+    )
+    menu.addSeparator()
+    menu.addItem((item) =>
+      item
+        .setTitle('Remove exercise')
+        .setIcon('trash-2')
+        .setWarning(true)
+        .onClick(() => void this.confirmAndRemoveExercise(index)),
+    )
+    show(menu)
+  }
+
+  /** The types a card can switch to, leaving out the one it shows. */
+  private typeMenu(index: number, shownType: ExerciseType): Menu {
+    const menu = new Menu()
     for (const target of EXERCISE_TYPES) {
       if (target === shownType) {
         continue
@@ -2389,37 +2383,7 @@ export class WorkoutEditorView extends FileView {
           .onClick(() => void this.switchCardType(index, target)),
       )
     }
-    menu.addSeparator()
-    menu.addItem((item) =>
-      item
-        .setTitle('Move up')
-        .setIcon('chevron-up')
-        .setDisabled(index === 0)
-        .onClick(() => this.moveExercise(index, -1)),
-    )
-    menu.addItem((item) =>
-      item
-        .setTitle('Move down')
-        .setIcon('chevron-down')
-        .setDisabled(index === lastIndex)
-        .onClick(() => this.moveExercise(index, 1)),
-    )
-    menu.addSeparator()
-    menu.addItem((item) =>
-      item
-        .setTitle('Remove exercise')
-        .setIcon('trash-2')
-        .setWarning(true)
-        .onClick(() => void this.confirmAndRemoveExercise(index)),
-    )
-
-    const target = evt.currentTarget
-    if (target instanceof HTMLElement) {
-      const rect = target.getBoundingClientRect()
-      menu.showAtPosition(menuAnchorForTrigger(rect))
-    } else {
-      menu.showAtMouseEvent(evt)
-    }
+    return menu
   }
 
   private renderExerciseHistoryBadges(
@@ -3113,6 +3077,19 @@ function setAriaInvalid(element: HTMLElement, invalid: boolean): void {
   } else {
     element.toggleAttribute('aria-invalid', false)
   }
+}
+
+/**
+ * Shows a menu under the button `evt` came from, or at the pointer. The position is read now,
+ * since `currentTarget` is gone once the event has been handled.
+ */
+function showCardMenuAt(evt: MouseEvent): (menu: Menu) => void {
+  const target = evt.currentTarget
+  if (target instanceof HTMLElement) {
+    const position = menuAnchorForTrigger(target.getBoundingClientRect())
+    return (menu) => menu.showAtPosition(position)
+  }
+  return (menu) => menu.showAtMouseEvent(evt)
 }
 
 function hasRows(card: ExerciseCard): boolean {

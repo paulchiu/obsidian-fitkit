@@ -545,7 +545,7 @@ describe('WorkoutEditorView row actions', () => {
     )
   })
 
-  it('adds Open exercise file to the exercise card menu before kind and move actions', () => {
+  it('lists the card actions, leaving opening the file to the name and moving to the drag handle', () => {
     vi.stubGlobal('HTMLElement', TestElement)
     const view = createCardMenuView()
     view.model = {
@@ -565,24 +565,21 @@ describe('WorkoutEditorView row actions', () => {
 
     expect(obsidianMock.menus).toHaveLength(1)
     expect(obsidianMock.menus[0]?.items.map((item) => item.title)).toEqual([
-      'Open exercise file',
       'Rename exercise',
       'Add exercise note',
       'Plan: increase',
       'Plan: keep',
       'Plan: decrease',
       'Set plan step...',
-      'Switch to duration',
-      'Switch to interval',
-      'Switch to bodyweight',
-      'Move up',
-      'Move down',
+      'Change type...',
       'Remove exercise',
     ])
   })
 
-  it('offers a switch item for every type other than the current one, interval included', () => {
+  it('offers every type other than the current one, interval included, behind Change type...', async () => {
     vi.stubGlobal('HTMLElement', TestElement)
+    // eslint-disable-next-line obsidianmd/no-global-this -- The type menu opens on a `window` timer, which the node environment lacks.
+    vi.stubGlobal('window', globalThis)
     for (const kind of EXERCISE_KINDS) {
       const view = createCardMenuView()
       view.model = {
@@ -590,42 +587,25 @@ describe('WorkoutEditorView row actions', () => {
           { name: 'Squat', kind, strengthSets: [], durationEntries: [], bodyweightSets: [] },
         ],
       }
-
       view.openCardMenu({ currentTarget: new TestElement('button') } as unknown as MouseEvent, 0)
+      const cardMenu = obsidianMock.menus[obsidianMock.menus.length - 1]
+      cardMenu?.items.find((item) => item.title === 'Change type...')?.onClick?.()
+      await vi.waitFor(() => expect(obsidianMock.menus.at(-1)).not.toBe(cardMenu))
 
-      const items = obsidianMock.menus[obsidianMock.menus.length - 1]?.items ?? []
-      const titles = items.map((item) => item.title)
-      const switchItems = items.filter((item) => item.title?.startsWith('Switch to ') === true)
+      const typeMenu = obsidianMock.menus.at(-1)
       const expected = ['strength', 'duration', 'interval', 'bodyweight']
         .filter((other) => other !== kind)
         .map((other) => `Switch to ${other}`)
-      expect(switchItems.map((item) => item.title)).toEqual(expected)
-      expect(switchItems.map((item) => item.icon)).toEqual(expected.map(() => 'repeat'))
-      for (const item of switchItems) {
-        expect(titles.indexOf(item.title)).toBeGreaterThan(titles.indexOf('Add exercise note'))
-        expect(titles.indexOf(item.title)).toBeLessThan(titles.indexOf('Move up'))
-      }
+      expect({
+        titles: typeMenu?.items.map((item) => item.title),
+        icons: typeMenu?.items.map((item) => item.icon),
+        position: typeMenu?.position,
+      }).toEqual({
+        titles: expected,
+        icons: expected.map(() => 'repeat'),
+        position: cardMenu?.position,
+      })
     }
-  })
-
-  it('routes the card menu Open exercise file item through the shared handler', () => {
-    vi.stubGlobal('HTMLElement', TestElement)
-    const view = createCardMenuView()
-    const exercise = {
-      name: 'Squat',
-      kind: 'strength',
-      strengthSets: [],
-      durationEntries: [],
-      bodyweightSets: [],
-    }
-    view.model = { exercises: [exercise] }
-    view.openOrCreateExerciseFile = vi.fn(() => Promise.resolve())
-    const button = new TestElement('button')
-
-    view.openCardMenu({ currentTarget: button } as unknown as MouseEvent, 0)
-    obsidianMock.menus[0]?.items[0]?.onClick?.()
-
-    expect(view.openOrCreateExerciseFile).toHaveBeenCalledWith(exercise)
   })
 
   it('renders the exercise name as an open-file link and moves rename to the pencil', () => {

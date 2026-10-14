@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Interval training. `Switch to interval` in the card menu, beside the other exercise types, writes a one-line plan such as `[plan:: 8 x 30s @ 300W, 90s rest]`, with presets you can edit in settings (Tabata and EMOM to start), watts, load or level targets, open work, and a Pace setting that turns a fixed rest into `every 1m` (EMOM). The card then shows each rep's intensity and rest, and `Add set` and `Repeat` carry both forward. Adding the exercise to a later workout starts it with the plan it last ran.
+- Interval training. `Switch to interval`, under `Change type...` in the card menu beside the other exercise types, writes a one-line plan such as `[plan:: 8 x 30s @ 300W, 90s rest]`, with presets you can edit in settings (Tabata and EMOM to start), watts, load or level targets, open work, and a Pace setting that turns a fixed rest into `every 1m` (EMOM). The card then shows each rep's intensity and rest, and `Add set` and `Repeat` carry both forward. Adding the exercise to a later workout starts it with the plan it last ran.
 - `Start` on a planned card takes over the editor tab with a big clock and one big button, which reads `Rest` while you work (ending the rep with the time you actually did) and `Skip` while you rest. Each rep is written to the note as it finishes, with a stepper during rest to correct the intensity you just held. Pause, End run, rep dots and a finished screen with the reps on target round it out.
 - A run survives Obsidian being closed or killed. The note holds one start stamp, so reopening it catches up reps that finished meanwhile (filled with the target and flagged `logged while Obsidian was closed`), or offers to resume or end a run whose plan has long since ended. Closing the tab pauses the run.
 - Interval is a saved exercise type. Choosing `Update registry too` when switching a card to interval records the exercise as interval, so it starts as interval next time, with its last plan or with the plan form open on Tabata and EMOM. It is stored as `kind: duration` plus `interval: true` in the exercise note, so older FitKit versions read it as an ordinary duration exercise with its history, charts and PBs intact. The registry form, the registry table, import and reading mode show Interval too.
@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The card menu is shorter. The three `Switch to ...` items sit behind one `Change type...` item, and `Open exercise file`, `Move up` and `Move down` are gone, since tapping the name opens the file and the drag handle reorders cards.
 - The duration timer and the rest timer take over the tab like the interval runner, as a big clock that keeps the screen awake. The duration timer stays open after `Stop`, with `Next set`, `Resume`, `Reset` and `Done`, so a run of stretches is timed set after set without going back to the card.
 
 ### Fixed

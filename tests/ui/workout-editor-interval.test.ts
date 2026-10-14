@@ -260,6 +260,13 @@ const menuItem = (title: string): MockMenuItem => {
   return item
 }
 
+/** Picks a type through Change type..., which opens the types as a second menu. */
+const switchTo = async (type: string): Promise<void> => {
+  menuItem('Change type...').onClick?.()
+  await vi.waitFor(() => menuItem(`Switch to ${type}`))
+  menuItem(`Switch to ${type}`).onClick?.()
+}
+
 /** Waits for autosave to leave the note's body lines (after the frontmatter) equal to `expected`. */
 const savedBody = async (contents: Map<string, string>, expected: string[]): Promise<void> => {
   await vi.waitFor(() => {
@@ -345,7 +352,7 @@ describe('WorkoutEditorView interval plans', () => {
     const chips = async (settings: Partial<typeof DEFAULT_SETTINGS>): Promise<string[]> => {
       const { view } = await openView(source, settings)
       button(view, 'Exercise options').click()
-      menuItem('Switch to interval').onClick?.()
+      await switchTo('interval')
       choose('Just this workout')
       await vi.waitFor(() => expect(openedModal().titleEl.textContent).toContain('Interval plan'))
       return [...openedModal().contentEl.querySelectorAll('.fitkit-plan-presets button')].map(
@@ -369,7 +376,7 @@ describe('WorkoutEditorView interval plans', () => {
     )
 
     button(view, 'Exercise options').click()
-    menuItem('Switch to interval').onClick?.()
+    await switchTo('interval')
     choose('Just this workout')
     await vi.waitFor(() => expect(openedModal().titleEl.textContent).toContain('Interval plan'))
     const modal = openedModal()
@@ -520,12 +527,15 @@ describe('WorkoutEditorView interval plans', () => {
 
       button(view, 'Exercise options').click()
       const titles = menuTitles()
+      menuItem('Change type...').onClick?.()
+      await vi.waitFor(() => menuItem('Switch to interval'))
+      const types = menuTitles()
       menuItem('Switch to interval').onClick?.()
       choose('Just this workout')
       await vi.waitFor(() => expect(obsidian.modals.length).toBe(2))
       saveForm()
 
-      expect(titles.filter((title) => title?.startsWith('Switch to'))).toEqual([
+      expect(types).toEqual([
         'Switch to strength',
         'Switch to interval',
         'Switch to bodyweight',
@@ -554,11 +564,14 @@ describe('WorkoutEditorView interval plans', () => {
 
       button(view, 'Exercise options').click()
       const titles = menuTitles()
+      menuItem('Change type...').onClick?.()
+      await vi.waitFor(() => menuItem('Switch to duration'))
+      const types = menuTitles()
       menuItem('Switch to duration').onClick?.()
       choose('Just this workout')
 
       expect(titles).toContain('Edit interval plan')
-      expect(titles.filter((title) => title?.startsWith('Switch to'))).toEqual([
+      expect(types).toEqual([
         'Switch to strength',
         'Switch to duration',
         'Switch to bodyweight',
@@ -572,7 +585,7 @@ describe('WorkoutEditorView interval plans', () => {
       )
 
       button(view, 'Exercise options').click()
-      menuItem('Switch to interval').onClick?.()
+      await switchTo('interval')
       const title = openedModal().titleEl.textContent
       choose('Just this workout')
       await vi.waitFor(() => expect(obsidian.modals.length).toBe(2))
@@ -1180,7 +1193,7 @@ describe('WorkoutEditorView interval plans', () => {
       )
 
       button(view, 'Exercise options').click()
-      menuItem('Switch to interval').onClick?.()
+      await switchTo('interval')
       choose('Just this workout')
       await vi.waitFor(() => expect(obsidian.modals.length).toBe(2))
 
@@ -1245,7 +1258,7 @@ describe('WorkoutEditorView interval plans', () => {
       )
 
       button(view, 'Exercise options').click()
-      menuItem('Switch to interval').onClick?.()
+      await switchTo('interval')
       const question = openedModal().contentEl.textContent
       choose('Update registry too')
 
@@ -1268,7 +1281,7 @@ describe('WorkoutEditorView interval plans', () => {
       })
 
       button(view, 'Exercise options').click()
-      menuItem('Switch to interval').onClick?.()
+      await switchTo('interval')
       choose('Update registry too')
 
       await vi.waitFor(() =>
@@ -1282,7 +1295,7 @@ describe('WorkoutEditorView interval plans', () => {
       const { view } = await openView(bikeCard, BIKE_IS_INTERVAL)
 
       button(view, 'Exercise options').click()
-      menuItem('Switch to interval').onClick?.()
+      await switchTo('interval')
 
       expect(obsidian.modals).toHaveLength(1)
       expect(openedModal().titleEl.textContent).toBe('Interval plan for Exercise Bike')
@@ -1295,7 +1308,7 @@ describe('WorkoutEditorView interval plans', () => {
       )
 
       button(view, 'Exercise options').click()
-      menuItem('Switch to duration').onClick?.()
+      await switchTo('duration')
 
       expect(openedModal().titleEl.textContent).toBe('Switch Sled Push to duration?')
     })
@@ -1314,7 +1327,7 @@ describe('WorkoutEditorView interval plans', () => {
       )
 
       button(view, 'Exercise options').click()
-      menuItem('Switch to duration').onClick?.()
+      await switchTo('duration')
       choose('Update registry too')
 
       await vi.waitFor(() =>
