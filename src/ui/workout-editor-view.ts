@@ -90,6 +90,7 @@ import {
 } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
 import { exercisesFolder, isInFolder, workoutsFolder } from '../settings-paths'
+import { createAutosaver, type Autosaver } from '../vault/autosaver'
 import { composeExerciseNote } from '../vault/exercise-note'
 import { planExerciseFileOpen } from '../vault/exercise-file-plan'
 import { exerciseHistoryFromVault } from '../vault/exercise-history-vault'
@@ -236,15 +237,7 @@ export class WorkoutEditorView extends FileView {
   private session: FileSession | null = null
   private model: EditorWorkoutModel | null = null
   private exerciseHistory: ExerciseHistoryByName | null = null
-  private dirty = false
-  private conflictDetected = false
   private resizeObserver: ResizeObserver | null = null
-  private autoSaveTimer: number | null = null
-  private autoSaveInflight = false
-  private autoSaveRequeued = false
-  private inflightSave?: Promise<void>
-  /** Bumped by every edit, so a finished write can tell whether it saved the latest one. */
-  private editCount?: number
   private dragSession: DragSession | null = null
   private activeTimer: ActiveTimer | null = null
   private activeRestTimer: ActiveRestTimer | null = null
@@ -254,6 +247,7 @@ export class WorkoutEditorView extends FileView {
   private activeRun: ActiveRun | null = null
   private seededWeightsStore?: WeakSet<EditableStrengthSet>
   private exerciseStoreInstance?: ExerciseStore
+  private autosaverInstance?: Autosaver
   private lastRestSeconds: number | null = null
   /**
    * One store per view, so its ladder overlay spans the session. Lazily
@@ -262,6 +256,23 @@ export class WorkoutEditorView extends FileView {
   private get exerciseStore(): ExerciseStore {
     this.exerciseStoreInstance ??= createExerciseStore(this.app, this.plugin)
     return this.exerciseStoreInstance
+  }
+
+  /** Lazily created for the same reason as exerciseStore. */
+  private get autosaver(): Autosaver {
+    this.autosaverInstance ??= createAutosaver({
+      session: () => this.session,
+      serialize: () =>
+        this.model?.isFitKitWorkout ? serializeWorkoutNote(toWorkoutNoteModel(this.model)) : null,
+      debounceMs: () => this.plugin.settings.autosaveDebounceMs,
+      refreshIndex: (path) => this.plugin.refreshIndexEntry(path),
+      onChange: () => this.updateMetaText(),
+      onConflict: () => {
+        new Notice('File changed on disk. Reload before further edits.')
+        this.render()
+      },
+    })
+    return this.autosaverInstance
   }
 
   constructor(
@@ -363,11 +374,7 @@ export class WorkoutEditorView extends FileView {
     this.stopTimer({ write: true, render: false })
     this.closeSetTimer()
     this.clearRestTimerState()
-    if (this.autoSaveTimer !== null) {
-      window.clearTimeout(this.autoSaveTimer)
-      this.autoSaveTimer = null
-    }
-    await this.settleAutoSave()
+    await this.autosaver.settle()
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
     if (this.dragSession) {
@@ -423,13 +430,7 @@ export class WorkoutEditorView extends FileView {
     this.stopTimer({ write: true, render: false })
     this.closeSetTimer()
     this.clearRestTimerState()
-    if (this.autoSaveTimer !== null) {
-      window.clearTimeout(this.autoSaveTimer)
-      this.autoSaveTimer = null
-    }
-    if (this.session && (this.dirty || this.autoSaveInflight) && !this.conflictDetected) {
-      await this.settleAutoSave()
-    }
+    await this.autosaver.settle()
   }
 
   async onLoadFile(file: TFile): Promise<void> {
@@ -443,8 +444,7 @@ export class WorkoutEditorView extends FileView {
     const { model, isWorkout, warnings } = await this.session.load()
     this.model = toEditorWorkoutModel(model, isWorkout, file.path)
     this.exerciseHistory = await this.loadExerciseHistory()
-    this.dirty = false
-    this.conflictDetected = false
+    this.autosaver.reset()
     this.resumeSavedTimer()
     if (skeletonShownAt !== null) {
       const elapsed = Date.now() - skeletonShownAt
@@ -467,17 +467,13 @@ export class WorkoutEditorView extends FileView {
     this.abortTimer()
     this.stopRun()
     this.clearRestTimer()
-    if (this.autoSaveTimer !== null) {
-      window.clearTimeout(this.autoSaveTimer)
-      this.autoSaveTimer = null
-    }
+    this.autosaver.reset()
     const { model, isWorkout } = await this.session.load()
     this.model = toEditorWorkoutModel(model, isWorkout, this.session.file.path)
     if (!this.model.isFitKitWorkout) {
       this.exerciseHistory = null
     }
-    this.dirty = false
-    this.conflictDetected = false
+    this.autosaver.reset()
     this.resumeSavedTimer()
     this.render()
     new Notice('Reloaded from disk.')
@@ -536,7 +532,7 @@ export class WorkoutEditorView extends FileView {
       return
     }
 
-    if (this.conflictDetected) {
+    if (this.autosaver.state().conflict) {
       const banner = container.createDiv({ cls: 'fitkit-conflict' })
       banner.createSpan({
         text: 'File changed on disk. Reload to pick up external edits before continuing.',
@@ -2657,10 +2653,7 @@ export class WorkoutEditorView extends FileView {
   }
 
   private markDirty(): void {
-    this.dirty = true
-    this.editCount = (this.editCount ?? 0) + 1
-    this.updateMetaText()
-    this.scheduleAutoSave()
+    this.autosaver.markDirty()
   }
 
   /**
@@ -2683,7 +2676,7 @@ export class WorkoutEditorView extends FileView {
     if (identity.length > 0) {
       parts.push(identity.join(', '))
     }
-    if (this.dirty) {
+    if (this.autosaver.state().dirty) {
       parts.push('unsaved')
     }
     return parts.join(' | ')
@@ -2693,85 +2686,6 @@ export class WorkoutEditorView extends FileView {
     const line = this.contentEl.querySelector('.fitkit-meta-line')
     if (line instanceof HTMLElement) {
       line.setText(this.metaLineText())
-    }
-  }
-
-  private scheduleAutoSave(): void {
-    if (this.conflictDetected) {
-      return
-    }
-    if (this.autoSaveTimer !== null) {
-      window.clearTimeout(this.autoSaveTimer)
-    }
-    this.autoSaveTimer = window.setTimeout(() => {
-      this.autoSaveTimer = null
-      void this.flushAutoSave()
-    }, this.plugin.settings.autosaveDebounceMs)
-  }
-
-  private async flushAutoSave(): Promise<void> {
-    if (!this.session || !this.model) {
-      return
-    }
-    if (!this.dirty || !this.model.isFitKitWorkout) {
-      return
-    }
-    if (this.conflictDetected) {
-      return
-    }
-    if (this.autoSaveInflight) {
-      this.autoSaveRequeued = true
-      return
-    }
-    this.autoSaveInflight = true
-    this.inflightSave = this.writeAutoSave()
-    await this.inflightSave
-  }
-
-  /** Waits out a write already in flight, then writes whatever it could not include. */
-  private async settleAutoSave(): Promise<void> {
-    while (this.autoSaveInflight) {
-      await this.inflightSave
-    }
-    await this.flushAutoSave()
-  }
-
-  private async writeAutoSave(): Promise<void> {
-    if (!this.session || !this.model) {
-      this.autoSaveInflight = false
-      return
-    }
-    /**
-     * Captured before the write so a concurrent onClose/loadFile on this view
-     * (which can null out or reassign this.session while we await below)
-     * cannot make the refresh below crash or target the wrong file.
-     */
-    const session = this.session
-    const path = session.file.path
-    try {
-      const savedEdit = this.editCount
-      const nextText = serializeWorkoutNote(toWorkoutNoteModel(this.model))
-      const result = await session.saveIfUnchanged(nextText)
-      if (!result.ok) {
-        this.conflictDetected = true
-        new Notice('File changed on disk. Reload before further edits.')
-        this.render()
-        return
-      }
-      /** An edit made while this write was in flight is not in `nextText`, so it keeps the note dirty. */
-      this.dirty = this.editCount !== savedEdit
-      this.updateMetaText()
-      /** A refresh failure is a cache-staleness problem, not a save failure; never let it surface as an unhandled rejection or block the finally below. */
-      await this.plugin.refreshIndexEntry(path).catch(() => undefined)
-    } finally {
-      this.autoSaveInflight = false
-      if (this.autoSaveRequeued) {
-        this.autoSaveRequeued = false
-        /** Only reschedule if the view is still live; onClose may have torn down session/model while this save was in flight. */
-        if (this.session) {
-          this.scheduleAutoSave()
-        }
-      }
     }
   }
 }

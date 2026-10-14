@@ -232,3 +232,81 @@ describe('WorkoutEditorView workspace state', () => {
     expect(view.file?.path).toBe(OTHER_WORKOUT_PATH)
   })
 })
+
+describe('WorkoutEditorView autosave wiring', () => {
+  /** Holds the debounce so an edit stays pending until the test closes or switches the view. */
+  const holdDebounce = (): void => {
+    vi.stubGlobal('window', { setTimeout: (): number => 1, clearTimeout: (): void => {} })
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('HTMLElement', harnessWindow.HTMLElement)
+    vi.stubGlobal('activeWindow', harnessWindow)
+    vi.stubGlobal('activeDocument', harnessDocument)
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(): void {}
+        disconnect(): void {}
+      },
+    )
+    vi.stubGlobal('window', {
+      setTimeout: (cb: () => void): number => (cb(), 0),
+      clearTimeout: () => {},
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const editReps = async (view: WorkoutEditorView, value: string): Promise<void> => {
+    await view.onOpen()
+    await view.setState({ file: WORKOUT_PATH }, { history: false })
+    holdDebounce()
+    const reps = view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')
+    if (!reps) {
+      throw new Error('reps input not rendered')
+    }
+    reps.value = value
+    reps.dispatchEvent(new harnessWindow.Event('input'))
+  }
+
+  const metaText = (view: WorkoutEditorView): string | undefined =>
+    view.contentEl.querySelector('.fitkit-meta-line')?.textContent ?? undefined
+
+  it('marks the meta line unsaved after an edit and clears it once the close writes it', async () => {
+    const { view, contents } = createView()
+    await editReps(view, '7')
+
+    expect(metaText(view)).toContain('unsaved')
+
+    await view.onUnloadFile()
+
+    expect(contents.get(WORKOUT_PATH)).toContain('[reps:: 7]')
+    expect(metaText(view)).not.toContain('unsaved')
+  })
+
+  it('writes a pending edit when the view is closed', async () => {
+    const { view, contents } = createView()
+    await editReps(view, '9')
+
+    await view.onClose()
+
+    expect(contents.get(WORKOUT_PATH)).toContain('[reps:: 9]')
+  })
+
+  it('shows the reload banner and keeps the disk copy when a pending edit meets an external change', async () => {
+    const { view, contents } = createView()
+    await editReps(view, '7')
+    contents.set(WORKOUT_PATH, workoutSource.replaceAll('Squat', 'Deadlift'))
+
+    await view.onUnloadFile()
+
+    expect(view.contentEl.querySelector('.fitkit-conflict')?.textContent).toContain(
+      'File changed on disk',
+    )
+    expect(contents.get(WORKOUT_PATH)).toContain('Deadlift')
+    expect(contents.get(WORKOUT_PATH)).not.toContain('[reps:: 7]')
+  })
+})

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const noticeMessages = vi.hoisted(() => [] as string[])
 
@@ -214,12 +214,9 @@ interface AutosaveIndexView {
   plugin: TestPlugin
   session: FileSession | null
   model: TestEditorModel | null
-  dirty: boolean
-  conflictDetected: boolean
-  autoSaveInflight: boolean
-  autoSaveRequeued: boolean
   contentEl: { querySelector: () => null }
-  flushAutoSave(): Promise<void>
+  markDirty(): void
+  onUnloadFile(): Promise<void>
 }
 
 interface Harness {
@@ -290,19 +287,22 @@ const createHarness = async (): Promise<Harness> => {
   view.plugin = plugin
   view.session = session
   view.model = model
-  view.dirty = true
-  view.conflictDetected = false
-  view.autoSaveInflight = false
-  view.autoSaveRequeued = false
   view.contentEl = { querySelector: () => null }
 
   return { view, plugin, contents }
 }
 
+/** The autosave path does `instanceof HTMLElement` and schedules on `window`; the vitest node environment has neither, so alias them to the Node globals. */
+const stubAutosaveGlobals = (): void => {
+  vi.stubGlobal('HTMLElement', class {})
+  // eslint-disable-next-line obsidianmd/no-global-this -- The test realm's global object is the only handle available for stubbing.
+  vi.stubGlobal('window', globalThis)
+}
+
 describe('WorkoutEditorView autosave keeps the cached index in sync', () => {
-  /** flushAutoSave's success path does `instanceof HTMLElement`; the vitest node environment has no such global, so stub it as in tests/ui/workout-editor-view.test.ts. */
-  beforeEach(() => {
-    vi.stubGlobal('HTMLElement', class {})
+  beforeEach(stubAutosaveGlobals)
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('updates plugin.cachedIndex with the freshly saved next-time plan after a successful autosave', async () => {
@@ -312,11 +312,11 @@ describe('WorkoutEditorView autosave keeps the cached index in sync', () => {
       throw new Error('test setup: exercise not present on model')
     }
     exercise.next = { direction: 'down' }
+    view.markDirty()
 
-    await view.flushAutoSave()
+    await view.onUnloadFile()
 
     /** Sanity check: the write to disk happened, so a stale cached index is the only remaining suspect. */
-    expect(view.dirty).toBe(false)
     expect(contents.get(WORKOUT_PATH)).toContain('[next:: down]')
 
     const entry = plugin.cachedIndex?.entries.find((candidate) => candidate.path === WORKOUT_PATH)
@@ -330,10 +330,10 @@ describe('WorkoutEditorView autosave keeps the cached index in sync', () => {
       throw new Error('test setup: exercise not present on model')
     }
     exercise.next = undefined
+    view.markDirty()
 
-    await view.flushAutoSave()
+    await view.onUnloadFile()
 
-    expect(view.dirty).toBe(false)
     expect(contents.get(WORKOUT_PATH)).not.toContain('[next::')
 
     const entry = plugin.cachedIndex?.entries.find((candidate) => candidate.path === WORKOUT_PATH)
@@ -348,10 +348,10 @@ describe('WorkoutEditorView autosave keeps the cached index in sync', () => {
       throw new Error('test setup: exercise not present on model')
     }
     exercise.next = { direction: 'down' }
+    view.markDirty()
 
-    await view.flushAutoSave()
+    await view.onUnloadFile()
 
-    expect(view.dirty).toBe(false)
     expect(plugin.cachedIndex).toBeNull()
   })
 })
@@ -378,15 +378,14 @@ interface TeardownHarness {
   plugin: TestPlugin
   fileA: TestFile
   fileB: TestFile
-  /** Unblocks the gated `vault.process` so a paused flushAutoSave can resume. */
+  /** Unblocks the gated `vault.process` so a paused save can resume. */
   releaseSave: () => void
 }
 
 /**
  * Same shape as createHarness, but vault.process blocks on a gate until
- * releaseSave() is called, so a test can pause flushAutoSave mid-write and
- * mutate view.session (nulling or reassigning it) before letting it resume,
- * mirroring what onClose/loadFile do to a concurrently in-flight autosave.
+ * releaseSave() is called, so a test can close the view mid-write and mutate
+ * view.session (nulling or reassigning it) before letting the write resume.
  */
 const createTeardownHarness = async (): Promise<TeardownHarness> => {
   const fileA: TestFile = {
@@ -459,21 +458,15 @@ const createTeardownHarness = async (): Promise<TeardownHarness> => {
   view.plugin = plugin
   view.session = sessionA
   view.model = model
-  view.dirty = true
-  view.conflictDetected = false
-  view.autoSaveInflight = false
-  view.autoSaveRequeued = false
   view.contentEl = { querySelector: () => null }
 
   return { view, plugin, fileA, fileB, releaseSave }
 }
 
 describe('WorkoutEditorView autosave survives teardown races on the shared view', () => {
-  beforeEach(() => {
-    vi.stubGlobal('HTMLElement', class {})
-    /** flushAutoSave's finally block may call scheduleAutoSave, which schedules on `window`; alias it to the real Node timers. */
-    // eslint-disable-next-line obsidianmd/no-global-this -- The test realm's global object is the only handle available for stubbing.
-    vi.stubGlobal('window', globalThis)
+  beforeEach(stubAutosaveGlobals)
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('does not throw or reject when the view is torn down while an autosave is in flight', async () => {
@@ -483,19 +476,18 @@ describe('WorkoutEditorView autosave survives teardown races on the shared view'
       throw new Error('test setup: exercise not present on model')
     }
     exercise.next = { direction: 'down', step: 2.5 }
+    view.markDirty()
 
-    const flushA = view.flushAutoSave()
-    /** Mirrors onClose's own flushAutoSave() call hitting the in-flight fast path. */
-    await view.flushAutoSave()
-    expect(view.autoSaveRequeued).toBe(true)
+    /** Closing starts the write, then waits on it while the gate is closed. */
+    const closing = view.onUnloadFile()
 
-    /** Mirrors onClose nulling the session right after its own flush call returns. */
+    /** Mirrors onClose nulling the session once its settle call has returned. */
     view.session = null
     view.model = null
 
     releaseSave()
 
-    await expect(flushA).resolves.toBeUndefined()
+    await expect(closing).resolves.toBeUndefined()
   })
 
   it('refreshes the file that was actually saved, not a file loaded into the view afterward', async () => {
@@ -505,20 +497,17 @@ describe('WorkoutEditorView autosave survives teardown races on the shared view'
       throw new Error('test setup: exercise not present on model')
     }
     exercise.next = { direction: 'down', step: 2.5 }
+    view.markDirty()
 
-    const flushA = view.flushAutoSave()
-    /** Mirrors loadFile's own flushAutoSave() call hitting the in-flight fast path. */
-    await view.flushAutoSave()
-    expect(view.autoSaveRequeued).toBe(true)
+    const closing = view.onUnloadFile()
 
-    /** Mirrors loadFile reassigning the view to a newly opened, unrelated file. */
+    /** Mirrors loadFile reassigning the view to a newly opened, unrelated file mid-save. */
     const sessionB = new FileSession(view.app as unknown as App, fileB as unknown as TFile)
     await sessionB.load()
     view.session = sessionB
-    view.dirty = false
 
     releaseSave()
-    await flushA
+    await closing
 
     const entryA = plugin.cachedIndex?.entries.find((candidate) => candidate.path === fileA.path)
     const entryB = plugin.cachedIndex?.entries.find((candidate) => candidate.path === fileB.path)
