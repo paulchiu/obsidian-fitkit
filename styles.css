@@ -536,7 +536,11 @@ body.is-mobile .fitkit-editor-root {
   max-height: inherit;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+/* The button bar holds the bottom spacing, so the form has none for scrolled content to show through below it, Obsidian's phone padding included. */
+.fitkit-set-note-modal-shell .fitkit-set-note-modal {
+  padding-bottom: 0;
 }
 
 .fitkit-set-note-modal h2 {
@@ -637,8 +641,17 @@ body.is-mobile .fitkit-editor-root {
   bottom: 0;
   z-index: 1;
   margin-top: 4px;
-  padding: 10px 0 max(8px, env(safe-area-inset-bottom));
+  padding: 10px 0 0;
+  padding-bottom: max(var(--size-4-3), env(safe-area-inset-bottom));
   background: var(--modal-background, var(--background-primary));
+}
+
+/* Runs the bar across the phone sheet's side padding so nothing scrolls past beside it. */
+.is-phone .fitkit-set-note-actions {
+  margin-left: calc(-1 * var(--size-4-3));
+  margin-right: calc(-1 * var(--size-4-3));
+  padding-left: var(--size-4-3);
+  padding-right: var(--size-4-3);
 }
 
 .fitkit-footer {

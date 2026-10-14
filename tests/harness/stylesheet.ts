@@ -23,6 +23,13 @@ export function ensureStylesheetLoaded(): void {
   harnessDocument.head.appendChild(style)
 }
 
+/** Add rules standing in for Obsidian's own stylesheet, which loads before the plugin's and so loses ties to it. */
+export function loadObsidianRules(css: string): void {
+  const style = harnessDocument.createElement('style')
+  style.textContent = css
+  harnessDocument.head.prepend(style)
+}
+
 /**
  * Assert that a property resolves to a theme token. jsdom never substitutes
  * custom properties, so the assertion names the token, not a colour.
