@@ -24,6 +24,7 @@ const REPEAT_GAP_SECONDS = 0.1
 export function createCuePlayer(win: Window, beeps: boolean): CuePlayer {
   let audio: AudioContext | null = null
   let lock: WakeLockSentinel | null = null
+  let requesting = false
   let wantAwake = false
 
   return {
@@ -61,19 +62,29 @@ export function createCuePlayer(win: Window, beeps: boolean): CuePlayer {
     keepAwake: () => {
       wantAwake = true
       const wakeLock = win.navigator.wakeLock as WakeLock | undefined
-      if (!wakeLock || lock) {
+      if (!wakeLock || lock || requesting) {
         return
       }
+      requesting = true
       /** A refused lock (low battery, no permission) only means the screen may dim. */
       wakeLock.request('screen').then(
         (sentinel) => {
-          if (wantAwake) {
-            lock = sentinel
-          } else {
+          requesting = false
+          if (!wantAwake) {
             void sentinel.release()
+            return
           }
+          lock = sentinel
+          /** The platform drops the lock while the page is hidden, so forget it and let the next keepAwake ask again. */
+          sentinel.addEventListener('release', () => {
+            if (lock === sentinel) {
+              lock = null
+            }
+          })
         },
-        () => undefined,
+        () => {
+          requesting = false
+        },
       )
     },
     release: () => {

@@ -541,7 +541,7 @@ describe('WorkoutEditorView timer screens keep the screen awake', () => {
       value: {
         request: async (type: string): Promise<unknown> => {
           locks.push(`acquire ${type}`)
-          return { release: async () => void locks.push('release') }
+          return { addEventListener: () => {}, release: async () => void locks.push('release') }
         },
       },
     })
@@ -633,7 +633,7 @@ describe('WorkoutEditorView screens give the tab back on every teardown', () => 
       value: {
         request: async (): Promise<unknown> => {
           locks.push('acquire')
-          return { release: async () => void locks.push('release') }
+          return { addEventListener: () => {}, release: async () => void locks.push('release') }
         },
       },
     })

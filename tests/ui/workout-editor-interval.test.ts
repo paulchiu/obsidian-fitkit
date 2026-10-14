@@ -970,7 +970,7 @@ describe('WorkoutEditorView interval plans', () => {
           value: {
             request: async (type: string): Promise<unknown> => {
               locks.push(`acquire ${type}`)
-              return { release: async () => void locks.push('release') }
+              return { addEventListener: () => {}, release: async () => void locks.push('release') }
             },
           },
         })
