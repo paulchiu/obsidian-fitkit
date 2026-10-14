@@ -535,11 +535,7 @@ describe('WorkoutEditorView interval plans', () => {
       await vi.waitFor(() => expect(obsidian.modals.length).toBe(2))
       saveForm()
 
-      expect(types).toEqual([
-        'Switch to strength',
-        'Switch to interval',
-        'Switch to bodyweight',
-      ])
+      expect(types).toEqual(['Switch to strength', 'Switch to interval', 'Switch to bodyweight'])
       expect(titles).not.toContain('Set interval plan')
       await savedBody(contents, [
         '## [[Exercise Bike]]',
@@ -571,11 +567,7 @@ describe('WorkoutEditorView interval plans', () => {
       choose('Just this workout')
 
       expect(titles).toContain('Edit interval plan')
-      expect(types).toEqual([
-        'Switch to strength',
-        'Switch to duration',
-        'Switch to bodyweight',
-      ])
+      expect(types).toEqual(['Switch to strength', 'Switch to duration', 'Switch to bodyweight'])
       await savedBody(contents, ['## [[Exercise Bike]]', '', ...rows])
     })
 
