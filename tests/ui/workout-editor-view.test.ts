@@ -2487,6 +2487,98 @@ describe('WorkoutEditorView kind switch persistence', () => {
       ])
     })
   })
+
+  describe('WorkoutEditorView rename onto a registry type', () => {
+    interface RenameCard {
+      name: string
+      kind: 'strength' | 'duration'
+      plan?: string
+      strengthSets: { set?: number; weight?: number; reps?: number }[]
+      durationEntries: { set?: number; durationSeconds?: number }[]
+      bodyweightSets: never[]
+    }
+    interface RenameView extends PersistKindChangeView {
+      model: { exercises: RenameCard[] }
+      render: ReturnType<typeof vi.fn>
+      markDirty: ReturnType<typeof vi.fn>
+      openIntervalPlanModal: ReturnType<typeof vi.fn>
+      confirmKindSwitch: () => Promise<boolean>
+      applyRename: (index: number, name: string, registry: unknown) => Promise<void>
+    }
+    const createRenameView = (card: RenameCard): RenameView => {
+      const { view } = createPersistKindChangeView([], [])
+      const renameView = view as unknown as RenameView
+      renameView.render = vi.fn()
+      renameView.markDirty = vi.fn()
+      renameView.openIntervalPlanModal = vi.fn()
+      renameView.confirmKindSwitch = async () => true
+      renameView.model = { exercises: [card] }
+      return renameView
+    }
+    const card = (overrides: Partial<RenameCard>): RenameCard => ({
+      name: 'Squat',
+      kind: 'strength',
+      strengthSets: [],
+      durationEntries: [],
+      bodyweightSets: [],
+      ...overrides,
+    })
+
+    beforeEach(() => {
+      obsidianMock.notices = []
+    })
+
+    it('lands a strength card renamed onto an interval name as plain duration', async () => {
+      const view = createRenameView(card({ strengthSets: [{ set: 1, weight: 10, reps: 8 }] }))
+      const registry = createRegistry([
+        { name: 'Rower', kind: 'duration', interval: true, aliases: [] },
+      ])
+
+      await view.applyRename(0, 'Rower', registry)
+
+      const renamed = view.model.exercises[0]
+      expect(renamed).toMatchObject({ name: 'Rower', kind: 'duration', strengthSets: [] })
+      expect(renamed?.plan).toBeUndefined()
+      expect(view.openIntervalPlanModal).not.toHaveBeenCalled()
+      expect(view.plugin.saveSettings).not.toHaveBeenCalled()
+      expect(obsidianMock.notices).toEqual([
+        'Switched to duration. Previous strength rows were cleared.',
+      ])
+    })
+
+    it('keeps the plan when an interval card takes a plain duration name', async () => {
+      const view = createRenameView(
+        card({ name: 'Bike', kind: 'duration', plan: '8 x 30s, 90s rest' }),
+      )
+      const registry = createRegistry([{ name: 'Rower', kind: 'duration', aliases: [] }])
+
+      await view.applyRename(0, 'Rower', registry)
+
+      expect(view.model.exercises[0]).toMatchObject({
+        name: 'Rower',
+        kind: 'duration',
+        plan: '8 x 30s, 90s rest',
+      })
+      expect(view.openIntervalPlanModal).not.toHaveBeenCalled()
+    })
+
+    it('only renames a plain duration card that takes an interval name', async () => {
+      const view = createRenameView(
+        card({ name: 'Bike', kind: 'duration', durationEntries: [{ durationSeconds: 60 }] }),
+      )
+      const registry = createRegistry([
+        { name: 'Rower', kind: 'duration', interval: true, aliases: [] },
+      ])
+
+      await view.applyRename(0, 'Rower', registry)
+
+      const renamed = view.model.exercises[0]
+      expect(renamed).toMatchObject({ name: 'Rower', durationEntries: [{ durationSeconds: 60 }] })
+      expect(renamed?.plan).toBeUndefined()
+      expect(view.openIntervalPlanModal).not.toHaveBeenCalled()
+      expect(obsidianMock.notices).toEqual([])
+    })
+  })
 })
 
 interface TimerExerciseCard {

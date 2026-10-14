@@ -39,7 +39,6 @@ import {
   type ExerciseHistorySummary,
 } from '../domain/exercise-history'
 import {
-  kindForName,
   typeForName,
   levelsForName,
   normalize,
@@ -54,6 +53,7 @@ import {
   loggedTypeOf,
   type ExerciseType,
 } from '../domain/exercise-type'
+import { planTypeSwitch, type TypeSwitchPlan } from '../domain/exercise-type-switch'
 import { filterSuggestableNames } from '../domain/exercise-suggestions'
 import {
   formatNumber as formatPlanNumber,
@@ -1733,7 +1733,7 @@ export class WorkoutEditorView extends FileView {
     return this.plugin.settings.strengthRestTimerEnabled !== false
   }
 
-  /** Duration and interval share rows, so switching between them only sets or drops the plan; the scope question is skipped when there is nothing to choose. */
+  /** The scope question is skipped when there is nothing to choose. */
   private async switchCardType(index: number, target: ExerciseType): Promise<void> {
     const ex = this.model?.exercises[index]
     const current = ex ? loggedTypeOf(ex) : null
@@ -1751,26 +1751,37 @@ export class WorkoutEditorView extends FileView {
     if (choice === 'cancel') {
       return
     }
+    await this.runTypeSwitch(
+      index,
+      planTypeSwitch({ loggedType: current, target, registryType, scope: choice }),
+    )
+  }
+
+  /** Carries out a type switch plan on the card at `index`, the one path both the card menu and rename take. */
+  private async runTypeSwitch(index: number, plan: TypeSwitchPlan): Promise<void> {
+    const ex = this.model?.exercises[index]
+    if (!ex) {
+      return
+    }
     /** Captured before the switch clears the card; the relabel offer below marks these as level 1. */
-    const relabelSource = nextKind === 'bodyweight' ? toWorkoutExercise(ex) : null
-    if (ex.kind !== nextKind) {
-      this.applyKindSwitch(index, nextKind, clearsRows, target)
-    } else if (target === 'duration') {
+    const relabelSource = plan.offersRelabel ? toWorkoutExercise(ex) : null
+    if (plan.changesKind) {
+      this.applyKindSwitch(index, kindOfType(plan.target), hasRows(ex), plan.announcedAs)
+    } else if (plan.dropsPlan) {
       ex.plan = undefined
       this.markDirty()
       this.render()
     }
-    if (choice === 'workout-and-registry') {
-      await this.persistTypeChange(ex.name, target)
+    if (plan.recordsType) {
+      await this.persistTypeChange(ex.name, plan.target)
     }
-    if (target === 'interval') {
+    if (plan.opensPlanForm) {
       this.openIntervalPlanModal(ex)
     }
-    if (nextKind === 'bodyweight' && relabelSource) {
-      /** Workout-only leaves durable stores alone: a ladder seeded into a note whose kind was not switched would be unreadable, and a registry entry would leak past the chosen scope. */
-      if (choice === 'workout-and-registry') {
-        await this.seedBodyweightLadder(ex)
-      }
+    if (plan.seedsLadder) {
+      await this.seedBodyweightLadder(ex)
+    }
+    if (relabelSource) {
       await this.offerFirstLevelRelabel(index, relabelSource)
     }
   }
@@ -2441,24 +2452,22 @@ export class WorkoutEditorView extends FileView {
     if (target.name === trimmed) {
       return
     }
-    const nextKind = kindForName(registry, trimmed)
-    if (nextKind && nextKind !== target.kind) {
-      const hadRows = hasRows(target)
-      const confirmed = await this.confirmKindSwitch(target, nextKind)
+    const registryType = typeForName(registry, trimmed)
+    const plan = registryType
+      ? planTypeSwitch({
+          loggedType: loggedTypeOf(target),
+          target: registryType,
+          registryType,
+          scope: 'registry-known',
+        })
+      : null
+    if (plan?.changesKind) {
+      const confirmed = await this.confirmKindSwitch(target, kindOfType(plan.target))
       if (!confirmed) {
         return
       }
-      /** Captured before the switch clears the card, mirroring the card menu path. */
-      const relabelSource = nextKind === 'bodyweight' ? toWorkoutExercise(target) : null
       target.name = trimmed
-      this.applyKindSwitch(index, nextKind, hadRows)
-      if (nextKind === 'bodyweight' && relabelSource) {
-        const switched = this.model.exercises[index]
-        if (switched) {
-          await this.seedBodyweightLadder(switched)
-        }
-        await this.offerFirstLevelRelabel(index, relabelSource)
-      }
+      await this.runTypeSwitch(index, plan)
       return
     }
     target.name = trimmed
