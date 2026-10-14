@@ -791,6 +791,24 @@ describe('WorkoutEditorView interval plans', () => {
       ])
     })
 
+    it('resumes a cut-off run from the next rep', async () => {
+      vi.setSystemTime(new Date('2026-10-12T08:00:00+10:00'))
+      const { view, contents } = await openView(
+        workoutSource(
+          ...BIKE,
+          '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 0] [started:: 2026-10-12T07:15:30+10:00]',
+        ),
+      )
+
+      runnerButton(view, 'Resume rep 2').click()
+
+      await savedBody(contents, [
+        ...BIKE,
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 90]',
+        '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 0] [started:: 2026-10-12T08:00:00+10:00]',
+      ])
+    })
+
     it('offers Start instead of the stopwatch on a card with a plan', async () => {
       const { view } = await openView(workoutSource(...BIKE))
 
@@ -970,6 +988,21 @@ describe('WorkoutEditorView interval plans', () => {
         runTo('07:15:31')
 
         expect(tones).toEqual([880, 880, 880, 1320])
+      })
+
+      it('double-beeps when work runs straight into the next step', async () => {
+        const { view } = await openView(
+          workoutSource(
+            '## [[Exercise Bike]]',
+            '',
+            '- [exercise:: [[Exercise Bike]]] [plan:: (x 2 (on 30s 350W) (off 30s 150W))]',
+          ),
+        )
+        button(view, 'Start interval plan').click()
+
+        runTo('07:15:31')
+
+        expect(tones).toEqual([880, 880, 880, 1100, 1100])
       })
 
       it('stays silent when interval beeps are off', async () => {
