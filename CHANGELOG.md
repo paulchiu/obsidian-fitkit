@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - An edit made while the workout editor was still saving the previous one could be dropped, and closing the tab during a save could lose the last edit.
+- `Add set` and `Repeat` after deleting a set could give the new set the same number as an existing one. New sets now number after the highest.
 
 ### Removed
 

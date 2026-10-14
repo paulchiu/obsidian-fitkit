@@ -715,7 +715,7 @@ export class WorkoutEditorView extends FileView {
     const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
     addBtn.addEventListener('click', () => {
       const last = ex.strengthSets[ex.strengthSets.length - 1]
-      const next: EditableStrengthSet = { set: ex.strengthSets.length + 1 }
+      const next: EditableStrengthSet = { set: nextSetNumber(ex.strengthSets) }
       if (last?.weight !== undefined) {
         next.weight = last.weight
       }
@@ -729,7 +729,7 @@ export class WorkoutEditorView extends FileView {
     repeatBtn.addEventListener('click', () => {
       const last = ex.strengthSets[ex.strengthSets.length - 1]
       ex.strengthSets.push({
-        set: ex.strengthSets.length + 1,
+        set: nextSetNumber(ex.strengthSets),
         weight: last?.weight,
         reps: last?.reps,
       })
@@ -829,7 +829,7 @@ export class WorkoutEditorView extends FileView {
     const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
     addBtn.addEventListener('click', () => {
       const last = ex.bodyweightSets[ex.bodyweightSets.length - 1]
-      ex.bodyweightSets.push({ set: ex.bodyweightSets.length + 1, level: last?.level ?? 1 })
+      ex.bodyweightSets.push({ set: nextSetNumber(ex.bodyweightSets), level: last?.level ?? 1 })
       this.markDirty()
       this.render()
       this.focusRowCell(exerciseIndex, ex.bodyweightSets.length - 1, 'Reps')
@@ -839,7 +839,7 @@ export class WorkoutEditorView extends FileView {
     repeatBtn.addEventListener('click', () => {
       const last = ex.bodyweightSets[ex.bodyweightSets.length - 1]
       ex.bodyweightSets.push({
-        set: ex.bodyweightSets.length + 1,
+        set: nextSetNumber(ex.bodyweightSets),
         level: last?.level,
         reps: last?.reps,
         load: last?.load,
@@ -1087,7 +1087,7 @@ export class WorkoutEditorView extends FileView {
       }
       const last = ex.durationEntries[ex.durationEntries.length - 1]
       ex.durationEntries.push({
-        set: ex.durationEntries.length + 1,
+        set: nextSetNumber(ex.durationEntries),
         durationSeconds: last?.durationSeconds,
         ...carriedIntervalFields(last),
       })
@@ -3396,12 +3396,12 @@ function durationRowClasses(columns: IntervalColumns, base: string): string {
     .join(' ')
 }
 
-/** Intensity and rest a new row starts from, copied from the row before it. */
 /** One past the highest set number, so a set added after a deletion never repeats one. */
-function nextSetNumber(entries: readonly EditableDurationEntry[]): number {
+function nextSetNumber(entries: readonly { set?: number }[]): number {
   return entries.reduce((high, entry, index) => Math.max(high, entry.set ?? index + 1), 0) + 1
 }
 
+/** Intensity and rest a new row starts from, copied from the row before it. */
 function carriedIntervalFields(last: EditableDurationEntry | undefined): EditableDurationEntry {
   const carried: EditableDurationEntry = {}
   for (const kind of INTENSITY_KINDS) {

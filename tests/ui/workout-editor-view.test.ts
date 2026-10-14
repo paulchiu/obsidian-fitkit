@@ -4389,6 +4389,32 @@ describe('WorkoutEditorView repeat set', () => {
     expect(ex.durationEntries[1]).toEqual({ set: 2, durationSeconds: 45 })
   })
 
+  it.each([
+    { button: 'Add set', kind: 'strength' as const, rows: 'strengthSets' as const },
+    { button: 'Repeat', kind: 'strength' as const, rows: 'strengthSets' as const },
+    { button: 'Add set', kind: 'bodyweight' as const, rows: 'bodyweightSets' as const },
+    { button: 'Repeat', kind: 'bodyweight' as const, rows: 'bodyweightSets' as const },
+    { button: 'Repeat', kind: 'duration' as const, rows: 'durationEntries' as const },
+  ])(
+    'numbers a set made by $button on a $kind card after the highest, so a deleted set is not reused',
+    ({ button, kind, rows }) => {
+      const ex = {
+        ...emptyCard(kind),
+        [rows]: [
+          { set: 1, level: 1 },
+          { set: 3, level: 1 },
+        ],
+      }
+
+      renderCard(ex)
+        .findByClass('fitkit-row-actions')
+        ?.children.find((child) => child.tagName === 'button' && child.textContent === button)
+        ?.listenersFor('click')[0]?.({})
+
+      expect(ex[rows].map((row) => (row as { set?: number }).set)).toEqual([1, 3, 4])
+    },
+  )
+
   it.each(['strength', 'bodyweight', 'duration'] as const)(
     'disables Repeat on an empty %s card, since there is no set to copy',
     (kind) => {
