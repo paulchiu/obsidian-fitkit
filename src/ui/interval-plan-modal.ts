@@ -59,6 +59,8 @@ const PLAN_EXAMPLES: ReadonlyArray<{ plan: string; about: string }> = [
 
 /** Edits the `[plan::]` on a duration card, previewing what the plan comes to as it is typed. */
 export class IntervalPlanModal extends Modal {
+  private stopKeepingPlanInView?: () => void
+
   constructor(
     app: App,
     private options: IntervalPlanModalOptions,
@@ -152,11 +154,42 @@ export class IntervalPlanModal extends Modal {
     }
 
     fill(this.options.initial ?? this.options.suggested ?? DEFAULT_PLAN)
+    this.stopKeepingPlanInView = keepInViewOverKeyboard(contentEl, heading, field)
   }
 
   onClose(): void {
+    this.stopKeepingPlanInView?.()
     this.modalEl.removeClass('fitkit-set-note-modal-shell')
     this.contentEl.empty()
+  }
+}
+
+/**
+ * Once the phone keyboard is up, scrolls `top` to the top of the visible form while `field`
+ * is being typed in: with the examples open, iOS can scroll the form past the field it revealed.
+ * Returns the cleanup.
+ */
+function keepInViewOverKeyboard(
+  form: HTMLElement,
+  top: HTMLElement,
+  field: HTMLElement,
+): () => void {
+  const win = activeWindow
+  const align = (): void => {
+    if (field.ownerDocument.activeElement !== field) {
+      return
+    }
+    const visibleTop = Math.max(
+      form.getBoundingClientRect().top,
+      win.visualViewport?.offsetTop ?? 0,
+    )
+    form.scrollTop += top.getBoundingClientRect().top - visibleTop
+  }
+  win.addEventListener('keyboardDidShow', align)
+  win.visualViewport?.addEventListener('resize', align)
+  return () => {
+    win.removeEventListener('keyboardDidShow', align)
+    win.visualViewport?.removeEventListener('resize', align)
   }
 }
 

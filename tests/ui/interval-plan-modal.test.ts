@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createTestRoot, findButtons, harnessWindow } from '../harness/obsidian-dom'
+import {
+  createTestRoot,
+  findButtons,
+  harnessDocument,
+  harnessWindow,
+} from '../harness/obsidian-dom'
 
 vi.mock('obsidian', () => {
   class Modal {
@@ -72,6 +77,7 @@ const text = (modal: IntervalPlanModal, selector: string): string | null | undef
 describe('interval plan modal', () => {
   beforeEach(() => {
     vi.stubGlobal('window', { setTimeout: (callback: () => void): number => (callback(), 1) })
+    vi.stubGlobal('activeWindow', harnessWindow)
   })
 
   afterEach(() => {
@@ -169,6 +175,54 @@ describe('interval plan modal', () => {
       hiddenAgain: true,
       docs: 'https://github.com/paulchiu/obsidian-fitkit/blob/main/docs/note-format.md#interval-plans',
       saved: [['(x 6 (climb 1m (L8 L10 L12 L14 L12 L10)) (rest 1m))']],
+    })
+  })
+
+  describe('when the phone keyboard opens', () => {
+    /** Lays the form out as iOS leaves it: examples open and scrolled so the plan sits above the visible top. */
+    const scrolledPastPlan = (modal: IntervalPlanModal): HTMLElement => {
+      const { contentEl } = modal
+      harnessDocument.body.append(contentEl)
+      contentEl.querySelector<HTMLButtonElement>('button[aria-label="Plan examples"]')?.click()
+      let scrollTop = 500
+      Object.defineProperty(contentEl, 'scrollTop', {
+        get: () => scrollTop,
+        set: (value: number) => (scrollTop = value),
+      })
+      contentEl.getBoundingClientRect = (): DOMRect => ({ top: 60 }) as DOMRect
+      const heading = contentEl.querySelector<HTMLElement>('.fitkit-plan-heading')
+      if (heading) {
+        heading.getBoundingClientRect = (): DOMRect => ({ top: -340 }) as DOMRect
+      }
+      return contentEl
+    }
+
+    const keyboardShows = (): void => {
+      harnessDocument.defaultView?.dispatchEvent(new harnessWindow.Event('keyboardDidShow'))
+    }
+
+    it('scrolls the plan back to the top of the form while it is being typed in', () => {
+      const { modal } = open('(x 3 (over 1m 300W))')
+      const form = scrolledPastPlan(modal)
+
+      planField(modal).focus()
+      keyboardShows()
+
+      expect(form.scrollTop).toBe(100)
+      modal.close()
+    })
+
+    it('leaves the form where it is when the plan is not being typed in, or the form has closed', () => {
+      const { modal } = open('(x 3 (over 1m 300W))')
+      const form = scrolledPastPlan(modal)
+
+      keyboardShows()
+      const unfocused = form.scrollTop
+      planField(modal).focus()
+      modal.close()
+      keyboardShows()
+
+      expect([unfocused, form.scrollTop]).toEqual([500, 500])
     })
   })
 
