@@ -197,7 +197,12 @@ function catchUp(session: RunSession, now: number): RunTransition {
     return { session: { ...session, screen }, effects: {} }
   }
   return {
-    session: { ...session, screen, rows: result.rows },
+    session: {
+      ...session,
+      screen,
+      rows: result.rows,
+      lastPhase: runPhase(result.rows, session.program, now),
+    },
     effects: { rows: result.rows, notice: caughtUpNotice(result.filled, session.program) },
   }
 }

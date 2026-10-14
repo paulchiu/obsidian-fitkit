@@ -445,6 +445,16 @@ describe('interval session', () => {
       ])
     })
 
+    it('plays no cue on the first tick after catching up, since the phase has not changed', () => {
+      const rows: RunRow[] = [
+        { set: 1, durationSeconds: 30, watts: 280, restSeconds: 90 },
+        { set: 2, durationSeconds: 0, startedAt: '2026-10-12T07:17:00+10:00' },
+      ]
+      const { session } = resumed(rows, FOUR_BIKE, at('07:19:40'))
+
+      expect(stepSession(session, { kind: 'tick' }, at('07:19:41')).effects.cue).toBeUndefined()
+    })
+
     it.each<[string, IntervalProgram, RunRow, string]>([
       [
         'names the intensity of the plan',
