@@ -6,21 +6,11 @@
  */
 
 import type { IntervalProgram, PlanStep } from './interval-program'
+import type { DurationEntry } from './workout-note-model'
 import { formatLocalTimestamp } from './local-timestamp'
 
-export interface RunRow {
-  set?: number
-  durationSeconds?: number
-  watts?: number
-  load?: number
-  level?: number
-  restSeconds?: number
-  startedAt?: string
-  paused?: boolean
-  note?: string
-  /** The plan step's name, written when the runner opens the row. */
-  step?: string
-}
+/** A duration row while a run may still be filling it in, so its time can be missing. */
+export type RunRow = Partial<DurationEntry>
 
 /**
  * Opens the next rep after the reps already done, on the first not-done row so any

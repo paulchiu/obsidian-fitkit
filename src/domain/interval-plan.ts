@@ -6,7 +6,12 @@
 
 import { formatDurationInput, parseDurationInput } from './duration-input'
 
-export type IntensityKind = 'watts' | 'load' | 'level'
+export const INTENSITY_KINDS = ['watts', 'load', 'level'] as const
+
+export type IntensityKind = (typeof INTENSITY_KINDS)[number]
+
+/** A row's intensity fields, named after the kind of target they record. */
+export type IntensityFields = { [K in IntensityKind]?: number }
 
 export interface IntervalPlan {
   reps: number

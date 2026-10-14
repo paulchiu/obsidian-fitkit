@@ -285,11 +285,12 @@ export interface NiceRange {
  * Ensures min < max so charts never collapse to a zero-height band.
  */
 export function niceRange(values: ReadonlyArray<number>): NiceRange {
-  if (values.length === 0) {
+  const [first] = values
+  if (first === undefined) {
     return { min: 0, max: 1 }
   }
-  let min = values[0] as number
-  let max = values[0] as number
+  let min = first
+  let max = first
   for (const value of values) {
     if (value < min) {
       min = value

@@ -37,6 +37,7 @@
  */
 
 import { assertUnreachableKind, EXERCISE_KINDS, type ExerciseKind } from './exercise-kind'
+import type { IntensityFields } from './interval-plan'
 import { formatNextPlan, parseNextPlan, type NextPlan } from './next-plan'
 
 export type { ExerciseKind }
@@ -48,12 +49,9 @@ export interface StrengthSet {
   note?: string
 }
 
-export interface DurationEntry {
+export interface DurationEntry extends IntensityFields {
   set?: number
   durationSeconds: number
-  watts?: number
-  load?: number
-  level?: number
   restSeconds?: number
   startedAt?: string
   paused?: boolean
@@ -729,37 +727,46 @@ export function canonicalizeForEquality(model: WorkoutNoteModel): unknown {
       plan: ex.kind === 'duration' ? ex.plan : undefined,
       strengthSets:
         ex.kind === 'strength'
-          ? ex.strengthSets.map((set) => ({
-              set: set.set,
-              weight: set.weight,
-              reps: set.reps,
-              note: set.note,
-            }))
+          ? ex.strengthSets.map(
+              (set) =>
+                ({
+                  set: set.set,
+                  weight: set.weight,
+                  reps: set.reps,
+                  note: set.note,
+                }) satisfies Record<keyof StrengthSet, unknown>,
+            )
           : undefined,
       durationEntries:
         ex.kind === 'duration'
-          ? ex.durationEntries.map((entry) => ({
-              set: entry.set,
-              durationSeconds: entry.durationSeconds,
-              watts: entry.watts,
-              load: entry.load,
-              level: entry.level,
-              restSeconds: entry.restSeconds,
-              startedAt: entry.startedAt,
-              paused: entry.paused,
-              note: entry.note,
-              step: entry.step,
-            }))
+          ? ex.durationEntries.map(
+              (entry) =>
+                ({
+                  set: entry.set,
+                  durationSeconds: entry.durationSeconds,
+                  watts: entry.watts,
+                  load: entry.load,
+                  level: entry.level,
+                  restSeconds: entry.restSeconds,
+                  startedAt: entry.startedAt,
+                  paused: entry.paused,
+                  note: entry.note,
+                  step: entry.step,
+                }) satisfies Record<keyof DurationEntry, unknown>,
+            )
           : undefined,
       bodyweightSets:
         ex.kind === 'bodyweight'
-          ? ex.bodyweightSets.map((set) => ({
-              set: set.set,
-              level: set.level,
-              reps: set.reps,
-              load: set.load,
-              note: set.note,
-            }))
+          ? ex.bodyweightSets.map(
+              (set) =>
+                ({
+                  set: set.set,
+                  level: set.level,
+                  reps: set.reps,
+                  load: set.load,
+                  note: set.note,
+                }) satisfies Record<keyof BodyweightSet, unknown>,
+            )
           : undefined,
     })),
   }

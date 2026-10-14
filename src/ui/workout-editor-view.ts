@@ -34,9 +34,10 @@ import {
   startRun,
   togglePauseRun,
   type RunPhase,
+  type RunRow,
 } from '../domain/interval-run'
 import { summarisePlan } from '../domain/plan-summary'
-import type { IntensityKind } from '../domain/interval-plan'
+import { INTENSITY_KINDS, type IntensityKind } from '../domain/interval-plan'
 import { parseIntervalProgram, type IntervalProgram } from '../domain/interval-program'
 import { parseIntervalPresets } from '../domain/interval-presets'
 import { assertUnreachableKind } from '../domain/exercise-kind'
@@ -49,6 +50,7 @@ import {
 } from '../domain/exercise-history'
 import {
   createRegistry,
+  intervalMarker,
   kindForName,
   typeForName,
   levelsForName,
@@ -184,18 +186,7 @@ interface EditableStrengthSet {
   note?: string
 }
 
-interface EditableDurationEntry {
-  set?: number
-  durationSeconds?: number
-  watts?: number
-  load?: number
-  level?: number
-  restSeconds?: number
-  startedAt?: string
-  paused?: boolean
-  note?: string
-  step?: string
-}
+type EditableDurationEntry = RunRow
 
 interface EditableBodyweightSet {
   set?: number
@@ -2137,7 +2128,7 @@ export class WorkoutEditorView extends FileView {
     const trimmedKey = normalize(trimmed)
     const existing = current.entries.find((entry) => normalize(entry.name) === trimmedKey)
     const kind = kindOfType(nextType)
-    const marker = nextType === 'interval' ? { interval: true as const } : {}
+    const marker = intervalMarker({ kind, interval: nextType === 'interval' })
     const nextEntry: ExerciseRegistryEntry = existing
       ? { ...existing, aliases: [...existing.aliases], kind, interval: undefined, ...marker }
       : { name: trimmed, kind, aliases: [], ...marker }
@@ -3376,8 +3367,6 @@ const INTENSITY_LABELS: Record<IntensityKind, string> = {
   load: 'Load',
   level: 'Level',
 }
-
-const INTENSITY_KINDS: readonly IntensityKind[] = ['watts', 'load', 'level']
 
 interface IntervalColumns {
   plan: IntervalProgram | null

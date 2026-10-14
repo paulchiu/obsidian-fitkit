@@ -8,15 +8,15 @@ import { formatRungUnit } from './bodyweight-levels'
 import type { ExerciseKind } from './exercise-kind'
 import type { WeightUnit } from './weight-unit'
 
-export type NextPlanDirection = 'up' | 'down' | 'stay'
+const DIRECTIONS = ['up', 'down', 'stay'] as const
+
+export type NextPlanDirection = (typeof DIRECTIONS)[number]
 
 export interface NextPlan {
   direction: NextPlanDirection
   /** Change to make next session: kilograms for strength, rungs for bodyweight. Absent means the direction alone. */
   step?: number
 }
-
-const DIRECTIONS: ReadonlySet<string> = new Set<NextPlanDirection>(['up', 'down', 'stay'])
 
 /**
  * Read a `[next:: ...]` value. Anything that does not start with a known
@@ -28,10 +28,10 @@ export function parseNextPlan(value: string | undefined): NextPlan | null {
     return null
   }
   const [rawDirection, rawStep] = value.trim().toLowerCase().split(/\s+/)
-  if (rawDirection === undefined || !DIRECTIONS.has(rawDirection)) {
+  const direction = DIRECTIONS.find((known) => known === rawDirection)
+  if (direction === undefined) {
     return null
   }
-  const direction = rawDirection as NextPlanDirection
   if (direction === 'stay') {
     return { direction }
   }

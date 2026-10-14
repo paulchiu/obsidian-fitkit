@@ -169,8 +169,9 @@ export function resolve(registry: ExerciseRegistry, rawName: string): Resolution
     seen.set(entry.name, entry)
   }
   const unique = [...seen.values()]
-  if (unique.length === 1) {
-    return { kind: 'match', entry: unique[0] as ExerciseRegistryEntry }
+  const [only, ...others] = unique
+  if (only && others.length === 0) {
+    return { kind: 'match', entry: only }
   }
   return { kind: 'ambiguous', candidates: unique }
 }

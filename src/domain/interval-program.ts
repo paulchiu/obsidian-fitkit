@@ -35,12 +35,12 @@ export interface PlanStep {
    * The last step keeps it, so open work there still has a period to be cut off by.
    */
   everySeconds?: number
-  /** This step's round in each enclosing repeat, outermost first. */
-  rounds: PlanRound[]
+  /** This step's round in each enclosing repeat, outermost first, shared by its siblings. */
+  rounds: readonly PlanRound[]
 }
 
 export interface IntervalProgram {
-  steps: PlanStep[]
+  steps: readonly PlanStep[]
   /** The one kind of target the plan uses, or null when no step has one. */
   intensity: IntensityKind | null
 }

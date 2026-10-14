@@ -77,10 +77,10 @@ function isWorkoutContext(plugin: FitKitPlugin, ctx: MarkdownPostProcessorContex
 }
 
 function frontmatterIsWorkout(frontmatter: unknown): boolean {
-  if (!frontmatter || typeof frontmatter !== 'object') {
+  if (!frontmatter || typeof frontmatter !== 'object' || !('type' in frontmatter)) {
     return false
   }
-  const type = (frontmatter as Record<string, unknown>).type
+  const { type } = frontmatter
   return typeof type === 'string' && type.toLowerCase() === 'workout'
 }
 
@@ -108,7 +108,7 @@ function workoutSourceRowCount(sectionText: string): number {
 }
 
 function hideRecognisedSourceRows(el: HTMLElement, sourceRowCount: number): number {
-  const listItems = Array.from(el.querySelectorAll('li')) as HTMLElement[]
+  const listItems = Array.from(el.querySelectorAll('li'))
   if (listItems.length === 0) {
     return 0
   }
