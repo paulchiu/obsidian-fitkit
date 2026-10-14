@@ -1,5 +1,5 @@
 import type { App, WorkspaceLeaf } from 'obsidian'
-import { FileView, Menu, Modal, Notice, TFile, normalizePath, setIcon } from 'obsidian'
+import { FileView, Menu, Modal, Notice, TFile, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
 import {
@@ -49,24 +49,15 @@ import {
   type ExerciseHistorySummary,
 } from '../domain/exercise-history'
 import {
-  createRegistry,
-  intervalMarker,
   kindForName,
   typeForName,
   levelsForName,
   normalize,
   unitForName,
-  upsertEntry,
   type ExerciseRegistry,
-  type ExerciseRegistryEntry,
 } from '../domain/exercise-registry'
 import { formatLocalTimestamp } from '../domain/local-timestamp'
 import { DEFAULT_WEIGHT_UNIT } from '../domain/weight-unit'
-import type {
-  ExerciseNoteKindUpdateResult,
-  ExerciseNoteLevelsUpdateResult,
-} from '../domain/exercise-note-migrate'
-import { setExerciseNoteType, setExerciseNoteLevels } from '../domain/exercise-note-migrate'
 import {
   EXERCISE_TYPES,
   kindOfType,
@@ -99,16 +90,17 @@ import {
 } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
 import { exercisesFolder, isInFolder, workoutsFolder } from '../settings-paths'
-import { findExerciseNotePath } from '../vault/exercise-catalog'
 import { composeExerciseNote } from '../vault/exercise-note'
 import { planExerciseFileOpen } from '../vault/exercise-file-plan'
 import { exerciseHistoryFromVault } from '../vault/exercise-history-vault'
+import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
 import {
-  applyLadderOverrides,
-  bodyweightLevelsFor,
-  exerciseRegistryWithVaultNotes,
-  sameLevels,
-} from '../vault/exercise-registry-vault'
+  createExerciseStore,
+  type EnsureKnownResult,
+  type ExerciseStore,
+  type LadderRecordResult,
+  type TypeRecordResult,
+} from '../vault/exercise-store'
 import { FileSession } from '../vault/file-session'
 import { markdownFilesInFolder } from '../vault/folder-scan'
 import { ensureParentFolder } from '../vault/vault-utils'
@@ -261,17 +253,15 @@ export class WorkoutEditorView extends FileView {
   private timerWake: CuePlayer | null = null
   private activeRun: ActiveRun | null = null
   private seededWeightsStore?: WeakSet<EditableStrengthSet>
-  private ladderOverridesStore?: Map<string, string[]>
+  private exerciseStoreInstance?: ExerciseStore
   private lastRestSeconds: number | null = null
   /**
-   * Ladders this session wrote that the metadata cache may not report yet.
-   * Renders overlay them until the snapshot catches up, so a card never
-   * shows the rungs from before its own write. Lazily created because
-   * prototype-built views never run field initializers.
+   * One store per view, so its ladder overlay spans the session. Lazily
+   * created because prototype-built views never run field initializers.
    */
-  private get ladderOverrides(): Map<string, string[]> {
-    this.ladderOverridesStore ??= new Map<string, string[]>()
-    return this.ladderOverridesStore
+  private get exerciseStore(): ExerciseStore {
+    this.exerciseStoreInstance ??= createExerciseStore(this.app, this.plugin)
+    return this.exerciseStoreInstance
   }
 
   constructor(
@@ -560,7 +550,7 @@ export class WorkoutEditorView extends FileView {
 
     const list = container.createDiv({ cls: 'fitkit-exercise-list' })
     /** One merged snapshot per render: every card reads its ladder from this instead of rebuilding it. */
-    const registry = this.registryForRender()
+    const registry = this.exerciseStore.registry()
     for (let i = 0; i < this.model.exercises.length; i++) {
       this.renderExerciseCard(list, i, registry)
     }
@@ -628,7 +618,7 @@ export class WorkoutEditorView extends FileView {
       return
     }
     /** Direct card renders (and tests) build their own snapshot; full renders share one. */
-    const snapshot = registry ?? this.registryForRender()
+    const snapshot = registry ?? this.exerciseStore.registry()
 
     const card = list.createDiv({ cls: 'fitkit-card' })
     card.dataset.exerciseIndex = String(index)
@@ -1276,7 +1266,7 @@ export class WorkoutEditorView extends FileView {
   private openEditLevelsModal(ex: ExerciseCard): void {
     new EditLevelsModal(this.app, {
       exerciseName: ex.name,
-      initial: this.currentBodyweightLevels(ex.name) ?? defaultBodyweightLevels(ex.name),
+      initial: this.exerciseStore.levelsFor(ex.name) ?? defaultBodyweightLevels(ex.name),
       onSave: (levels) => {
         void this.confirmLadderEdit(ex, levels)
       },
@@ -1289,7 +1279,7 @@ export class WorkoutEditorView extends FileView {
    * proceeds on confirmation. Logged sets keep their numbers throughout.
    */
   private async confirmLadderEdit(ex: ExerciseCard, levels: string[]): Promise<void> {
-    const previous = this.currentBodyweightLevels(ex.name) ?? []
+    const previous = this.exerciseStore.levelsFor(ex.name) ?? []
     const changes = describeBodyweightLadderChanges(previous, levels, [
       ...(await this.occupiedBodyweightLevels(ex)),
     ])
@@ -1354,76 +1344,15 @@ export class WorkoutEditorView extends FileView {
     return occupied
   }
 
-  /**
-   * Snapshot for rendering, with ladders this session wrote overlaid.
-   * Vault writes land on disk before the metadata cache reports them, so
-   * the render straight after a ladder write would otherwise show stale rungs.
-   */
-  private registryForRender(): ExerciseRegistry {
-    const snapshot = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
-    this.pruneLadderOverrides(snapshot)
-    return createRegistry(applyLadderOverrides(snapshot.entries, this.ladderOverrides))
-  }
-
-  /**
-   * Freshest ladder for decisions and menus: a value this session wrote
-   * wins until the snapshot reports it, so later reads never shadow it.
-   */
-  private currentBodyweightLevels(name: string): string[] | undefined {
-    const override = this.ladderOverrides.get(normalize(name))
-    if (override !== undefined) {
-      return [...override]
-    }
-    return bodyweightLevelsFor(this.app, this.plugin.settings, name)
-  }
-
-  /**
-   * Drops overrides the snapshot has caught up with. Without this a later
-   * outside edit to the same ladder would stay hidden behind the override.
-   */
-  private pruneLadderOverrides(snapshot: ExerciseRegistry): void {
-    for (const [key, levels] of this.ladderOverrides) {
-      if (sameLevels(levelsForName(snapshot, key) ?? [], levels)) {
-        this.ladderOverrides.delete(key)
-      }
-    }
-  }
-
-  /**
-   * Writes an edited ladder to whichever store wins on read: the exercise
-   * note when one exists, else the registry entry (created when missing).
-   */
   private async persistLadder(name: string, levels: string[]): Promise<void> {
-    const trimmed = name.trim()
-    if (!trimmed) {
+    const result = await this.exerciseStore.recordLadder(name, levels)
+    if (!result) {
       return
     }
-    const notePath = findExerciseNotePath(this.app, this.plugin.settings, trimmed)
-    const noteFile = notePath ? this.app.vault.getAbstractFileByPath(notePath) : null
-    if (noteFile instanceof TFile) {
-      let result: ExerciseNoteLevelsUpdateResult | undefined
-      await this.app.vault.process(noteFile, (text) => {
-        result = setExerciseNoteLevels(text, levels)
-        return result.markdown
-      })
-      if (result?.changed) {
-        this.ladderOverrides.set(normalize(trimmed), [...levels])
-        new Notice(`Exercise note now records levels for ${trimmed}.`)
-      }
-      this.render()
-      return
+    const notice = ladderRecordNotice(result)
+    if (notice) {
+      new Notice(notice)
     }
-    const settings = this.plugin.settings
-    const current = createRegistry(settings.exerciseRegistry)
-    const key = normalize(trimmed)
-    const existing = current.entries.find((entry) => normalize(entry.name) === key)
-    const nextEntry: ExerciseRegistryEntry = existing
-      ? { ...existing, aliases: [...existing.aliases], levels: [...levels] }
-      : { name: trimmed, kind: 'bodyweight', aliases: [], levels: [...levels] }
-    settings.exerciseRegistry = upsertEntry(current, nextEntry).entries
-    await this.plugin.saveSettings()
-    this.ladderOverrides.set(key, [...levels])
-    new Notice(`Registry now records levels for ${trimmed}.`)
     this.render()
   }
 
@@ -1968,7 +1897,7 @@ export class WorkoutEditorView extends FileView {
     }
     const nextKind = kindOfType(target)
     const clearsRows = ex.kind !== nextKind && hasRows(ex)
-    const registry = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
+    const registry = this.exerciseStore.registry()
     const registryType = typeForName(registry, ex.name)
     const choice =
       registryType === target && ex.kind === nextKind
@@ -2007,7 +1936,7 @@ export class WorkoutEditorView extends FileView {
    * menu is usable immediately. An existing ladder is left alone.
    */
   private async seedBodyweightLadder(ex: ExerciseCard): Promise<void> {
-    if ((this.currentBodyweightLevels(ex.name) ?? []).length > 0) {
+    if ((this.exerciseStore.levelsFor(ex.name) ?? []).length > 0) {
       return
     }
     await this.persistLadder(ex.name, defaultBodyweightLevels(ex.name))
@@ -2057,49 +1986,11 @@ export class WorkoutEditorView extends FileView {
     })
   }
 
-  /**
-   * Writes the kind switch to the exercise note when one exists, and to the
-   * registry either way. An exercise note always beats the registry overlay
-   * (see buildExerciseRegistrySnapshot), so the note decides behaviour; the
-   * registry copy keeps the settings table and its readers truthful.
-   */
   private async persistTypeChange(name: string, nextType: ExerciseType): Promise<void> {
-    const trimmed = name.trim()
-    if (!trimmed) {
-      return
+    const result = await this.exerciseStore.recordType(name, nextType)
+    for (const notice of result ? typeRecordNotices(result, nextType) : []) {
+      new Notice(notice)
     }
-    const notePath = findExerciseNotePath(this.app, this.plugin.settings, trimmed)
-    const noteFile = notePath ? this.app.vault.getAbstractFileByPath(notePath) : null
-    if (noteFile instanceof TFile) {
-      let result: ExerciseNoteKindUpdateResult | undefined
-      await this.app.vault.process(noteFile, (text) => {
-        result = setExerciseNoteType(text, nextType, {
-          name: noteFile.basename,
-          fitnessRoot: this.plugin.settings.fitnessRoot,
-        })
-        return result.markdown
-      })
-      if (result?.warnings.some((warning) => warning.kind === 'custom-recent-sessions')) {
-        new Notice(
-          `The Recent sessions query in the note for ${trimmed} looks customised, so it was left as it is and still reads the old kind's fields.`,
-        )
-      }
-      if (result?.changed) {
-        new Notice(`Exercise note now records ${trimmed} as ${nextType}.`)
-        /**
-         * The registry is read on its own by the settings table, so leaving
-         * it behind would mislead the next reader and raise a conflict
-         * against the note that just won. The note still wins on read.
-         */
-        await this.persistRegistryType(trimmed, nextType)
-      } else {
-        new Notice(
-          `Could not update the exercise note for ${trimmed}; its frontmatter was left unchanged.`,
-        )
-      }
-      return
-    }
-    await this.persistRegistryType(trimmed, nextType)
   }
 
   private chooseTypeSwitch(
@@ -2116,26 +2007,6 @@ export class WorkoutEditorView extends FileView {
         resolve,
       ).open()
     })
-  }
-
-  private async persistRegistryType(name: string, nextType: ExerciseType): Promise<void> {
-    const settings = this.plugin.settings
-    const trimmed = name.trim()
-    if (!trimmed) {
-      return
-    }
-    const current = createRegistry(settings.exerciseRegistry)
-    const trimmedKey = normalize(trimmed)
-    const existing = current.entries.find((entry) => normalize(entry.name) === trimmedKey)
-    const kind = kindOfType(nextType)
-    const marker = intervalMarker({ kind, interval: nextType === 'interval' })
-    const nextEntry: ExerciseRegistryEntry = existing
-      ? { ...existing, aliases: [...existing.aliases], kind, interval: undefined, ...marker }
-      : { name: trimmed, kind, aliases: [], ...marker }
-    const updated = upsertEntry(current, nextEntry)
-    settings.exerciseRegistry = updated.entries
-    await this.plugin.saveSettings()
-    new Notice(`Registry now records ${trimmed} as ${nextType}.`)
   }
 
   private async confirmKindSwitch(card: ExerciseCard, nextKind: ExerciseKind): Promise<boolean> {
@@ -2460,11 +2331,6 @@ export class WorkoutEditorView extends FileView {
       return
     }
 
-    const deletedKey = normalize(plan.name)
-    const previousDeleted = this.plugin.settings.deletedExercises ?? []
-    const hadTombstone = previousDeleted.some(
-      (deletedName) => normalize(deletedName) === deletedKey,
-    )
     let shouldClearTombstone = false
 
     if (plan.kind === 'create') {
@@ -2492,11 +2358,8 @@ export class WorkoutEditorView extends FileView {
       new Notice(`Could not open exercise file: ${formatError(error)}`)
     }
 
-    if (hadTombstone && shouldClearTombstone) {
-      this.plugin.settings.deletedExercises = previousDeleted.filter(
-        (deletedName) => normalize(deletedName) !== deletedKey,
-      )
-      await this.plugin.saveSettings()
+    if (shouldClearTombstone) {
+      await this.exerciseStore.undelete(plan.name)
     }
   }
 
@@ -2630,16 +2493,13 @@ export class WorkoutEditorView extends FileView {
       return
     }
     const names = await this.collectExerciseSuggestions()
-    const registry = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
+    const registry = this.exerciseStore.registry()
     new ExerciseSuggestModal(this.app, names, (name) => {
       void this.addExerciseFromSuggestion(name, registry)
     }).open()
   }
 
-  private async addExerciseFromSuggestion(
-    name: string,
-    registry: ReturnType<typeof createRegistry>,
-  ): Promise<void> {
+  private async addExerciseFromSuggestion(name: string, registry: ExerciseRegistry): Promise<void> {
     const trimmed = name.trim()
     if (!trimmed || !this.model) {
       return
@@ -2692,70 +2552,10 @@ export class WorkoutEditorView extends FileView {
     kind: ExerciseKind,
     createNote: boolean,
   ): Promise<void> {
-    let settingsChanged = false
-    const deletedKey = normalize(name)
-    const previousDeleted = this.plugin.settings.deletedExercises ?? []
-    const hadTombstone = previousDeleted.some(
-      (deletedName) => normalize(deletedName) === deletedKey,
-    )
-
-    if (createNote) {
-      const path = normalizePath(`${exercisesFolder(this.plugin.settings)}/${name}.md`)
-      if (!this.app.vault.getAbstractFileByPath(path)) {
-        try {
-          await ensureParentFolder(this.app, path)
-          await this.app.vault.create(
-            path,
-            composeExerciseNote(name, kind, workoutsFolder(this.plugin.settings)),
-          )
-        } catch (error) {
-          new Notice(`Could not create exercise note for '${name}': ${formatErrorMessage(error)}.`)
-          return
-        }
-        /**
-         * A note-backed exercise still needs a registry entry so it shows up in
-         * the settings Registry table, which lists settings.exerciseRegistry
-         * directly rather than the note-merged snapshot.
-         */
-        const registry = createRegistry(this.plugin.settings.exerciseRegistry)
-        if (kindForName(registry, name) === null) {
-          this.plugin.settings.exerciseRegistry = upsertEntry(registry, {
-            name,
-            kind,
-            aliases: [],
-          }).entries
-          settingsChanged = true
-        }
-        new Notice(`Created exercise note for '${name}'.`)
-      } else {
-        new Notice(
-          hadTombstone
-            ? `Restored '${name}' using the existing exercise note.`
-            : `Using existing exercise note for '${name}'.`,
-        )
-      }
-    } else {
-      const registry = createRegistry(this.plugin.settings.exerciseRegistry)
-      if (kindForName(registry, name) === null) {
-        this.plugin.settings.exerciseRegistry = upsertEntry(registry, {
-          name,
-          kind,
-          aliases: [],
-        }).entries
-        settingsChanged = true
-        new Notice(`Added '${name}' as a no-note registry entry.`)
-      }
-    }
-
-    if (hadTombstone) {
-      this.plugin.settings.deletedExercises = previousDeleted.filter(
-        (deletedName) => normalize(deletedName) !== deletedKey,
-      )
-      settingsChanged = true
-    }
-
-    if (settingsChanged) {
-      await this.plugin.saveSettings()
+    const result = await this.exerciseStore.ensureKnown(name, kind, { createNote })
+    const notice = ensureKnownNotice(name, result)
+    if (notice) {
+      new Notice(notice)
     }
   }
 
@@ -2768,7 +2568,7 @@ export class WorkoutEditorView extends FileView {
       return
     }
     const names = await this.collectExerciseSuggestions()
-    const registry = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
+    const registry = this.exerciseStore.registry()
     const modal = new ExerciseSuggestModal(this.app, names, (name) => {
       const trimmed = name.trim()
       if (!trimmed || !this.model) {
@@ -2784,7 +2584,7 @@ export class WorkoutEditorView extends FileView {
   private async applyRename(
     index: number,
     trimmed: string,
-    registry: ReturnType<typeof createRegistry>,
+    registry: ExerciseRegistry,
   ): Promise<void> {
     if (!this.model) {
       return
@@ -3272,6 +3072,61 @@ export function formatLadderChangesWarning(
   return {
     title: `Change what logged levels mean for ${name}?`,
     message: `This edit changes what some already-logged levels mean. ${lines.join(' ')} Logged sets keep their numbers.`,
+  }
+}
+
+/** Notices for a recorded type change, in the order they are shown. */
+export function typeRecordNotices(result: TypeRecordResult, type: ExerciseType): string[] {
+  const { name } = result
+  const warning = result.customRecentSessions
+    ? [
+        `The Recent sessions query in the note for ${name} looks customised, so it was left as it is and still reads the old kind's fields.`,
+      ]
+    : []
+  switch (result.wrote) {
+    case 'note':
+      return [
+        ...warning,
+        `Exercise note now records ${name} as ${type}.`,
+        `Registry now records ${name} as ${type}.`,
+      ]
+    case 'registry':
+      return [...warning, `Registry now records ${name} as ${type}.`]
+    case 'note-unchanged':
+      return [
+        ...warning,
+        `Could not update the exercise note for ${name}; its frontmatter was left unchanged.`,
+      ]
+  }
+}
+
+/** Notice for a recorded ladder; null when an unchanged note leaves nothing to report. */
+export function ladderRecordNotice(result: LadderRecordResult): string | null {
+  switch (result.wrote) {
+    case 'note':
+      return `Exercise note now records levels for ${result.name}.`
+    case 'registry':
+      return `Registry now records levels for ${result.name}.`
+    case 'note-unchanged':
+      return null
+  }
+}
+
+/** Notice for adding an unknown exercise; null when it was already known. */
+export function ensureKnownNotice(name: string, result: EnsureKnownResult): string | null {
+  switch (result.outcome) {
+    case 'note-created':
+      return `Created exercise note for '${name}'.`
+    case 'note-reused':
+      return result.restored
+        ? `Restored '${name}' using the existing exercise note.`
+        : `Using existing exercise note for '${name}'.`
+    case 'registry-added':
+      return `Added '${name}' as a no-note registry entry.`
+    case 'already-known':
+      return null
+    case 'note-failed':
+      return `Could not create exercise note for '${name}': ${result.message}.`
   }
 }
 

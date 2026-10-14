@@ -8,7 +8,6 @@ import {
   addDeletedExerciseTombstone,
   DEFAULT_SETTINGS,
   FitKitSettingTab,
-  removeDeletedExerciseTombstone,
   settingsFromStored,
   type FitKitSettings,
 } from '../src/settings'
@@ -165,11 +164,11 @@ describe('settings migration', () => {
 })
 
 describe('deleted exercise tombstones', () => {
-  it('normalizes, dedupes, and removes tombstones', () => {
-    const added = addDeletedExerciseTombstone([' Squat ', 'bench press'], 'squat')
-
-    expect(added).toEqual(['squat', 'bench press'])
-    expect(removeDeletedExerciseTombstone(added, ' BENCH   PRESS ')).toEqual(['squat'])
+  it('normalizes and dedupes tombstones', () => {
+    expect(addDeletedExerciseTombstone([' Squat ', 'bench press'], 'squat')).toEqual([
+      'squat',
+      'bench press',
+    ])
   })
 })
 

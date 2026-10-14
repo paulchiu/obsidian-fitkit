@@ -83,14 +83,6 @@ export function addDeletedExerciseTombstone(
   return normalizeDeletedExerciseTombstones([...(deletedExercises ?? []), name])
 }
 
-export function removeDeletedExerciseTombstone(
-  deletedExercises: readonly string[] | undefined,
-  name: string,
-): string[] {
-  const targetKey = normalize(name)
-  return normalizeDeletedExerciseTombstones(deletedExercises).filter((key) => key !== targetKey)
-}
-
 export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitKitSettings {
   if (!stored) {
     return { ...DEFAULT_SETTINGS }

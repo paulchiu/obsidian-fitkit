@@ -204,10 +204,13 @@ vi.mock('../../src/vault/exercise-registry-vault', async (importOriginal) => {
 
 import { TFile, type App } from 'obsidian'
 import {
+  ensureKnownNotice,
   formatLadderChangesWarning,
+  ladderRecordNotice,
   shouldShortenLevelLabel,
   toEditorExercise,
   toWorkoutExercise,
+  typeRecordNotices,
   WorkoutEditorView,
 } from '../../src/ui/workout-editor-view'
 import { buildMockVaultFolderTree, type MockVaultFolder } from '../fixtures/mock-vault-folder-tree'
@@ -1664,96 +1667,32 @@ interface PersistUnknownExerciseView {
   plugin: {
     settings: {
       fitnessRoot: string
-      exerciseRegistry: {
-        name: string
-        kind: 'strength' | 'duration'
-        unit: 'kg' | 'lbs'
-        aliases: string[]
-      }[]
-      deletedExercises?: string[]
+      exerciseRegistry: ExerciseRegistryEntry[]
+      deletedExercises: string[]
     }
     saveSettings: ReturnType<typeof vi.fn>
   }
-  persistUnknownExercise(
-    name: string,
-    kind: 'strength' | 'duration',
-    createNote: boolean,
-  ): Promise<void>
+  persistUnknownExercise(name: string, kind: ExerciseKind, createNote: boolean): Promise<void>
 }
 
 describe('WorkoutEditorView unknown exercise persistence', () => {
-  const resetEnsureParentFolderMock = (): void => {
+  beforeEach(() => {
+    obsidianMock.notices = []
     vaultUtilsMock.ensureParentFolder.mockClear()
-    vaultUtilsMock.ensureParentFolder.mockResolvedValue(undefined)
-  }
+  })
 
-  const createPersistUnknownExerciseView = (
-    options: {
-      existingNote?: boolean
-      deletedExercises?: string[]
-      createRejects?: Error
-    } = {},
-  ): PersistUnknownExerciseView => {
+  it('creates the note through the store and notices it', async () => {
     const view = Object.create(WorkoutEditorView.prototype) as PersistUnknownExerciseView
     view.app = {
       vault: {
-        getAbstractFileByPath: vi.fn((path: string) =>
-          options.existingNote && path === 'Fitness/Exercises/Squat.md' ? { path } : null,
-        ),
-        create: vi.fn((_path: string, _contents: string) => {
-          if (options.createRejects) {
-            return Promise.reject(options.createRejects)
-          }
-          return Promise.resolve({ path: _path })
-        }),
+        getAbstractFileByPath: vi.fn(() => null),
+        create: vi.fn((path: string) => Promise.resolve({ path })),
       },
     }
     view.plugin = {
-      settings: {
-        fitnessRoot: 'Fitness',
-        exerciseRegistry: [],
-        deletedExercises: options.deletedExercises,
-      },
+      settings: { fitnessRoot: 'Fitness', exerciseRegistry: [], deletedExercises: ['squat'] },
       saveSettings: vi.fn(() => Promise.resolve()),
     }
-    return view
-  }
-
-  beforeEach(() => {
-    obsidianMock.notices = []
-    resetEnsureParentFolderMock()
-  })
-
-  afterEach(() => {
-    resetEnsureParentFolderMock()
-  })
-
-  it('notices when note creation reuses an existing exercise note without a tombstone', async () => {
-    const view = createPersistUnknownExerciseView({ existingNote: true })
-
-    await view.persistUnknownExercise('Squat', 'strength', true)
-
-    expect(view.app.vault.create).not.toHaveBeenCalled()
-    expect(view.plugin.saveSettings).not.toHaveBeenCalled()
-    expect(obsidianMock.notices).toEqual(["Using existing exercise note for 'Squat'."])
-  })
-
-  it('notices and clears the tombstone when note creation restores an existing exercise note', async () => {
-    const view = createPersistUnknownExerciseView({
-      existingNote: true,
-      deletedExercises: ['squat', 'bench'],
-    })
-
-    await view.persistUnknownExercise('Squat', 'strength', true)
-
-    expect(view.app.vault.create).not.toHaveBeenCalled()
-    expect(view.plugin.settings.deletedExercises).toEqual(['bench'])
-    expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
-    expect(obsidianMock.notices).toEqual(["Restored 'Squat' using the existing exercise note."])
-  })
-
-  it('adds a registry entry alongside a newly created exercise note', async () => {
-    const view = createPersistUnknownExerciseView()
 
     await view.persistUnknownExercise('Squat', 'strength', true)
 
@@ -1761,75 +1700,69 @@ describe('WorkoutEditorView unknown exercise persistence', () => {
     expect(view.plugin.settings.exerciseRegistry).toEqual([
       { name: 'Squat', kind: 'strength', aliases: [] },
     ])
+    expect(view.plugin.settings.deletedExercises).toEqual([])
     expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
     expect(obsidianMock.notices).toEqual(["Created exercise note for 'Squat'."])
   })
-
-  it('notices and does not save settings when parent folder creation fails', async () => {
-    vaultUtilsMock.ensureParentFolder.mockRejectedValue(new Error('no folder'))
-    const view = createPersistUnknownExerciseView()
-
-    await view.persistUnknownExercise('Squat', 'strength', true)
-
-    expect(view.app.vault.create).not.toHaveBeenCalled()
-    expect(view.plugin.saveSettings).not.toHaveBeenCalled()
-    expect(obsidianMock.notices).toEqual(["Could not create exercise note for 'Squat': no folder."])
-  })
-
-  it('notices and does not save settings when vault.create fails', async () => {
-    const view = createPersistUnknownExerciseView({ createRejects: new Error('read only') })
-
-    await view.persistUnknownExercise('Squat', 'strength', true)
-
-    expect(vaultUtilsMock.ensureParentFolder).toHaveBeenCalledWith(
-      view.app,
-      'Fitness/Exercises/Squat.md',
-    )
-    expect(view.app.vault.create).toHaveBeenCalledTimes(1)
-    expect(view.plugin.saveSettings).not.toHaveBeenCalled()
-    expect(obsidianMock.notices).toEqual(["Could not create exercise note for 'Squat': read only."])
-  })
 })
 
-interface PersistRegistryKindView {
-  plugin: {
-    settings: {
-      exerciseRegistry: ExerciseRegistryEntry[]
-    }
-    saveSettings: ReturnType<typeof vi.fn>
-  }
-  persistRegistryType(name: string, nextKind: 'strength' | 'duration'): Promise<void>
-}
-
-describe('WorkoutEditorView registry kind persistence', () => {
-  const createPersistRegistryKindView = (
-    exerciseRegistry: ExerciseRegistryEntry[],
-  ): PersistRegistryKindView => {
-    const view = Object.create(WorkoutEditorView.prototype) as PersistRegistryKindView
-    view.plugin = {
-      settings: { exerciseRegistry },
-      saveSettings: vi.fn(() => Promise.resolve()),
-    }
-    return view
-  }
-
-  beforeEach(() => {
-    obsidianMock.notices = []
+describe('WorkoutEditorView exercise store notices', () => {
+  it.each([
+    {
+      result: { name: 'Squat', wrote: 'note', customRecentSessions: false },
+      notices: [
+        'Exercise note now records Squat as strength.',
+        'Registry now records Squat as strength.',
+      ],
+    },
+    {
+      result: { name: 'Squat', wrote: 'registry', customRecentSessions: false },
+      notices: ['Registry now records Squat as strength.'],
+    },
+    {
+      result: { name: 'Squat', wrote: 'note-unchanged', customRecentSessions: false },
+      notices: [
+        'Could not update the exercise note for Squat; its frontmatter was left unchanged.',
+      ],
+    },
+    {
+      result: { name: 'Squat', wrote: 'note', customRecentSessions: true },
+      notices: [
+        "The Recent sessions query in the note for Squat looks customised, so it was left as it is and still reads the old kind's fields.",
+        'Exercise note now records Squat as strength.',
+        'Registry now records Squat as strength.',
+      ],
+    },
+  ] as const)('words a type record that wrote $result.wrote', ({ result, notices }) => {
+    expect(typeRecordNotices(result, 'strength')).toEqual(notices)
   })
 
-  it('updates the existing entry for a case-variant name instead of duplicating it', async () => {
-    const view = createPersistRegistryKindView([
-      { name: 'Squat', kind: 'strength', unit: 'kg', aliases: ['back squat'] },
-    ])
+  it.each([
+    { wrote: 'note', notice: 'Exercise note now records levels for Push-up.' },
+    { wrote: 'registry', notice: 'Registry now records levels for Push-up.' },
+    { wrote: 'note-unchanged', notice: null },
+  ] as const)('words a ladder record that wrote $wrote', ({ wrote, notice }) => {
+    expect(ladderRecordNotice({ name: 'Push-up', wrote })).toBe(notice)
+  })
 
-    await view.persistRegistryType('squat', 'duration')
-
-    expect(view.plugin.settings.exerciseRegistry).toHaveLength(1)
-    expect(view.plugin.settings.exerciseRegistry[0]).toMatchObject({
-      name: 'Squat',
-      kind: 'duration',
-      aliases: ['back squat'],
-    })
+  it.each([
+    { result: { outcome: 'note-created' }, notice: "Created exercise note for 'Squat'." },
+    {
+      result: { outcome: 'note-reused', restored: false },
+      notice: "Using existing exercise note for 'Squat'.",
+    },
+    {
+      result: { outcome: 'note-reused', restored: true },
+      notice: "Restored 'Squat' using the existing exercise note.",
+    },
+    { result: { outcome: 'registry-added' }, notice: "Added 'Squat' as a no-note registry entry." },
+    { result: { outcome: 'already-known' }, notice: null },
+    {
+      result: { outcome: 'note-failed', message: 'read only' },
+      notice: "Could not create exercise note for 'Squat': read only.",
+    },
+  ] as const)('words an unknown exercise outcome of $result.outcome', ({ result, notice }) => {
+    expect(ensureKnownNotice('Squat', result)).toBe(notice)
   })
 })
 
@@ -1837,8 +1770,6 @@ interface PersistKindChangeMarkdownFile {
   path: string
   basename: string
   frontmatter?: Record<string, unknown>
-  /** Markdown after the frontmatter; the default note is frontmatter only. */
-  body?: string
 }
 
 interface PersistKindChangeView {
@@ -1872,7 +1803,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
     const contents = new Map(
       markdownFiles.map((file) => {
         const kind = typeof file.frontmatter?.kind === 'string' ? file.frontmatter.kind : 'strength'
-        return [file.path, `---\ntype: exercise\nkind: ${kind}\n---\n${file.body ?? ''}`] as const
+        return [file.path, `---\ntype: exercise\nkind: ${kind}\n---\n`] as const
       }),
     )
     const filesByPath = new Map(markdownFiles.map((file) => [file.path, new TFile()]))
@@ -1907,64 +1838,6 @@ describe('WorkoutEditorView kind switch persistence', () => {
     obsidianMock.notices = []
   })
 
-  const strengthRecentSessionsBody = [
-    '',
-    '## Recent sessions',
-    '',
-    '```dataview',
-    'TABLE WITHOUT ID',
-    '  file.link AS Workout,',
-    '  L.set AS Set,',
-    '  L.weight AS Weight,',
-    '  L.reps AS Reps',
-    'FROM "Fitness/Workouts"',
-    'FLATTEN file.lists AS L',
-    'WHERE L.exercise = link("Squat") AND L.set',
-    'SORT file.name DESC, L.set ASC',
-    'LIMIT 10',
-    '```',
-    '',
-  ].join('\n')
-
-  it('retargets the Recent sessions query at the switched kind', async () => {
-    const { view, contents } = createPersistKindChangeView([
-      {
-        path: 'Fitness/Exercises/Squat.md',
-        basename: 'Squat',
-        frontmatter: { type: 'exercise', kind: 'strength' },
-        body: strengthRecentSessionsBody,
-      },
-    ])
-
-    await view.persistTypeChange('Squat', 'duration')
-
-    const written = contents.get('Fitness/Exercises/Squat.md') ?? ''
-    expect(written).toContain('table without id file.link as Session, duration + "s" as Duration')
-    expect(written).not.toContain('L.weight AS Weight')
-  })
-
-  it('tells the user when a customised Recent sessions query was left alone', async () => {
-    const customised = strengthRecentSessionsBody.replace(
-      '  L.weight AS Weight,\n  L.reps AS Reps',
-      '  L.weight AS Weight,\n  L.rpe AS RPE',
-    )
-    const { view, contents } = createPersistKindChangeView([
-      {
-        path: 'Fitness/Exercises/Squat.md',
-        basename: 'Squat',
-        frontmatter: { type: 'exercise', kind: 'strength' },
-        body: customised,
-      },
-    ])
-
-    await view.persistTypeChange('Squat', 'duration')
-
-    expect(contents.get('Fitness/Exercises/Squat.md')).toContain('L.rpe AS RPE')
-    expect(obsidianMock.notices).toContain(
-      "The Recent sessions query in the note for Squat looks customised, so it was left as it is and still reads the old kind's fields.",
-    )
-  })
-
   it('writes the switched kind into the exercise note and records it in the registry', async () => {
     const { view, contents } = createPersistKindChangeView([
       {
@@ -1988,97 +1861,6 @@ describe('WorkoutEditorView kind switch persistence', () => {
     ])
   })
 
-  it('also updates the registry on the note path, so the option keeps its promise', async () => {
-    const { view, contents } = createPersistKindChangeView(
-      [
-        {
-          path: 'Fitness/Exercises/Squat.md',
-          basename: 'Squat',
-          frontmatter: { type: 'exercise', kind: 'duration' },
-        },
-      ],
-      [{ name: 'Squat', kind: 'duration', aliases: [] }],
-    )
-
-    await view.persistTypeChange('Squat', 'strength')
-
-    expect(contents.get('Fitness/Exercises/Squat.md')).toContain('kind: strength')
-    expect(view.plugin.settings.exerciseRegistry).toMatchObject([
-      { name: 'Squat', kind: 'strength' },
-    ])
-    expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
-    expect(obsidianMock.notices).toEqual([
-      'Exercise note now records Squat as strength.',
-      'Registry now records Squat as strength.',
-    ])
-  })
-
-  it('keeps the registry ladder when the note path records a kind switch', async () => {
-    const { view } = createPersistKindChangeView(
-      [
-        {
-          path: 'Fitness/Exercises/Push-up.md',
-          basename: 'Push-up',
-          frontmatter: { type: 'exercise', kind: 'strength' },
-        },
-      ],
-      [{ name: 'Push-up', kind: 'strength', levels: ['Wall push-up'], aliases: [] }],
-    )
-
-    await view.persistTypeChange('Push-up', 'bodyweight')
-
-    expect(view.plugin.settings.exerciseRegistry).toMatchObject([
-      { name: 'Push-up', kind: 'bodyweight', levels: ['Wall push-up'] },
-    ])
-  })
-
-  it('matches the note case-insensitively', async () => {
-    const { view, contents } = createPersistKindChangeView([
-      {
-        path: 'Fitness/Exercises/Squat.md',
-        basename: 'Squat',
-        frontmatter: { type: 'exercise', kind: 'duration' },
-      },
-    ])
-
-    await view.persistTypeChange('squat', 'strength')
-
-    expect(contents.get('Fitness/Exercises/Squat.md')).toContain('kind: strength')
-  })
-
-  it('falls back to the registry when no exercise note exists for the name', async () => {
-    const { view } = createPersistKindChangeView([])
-
-    await view.persistTypeChange('Air bike', 'duration')
-
-    expect(view.app.vault.process).not.toHaveBeenCalled()
-    expect(view.plugin.settings.exerciseRegistry).toMatchObject([
-      { name: 'Air bike', kind: 'duration' },
-    ])
-    expect(view.plugin.saveSettings).toHaveBeenCalledTimes(1)
-    expect(obsidianMock.notices).toEqual(['Registry now records Air bike as duration.'])
-  })
-
-  it('routes a matching unreadable note through the note writer without changing the registry', async () => {
-    const { view, contents } = createPersistKindChangeView([
-      {
-        path: 'Fitness/Exercises/Squat.md',
-        basename: 'Squat',
-      },
-    ])
-    const malformed = '---\ntype: exercise\nkind: duration\n'
-    contents.set('Fitness/Exercises/Squat.md', malformed)
-
-    await view.persistTypeChange('Squat', 'strength')
-
-    expect(view.app.vault.process).toHaveBeenCalledTimes(1)
-    expect(contents.get('Fitness/Exercises/Squat.md')).toBe(malformed)
-    expect(view.plugin.settings.exerciseRegistry).toEqual([])
-    expect(view.plugin.saveSettings).not.toHaveBeenCalled()
-    expect(obsidianMock.notices).toEqual([
-      'Could not update the exercise note for Squat; its frontmatter was left unchanged.',
-    ])
-  })
   interface PersistLadderView extends PersistKindChangeView {
     render: ReturnType<typeof vi.fn>
     persistLadder(name: string, levels: string[]): Promise<void>
@@ -2102,29 +1884,6 @@ describe('WorkoutEditorView kind switch persistence', () => {
     afterEach(() => {
       obsidianMock.menus = []
       vi.unstubAllGlobals()
-    })
-
-    it('writes the edited ladder into the exercise note and leaves the registry untouched', async () => {
-      const { view, contents } = createPersistLadderView([
-        {
-          path: 'Fitness/Exercises/Push-up.md',
-          basename: 'Push-up',
-          frontmatter: { type: 'exercise', kind: 'bodyweight' },
-        },
-      ])
-      contents.set(
-        'Fitness/Exercises/Push-up.md',
-        '---\ntype: exercise\nkind: bodyweight\nlevels:\n  - Wall push-up\n---\n',
-      )
-
-      await view.persistLadder('Push-up', ['Incline push-up', 'Knee push-up'])
-
-      expect(contents.get('Fitness/Exercises/Push-up.md')).toContain('  - Incline push-up\n')
-      expect(contents.get('Fitness/Exercises/Push-up.md')).toContain('  - Knee push-up\n')
-      expect(contents.get('Fitness/Exercises/Push-up.md')).not.toContain('Wall push-up')
-      expect(view.plugin.settings.exerciseRegistry).toEqual([])
-      expect(view.plugin.saveSettings).not.toHaveBeenCalled()
-      expect(obsidianMock.notices).toEqual(['Exercise note now records levels for Push-up.'])
     })
 
     it('re-renders after writing the ladder into the exercise note', async () => {
