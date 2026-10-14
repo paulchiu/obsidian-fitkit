@@ -30,6 +30,9 @@ export interface OutlineRepeat {
 
 export type OutlineItem = OutlineStep | OutlineRest | OutlineRepeat
 
+/** The name a one-line plan's reps go by, since that form has no step names. */
+export const ONE_LINE_STEP_NAME = 'work'
+
 /** The rows for a plan, or null when it cannot run or uses a shape rows cannot show. */
 export function outlineFromPlan(raw: string): OutlineItem[] | null {
   const text = raw.trim()
@@ -53,7 +56,7 @@ function outlineFromOneLine(text: string): OutlineItem[] | null {
   const { plan } = parsed
   const work: OutlineStep = {
     kind: 'step',
-    name: 'work',
+    name: ONE_LINE_STEP_NAME,
     work: plan.workSeconds === null ? 'open' : formatPlanSeconds(plan.workSeconds),
     target: formatTarget(plan.intensity),
   }

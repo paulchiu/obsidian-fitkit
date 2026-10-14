@@ -35,6 +35,7 @@ import {
   togglePauseRun,
   type RunPhase,
 } from '../domain/interval-run'
+import { summarisePlan } from '../domain/plan-summary'
 import type { IntensityKind } from '../domain/interval-plan'
 import { parseIntervalProgram, type IntervalProgram } from '../domain/interval-program'
 import { parseIntervalPresets } from '../domain/interval-presets'
@@ -118,6 +119,7 @@ import { IntervalPlanModal } from './interval-plan-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
 import { KindSwitchChoiceModal, type KindSwitchChoice } from './kind-switch-choice-modal'
 import { menuAnchorForTrigger } from './menu-anchor'
+import { renderPlanSummary } from './plan-summary-view'
 import { SetNoteModal } from './set-note-modal'
 import { PlanStepModal } from './plan-step-modal'
 
@@ -1047,10 +1049,14 @@ export class WorkoutEditorView extends FileView {
     const columns = intervalColumns(ex)
     if (ex.plan !== undefined) {
       const line = card.createDiv({
-        cls: 'fitkit-note-line fitkit-plan-line',
-        text: ex.plan,
+        cls: 'fitkit-plan-line',
         attr: { role: 'button', tabindex: '0', 'aria-label': 'Edit interval plan' },
       })
+      if (columns.plan) {
+        renderPlanSummary(line, summarisePlan(ex.plan, columns.plan, ex.durationEntries), ex.plan)
+      } else {
+        line.createDiv({ cls: 'fitkit-plan-legend', text: ex.plan })
+      }
       line.addEventListener('click', () => this.openIntervalPlanModal(ex))
     }
     const wrap = card.createDiv({ cls: 'fitkit-set-area' })

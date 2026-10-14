@@ -423,8 +423,116 @@ body.is-mobile .fitkit-editor-root {
   grid-template-columns: 20px repeat(3, minmax(0, 1fr));
 }
 
+/** The card's plan: profile, progress strip, legend and totals; tapping it opens the plan form. */
 .fitkit-plan-line {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+  cursor: pointer;
   font-variant-numeric: tabular-nums;
+}
+
+.fitkit-plan-profile {
+  display: block;
+  width: 100%;
+  height: 40px;
+}
+
+.fitkit-plan-strip {
+  display: block;
+  width: 100%;
+  height: 6px;
+}
+
+.fitkit-plan-bar.is-key-0,
+.fitkit-plan-swatch.is-key-0 {
+  fill: var(--background-modifier-border);
+  background: var(--background-modifier-border);
+}
+
+.fitkit-plan-bar.is-key-1,
+.fitkit-plan-swatch.is-key-1 {
+  fill: var(--color-purple, var(--interactive-accent));
+  background: var(--color-purple, var(--interactive-accent));
+}
+
+.fitkit-plan-bar.is-key-2,
+.fitkit-plan-swatch.is-key-2 {
+  fill: var(--color-cyan, var(--text-accent));
+  background: var(--color-cyan, var(--text-accent));
+}
+
+.fitkit-plan-bar.is-key-3,
+.fitkit-plan-swatch.is-key-3 {
+  fill: var(--color-blue, var(--text-accent));
+  background: var(--color-blue, var(--text-accent));
+}
+
+.fitkit-plan-bar.is-key-4,
+.fitkit-plan-swatch.is-key-4 {
+  fill: var(--color-pink, var(--text-accent));
+  background: var(--color-pink, var(--text-accent));
+}
+
+.fitkit-plan-bar.is-key-5,
+.fitkit-plan-swatch.is-key-5 {
+  fill: var(--color-yellow, var(--text-accent));
+  background: var(--color-yellow, var(--text-accent));
+}
+
+/** The same hit and miss colours as the runner's rep dots. */
+.fitkit-plan-progress.is-todo {
+  fill: var(--background-modifier-border);
+}
+
+.fitkit-plan-progress.is-done {
+  fill: var(--text-faint);
+}
+
+.fitkit-plan-progress.is-hit {
+  fill: var(--color-green, var(--text-success));
+}
+
+.fitkit-plan-progress.is-miss {
+  fill: var(--color-orange, var(--text-warning));
+}
+
+.fitkit-plan-marker {
+  fill: var(--text-normal);
+}
+
+.fitkit-plan-legend {
+  font-size: var(--font-ui-small);
+  line-height: 1.5;
+}
+
+.fitkit-plan-step {
+  white-space: nowrap;
+}
+
+.fitkit-plan-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 4px;
+  border-radius: 2px;
+}
+
+.fitkit-plan-count {
+  font-weight: var(--font-semibold);
+  color: var(--text-accent);
+}
+
+.fitkit-plan-muted {
+  color: var(--text-muted);
+}
+
+.fitkit-plan-totals {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
 }
 
 .fitkit-cell {

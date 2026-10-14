@@ -389,7 +389,7 @@ describe('WorkoutEditorView interval plans', () => {
     ])
   })
 
-  it('shows the plan, the intensity and rest of each rep, and where Start will pick up', async () => {
+  it('shows the plan as a profile and a legend, each logged rep by hit, and where Start will pick up', async () => {
     const { view } = await openView(
       workoutSource(
         '## [[Exercise Bike]]',
@@ -404,13 +404,30 @@ describe('WorkoutEditorView interval plans', () => {
       [...view.contentEl.querySelectorAll<HTMLInputElement>(`input[aria-label="${label}"]`)].map(
         (input) => input.value,
       )
+    const plan = view.contentEl.querySelector('.fitkit-plan-line')
     expect({
-      plan: view.contentEl.querySelector('.fitkit-plan-line')?.textContent,
+      legend: plan?.querySelector('.fitkit-plan-legend')?.textContent,
+      totals: [...(plan?.querySelectorAll('.fitkit-plan-totals span') ?? [])].map(
+        (span) => span.textContent,
+      ),
+      bars: plan?.querySelectorAll('.fitkit-plan-bar.is-key-1').length,
+      progress: [...(plan?.querySelectorAll('.fitkit-plan-progress') ?? [])]
+        .slice(0, 3)
+        .map((bar) => bar.getAttribute('class')),
+      marker: plan?.querySelectorAll('.fitkit-plan-marker').length,
       run: button(view, 'Start interval plan').textContent,
       watts: inputs('Watts'),
       rest: inputs('Rest'),
     }).toEqual({
-      plan: '8 x 30s @ 300W, 90s rest',
+      legend: '8× work 30s 300W · rest 90s',
+      totals: ['8 reps · 14m30s', '2 of 8 done'],
+      bars: 8,
+      progress: [
+        'fitkit-plan-progress is-hit',
+        'fitkit-plan-progress is-miss',
+        'fitkit-plan-progress is-todo',
+      ],
+      marker: 1,
       run: 'Start from rep 3',
       watts: ['305', '280'],
       rest: ['1m30s', '1m15s'],
