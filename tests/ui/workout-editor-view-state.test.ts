@@ -339,7 +339,7 @@ describe('WorkoutEditorView autosave wiring', () => {
       release()
     }
     await reloading
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    await new Promise((resolve) => window.setTimeout(resolve, 0))
 
     expect(contents.get(WORKOUT_PATH)).toContain('Deadlift')
     expect(contents.get(WORKOUT_PATH)).not.toContain('[reps:: 9]')
