@@ -61,7 +61,7 @@ export function parseIntervalProgram(raw: string): IntervalProgramResult {
     return parsed.ok ? { ok: true, program: programFromPlan(parsed.plan) } : parsed
   }
   try {
-    return { ok: true, program: compileProgram(readLists(text)) }
+    return { ok: true, program: compileProgram(readPlanLists(text)) }
   } catch (error) {
     if (error instanceof PlanError) {
       return { ok: false, reason: error.message }
@@ -77,11 +77,11 @@ function fail(reason: string): never {
   throw new PlanError(reason)
 }
 
-type PlanNode =
+export type PlanNode =
   { kind: 'word'; text: string; quoted: boolean } | { kind: 'list'; items: PlanNode[] }
 
 /** Splits the plan into its bracketed lists; a quoted run is one word, so names can have spaces. */
-function readLists(text: string): PlanNode[] {
+export function readPlanLists(text: string): PlanNode[] {
   const open: PlanNode[][] = [[]]
   let index = 0
   const add = (node: PlanNode): void => {

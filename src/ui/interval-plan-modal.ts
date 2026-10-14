@@ -8,6 +8,8 @@ import {
   programSeconds,
   type IntervalProgramResult,
 } from '../domain/interval-program'
+import { outlineFromPlan, outlineProblem, planFromOutline } from '../domain/plan-outline'
+import { renderPlanBuilder } from './plan-builder'
 
 export interface IntervalPlanModalOptions {
   exerciseName: string
@@ -57,7 +59,10 @@ const PLAN_EXAMPLES: ReadonlyArray<{ plan: string; about: string }> = [
   },
 ]
 
-/** Edits the `[plan::]` on a duration card, previewing what the plan comes to as it is typed. */
+/**
+ * Edits the `[plan::]` on a duration card as rows of steps, or as text for plans rows cannot
+ * show, previewing what the plan comes to as it is edited.
+ */
 export class IntervalPlanModal extends Modal {
   private stopKeepingPlanInView?: () => void
 
@@ -86,9 +91,19 @@ export class IntervalPlanModal extends Modal {
       attr: { type: 'button', 'aria-label': 'Plan examples', 'aria-expanded': 'false' },
     })
     setIcon(info, 'info')
+    const modes = heading.createDiv({ cls: 'fitkit-plan-modes' })
+    const modeButton = (text: string): HTMLButtonElement =>
+      modes.createEl('button', { cls: 'fitkit-btn', text, attr: { type: 'button' } })
+    const stepsButton = modeButton('Steps')
+    const textButton = modeButton('Text')
+    const builder = contentEl.createDiv({ cls: 'fitkit-plan-builder' })
     const field = contentEl.createEl('textarea', {
       cls: 'fitkit-input fitkit-plan-text',
       attr: { 'aria-label': 'Plan', rows: '3', spellcheck: 'false', autocapitalize: 'off' },
+    })
+    const note = contentEl.createDiv({
+      cls: 'fitkit-plan-note',
+      text: "This plan can't be shown as steps, so edit it as text.",
     })
     const preview = contentEl.createDiv({ cls: 'fitkit-plan-preview' })
     const examples = contentEl.createDiv({ cls: 'fitkit-plan-examples', attr: { hidden: '' } })
@@ -106,8 +121,9 @@ export class IntervalPlanModal extends Modal {
     const save = actions.createEl('button', { cls: 'fitkit-btn fitkit-btn-primary', text: 'Save' })
 
     let current: IntervalProgramResult = parseIntervalProgram('')
+    let blank: string | null = null
     const update = (): void => {
-      current = parseIntervalProgram(field.value)
+      current = blank === null ? parseIntervalProgram(field.value) : { ok: false, reason: blank }
       preview.empty()
       if (current.ok) {
         const reps = current.program.steps.length
@@ -119,10 +135,33 @@ export class IntervalPlanModal extends Modal {
       }
       save.disabled = !current.ok
     }
-    const fill = (plan: string): void => {
-      field.value = plan
+    let inSteps = true
+    /** Shows the plan as rows when asked and they can show it, else as text. */
+    const show = (steps: boolean): void => {
+      const rows = steps ? outlineFromPlan(field.value) : null
+      inSteps = rows !== null
+      blank = null
+      builder.toggleAttribute('hidden', !inSteps)
+      field.toggleAttribute('hidden', inSteps)
+      note.toggleAttribute('hidden', !steps || inSteps)
+      stepsButton.setAttribute('aria-pressed', String(inSteps))
+      textButton.setAttribute('aria-pressed', String(!inSteps))
+      if (rows) {
+        renderPlanBuilder(builder, rows, () => {
+          field.value = planFromOutline(rows)
+          blank = outlineProblem(rows)
+          update()
+        })
+        blank = outlineProblem(rows)
+      }
       update()
     }
+    const fill = (plan: string): void => {
+      field.value = plan
+      show(inSteps)
+    }
+    stepsButton.addEventListener('click', () => show(true))
+    textButton.addEventListener('click', () => show(false))
     save.addEventListener('click', () => {
       if (current.ok) {
         this.options.onSave(tidyPlan(field.value))

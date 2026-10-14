@@ -7,7 +7,29 @@ import {
   harnessWindow,
 } from '../harness/obsidian-dom'
 
+const menus = vi.hoisted((): Array<Array<{ title: string; click: () => void }>> => [])
+
 vi.mock('obsidian', () => {
+  class Menu {
+    items: Array<{ title: string; click: () => void }> = []
+
+    addItem(callback: (item: unknown) => void): this {
+      const state = { title: '', click: (): void => {} }
+      const item = {
+        setTitle: (title: string) => ((state.title = title), item),
+        setIcon: () => item,
+        onClick: (click: () => void) => ((state.click = click), item),
+      }
+      callback(item)
+      this.items.push(state)
+      return this
+    }
+
+    showAtPosition(): void {
+      menus.push(this.items)
+    }
+  }
+
   class Modal {
     contentEl = createTestRoot()
     modalEl = createTestRoot()
@@ -26,7 +48,7 @@ vi.mock('obsidian', () => {
     }
   }
 
-  return { Modal, setIcon: (): void => {} }
+  return { Menu, Modal, setIcon: (): void => {} }
 })
 
 import type { IntervalPreset } from '../../src/domain/interval-presets'
@@ -82,6 +104,7 @@ describe('interval plan modal', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    menus.length = 0
   })
 
   it('opens on the plan already on the card, with how many reps it has and how long it takes', () => {
@@ -223,6 +246,154 @@ describe('interval plan modal', () => {
       keyboardShows()
 
       expect([unfocused, form.scrollTop]).toEqual([500, 500])
+    })
+  })
+
+  describe('step editor', () => {
+    const inputs = (modal: IntervalPlanModal, label: string): HTMLInputElement[] => [
+      ...modal.contentEl.querySelectorAll<HTMLInputElement>(`input[aria-label="${label}"]`),
+    ]
+
+    const edit = (input: HTMLInputElement | undefined, value: string): void => {
+      if (!input) {
+        throw new Error('Field not rendered')
+      }
+      input.value = value
+      input.dispatchEvent(new harnessWindow.Event('input', { bubbles: true }))
+    }
+
+    const pick = (
+      modal: IntervalPlanModal,
+      options: string,
+      index: number,
+      title: string,
+    ): void => {
+      const buttons = modal.contentEl.querySelectorAll<HTMLButtonElement>(
+        `button[aria-label="${options}"]`,
+      )
+      buttons[index]?.click()
+      menus
+        .at(-1)
+        ?.find((item) => item.title === title)
+        ?.click()
+    }
+
+    const hidden = (modal: IntervalPlanModal, selector: string): boolean | undefined =>
+      modal.contentEl.querySelector(selector)?.hasAttribute('hidden')
+
+    it('shows a plan as rows, with repeats holding their steps', () => {
+      const { modal } = open('(warmup 10m 150W) (x 3 (over 1m 300W) (rest 2m))')
+
+      expect({
+        names: inputs(modal, 'Step name').map((input) => input.value),
+        work: inputs(modal, 'Work time').map((input) => input.value),
+        targets: inputs(modal, 'Target').map((input) => input.value),
+        rounds: inputs(modal, 'Rounds').map((input) => input.value),
+        rests: inputs(modal, 'Rest time').map((input) => input.value),
+        textHidden: hidden(modal, '.fitkit-plan-text'),
+        preview: text(modal, '.fitkit-plan-preview'),
+      }).toEqual({
+        names: ['warmup', 'over'],
+        work: ['10m', '1m'],
+        targets: ['150W', '300W'],
+        rounds: ['3'],
+        rests: ['2m'],
+        textHidden: true,
+        preview: '4 reps · 17m',
+      })
+    })
+
+    it('saves what was changed in the rows, previewing it as it is typed', () => {
+      const { modal, onSave } = open('(x 3 (over 1m 300W) (rest 2m))')
+
+      edit(inputs(modal, 'Rounds')[0], '4')
+      edit(inputs(modal, 'Work time')[0], '90s')
+      const preview = text(modal, '.fitkit-plan-preview')
+      saveButton(modal).click()
+
+      expect([preview, onSave.mock.calls]).toEqual([
+        '4 reps · 12m',
+        [['(x 4 (over 90s 300W) (rest 2m))']],
+      ])
+    })
+
+    it('adds a step, a rest and a repeat at the end of the list they are added to', () => {
+      const { modal, onSave } = open('(x 3 (over 1m 300W))')
+      const [inRepeat, atTop] = [0, 1].map(
+        (index) => modal.contentEl.querySelectorAll<HTMLElement>('.fitkit-plan-add')[index] ?? null,
+      )
+
+      inRepeat?.querySelector<HTMLButtonElement>('button[aria-label="Add rest"]')?.click()
+      atTop?.querySelector<HTMLButtonElement>('button[aria-label="Add step"]')?.click()
+      edit(inputs(modal, 'Step name')[1], 'cooldown')
+      saveButton(modal).click()
+
+      expect(onSave.mock.calls).toEqual([['(x 3 (over 1m 300W) (rest 1m)) (cooldown 1m)']])
+    })
+
+    it('moves, copies, groups and removes rows from their menu', () => {
+      const { modal, onSave } = open('(a 1m) (b 2m) (x 2 (c 3m))')
+
+      pick(modal, 'Step options', 1, 'Move up')
+      pick(modal, 'Step options', 0, 'Duplicate')
+      pick(modal, 'Step options', 1, 'Delete')
+      pick(modal, 'Step options', 1, 'Put in a repeat')
+      pick(modal, 'Repeat options', 1, 'Ungroup')
+      saveButton(modal).click()
+
+      expect(onSave.mock.calls).toEqual([['(b 2m) (x 3 (a 1m)) (c 3m)']])
+    })
+
+    it('names the blank field and will not save until it is filled', () => {
+      const { modal, onSave } = open('(x 3 (over 1m 300W))')
+
+      edit(inputs(modal, 'Work time')[0], '')
+      saveButton(modal).click()
+
+      expect([
+        text(modal, '.fitkit-plan-error'),
+        saveButton(modal).disabled,
+        onSave.mock.calls,
+      ]).toEqual(['Give over a time, like 1m, or open.', true, []])
+    })
+
+    it('switches to text with the plan so far, and back to rows with what was typed', () => {
+      const { modal, onSave } = open('(x 3 (over 1m 300W))')
+
+      edit(inputs(modal, 'Target')[0], '320W')
+      findButtons(modal.contentEl, 'Text')[0]?.click()
+      const typedFrom = planField(modal).value
+      type(modal, '(x 2 (under 2m 220W))')
+      findButtons(modal.contentEl, 'Steps')[0]?.click()
+      const names = inputs(modal, 'Step name').map((input) => input.value)
+      saveButton(modal).click()
+
+      expect([typedFrom, names, onSave.mock.calls]).toEqual([
+        '(x 3 (over 1m 320W))',
+        ['under'],
+        [['(x 2 (under 2m 220W))']],
+      ])
+    })
+
+    it('opens a plan the rows cannot show as text, says why, and stays there on Steps', () => {
+      const { modal } = open('(every 1m (work 40s 300W))')
+      const opened = [hidden(modal, '.fitkit-plan-text'), hidden(modal, '.fitkit-plan-note')]
+
+      findButtons(modal.contentEl, 'Text')[0]?.click()
+      const inText = hidden(modal, '.fitkit-plan-note')
+      findButtons(modal.contentEl, 'Steps')[0]?.click()
+
+      expect({
+        opened,
+        inText,
+        afterSteps: [hidden(modal, '.fitkit-plan-text'), hidden(modal, '.fitkit-plan-note')],
+        note: text(modal, '.fitkit-plan-note'),
+      }).toEqual({
+        opened: [false, false],
+        inText: true,
+        afterSteps: [false, false],
+        note: "This plan can't be shown as steps, so edit it as text.",
+      })
     })
   })
 
