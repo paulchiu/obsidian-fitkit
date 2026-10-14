@@ -319,18 +319,35 @@ describe('interval plan modal', () => {
       ])
     })
 
-    it('adds a step, a rest and a repeat at the end of the list they are added to', () => {
+    it('adds to a repeat from the + on its bracket, and to the plan from one Add bar', () => {
       const { modal, onSave } = open('(x 3 (over 1m 300W))')
-      const [inRepeat, atTop] = [0, 1].map(
-        (index) => modal.contentEl.querySelectorAll<HTMLElement>('.fitkit-plan-add')[index] ?? null,
-      )
+      const add = (label: string, index: number, title: string): void =>
+        pick(modal, label, index, title)
+      const controls = {
+        bars: modal.contentEl.querySelectorAll('button[aria-label="Add to plan"]').length,
+        feet: modal.contentEl.querySelectorAll('button[aria-label="Add to repeat"]').length,
+        menu: (): string[] => menus.at(-1)?.map((item) => item.title) ?? [],
+      }
 
-      inRepeat?.querySelector<HTMLButtonElement>('button[aria-label="Add rest"]')?.click()
-      atTop?.querySelector<HTMLButtonElement>('button[aria-label="Add step"]')?.click()
-      edit(inputs(modal, 'Step name')[1], 'cooldown')
+      add('Add to repeat', 0, 'Rest')
+      const offered = controls.menu()
+      add('Add to plan', 0, 'Repeat')
+      add('Add to repeat', 1, 'Step')
+      add('Add to plan', 0, 'Step')
+      edit(inputs(modal, 'Step name')[3], 'cooldown')
       saveButton(modal).click()
 
-      expect(onSave.mock.calls).toEqual([['(x 3 (over 1m 300W) (rest 1m)) (cooldown 1m)']])
+      expect({
+        bars: controls.bars,
+        feet: controls.feet,
+        offered,
+        saved: onSave.mock.calls,
+      }).toEqual({
+        bars: 1,
+        feet: 1,
+        offered: ['Step', 'Rest', 'Repeat'],
+        saved: [['(x 3 (over 1m 300W) (rest 1m)) (x 3 (work 1m) (work 1m)) (cooldown 1m)']],
+      })
     })
 
     it('moves, copies, groups and removes rows from their menu', () => {

@@ -15,6 +15,13 @@ export function renderPlanBuilder(
   const draw = (): void => {
     parent.empty()
     renderList(parent, items, { changed, redraw })
+    const add = parent.createEl('button', {
+      cls: 'fitkit-plan-add-bar',
+      attr: { type: 'button', 'aria-label': 'Add to plan' },
+    })
+    setIcon(add, 'plus')
+    add.createSpan({ text: 'Add' })
+    renderAddMenu(add, items, { changed, redraw })
   }
   const redraw = (): void => {
     draw()
@@ -51,7 +58,15 @@ function renderList(parent: HTMLElement, list: OutlineItem[], context: BuilderCo
         set: (value) => (item.every = value),
       })
       renderOptions(head, 'Repeat options', list, index, context)
-      renderList(group.createDiv({ cls: 'fitkit-plan-repeat-body' }), item.items, context)
+      const body = group.createDiv({ cls: 'fitkit-plan-repeat-body' })
+      renderList(body, item.items, context)
+      /** Sits on the foot of the repeat's bracket, so it can only mean "add to this repeat". */
+      const foot = body.createEl('button', {
+        cls: 'fitkit-plan-add-foot',
+        attr: { type: 'button', 'aria-label': 'Add to repeat' },
+      })
+      setIcon(foot, 'plus')
+      renderAddMenu(foot, item.items, context)
     } else if (item.kind === 'rest') {
       const row = container.createDiv({ cls: 'fitkit-plan-row' })
       row.createSpan({ cls: 'fitkit-plan-word fitkit-plan-grow', text: 'Rest' })
@@ -89,25 +104,30 @@ function renderList(parent: HTMLElement, list: OutlineItem[], context: BuilderCo
       renderOptions(row, 'Step options', list, index, context)
     }
   })
+}
 
-  const add = container.createDiv({ cls: 'fitkit-plan-add' })
-  const adders: ReadonlyArray<[string, () => OutlineItem]> = [
-    ['Step', newStep],
-    ['Rest', () => ({ kind: 'rest', time: '1m' })],
-    ['Repeat', () => ({ kind: 'repeat', count: '3', every: '', items: [newStep()] })],
+/** Opens Step / Rest / Repeat from `button`, adding the choice to the end of `list`. */
+function renderAddMenu(button: HTMLElement, list: OutlineItem[], context: BuilderContext): void {
+  const choices: ReadonlyArray<[string, string, () => OutlineItem]> = [
+    ['Step', 'activity', newStep],
+    ['Rest', 'pause', () => ({ kind: 'rest', time: '1m' })],
+    ['Repeat', 'repeat', () => ({ kind: 'repeat', count: '3', every: '', items: [newStep()] })],
   ]
-  for (const [text, create] of adders) {
-    const button = add.createEl('button', {
-      cls: 'fitkit-btn',
-      attr: { type: 'button', 'aria-label': `Add ${text.toLowerCase()}` },
-    })
-    setIcon(button, 'plus')
-    button.createSpan({ text })
-    button.addEventListener('click', () => {
-      list.push(create())
-      context.redraw()
-    })
-  }
+  button.addEventListener('click', () => {
+    const menu = new Menu()
+    for (const [title, icon, create] of choices) {
+      menu.addItem((entry) =>
+        entry
+          .setTitle(title)
+          .setIcon(icon)
+          .onClick(() => {
+            list.push(create())
+            context.redraw()
+          }),
+      )
+    }
+    menu.showAtPosition(menuAnchorForTrigger(button.getBoundingClientRect()))
+  })
 }
 
 function newStep(): OutlineStep {

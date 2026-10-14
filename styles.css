@@ -684,31 +684,84 @@ body.is-mobile .fitkit-editor-root {
   height: 16px;
 }
 
+/** The bottom margin clears the + that hangs below the bracket. */
 .fitkit-plan-repeat {
   display: grid;
   gap: 6px;
+  margin-bottom: 8px;
 }
 
 .fitkit-plan-repeat-body {
+  position: relative;
+  margin-left: 12px;
   padding-left: 10px;
+  padding-bottom: 16px;
   border-left: 2px solid var(--background-modifier-border);
 }
 
-.fitkit-plan-add {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.fitkit-plan-builder {
+  display: grid;
+  gap: 8px;
 }
 
-.fitkit-plan-add .fitkit-btn {
+/** The plan's one Add, a dashed bar after the last row; scoped to beat button:not(.clickable-icon). */
+.fitkit-plan-builder > .fitkit-plan-add-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: 6px;
+  border: 1.5px dashed var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+}
+
+.fitkit-plan-builder > .fitkit-plan-add-bar.mobile-tap {
+  background: var(--background-modifier-hover);
+  box-shadow: none;
+}
+
+.fitkit-plan-add-bar svg {
+  width: 14px;
+  height: 14px;
+}
+
+/** A small round + centred on the foot of the repeat's bracket, with a larger invisible touch area. */
+.fitkit-plan-repeat-body > .fitkit-plan-add-foot {
+  position: absolute;
+  left: -12px;
+  bottom: -11px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  font-size: var(--font-ui-small);
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1.5px solid var(--interactive-accent);
+  border-radius: 50%;
+  background: var(--background-primary);
+  box-shadow: none;
+  color: var(--interactive-accent);
+  cursor: pointer;
 }
 
-.fitkit-plan-add svg {
+.fitkit-plan-repeat-body > .fitkit-plan-add-foot.mobile-tap {
+  background: var(--background-modifier-hover);
+  box-shadow: none;
+}
+
+.fitkit-plan-add-foot::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+}
+
+.fitkit-plan-add-foot svg {
   width: 14px;
   height: 14px;
 }
