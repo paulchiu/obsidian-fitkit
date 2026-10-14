@@ -110,6 +110,7 @@ const createWorkoutFile = (path: string): TFile =>
 const createView = (): {
   view: WorkoutEditorView
   contents: Map<string, string>
+  vault: { read: (target: TFile) => Promise<string> }
 } => {
   const files = new Map([WORKOUT_PATH, OTHER_WORKOUT_PATH].map((p) => [p, createWorkoutFile(p)]))
   const contents = new Map<string, string>([
@@ -132,7 +133,7 @@ const createView = (): {
   plugin.app = app as unknown as App
   plugin.settings = { ...DEFAULT_SETTINGS }
   const view = new WorkoutEditorView({ app } as unknown as WorkspaceLeaf, plugin)
-  return { view, contents }
+  return { view, contents, vault }
 }
 
 describe('WorkoutEditorView workspace state', () => {
@@ -308,5 +309,39 @@ describe('WorkoutEditorView autosave wiring', () => {
     )
     expect(contents.get(WORKOUT_PATH)).toContain('Deadlift')
     expect(contents.get(WORKOUT_PATH)).not.toContain('[reps:: 7]')
+  })
+
+  it('keeps autosave blocked while a reload from the conflict banner is reading the disk', async () => {
+    const { view, contents, vault } = createView()
+    await view.onOpen()
+    await view.setState({ file: WORKOUT_PATH }, { history: false })
+    contents.set(WORKOUT_PATH, workoutSource.replaceAll('Squat', 'Deadlift'))
+    const typeReps = async (value: string): Promise<void> => {
+      const reps = view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')
+      if (!reps) {
+        throw new Error('reps input not rendered')
+      }
+      reps.value = value
+      reps.dispatchEvent(new harnessWindow.Event('input'))
+      await Promise.resolve()
+    }
+    await typeReps('7')
+    expect(view.contentEl.querySelector('.fitkit-conflict')).not.toBeNull()
+
+    const pending: Array<() => void> = []
+    const read = vault.read
+    vault.read = (target) =>
+      new Promise((resolve) => pending.push(() => void read(target).then(resolve)))
+    const reloading = view.reloadFromDisk()
+    await typeReps('9')
+    vault.read = read
+    for (const release of pending) {
+      release()
+    }
+    await reloading
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(contents.get(WORKOUT_PATH)).toContain('Deadlift')
+    expect(contents.get(WORKOUT_PATH)).not.toContain('[reps:: 9]')
   })
 })

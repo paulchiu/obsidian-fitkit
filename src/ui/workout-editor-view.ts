@@ -449,7 +449,7 @@ export class WorkoutEditorView extends FileView {
       return
     }
     this.screens.teardown('discard')
-    this.autosaver.reset()
+    /** Autosave stays blocked by the conflict until the disk copy is in, so an edit made during the read cannot write the stale model. */
     const { model, isWorkout } = await this.session.load()
     this.model = toEditorWorkoutModel(model, isWorkout, this.session.file.path)
     if (!this.model.isFitKitWorkout) {
