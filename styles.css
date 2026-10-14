@@ -613,6 +613,7 @@ body.is-mobile .fitkit-editor-root {
   color: var(--text-on-accent);
 }
 
+.fitkit-plan-info[hidden],
 .fitkit-plan-builder[hidden],
 .fitkit-plan-text[hidden],
 .fitkit-plan-note[hidden] {
@@ -631,8 +632,11 @@ body.is-mobile .fitkit-editor-root {
   min-width: 0;
 }
 
-.fitkit-plan-row .fitkit-input {
+/** Tighter than Obsidian's phone input padding, which clips short values like 300W. */
+.fitkit-plan-builder .fitkit-plan-row > input.fitkit-input {
   min-width: 0;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 .fitkit-plan-grow {

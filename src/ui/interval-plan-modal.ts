@@ -144,6 +144,11 @@ export class IntervalPlanModal extends Modal {
       builder.toggleAttribute('hidden', !inSteps)
       field.toggleAttribute('hidden', inSteps)
       note.toggleAttribute('hidden', !steps || inSteps)
+      info.toggleAttribute('hidden', inSteps)
+      if (inSteps) {
+        examples.setAttribute('hidden', '')
+        info.setAttribute('aria-expanded', 'false')
+      }
       stepsButton.setAttribute('aria-pressed', String(inSteps))
       textButton.setAttribute('aria-pressed', String(!inSteps))
       if (rows) {

@@ -172,6 +172,7 @@ describe('interval plan modal', () => {
 
   it('shows examples behind the info button, each one ready to use', () => {
     const { modal, onSave } = open(undefined)
+    findButtons(modal.contentEl, 'Text')[0]?.click()
     const hiddenAtFirst = modal.contentEl
       .querySelector('.fitkit-plan-examples')
       ?.hasAttribute('hidden')
@@ -374,6 +375,25 @@ describe('interval plan modal', () => {
         ['under'],
         [['(x 2 (under 2m 220W))']],
       ])
+    })
+
+    it('offers the text examples only in Text, closing them on the way back to Steps', () => {
+      const { modal } = open('(x 3 (over 1m 300W))')
+      const info = (): HTMLButtonElement | null =>
+        modal.contentEl.querySelector<HTMLButtonElement>('button[aria-label="Plan examples"]')
+      const inSteps = info()?.hasAttribute('hidden')
+
+      findButtons(modal.contentEl, 'Text')[0]?.click()
+      const inText = info()?.hasAttribute('hidden')
+      info()?.click()
+      findButtons(modal.contentEl, 'Steps')[0]?.click()
+
+      expect({
+        inSteps,
+        inText,
+        examplesBack: hidden(modal, '.fitkit-plan-examples'),
+        expanded: info()?.getAttribute('aria-expanded'),
+      }).toEqual({ inSteps: true, inText: false, examplesBack: true, expanded: 'false' })
     })
 
     it('opens a plan the rows cannot show as text, says why, and stays there on Steps', () => {
