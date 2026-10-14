@@ -31,6 +31,7 @@ vi.mock('obsidian', () => {
   }
 
   class Modal {
+    containerEl = createTestRoot()
     contentEl = createTestRoot()
     modalEl = createTestRoot()
     titleEl = createTestRoot()
@@ -287,17 +288,51 @@ describe('interval plan modal', () => {
         )
       }
 
-      it('scrolls the field being typed in to just above the keyboard, with room below the last rows', () => {
+      /** A sheet at `top`, `height` tall, in a modal area 734 tall that stops short of the 768 window. */
+      const sheetIn = (modal: IntervalPlanModal, top = 16, height = 700): void => {
+        modal.containerEl.getBoundingClientRect = (): DOMRect =>
+          ({ top: 0, bottom: 734, height: 734 }) as DOMRect
+        modal.modalEl.getBoundingClientRect = (): DOMRect => ({ top, height }) as DOMRect
+      }
+
+      const lifted = (modal: IntervalPlanModal): Record<string, unknown> => ({
+        up: modal.modalEl.classList.contains('fitkit-keyboard-up'),
+        top: modal.modalEl.style.getPropertyValue('--fitkit-keyboard-top'),
+        room: modal.modalEl.style.getPropertyValue('--fitkit-keyboard-room'),
+      })
+
+      it('scrolls the field being typed in to just above the keyboard', () => {
         const { modal } = open('(x 3 (over 1m 300W) (under 2m 200W))')
         const { form, fields } = formWithFields(modal, [600, 700])
 
         fields[1]?.focus()
         keyboardShows(300)
 
-        expect({
-          scrollTop: form.scrollTop,
-          room: form.style.getPropertyValue('--fitkit-keyboard-height'),
-        }).toEqual({ scrollTop: 248, room: '300px' })
+        expect(form.scrollTop).toBe(248)
+        modal.close()
+      })
+
+      it('ends the sheet at the keyboard, keeping its top where it was', () => {
+        const { modal } = open('(x 3 (over 1m 300W))')
+        const { fields } = formWithFields(modal, [400])
+        sheetIn(modal)
+
+        fields[0]?.focus()
+        keyboardShows(300)
+
+        expect(lifted(modal)).toEqual({ up: true, top: '16px', room: '452px' })
+        modal.close()
+      })
+
+      it('moves a short sheet up to sit on the keyboard rather than squashing it', () => {
+        const { modal } = open('(x 3 (over 1m 300W))')
+        const { fields } = formWithFields(modal, [400])
+        sheetIn(modal, 217, 300)
+
+        fields[0]?.focus()
+        keyboardShows(300)
+
+        expect(lifted(modal)).toEqual({ up: true, top: '168px', room: '300px' })
         modal.close()
       })
 
@@ -325,15 +360,16 @@ describe('interval plan modal', () => {
         modal.close()
       })
 
-      it('gives the room back once the keyboard hides', () => {
+      it('puts the sheet back once the keyboard hides', () => {
         const { modal } = open('(x 3 (over 1m 300W))')
-        const { form, fields } = formWithFields(modal, [700])
+        const { fields } = formWithFields(modal, [700])
+        sheetIn(modal)
 
         fields[0]?.focus()
         keyboardShows(300)
         harnessDocument.defaultView?.dispatchEvent(new harnessWindow.Event('keyboardDidHide'))
 
-        expect(form.style.getPropertyValue('--fitkit-keyboard-height')).toBe('')
+        expect(lifted(modal)).toEqual({ up: false, top: '', room: '' })
         modal.close()
       })
     })

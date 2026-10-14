@@ -646,9 +646,20 @@ body.is-mobile .fitkit-editor-root {
   overscroll-behavior: contain;
 }
 
-/* The button bar holds the bottom spacing, so the form has none for scrolled content to show through below it, Obsidian's phone padding included. While the phone keyboard covers the plan form, its height is room for the last rows to scroll above it. */
+/* The button bar holds the bottom spacing, so the form has none for scrolled content to show through below it, Obsidian's phone padding included. */
 .fitkit-set-note-modal-shell .fitkit-set-note-modal {
-  padding-bottom: var(--fitkit-keyboard-height, 0);
+  padding-bottom: 0;
+}
+
+/* While the phone keyboard is up, the sheet ends at it and the button bar rests on it, the keyboard covering the home indicator's safe area. */
+.modal.fitkit-set-note-modal-shell.fitkit-keyboard-up {
+  align-self: flex-start;
+  margin-top: var(--fitkit-keyboard-top);
+  max-height: var(--fitkit-keyboard-room);
+}
+
+.fitkit-keyboard-up .fitkit-set-note-actions {
+  padding-bottom: var(--size-4-3);
 }
 
 .fitkit-set-note-modal h2 {
