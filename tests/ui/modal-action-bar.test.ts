@@ -37,7 +37,7 @@ describe('modal button bar', () => {
       barBottom: style(bar, 'bottom'),
       barPaddingBottom: style(bar, 'padding-bottom'),
     }).toEqual({
-      formPaddingBottom: '0px',
+      formPaddingBottom: 'var(--fitkit-keyboard-height, 0)',
       barBottom: '0px',
       barPaddingBottom: 'max(var(--size-4-3), env(safe-area-inset-bottom))',
     })
@@ -52,7 +52,7 @@ describe('modal button bar', () => {
       barMargin: [style(bar, 'margin-left'), style(bar, 'margin-right')],
       barPadding: [style(bar, 'padding-left'), style(bar, 'padding-right')],
     }).toEqual({
-      formPaddingBottom: '0px',
+      formPaddingBottom: 'var(--fitkit-keyboard-height, 0)',
       barMargin: ['calc(-1 * var(--size-4-3))', 'calc(-1 * var(--size-4-3))'],
       barPadding: ['var(--size-4-3)', 'var(--size-4-3)'],
     })

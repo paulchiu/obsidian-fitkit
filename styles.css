@@ -646,9 +646,9 @@ body.is-mobile .fitkit-editor-root {
   overscroll-behavior: contain;
 }
 
-/* The button bar holds the bottom spacing, so the form has none for scrolled content to show through below it, Obsidian's phone padding included. */
+/* The button bar holds the bottom spacing, so the form has none for scrolled content to show through below it, Obsidian's phone padding included. While the phone keyboard covers the plan form, its height is room for the last rows to scroll above it. */
 .fitkit-set-note-modal-shell .fitkit-set-note-modal {
-  padding-bottom: 0;
+  padding-bottom: var(--fitkit-keyboard-height, 0);
 }
 
 .fitkit-set-note-modal h2 {

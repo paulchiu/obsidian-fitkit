@@ -249,6 +249,94 @@ describe('interval plan modal', () => {
 
       expect([unfocused, form.scrollTop]).toEqual([500, 500])
     })
+
+    describe('in the step editor', () => {
+      /**
+       * The form at the top of its scroll in a window 768 tall, with step fields whose bottoms sit
+       * at `bottoms` and the Save bar's top at `barTop`.
+       */
+      const formWithFields = (
+        modal: IntervalPlanModal,
+        bottoms: number[],
+        barTop = 900,
+      ): { form: HTMLElement; fields: HTMLInputElement[] } => {
+        const { contentEl } = modal
+        const bar = contentEl.querySelector<HTMLElement>('.fitkit-set-note-actions')
+        if (bar) {
+          bar.getBoundingClientRect = (): DOMRect => ({ top: barTop }) as DOMRect
+        }
+        harnessDocument.body.append(contentEl)
+        let scrollTop = 0
+        Object.defineProperty(contentEl, 'scrollTop', {
+          get: () => scrollTop,
+          set: (value: number) => (scrollTop = value),
+        })
+        const fields = [
+          ...contentEl.querySelectorAll<HTMLInputElement>('input[aria-label="Target"]'),
+        ]
+        fields.forEach((field, index) => {
+          field.getBoundingClientRect = (): DOMRect =>
+            ({ bottom: (bottoms[index] ?? 0) - scrollTop }) as DOMRect
+        })
+        return { form: contentEl, fields }
+      }
+
+      const keyboardShows = (height: number): void => {
+        harnessDocument.defaultView?.dispatchEvent(
+          Object.assign(new harnessWindow.Event('keyboardDidShow'), { keyboardHeight: height }),
+        )
+      }
+
+      it('scrolls the field being typed in to just above the keyboard, with room below the last rows', () => {
+        const { modal } = open('(x 3 (over 1m 300W) (under 2m 200W))')
+        const { form, fields } = formWithFields(modal, [600, 700])
+
+        fields[1]?.focus()
+        keyboardShows(300)
+
+        expect({
+          scrollTop: form.scrollTop,
+          room: form.style.getPropertyValue('--fitkit-keyboard-height'),
+        }).toEqual({ scrollTop: 248, room: '300px' })
+        modal.close()
+      })
+
+      it('brings a field tapped while the keyboard is up into view, and leaves one already in view', () => {
+        const { modal } = open('(x 3 (over 1m 300W) (under 2m 200W))')
+        const { form, fields } = formWithFields(modal, [400, 600])
+
+        keyboardShows(300)
+        fields[0]?.focus()
+        const inView = form.scrollTop
+        fields[1]?.focus()
+
+        expect([inView, form.scrollTop]).toEqual([0, 148])
+        modal.close()
+      })
+
+      it('keeps the field clear of the Save bar when the bar rides above the keyboard', () => {
+        const { modal } = open('(x 3 (over 1m 300W))')
+        const { form, fields } = formWithFields(modal, [450], 400)
+
+        fields[0]?.focus()
+        keyboardShows(300)
+
+        expect(form.scrollTop).toBe(66)
+        modal.close()
+      })
+
+      it('gives the room back once the keyboard hides', () => {
+        const { modal } = open('(x 3 (over 1m 300W))')
+        const { form, fields } = formWithFields(modal, [700])
+
+        fields[0]?.focus()
+        keyboardShows(300)
+        harnessDocument.defaultView?.dispatchEvent(new harnessWindow.Event('keyboardDidHide'))
+
+        expect(form.style.getPropertyValue('--fitkit-keyboard-height')).toBe('')
+        modal.close()
+      })
+    })
   })
 
   describe('step editor', () => {

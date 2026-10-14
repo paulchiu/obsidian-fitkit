@@ -198,7 +198,11 @@ export class IntervalPlanModal extends Modal {
     }
 
     fill(this.options.initial ?? this.options.suggested ?? DEFAULT_PLAN)
-    this.stopKeepingPlanInView = keepInViewOverKeyboard(contentEl, heading, field)
+    this.stopKeepingPlanInView = keepInViewOverKeyboard(contentEl, {
+      top: heading,
+      field,
+      bar: actions,
+    })
   }
 
   onClose(): void {
@@ -208,33 +212,74 @@ export class IntervalPlanModal extends Modal {
   }
 }
 
+/** Space kept between a step field being typed in and the top of the phone keyboard. */
+const KEYBOARD_CLEARANCE = 16
+
 /**
- * Once the phone keyboard is up, scrolls `top` to the top of the visible form while `field`
- * is being typed in: with the examples open, iOS can scroll the form past the field it revealed.
+ * Keeps what is being typed in visible over the phone keyboard, which covers the form rather than
+ * shrinking it. The plan text scrolls `top` to the top of the form, since with the examples open
+ * iOS can scroll past the field it revealed; a step field scrolls up just enough to clear the
+ * keyboard and the Save bar, with the keyboard's height as room below the last rows.
  * Returns the cleanup.
  */
 function keepInViewOverKeyboard(
   form: HTMLElement,
-  top: HTMLElement,
-  field: HTMLElement,
+  { top, field, bar }: { top: HTMLElement; field: HTMLElement; bar: HTMLElement },
 ): () => void {
   const win = activeWindow
+  let keyboard = 0
   const align = (): void => {
-    if (field.ownerDocument.activeElement !== field) {
-      return
+    const focused = form.ownerDocument.activeElement
+    if (focused === field) {
+      const visibleTop = Math.max(
+        form.getBoundingClientRect().top,
+        win.visualViewport?.offsetTop ?? 0,
+      )
+      form.scrollTop += top.getBoundingClientRect().top - visibleTop
+    } else if (keyboard > 0 && focused?.tagName === 'INPUT' && form.contains(focused)) {
+      const visibleBottom = Math.min(win.innerHeight - keyboard, bar.getBoundingClientRect().top)
+      const hidden = focused.getBoundingClientRect().bottom - (visibleBottom - KEYBOARD_CLEARANCE)
+      if (hidden > 0) {
+        form.scrollTop += hidden
+      }
     }
-    const visibleTop = Math.max(
-      form.getBoundingClientRect().top,
-      win.visualViewport?.offsetTop ?? 0,
-    )
-    form.scrollTop += top.getBoundingClientRect().top - visibleTop
   }
-  win.addEventListener('keyboardDidShow', align)
-  win.visualViewport?.addEventListener('resize', align)
+  const resized = (evt: Event): void => {
+    keyboard = keyboardHeight(evt, win)
+    if (keyboard > 0) {
+      form.style.setProperty('--fitkit-keyboard-height', `${keyboard}px`)
+    } else {
+      form.style.removeProperty('--fitkit-keyboard-height')
+    }
+    align()
+  }
+  /** A step field scrolls as soon as it is tapped; the plan text waits for the keyboard. */
+  const fieldFocused = (): void => {
+    if (form.ownerDocument.activeElement !== field) {
+      align()
+    }
+  }
+  win.addEventListener('keyboardDidShow', resized)
+  win.addEventListener('keyboardDidHide', resized)
+  win.visualViewport?.addEventListener('resize', resized)
+  form.addEventListener('focusin', fieldFocused)
   return () => {
-    win.removeEventListener('keyboardDidShow', align)
-    win.visualViewport?.removeEventListener('resize', align)
+    win.removeEventListener('keyboardDidShow', resized)
+    win.removeEventListener('keyboardDidHide', resized)
+    win.visualViewport?.removeEventListener('resize', resized)
+    form.removeEventListener('focusin', fieldFocused)
   }
+}
+
+/** The keyboard's height from the app's keyboard event, else what it takes off the visual viewport. */
+function keyboardHeight(evt: Event, win: Window): number {
+  if (evt.type === 'keyboardDidHide') {
+    return 0
+  }
+  const viewport = win.visualViewport
+  const covered = viewport ? win.innerHeight - viewport.height - viewport.offsetTop : 0
+  const reported = 'keyboardHeight' in evt ? Number(evt.keyboardHeight) : 0
+  return Math.max(0, covered, Number.isFinite(reported) ? reported : 0)
 }
 
 /** One line for the note: a one-line plan in its usual spelling, lists with spacing collapsed outside quoted names. */
