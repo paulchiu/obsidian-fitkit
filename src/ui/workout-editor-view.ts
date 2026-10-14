@@ -17,25 +17,15 @@ import {
   ZERO_DURATION_DISPLAY,
 } from '../domain/duration-input'
 import { formatErrorMessage } from '../domain/error'
-import { cueBetween } from '../domain/interval-cues'
+import { loggedReps, restsAfter, type RunRow } from '../domain/interval-run'
 import {
-  advanceRun,
-  catchUpRun,
-  endCutRun,
-  endRun,
-  hasOpenRep,
-  hitCount,
-  loggedReps,
-  pauseRun,
-  pressRunButton,
-  restsAfter,
-  resumeCutRun,
-  runPhase,
-  startRun,
-  togglePauseRun,
-  type RunPhase,
-  type RunRow,
-} from '../domain/interval-run'
+  resumeSession,
+  startSession,
+  stepSession,
+  type RunEvent,
+  type RunSession,
+  type RunTransition,
+} from '../domain/interval-session'
 import { summarisePlan } from '../domain/plan-summary'
 import { INTENSITY_KINDS, type IntensityKind } from '../domain/interval-plan'
 import { parseIntervalProgram, type IntervalProgram } from '../domain/interval-program'
@@ -108,7 +98,7 @@ import { ensureParentFolder } from '../vault/vault-utils'
 import { ConfirmModal } from './confirm-modal'
 import { EditLevelsModal } from './edit-levels-modal'
 import { createCuePlayer, type CuePlayer } from './interval-cues'
-import { clockSeconds, formatClock, renderRunner, type RunnerScreen } from './interval-runner'
+import { clockSeconds, formatClock, renderRunner } from './interval-runner'
 import { renderRestTimer, renderSetTimer } from './timer-screen'
 import { IntervalPlanModal } from './interval-plan-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
@@ -148,20 +138,13 @@ interface SetTimerScreen {
 
 interface ActiveRun {
   card: ExerciseCard
-  program: IntervalProgram
-  screen: RunnerScreen
+  session: RunSession
   intervalId: number
-  lastTickAt: number
   clockEl: HTMLElement | null
-  /** The phase the last tick saw, so the next one knows which cue it crossed. */
-  lastPhase: RunPhase
   cues: CuePlayer
   /** Where the card list was scrolled when the run took over the tab, restored on the way back. */
   returnScrollTop: number
 }
-
-/** A tick this late means the app was suspended, so it catches up the way a reopen does. */
-const LATE_TICK_MS = 5000
 
 interface ActiveRestTimer {
   startedAtMs: number
@@ -1557,11 +1540,10 @@ export class WorkoutEditorView extends FileView {
   private resumeSavedTimer(): void {
     for (const card of this.model?.exercises ?? []) {
       const plan = intervalColumns(card).plan
-      if (plan && hasOpenRep(card.durationEntries)) {
-        this.enterRun(card, plan, { kind: 'running' })
-        if (this.activeRun && card.durationEntries.at(-1)?.startedAt !== undefined) {
-          this.catchUpActiveRun(this.activeRun, Date.now())
-        }
+      const now = Date.now()
+      const resumed = plan && resumeSession(card.durationEntries, plan, now)
+      if (resumed) {
+        this.applyRun(this.enterRun(card, resumed.session), resumed, now)
         return
       }
     }
@@ -1630,28 +1612,27 @@ export class WorkoutEditorView extends FileView {
     this.stopTimer({ write: true, render: false })
     this.closeSetTimer()
     this.clearRestTimer()
-    card.durationEntries = startRun(card.durationEntries, program, Date.now())
-    this.enterRun(card, program, { kind: 'running' })
-    this.activeRun?.cues.prime()
-    this.markDirty()
-    this.render()
+    const now = Date.now()
+    const started = startSession(card.durationEntries, program, now)
+    const run = this.enterRun(card, started.session)
+    run.cues.prime()
+    this.applyRun(run, started, now)
     this.contentEl.scrollTop = 0
   }
 
-  private enterRun(card: ExerciseCard, program: IntervalProgram, screen: RunnerScreen): void {
+  private enterRun(card: ExerciseCard, session: RunSession): ActiveRun {
     const cues = createCuePlayer(activeWindow, this.plugin.settings.intervalBeepsEnabled !== false)
     cues.keepAwake()
-    this.activeRun = {
+    const run: ActiveRun = {
       card,
-      program,
-      screen,
-      intervalId: window.setInterval(() => this.tickRun(), 500),
-      lastTickAt: Date.now(),
+      session,
+      intervalId: window.setInterval(() => this.sendRun({ kind: 'tick' }), 500),
       clockEl: null,
-      lastPhase: runPhase(card.durationEntries, program, Date.now()),
       cues,
       returnScrollTop: this.contentEl.scrollTop,
     }
+    this.activeRun = run
+    return run
   }
 
   /** Stops the run's clock, cues and wake lock without touching the rows. */
@@ -1675,143 +1656,74 @@ export class WorkoutEditorView extends FileView {
   }
 
   private renderRun(container: HTMLElement, run: ActiveRun): void {
-    const rows = (): EditableDurationEntry[] => run.card.durationEntries
+    const { session } = run
+    const primed = (event: RunEvent) => (): void => {
+      run.cues.prime()
+      this.sendRun(event)
+    }
     run.clockEl = renderRunner(
       container,
       {
         exerciseName: run.card.name,
-        program: run.program,
-        rows: rows(),
+        program: session.program,
+        rows: session.rows,
         now: Date.now(),
-        screen: run.screen,
+        screen: session.screen,
       },
       {
-        primary: () => {
-          run.cues.prime()
-          this.applyRunRows(pressRunButton(rows(), run.program, Date.now()))
-        },
-        togglePause: () => {
-          run.cues.prime()
-          this.applyRunRows(togglePauseRun(rows(), run.program, Date.now()))
-        },
-        end: () => {
-          this.applyRunRows({ rows: endRun(rows(), Date.now()) })
-          this.leaveRun()
-        },
-        adjust: (delta) => this.adjustLastRep(run, delta),
-        resumeCut: () => {
-          run.cues.prime()
-          run.screen = { kind: 'running' }
-          this.applyRunRows({ rows: resumeCutRun(rows(), run.program, Date.now()) })
-        },
-        endCut: () => {
-          this.applyRunRows({ rows: endCutRun(rows()) })
-          this.leaveRun()
-        },
-        back: () => this.leaveRun(),
+        primary: primed({ kind: 'press' }),
+        togglePause: primed({ kind: 'toggle-pause' }),
+        end: () => this.sendRun({ kind: 'end' }),
+        adjust: (delta) => this.sendRun({ kind: 'adjust', delta }),
+        resumeCut: primed({ kind: 'resume-cut' }),
+        endCut: () => this.sendRun({ kind: 'end-cut' }),
+        back: () => this.sendRun({ kind: 'back' }),
       },
     )
   }
 
-  private tickRun(): void {
+  private sendRun(event: RunEvent): void {
     const run = this.activeRun
-    if (!run || run.screen.kind !== 'running') {
+    if (run) {
+      const now = Date.now()
+      this.applyRun(run, stepSession(run.session, event, now), now)
+    }
+  }
+
+  /** Carries out what a run transition asks of the view. */
+  private applyRun(run: ActiveRun, { session, effects }: RunTransition, now: number): void {
+    run.session = session
+    if (effects.rows) {
+      run.card.durationEntries = effects.rows
+      this.markDirty()
+    }
+    if (effects.notice !== undefined) {
+      new Notice(effects.notice)
+    }
+    if (effects.leave) {
+      this.leaveRun()
       return
     }
-    const now = Date.now()
-    const late = now - run.lastTickAt > LATE_TICK_MS
-    run.lastTickAt = now
-    if (late) {
-      this.catchUpActiveRun(run, now)
-      run.lastPhase = runPhase(run.card.durationEntries, run.program, now)
+    if (effects.redraw === 'full') {
       this.render()
-      return
     }
-    const before = run.lastPhase
-    const result = advanceRun(run.card.durationEntries, run.program, now)
-    const redrawn = this.applyRunRows(result)
-    const cue = result.finished ? 'go' : cueBetween(before, run.lastPhase)
-    if (cue) {
-      run.cues.play(cue)
+    if (effects.cue) {
+      run.cues.play(effects.cue)
     }
-    if (!redrawn && run.clockEl) {
-      const clock = {
-        exerciseName: run.card.name,
-        program: run.program,
-        rows: run.card.durationEntries,
-      }
+    if (effects.redraw === 'clock' && run.clockEl) {
+      const clock = { exerciseName: run.card.name, program: session.program, rows: session.rows }
       run.clockEl.setText(formatClock(clockSeconds({ ...clock, now })))
-    }
-  }
-
-  /**
-   * Takes the run's next rows, marking the note dirty when they differ, and redraws
-   * on a change or a finish. Returns whether it redrew, so a plain tick only moves the clock.
-   */
-  private applyRunRows(next: { rows: EditableDurationEntry[]; finished?: boolean }): boolean {
-    const run = this.activeRun
-    if (!run) {
-      return false
-    }
-    const changed = JSON.stringify(next.rows) !== JSON.stringify(run.card.durationEntries)
-    if (changed) {
-      run.card.durationEntries = next.rows
-      this.markDirty()
-    }
-    run.lastPhase = runPhase(next.rows, run.program, Date.now())
-    if (next.finished) {
-      run.screen = { kind: 'finished', hits: hitCount(next.rows, run.program) }
-    }
-    const redraw = changed || next.finished === true
-    if (redraw) {
-      this.render()
-    }
-    return redraw
-  }
-
-  private adjustLastRep(run: ActiveRun, delta: number): void {
-    const kind = run.program.intensity
-    const rows = run.card.durationEntries.map((row) => ({ ...row }))
-    const last = rows[rows.length - 1]
-    if (!last || !kind) {
-      return
-    }
-    const target = run.program.steps[rows.length - 1]?.target?.target ?? 0
-    last[kind] = Math.max(0, Math.round(((last[kind] ?? target) + delta) * 10) / 10)
-    this.applyRunRows({ rows })
-  }
-
-  /** Picks a run back up from the note after the app was away: catch up, or report a cut-off. */
-  private catchUpActiveRun(run: ActiveRun, now: number): void {
-    const result = catchUpRun(run.card.durationEntries, run.program, now)
-    if (result.kind === 'cut-off') {
-      run.screen = { kind: 'cut-off', rep: result.rep, resting: result.resting }
-      return
-    }
-    if (result.finished) {
-      run.screen = { kind: 'finished', hits: hitCount(result.rows, run.program) }
-    }
-    if (result.filled > 0) {
-      run.card.durationEntries = result.rows
-      this.markDirty()
-      const kind = run.program.intensity
-      const label = kind ? INTENSITY_LABELS[kind].toLowerCase() : 'times'
-      new Notice(
-        result.filled === 1
-          ? `1 rep finished while Obsidian was closed. It has the target filled in, so check its ${label}.`
-          : `${result.filled} reps finished while Obsidian was closed. They have the target filled in, so check their ${label}.`,
-      )
     }
   }
 
   /** Closing the tab pauses a run, banking the time so far the way the duration timer does. */
   private pauseRunForClose(): void {
     const run = this.stopRun()
-    if (!run || run.screen.kind !== 'running') {
+    if (!run) {
       return
     }
-    const { rows } = pauseRun(run.card.durationEntries, run.program, Date.now())
-    if (JSON.stringify(rows) !== JSON.stringify(run.card.durationEntries)) {
+    const { rows } = stepSession(run.session, { kind: 'close' }, Date.now()).effects
+    if (rows) {
       run.card.durationEntries = rows
       this.markDirty()
     }

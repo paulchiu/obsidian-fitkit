@@ -12,18 +12,14 @@ import {
   targetedSteps,
   type RunRow,
 } from '../domain/interval-run'
-
-export type RunnerScreen =
-  | { kind: 'running' }
-  | { kind: 'finished'; hits: number }
-  | { kind: 'cut-off'; rep: number; resting: boolean }
+import type { RunScreen } from '../domain/interval-session'
 
 export interface RunnerModel {
   exerciseName: string
   program: IntervalProgram
   rows: readonly RunRow[]
   now: number
-  screen: RunnerScreen
+  screen: RunScreen
 }
 
 export interface RunnerHandlers {

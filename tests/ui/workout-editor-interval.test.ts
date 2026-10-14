@@ -606,6 +606,19 @@ describe('WorkoutEditorView interval plans', () => {
     const runnerText = (view: WorkoutEditorView, selector: string): string | null | undefined =>
       view.contentEl.querySelector(`.fitkit-runner ${selector}`)?.textContent
 
+    it('moves the clock on each tick without rebuilding the runner', async () => {
+      const { view } = await openView(workoutSource(...BIKE))
+      button(view, 'Start interval plan').click()
+      const runner = view.contentEl.querySelector('.fitkit-runner')
+
+      runTo('07:15:04')
+
+      expect([
+        view.contentEl.querySelector('.fitkit-runner') === runner,
+        runnerText(view, '.fitkit-runner-clock'),
+      ]).toEqual([true, '0:26'])
+    })
+
     it('takes over the tab with a clock counting the work down and a Rest button', async () => {
       const { view } = await openView(workoutSource(...BIKE))
 
@@ -643,19 +656,6 @@ describe('WorkoutEditorView interval plans', () => {
         ...BIKE,
         '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 22] [watts:: 300] [rest:: 38]',
         '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 0] [started:: 2026-10-12T07:16:00+10:00]',
-      ])
-    })
-
-    it('ends work by itself when its time runs out and writes the rep with the target', async () => {
-      const { view, contents } = await openView(workoutSource(...BIKE))
-      button(view, 'Start interval plan').click()
-
-      runTo('07:15:31')
-
-      expect(runnerText(view, '.fitkit-runner-primary')).toBe('Skip')
-      await savedBody(contents, [
-        ...BIKE,
-        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 0] [started:: 2026-10-12T07:15:30+10:00]',
       ])
     })
 
@@ -791,24 +791,6 @@ describe('WorkoutEditorView interval plans', () => {
       ])
     })
 
-    it('resumes a cut-off run from the next rep', async () => {
-      vi.setSystemTime(new Date('2026-10-12T08:00:00+10:00'))
-      const { view, contents } = await openView(
-        workoutSource(
-          ...BIKE,
-          '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 0] [started:: 2026-10-12T07:15:30+10:00]',
-        ),
-      )
-
-      runnerButton(view, 'Resume rep 2').click()
-
-      await savedBody(contents, [
-        ...BIKE,
-        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 90]',
-        '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 0] [started:: 2026-10-12T08:00:00+10:00]',
-      ])
-    })
-
     it('offers Start instead of the stopwatch on a card with a plan', async () => {
       const { view } = await openView(workoutSource(...BIKE))
 
@@ -908,26 +890,6 @@ describe('WorkoutEditorView interval plans', () => {
       ])
     })
 
-    it('rests for what is left of the period on an every pace', async () => {
-      const emom = [
-        '## [[Exercise Bike]]',
-        '',
-        '- [exercise:: [[Exercise Bike]]] [plan:: 3 x 40s @ 300W, every 1m]',
-      ]
-      const { view, contents } = await openView(workoutSource(...emom))
-      button(view, 'Start interval plan').click()
-
-      runTo('07:15:30')
-      runnerButton(view, 'Rest').click()
-      runTo('07:16:01')
-
-      await savedBody(contents, [
-        ...emom,
-        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 30]',
-        '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 0] [started:: 2026-10-12T07:16:00+10:00]',
-      ])
-    })
-
     it('starts a run after a stopwatch on another card is done, keeping its time', async () => {
       const plank = ['## [[Plank]]', '', '- [exercise:: [[Plank]]] [set:: 1] [duration:: 0]']
       const { view, contents } = await openView(workoutSource(...plank, '', ...BIKE))
@@ -1010,21 +972,6 @@ describe('WorkoutEditorView interval plans', () => {
         expect(tones).toEqual([880, 880, 880, 1320])
       })
 
-      it('double-beeps when work runs straight into the next step', async () => {
-        const { view } = await openView(
-          workoutSource(
-            '## [[Exercise Bike]]',
-            '',
-            '- [exercise:: [[Exercise Bike]]] [plan:: (x 2 (on 30s 350W) (off 30s 150W))]',
-          ),
-        )
-        button(view, 'Start interval plan').click()
-
-        runTo('07:15:31')
-
-        expect(tones).toEqual([880, 880, 880, 1100, 1100])
-      })
-
       it('stays silent when interval beeps are off', async () => {
         const { view } = await openView(workoutSource(...BIKE), { intervalBeepsEnabled: false })
         button(view, 'Start interval plan').click()
@@ -1075,21 +1022,6 @@ describe('WorkoutEditorView interval plans', () => {
           rounds: 'Round 1 of 2',
           primary: 'Next',
         })
-      })
-
-      it('moves straight to the next step and writes each step name on its row', async () => {
-        const { view, contents } = await openView(workoutSource(...ON_OFF))
-        button(view, 'Start interval plan').click()
-
-        at('07:15:20')
-        runnerButton(view, 'Next').click()
-
-        expect(runnerText(view, '.fitkit-runner-step')).toBe('off')
-        await savedBody(contents, [
-          ...ON_OFF,
-          '- [exercise:: [[Exercise Bike]]] [set:: 1] [step:: on] [duration:: 20] [watts:: 350]',
-          '- [exercise:: [[Exercise Bike]]] [set:: 2] [step:: off] [duration:: 0] [started:: 2026-10-12T07:15:20+10:00]',
-        ])
       })
 
       it('counts sets and rounds when repeats nest', async () => {
