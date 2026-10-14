@@ -202,10 +202,11 @@ describe('interval plan modal', () => {
   })
 
   describe('when the phone keyboard opens', () => {
-    /** Lays the form out as iOS leaves it: examples open and scrolled so the plan sits above the visible top. */
+    /** Lays the form out as iOS leaves it: in Text, examples open and scrolled so the plan sits above the visible top. */
     const scrolledPastPlan = (modal: IntervalPlanModal): HTMLElement => {
       const { contentEl } = modal
       harnessDocument.body.append(contentEl)
+      findButtons(contentEl, 'Text')[0]?.click()
       contentEl.querySelector<HTMLButtonElement>('button[aria-label="Plan examples"]')?.click()
       let scrollTop = 500
       Object.defineProperty(contentEl, 'scrollTop', {
