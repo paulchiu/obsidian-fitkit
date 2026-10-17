@@ -85,7 +85,21 @@ describe('FileSession atomic save', () => {
     expect(readNote()).toBe(EXTERNAL_TEXT)
 
     await session.load()
-    expect(await session.saveIfUnchanged(EXTERNAL_TEXT)).toMatchObject({ ok: true })
+    const recovered = 'recovered revision'
+    expect(await session.saveIfUnchanged(recovered)).toMatchObject({ ok: true })
+    expect(readNote()).toBe(recovered)
+  })
+
+  it('keeps the loaded snapshot when it rejects an atomic external edit', async () => {
+    const { session, readNote, writeExternally } = createHarness(LOADED_TEXT)
+    const loaded = await session.load()
+
+    const rejected = session.saveIfUnchanged('replacement text')
+    writeExternally(EXTERNAL_TEXT)
+    expect(await rejected).toEqual({ ok: false, reason: 'hash' })
+
+    expect(session.snapshotHash).toBe(loaded.hash)
+    expect(session.snapshotMtime).toBe(loaded.mtime)
     expect(readNote()).toBe(EXTERNAL_TEXT)
   })
 
@@ -102,5 +116,19 @@ describe('FileSession atomic save', () => {
     const secondSave = 'second saved revision'
     expect(await session.saveIfUnchanged(secondSave)).toMatchObject({ ok: true })
     expect(readNote()).toBe(secondSave)
+  })
+
+  it('rejects a stale external edit after saving the loaded text', async () => {
+    const { session, readNote, writeExternally } = createHarness(LOADED_TEXT)
+    await session.load()
+
+    const firstSave = 'first saved revision'
+    expect(await session.saveIfUnchanged(firstSave)).toMatchObject({ ok: true })
+    expect(readNote()).toBe(firstSave)
+
+    const saving = session.saveIfUnchanged('second revision')
+    writeExternally(EXTERNAL_TEXT)
+    expect(await saving).toEqual({ ok: false, reason: 'hash' })
+    expect(readNote()).toBe(EXTERNAL_TEXT)
   })
 })
