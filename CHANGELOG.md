@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A workout save could overwrite an edit made by another editor or sync when it landed between the save's check of the note text and its write. The save is now rejected and the external text left intact, so another save stays blocked until the note is reloaded.
 - An edit made while the workout editor was still saving the previous one could be dropped, and closing the tab during a save could lose the last edit.
 - `Add set` and `Repeat` after deleting a set could give the new set the same number as an existing one. New sets now number after the highest.
 
