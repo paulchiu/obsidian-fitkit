@@ -20,13 +20,14 @@ const EXTERNAL_TEXT = '---\ntype: workout\n---\n\n[exercise:: [[Bench]]]\n'
 
 interface Harness {
   session: FileSession
-  contents: Map<string, string>
+  readNote: () => string
+  writeExternally: (text: string) => void
 }
 
 /**
  * A vault whose text only changes when a test says so. `read` and `process`
- * both go through the same map, so a test can land an external edit between a
- * save's preflight read and its process callback by mutating `contents` while
+ * both go through the same value, so a test can land an external edit between a
+ * save's preflight read and its process callback with `writeExternally` while
  * the save is awaiting the read. The file's mtime never changes, matching a
  * sync that rewrites text without Obsidian noticing a new stat.
  */
@@ -37,70 +38,69 @@ function createHarness(initialText: string): Harness {
     extension: 'md',
     stat: { mtime: 1000 },
   })
-  const contents = new Map<string, string>([[NOTE_PATH, initialText]])
+  let text = initialText
   const app = {
     vault: {
-      read: async (target: { path: string }): Promise<string> => contents.get(target.path) ?? '',
-      process: async (
-        target: { path: string },
-        callback: (live: string) => string,
-      ): Promise<string> => {
-        const next = callback(contents.get(target.path) ?? '')
-        contents.set(target.path, next)
-        return next
+      read: async (): Promise<string> => text,
+      process: async (_target: TFile, callback: (live: string) => string): Promise<string> => {
+        text = callback(text)
+        return text
       },
     },
   }
   return {
     session: new FileSession(app as unknown as App, file),
-    contents,
+    readNote: () => text,
+    writeExternally: (next) => {
+      text = next
+    },
   }
 }
 
 describe('FileSession atomic save', () => {
   it('rejects a save when an external edit lands between the preflight read and the process callback', async () => {
-    const { session, contents } = createHarness(LOADED_TEXT)
+    const { session, readNote, writeExternally } = createHarness(LOADED_TEXT)
     await session.load()
 
     const saving = session.saveIfUnchanged('replacement text')
-    contents.set(NOTE_PATH, EXTERNAL_TEXT)
+    writeExternally(EXTERNAL_TEXT)
     const result = await saving
 
     expect(result).toEqual({ ok: false, reason: 'hash' })
-    expect(contents.get(NOTE_PATH)).toBe(EXTERNAL_TEXT)
+    expect(readNote()).toBe(EXTERNAL_TEXT)
   })
 
   it('keeps a rejected save blocked against the external text until the session reloads it', async () => {
-    const { session, contents } = createHarness(LOADED_TEXT)
+    const { session, readNote, writeExternally } = createHarness(LOADED_TEXT)
     await session.load()
 
     const rejected = session.saveIfUnchanged('replacement text')
-    contents.set(NOTE_PATH, EXTERNAL_TEXT)
+    writeExternally(EXTERNAL_TEXT)
     expect(await rejected).toEqual({ ok: false, reason: 'hash' })
 
     expect(await session.saveIfUnchanged('another replacement')).toEqual({
       ok: false,
       reason: 'hash',
     })
-    expect(contents.get(NOTE_PATH)).toBe(EXTERNAL_TEXT)
+    expect(readNote()).toBe(EXTERNAL_TEXT)
 
     await session.load()
     expect(await session.saveIfUnchanged(EXTERNAL_TEXT)).toMatchObject({ ok: true })
-    expect(contents.get(NOTE_PATH)).toBe(EXTERNAL_TEXT)
+    expect(readNote()).toBe(EXTERNAL_TEXT)
   })
 
   it('saves an unchanged note and uses each saved text as the next conflict baseline', async () => {
-    const { session, contents } = createHarness(LOADED_TEXT)
+    const { session, readNote } = createHarness(LOADED_TEXT)
     await session.load()
 
     expect(await session.saveIfUnchanged(LOADED_TEXT)).toMatchObject({ ok: true })
-    expect(contents.get(NOTE_PATH)).toBe(LOADED_TEXT)
+    expect(readNote()).toBe(LOADED_TEXT)
 
     const firstSave = 'first saved revision'
     expect(await session.saveIfUnchanged(firstSave)).toMatchObject({ ok: true })
 
     const secondSave = 'second saved revision'
     expect(await session.saveIfUnchanged(secondSave)).toMatchObject({ ok: true })
-    expect(contents.get(NOTE_PATH)).toBe(secondSave)
+    expect(readNote()).toBe(secondSave)
   })
 })
