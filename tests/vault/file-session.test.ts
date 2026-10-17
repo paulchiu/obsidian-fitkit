@@ -1,5 +1,16 @@
-import type { App, TFile } from 'obsidian'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('obsidian', () => {
+  class TFile {
+    path = ''
+    basename = ''
+    extension = 'md'
+    stat = { mtime: 0 }
+  }
+  return { TFile }
+})
+
+import { TFile, type App } from 'obsidian'
 
 import { FileSession } from '../../src/vault/file-session'
 
@@ -20,12 +31,12 @@ interface Harness {
  * sync that rewrites text without Obsidian noticing a new stat.
  */
 function createHarness(initialText: string): Harness {
-  const file = {
+  const file = Object.assign(new TFile(), {
     path: NOTE_PATH,
     basename: '2026-08-15',
     extension: 'md',
     stat: { mtime: 1000 },
-  }
+  })
   const contents = new Map<string, string>([[NOTE_PATH, initialText]])
   const app = {
     vault: {
@@ -41,7 +52,7 @@ function createHarness(initialText: string): Harness {
     },
   }
   return {
-    session: new FileSession(app as unknown as App, file as unknown as TFile),
+    session: new FileSession(app as unknown as App, file),
     contents,
   }
 }
