@@ -277,6 +277,39 @@ describe('createAutosaver', () => {
     expect(writes).toEqual(['a', 'b', 'c', 'd'])
   })
 
+  it('overlapping settle calls both wait for the latest text to persist', async () => {
+    const first = gate()
+    const latest = gate()
+    let persisted = ''
+    const { autosaver, setText } = rig(async (text) => {
+      await (text === 'a' ? first.promise : latest.promise)
+      persisted = text
+      return OK
+    })
+    autosaver.markDirty()
+    let firstSettled = false
+    let secondSettled = false
+    const firstSettling = autosaver.settle().then(() => {
+      firstSettled = true
+    })
+    const secondSettling = autosaver.settle().then(() => {
+      secondSettled = true
+    })
+    setText('b')
+    autosaver.markDirty()
+    first.open()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(persisted).toBe('a')
+    expect(firstSettled).toBe(false)
+    expect(secondSettled).toBe(false)
+
+    latest.open()
+    await Promise.all([firstSettling, secondSettling])
+    expect(persisted).toBe('b')
+    expect(autosaver.state()).toEqual({ dirty: false, conflict: false })
+  })
+
   it.each(['conflict', 'missing session', 'null serialization'] as const)(
     'settle finishes with dirty edits when saving is blocked by %s',
     async (blockedBy) => {

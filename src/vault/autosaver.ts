@@ -109,13 +109,12 @@ export function createAutosaver(deps: AutosaverDeps): Autosaver {
   }
 
   const settle = async (): Promise<void> => {
-    clearTimer()
-    while (inflight) {
-      await inflight
-    }
-    while (await flush()) {
+    do {
       clearTimer()
-    }
+      while (inflight) {
+        await inflight
+      }
+    } while ((await flush()) || inflight !== null)
     clearTimer()
   }
 
