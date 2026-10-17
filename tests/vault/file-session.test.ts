@@ -58,4 +58,23 @@ describe('FileSession atomic save', () => {
     expect(result).toEqual({ ok: false, reason: 'hash' })
     expect(contents.get(NOTE_PATH)).toBe(EXTERNAL_TEXT)
   })
+
+  it('keeps a rejected save blocked against the external text until the session reloads it', async () => {
+    const { session, contents } = createHarness(LOADED_TEXT)
+    await session.load()
+
+    const rejected = session.saveIfUnchanged('replacement text')
+    contents.set(NOTE_PATH, EXTERNAL_TEXT)
+    expect(await rejected).toEqual({ ok: false, reason: 'hash' })
+
+    expect(await session.saveIfUnchanged('another replacement')).toEqual({
+      ok: false,
+      reason: 'hash',
+    })
+    expect(contents.get(NOTE_PATH)).toBe(EXTERNAL_TEXT)
+
+    await session.load()
+    expect(await session.saveIfUnchanged(EXTERNAL_TEXT)).toMatchObject({ ok: true })
+    expect(contents.get(NOTE_PATH)).toBe(EXTERNAL_TEXT)
+  })
 })
