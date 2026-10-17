@@ -206,6 +206,36 @@ describe('createAutosaver', () => {
     expect(autosaver.state().dirty).toBe(false)
   })
 
+  it('settle waits until an edit made during its flush has persisted', async () => {
+    const first = gate()
+    const latest = gate()
+    let persisted = ''
+    const { autosaver, setText } = rig(async (text) => {
+      await (text === 'a' ? first.promise : latest.promise)
+      persisted = text
+      return OK
+    })
+    autosaver.markDirty()
+    let settled = false
+    const settling = autosaver.settle().then(() => {
+      settled = true
+    })
+
+    setText('b')
+    autosaver.markDirty()
+    first.open()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(persisted).toBe('a')
+    expect(settled).toBe(false)
+    expect(autosaver.state().dirty).toBe(true)
+
+    latest.open()
+    await settling
+    expect(persisted).toBe('b')
+    expect(autosaver.state()).toEqual({ dirty: false, conflict: false })
+  })
+
   it('does not write again from a debounce timer that was pending at settle', async () => {
     const { autosaver, writes } = rig()
     autosaver.markDirty()

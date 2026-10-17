@@ -23,7 +23,7 @@ export interface AutosaverDeps {
 export interface Autosaver {
   markDirty(): void
   state(): AutosaveState
-  /** Waits out an in-flight save, writes pending edits, then stops the debounce timer. */
+  /** Drains saveable edits until quiescent, then stops the debounce timer. */
   settle(): Promise<void>
   /** Stops the timer and clears dirty and conflict state for a freshly loaded note. */
   reset(): void
@@ -85,19 +85,20 @@ export function createAutosaver(deps: AutosaverDeps): Autosaver {
     }
   }
 
-  const flush = async (): Promise<void> => {
+  const flush = async (): Promise<boolean> => {
     const session = deps.session()
     const text = session ? deps.serialize() : null
     if (!dirty || conflict || !session || text === null) {
-      return
+      return false
     }
     if (inflight) {
       requeued = true
-      return
+      return false
     }
     const savedEdit = editCount
     inflight = write(session, text, savedEdit)
     await inflight
+    return true
   }
 
   const markDirty = (): void => {
@@ -112,7 +113,9 @@ export function createAutosaver(deps: AutosaverDeps): Autosaver {
     while (inflight) {
       await inflight
     }
-    await flush()
+    while (await flush()) {
+      clearTimer()
+    }
     clearTimer()
   }
 
