@@ -236,6 +236,47 @@ describe('createAutosaver', () => {
     expect(autosaver.state()).toEqual({ dirty: false, conflict: false })
   })
 
+  it('settle drains successive edits and leaves no delayed write after completion', async () => {
+    const first = gate()
+    const second = gate()
+    const last = gate()
+    const persisted: string[] = []
+    const { autosaver, writes, setText } = rig(async (text) => {
+      if (text === 'a') await first.promise
+      if (text === 'b') await second.promise
+      if (text === 'c') await last.promise
+      persisted.push(text)
+      return OK
+    })
+    autosaver.markDirty()
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS)
+    setText('b')
+    autosaver.markDirty()
+    let settled = false
+    const settling = autosaver.settle().then(() => {
+      settled = true
+    })
+    first.open()
+    await vi.advanceTimersByTimeAsync(0)
+
+    setText('c')
+    autosaver.markDirty()
+    second.open()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(persisted).toEqual(['a', 'b'])
+    expect(settled).toBe(false)
+
+    setText('d')
+    autosaver.markDirty()
+    last.open()
+    await settling
+    expect(persisted).toEqual(['a', 'b', 'c', 'd'])
+    expect(autosaver.state()).toEqual({ dirty: false, conflict: false })
+
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS * 2)
+    expect(writes).toEqual(['a', 'b', 'c', 'd'])
+  })
+
   it('does not write again from a debounce timer that was pending at settle', async () => {
     const { autosaver, writes } = rig()
     autosaver.markDirty()
