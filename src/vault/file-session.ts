@@ -50,7 +50,15 @@ export class FileSession {
       return { ok: false, reason: 'hash' }
     }
 
-    await this.app.vault.process(this.file, () => nextText)
+    let conflict = false
+    await this.app.vault.process(this.file, (text) => {
+      if (this.lastHash !== null && fnv1a32(text) !== this.lastHash) {
+        conflict = true
+        return text
+      }
+      return nextText
+    })
+    if (conflict) return { ok: false, reason: 'hash' }
     const newHash = fnv1a32(nextText)
     const newMtime = this.file.stat.mtime
     this.lastHash = newHash
