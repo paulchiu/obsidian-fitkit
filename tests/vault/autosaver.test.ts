@@ -277,6 +277,55 @@ describe('createAutosaver', () => {
     expect(writes).toEqual(['a', 'b', 'c', 'd'])
   })
 
+  it.each(['conflict', 'missing session', 'null serialization'] as const)(
+    'settle finishes with dirty edits when saving is blocked by %s',
+    async (blockedBy) => {
+      const first = gate()
+      let persisted = ''
+      const { autosaver, writes, setText, setSession } = rig(async (text) => {
+        await first.promise
+        if (blockedBy === 'conflict') return CONFLICT
+        persisted = text
+        return OK
+      })
+      autosaver.markDirty()
+      const settling = autosaver.settle()
+      setText('b')
+      autosaver.markDirty()
+      if (blockedBy === 'missing session') setSession(null)
+      if (blockedBy === 'null serialization') setText(null)
+      first.open()
+
+      await expect(settling).resolves.toBeUndefined()
+      expect(autosaver.state()).toEqual({ dirty: true, conflict: blockedBy === 'conflict' })
+      expect(persisted).toBe(blockedBy === 'conflict' ? '' : 'a')
+      await vi.advanceTimersByTimeAsync(DEBOUNCE_MS * 2)
+      expect(writes).toEqual(['a'])
+    },
+  )
+
+  it('settle rejects and keeps edits dirty when its final write fails', async () => {
+    const first = gate()
+    const failure = new Error('write failed')
+    let persisted = ''
+    const { autosaver, setText } = rig(async (text) => {
+      if (text === 'b') throw failure
+      await first.promise
+      persisted = text
+      return OK
+    })
+    autosaver.markDirty()
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS)
+    setText('b')
+    autosaver.markDirty()
+    const rejected = expect(autosaver.settle()).rejects.toBe(failure)
+    first.open()
+
+    await rejected
+    expect(persisted).toBe('a')
+    expect(autosaver.state()).toEqual({ dirty: true, conflict: false })
+  })
+
   it('does not write again from a debounce timer that was pending at settle', async () => {
     const { autosaver, writes } = rig()
     autosaver.markDirty()
