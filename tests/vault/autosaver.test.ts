@@ -206,6 +206,159 @@ describe('createAutosaver', () => {
     expect(autosaver.state().dirty).toBe(false)
   })
 
+  it('settle waits until an edit made during its flush has persisted', async () => {
+    const first = gate()
+    const latest = gate()
+    let persisted = ''
+    const { autosaver, setText } = rig(async (text) => {
+      await (text === 'a' ? first.promise : latest.promise)
+      persisted = text
+      return OK
+    })
+    autosaver.markDirty()
+    let settled = false
+    const settling = autosaver.settle().then(() => {
+      settled = true
+    })
+
+    setText('b')
+    autosaver.markDirty()
+    first.open()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(persisted).toBe('a')
+    expect(settled).toBe(false)
+    expect(autosaver.state().dirty).toBe(true)
+
+    latest.open()
+    await settling
+    expect(persisted).toBe('b')
+    expect(autosaver.state()).toEqual({ dirty: false, conflict: false })
+  })
+
+  it('settle drains successive edits and leaves no delayed write after completion', async () => {
+    const first = gate()
+    const second = gate()
+    const last = gate()
+    const persisted: string[] = []
+    const { autosaver, writes, setText } = rig(async (text) => {
+      if (text === 'a') await first.promise
+      if (text === 'b') await second.promise
+      if (text === 'c') await last.promise
+      persisted.push(text)
+      return OK
+    })
+    autosaver.markDirty()
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS)
+    setText('b')
+    autosaver.markDirty()
+    let settled = false
+    const settling = autosaver.settle().then(() => {
+      settled = true
+    })
+    first.open()
+    await vi.advanceTimersByTimeAsync(0)
+
+    setText('c')
+    autosaver.markDirty()
+    second.open()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(persisted).toEqual(['a', 'b'])
+    expect(settled).toBe(false)
+
+    setText('d')
+    autosaver.markDirty()
+    last.open()
+    await settling
+    expect(persisted).toEqual(['a', 'b', 'c', 'd'])
+    expect(autosaver.state()).toEqual({ dirty: false, conflict: false })
+
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS * 2)
+    expect(writes).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  it('overlapping settle calls both wait for the latest text to persist', async () => {
+    const first = gate()
+    const latest = gate()
+    let persisted = ''
+    const { autosaver, setText } = rig(async (text) => {
+      await (text === 'a' ? first.promise : latest.promise)
+      persisted = text
+      return OK
+    })
+    autosaver.markDirty()
+    let firstSettled = false
+    let secondSettled = false
+    const firstSettling = autosaver.settle().then(() => {
+      firstSettled = true
+    })
+    const secondSettling = autosaver.settle().then(() => {
+      secondSettled = true
+    })
+    setText('b')
+    autosaver.markDirty()
+    first.open()
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(persisted).toBe('a')
+    expect(firstSettled).toBe(false)
+    expect(secondSettled).toBe(false)
+
+    latest.open()
+    await Promise.all([firstSettling, secondSettling])
+    expect(persisted).toBe('b')
+    expect(autosaver.state()).toEqual({ dirty: false, conflict: false })
+  })
+
+  it.each(['conflict', 'missing session', 'null serialization'] as const)(
+    'settle finishes with dirty edits when saving is blocked by %s',
+    async (blockedBy) => {
+      const first = gate()
+      let persisted = ''
+      const { autosaver, writes, setText, setSession } = rig(async (text) => {
+        await first.promise
+        if (blockedBy === 'conflict') return CONFLICT
+        persisted = text
+        return OK
+      })
+      autosaver.markDirty()
+      const settling = autosaver.settle()
+      setText('b')
+      autosaver.markDirty()
+      if (blockedBy === 'missing session') setSession(null)
+      if (blockedBy === 'null serialization') setText(null)
+      first.open()
+
+      await expect(settling).resolves.toBeUndefined()
+      expect(autosaver.state()).toEqual({ dirty: true, conflict: blockedBy === 'conflict' })
+      expect(persisted).toBe(blockedBy === 'conflict' ? '' : 'a')
+      await vi.advanceTimersByTimeAsync(DEBOUNCE_MS * 2)
+      expect(writes).toEqual(['a'])
+    },
+  )
+
+  it('settle rejects and keeps edits dirty when its final write fails', async () => {
+    const first = gate()
+    const failure = new Error('write failed')
+    let persisted = ''
+    const { autosaver, setText } = rig(async (text) => {
+      if (text === 'b') throw failure
+      await first.promise
+      persisted = text
+      return OK
+    })
+    autosaver.markDirty()
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS)
+    setText('b')
+    autosaver.markDirty()
+    const rejected = expect(autosaver.settle()).rejects.toBe(failure)
+    first.open()
+
+    await rejected
+    expect(persisted).toBe('a')
+    expect(autosaver.state()).toEqual({ dirty: true, conflict: false })
+  })
+
   it('does not write again from a debounce timer that was pending at settle', async () => {
     const { autosaver, writes } = rig()
     autosaver.markDirty()
