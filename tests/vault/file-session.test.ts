@@ -77,4 +77,19 @@ describe('FileSession atomic save', () => {
     expect(await session.saveIfUnchanged(EXTERNAL_TEXT)).toMatchObject({ ok: true })
     expect(contents.get(NOTE_PATH)).toBe(EXTERNAL_TEXT)
   })
+
+  it('saves an unchanged note and uses each saved text as the next conflict baseline', async () => {
+    const { session, contents } = createHarness(LOADED_TEXT)
+    await session.load()
+
+    expect(await session.saveIfUnchanged(LOADED_TEXT)).toMatchObject({ ok: true })
+    expect(contents.get(NOTE_PATH)).toBe(LOADED_TEXT)
+
+    const firstSave = 'first saved revision'
+    expect(await session.saveIfUnchanged(firstSave)).toMatchObject({ ok: true })
+
+    const secondSave = 'second saved revision'
+    expect(await session.saveIfUnchanged(secondSave)).toMatchObject({ ok: true })
+    expect(contents.get(NOTE_PATH)).toBe(secondSave)
+  })
 })
