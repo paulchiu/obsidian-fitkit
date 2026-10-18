@@ -65,6 +65,18 @@ export default class FitKitPlugin extends Plugin {
     await this.loadSettings()
     this.addSettingTab(new FitKitSettingTab(this.app, this))
 
+    this.registerEvent(
+      this.app.vault.on('modify', (file) => {
+        if (
+          file.path.startsWith(`${workoutsFolder(this.settings)}/`) &&
+          'extension' in file &&
+          String(file.extension).toLowerCase() === 'md'
+        ) {
+          this.cachedIndex = null
+        }
+      }),
+    )
+
     this.registerMarkdownCodeBlockProcessor('fitkit-chart', (source, el, ctx) =>
       renderExerciseChartBlock(this, source, el, ctx),
     )
@@ -146,11 +158,19 @@ export default class FitKitPlugin extends Plugin {
     }
   }
 
+  async getIndex(): Promise<FitKitIndex> {
+    if (this.cachedIndex === null) {
+      this.cachedIndex = await rebuildIndex(this.app, this.settings)
+      this.lastDiagnostics = this.cachedIndex.diagnostics
+    }
+    return this.cachedIndex
+  }
+
   async rebuildWorkoutIndex(): Promise<void> {
-    this.cachedIndex = await rebuildIndex(this.app, this.settings)
-    this.lastDiagnostics = this.cachedIndex.diagnostics
+    this.cachedIndex = null
+    const index = await this.getIndex()
     new Notice(
-      `Indexed ${this.cachedIndex.entries.length} workout(s)${
+      `Indexed ${index.entries.length} workout(s)${
         this.lastDiagnostics.length ? `, ${this.lastDiagnostics.length} diagnostic(s)` : ''
       }.`,
     )
@@ -180,9 +200,9 @@ export default class FitKitPlugin extends Plugin {
   }
 
   async rebuildDashboard(): Promise<void> {
-    this.cachedIndex = await rebuildIndex(this.app, this.settings)
-    this.lastDiagnostics = this.cachedIndex.diagnostics
-    const result = await regenerateDashboard(this.app, this.settings, this.cachedIndex)
+    this.cachedIndex = null
+    const index = await this.getIndex()
+    const result = await regenerateDashboard(this.app, this.settings, index)
     new Notice(`Dashboard rebuilt: ${result.sectionCount} section(s) at ${result.path}.`)
   }
 
@@ -192,9 +212,9 @@ export default class FitKitPlugin extends Plugin {
       delete this.settings.hiddenDashboardSectionsByPath[path]
       await this.saveSettings()
     }
-    this.cachedIndex = await rebuildIndex(this.app, this.settings)
-    this.lastDiagnostics = this.cachedIndex.diagnostics
-    const result = await regenerateDashboard(this.app, this.settings, this.cachedIndex)
+    this.cachedIndex = null
+    const index = await this.getIndex()
+    const result = await regenerateDashboard(this.app, this.settings, index)
     new Notice(`Restored hidden sections; ${result.sectionCount} section(s) now in dashboard.`)
   }
 

@@ -21,7 +21,6 @@ import {
 } from '../domain/exercise-registry'
 import type FitKitPlugin from '../main'
 import { exercisesFolder } from '../settings-paths'
-import { rebuildIndex } from '../vault/index'
 import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
 import { DEFAULT_WEIGHT_UNIT, parseWeightUnit, type WeightUnit } from '../domain/weight-unit'
 import { renderExerciseChartSvg } from './exercise-chart-svg'
@@ -142,13 +141,10 @@ async function renderInternal(
     kind === 'strength'
       ? resolveExerciseWeightUnit(exerciseFrontmatter, registry, exerciseName)
       : null
-  if (!plugin.cachedIndex) {
-    plugin.cachedIndex = await rebuildIndex(plugin.app, plugin.settings)
-    plugin.lastDiagnostics = plugin.cachedIndex.diagnostics
-  }
+  const index = await plugin.getIndex()
 
   const series = buildExerciseChartSeries(
-    plugin.cachedIndex,
+    index,
     registry,
     exerciseName,
     kind,

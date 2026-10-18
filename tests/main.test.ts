@@ -153,6 +153,7 @@ import FitKitPlugin from '../src/main'
 import { DEFAULT_SETTINGS, type FitKitSettings } from '../src/settings'
 import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from '../src/ui/workout-editor-view'
 import { rebuildIndex } from '../src/vault/index'
+import { exerciseHistoryFromVault } from '../src/vault/exercise-history-vault'
 import { buildMockVaultFolderTree, type MockVaultFolder } from './fixtures/mock-vault-folder-tree'
 
 interface SetViewStateArg {
@@ -183,6 +184,7 @@ interface MockWorkspace {
 }
 
 interface MockVault {
+  on: (event: string, cb: (...args: unknown[]) => void) => unknown
   getFolderByPath: (path: string) => MockVaultFolder | null
   read: (file: TFile) => Promise<string>
   process: (file: TFile, callback: (live: string) => string) => Promise<void>
@@ -316,6 +318,7 @@ const makeApp = (
     ...overrides,
   },
   vault: {
+    on: vi.fn(),
     getFolderByPath: vi.fn(() => null),
     read: vi.fn(async () => ''),
     process: vi.fn(async () => undefined),
@@ -1238,5 +1241,66 @@ describe('FitKitPlugin tab menu view switch', () => {
     events.handlers.get('file-menu')?.(menu.menu, file, 'more-options', makeEditorLeaf(file))
 
     expect(menu.titles()).not.toContain('Open in workout editor')
+  })
+})
+
+const freshnessSource = (weight: number): string =>
+  `---\ntype: workout\ndate: 2026-08-15\nname: Push\n---\n\n- [exercise:: [[Squat]]] [set:: 1] [weight:: ${weight}] [reps:: 5]\n`
+
+const makeFreshnessVault = async (): Promise<{
+  plugin: FitKitPlugin
+  files: Array<{ path: string; extension: string; basename: string; stat: { mtime: number } }>
+  contents: Map<string, string>
+  emit: (event: string, file: { path: string; extension?: string }, oldPath?: string) => void
+  app: MockApp
+}> => {
+  const files = [
+    {
+      path: 'Fitness/Workouts/2026-08-15.md',
+      extension: 'md',
+      basename: '2026-08-15',
+      stat: { mtime: 1 },
+    },
+  ]
+  const contents = new Map([[files[0]!.path, freshnessSource(50)]])
+  const handlers = new Map<string, (...args: unknown[]) => void>()
+  const app = makeApp(
+    {},
+    {
+      on: (event, cb) => {
+        handlers.set(event, cb)
+        return {}
+      },
+      getFolderByPath: (path) => buildMockVaultFolderTree(files).getFolderByPath(path),
+      read: async (file) => contents.get(file.path) ?? '',
+    },
+  )
+  Object.assign(app.vault, {
+    getAbstractFileByPath: (path: string) => files.find((file) => file.path === path) ?? null,
+  })
+  const plugin = new (FitKitPlugin as unknown as { new (app: MockApp): FitKitPlugin })(app)
+  await plugin.onload()
+  return {
+    plugin,
+    files,
+    contents,
+    app,
+    emit: (event, file, oldPath) => handlers.get(event)?.(file, oldPath),
+  }
+}
+
+describe('Workout index freshness', () => {
+  it('reads externally modified history without rendering an editor', async () => {
+    const { plugin, files, contents, emit } = await makeFreshnessVault()
+    await plugin.rebuildWorkoutIndex()
+    contents.set(files[0]!.path, freshnessSource(80))
+    emit('modify', files[0]!)
+
+    const history = await exerciseHistoryFromVault(plugin, {
+      sourcePath: 'Fitness/Workouts/2026-08-16.md',
+      date: '2026-08-16',
+    })
+
+    expect(history.get('Squat')?.strength?.personalBest?.weight).toBe(80)
   })
 })
