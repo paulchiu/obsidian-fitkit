@@ -154,6 +154,8 @@ import { DEFAULT_SETTINGS, type FitKitSettings } from '../src/settings'
 import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from '../src/ui/workout-editor-view'
 import { rebuildIndex } from '../src/vault/index'
 import { exerciseHistoryFromVault } from '../src/vault/exercise-history-vault'
+import { renderExerciseChartBlock } from '../src/ui/exercise-chart-block'
+import { createTestRoot } from './harness/obsidian-dom'
 import { buildMockVaultFolderTree, type MockVaultFolder } from './fixtures/mock-vault-folder-tree'
 
 interface SetViewStateArg {
@@ -1290,6 +1292,21 @@ const makeFreshnessVault = async (): Promise<{
 }
 
 describe('Workout index freshness', () => {
+  it('renders a fresh chart after an external edit without writing the vault', async () => {
+    const { plugin, files, contents, emit, app } = await makeFreshnessVault()
+    await plugin.rebuildWorkoutIndex()
+    contents.set(files[0]!.path, freshnessSource(80))
+    app.vault.process = async () => {
+      throw new Error('Rendering must not save workout drafts')
+    }
+    emit('modify', files[0]!)
+    const el = createTestRoot()
+    await renderExerciseChartBlock(plugin, 'exercise: Squat\nkind: strength\nmetric: weight', el, {
+      sourcePath: 'Journal/chart.md',
+    } as Parameters<typeof renderExerciseChartBlock>[3])
+    expect(el.querySelector('.fitkit-chart-dot title')?.textContent).toContain('80kg')
+  })
+
   it.each(['modify', 'settings', 'manual rebuild'] as const)(
     'keeps a pending incremental refresh from replacing newer data after %s',
     async (change) => {
@@ -1454,9 +1471,7 @@ describe('Workout index freshness', () => {
   it('preserves the available index for unrelated paths and attachments without reading workouts', async () => {
     const { plugin, emit, app } = await makeFreshnessVault()
     const index = await plugin.getIndex()
-    app.vault.read = async () => {
-      throw new Error('Unrelated event read a workout')
-    }
+    app.vault.read = async () => freshnessSource(95)
     for (const event of ['modify', 'create', 'delete', 'rename']) {
       emit(event, { path: 'Journal/today.md', extension: 'md' }, 'Notes/yesterday.md')
       emit(
@@ -1466,7 +1481,9 @@ describe('Workout index freshness', () => {
       )
       emit(event, { path: 'Fitness/Workouts-old' }, 'Fitness/Workouts-new')
     }
-    expect(await plugin.getIndex()).toBe(index)
+    const available = await plugin.getIndex()
+    expect(available.entries[0]?.exercises[0]?.maxWeightSet?.weight).toBe(50)
+    expect(available).toBe(index)
   })
 
   it('includes externally created workouts on the next read', async () => {
