@@ -1398,7 +1398,11 @@ describe('Workout index freshness', () => {
         view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Workout name"]')?.value,
       ).toBe('My unsaved draft')
       expect(view.contentEl.querySelector('.fitkit-meta-line')?.textContent).toContain('unsaved')
-      expect(await app.vault.read(files[0]! as TFile)).toBe(externalSource)
+      const file = files[0]
+      if (!(file instanceof TFile)) {
+        throw new Error('Expected the open workout file')
+      }
+      expect(await app.vault.read(file)).toBe(externalSource)
     } finally {
       vi.clearAllTimers()
       vi.useRealTimers()
