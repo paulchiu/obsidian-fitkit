@@ -380,6 +380,22 @@ body.is-mobile .fitkit-editor-root {
   gap: 4px;
 }
 
+.fitkit-set-rows {
+  display: grid;
+  gap: 6px;
+}
+
+/** A long set list stops at half the screen and fades out above its Show all toggle. */
+.fitkit-set-rows.is-capped {
+  max-height: 50vh;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, black calc(100% - 48px), transparent);
+}
+
+.fitkit-set-toggle {
+  justify-self: start;
+}
+
 /** The row being logged right now gets a larger target than the finished rows above it. */
 .fitkit-row--live .fitkit-input {
   min-height: 36px;

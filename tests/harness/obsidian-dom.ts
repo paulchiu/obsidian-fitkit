@@ -45,6 +45,13 @@ export function installObsidianDomExtensions(): void {
   }
   Object.assign(harnessWindow.HTMLElement.prototype, extensions)
   Object.assign(harnessWindow.SVGElement.prototype, extensions)
+  /** Obsidian's `el.win`: the window an element lives in, a popout's own included. */
+  Object.defineProperty(harnessWindow.Node.prototype, 'win', {
+    configurable: true,
+    get(): Window {
+      return harnessWindow as unknown as Window
+    },
+  })
 }
 
 /** Fresh detached root for a test to render into. Detached roots keep

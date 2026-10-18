@@ -252,6 +252,9 @@ class TestElement {
   textContent = ''
   clientWidth = 0
   scrollWidth = 0
+  scrollHeight = 0
+  hidden = false
+  readonly win = { innerHeight: 768 }
   rect: DOMRect = testRect({ left: 10, bottom: 20, width: 10 })
 
   constructor(readonly tagName: string) {}

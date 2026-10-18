@@ -107,6 +107,7 @@ import { KindSwitchChoiceModal, type KindSwitchChoice } from './kind-switch-choi
 import { menuAnchorForTrigger } from './menu-anchor'
 import { renderPlanSummary } from './plan-summary-view'
 import { SetNoteModal } from './set-note-modal'
+import { capSetList } from './set-list-cap'
 import { PlanStepModal } from './plan-step-modal'
 
 interface DragSession {
@@ -225,6 +226,8 @@ export class WorkoutEditorView extends FileView {
   private resizeObserver: ResizeObserver | null = null
   private dragSession: DragSession | null = null
   private seededWeightsStore?: WeakSet<EditableStrengthSet>
+  private expandedSetListsStore?: WeakSet<ExerciseCard>
+  private setListRefits?: Array<() => void>
   private exerciseStoreInstance?: ExerciseStore
   private autosaverInstance?: Autosaver
   private screensInstance?: TabScreens<EditorScreen>
@@ -318,7 +321,10 @@ export class WorkoutEditorView extends FileView {
 
   async onOpen(): Promise<void> {
     this.contentEl.addClass('fitkit-editor-root')
-    this.resizeObserver = new ResizeObserver(() => this.updateNarrowState())
+    this.resizeObserver = new ResizeObserver(() => {
+      this.updateNarrowState()
+      this.setListRefits?.forEach((refit) => refit())
+    })
     this.resizeObserver.observe(this.contentEl)
     this.updateNarrowState()
     this.registerDragLifetimeListeners()
@@ -490,6 +496,7 @@ export class WorkoutEditorView extends FileView {
       return
     }
     this.contentEl.empty()
+    this.setListRefits = []
     const container = this.contentEl.createDiv({ cls: 'fitkit-container' })
     const screen = this.screens.current()
     if (screen?.kind === 'run') {
@@ -669,6 +676,31 @@ export class WorkoutEditorView extends FileView {
     }
   }
 
+  /** Renders a card's set rows into their own box, capped when the list runs long. */
+  private renderSetRows(
+    wrap: HTMLElement,
+    ex: ExerciseCard,
+    count: number,
+    renderRow: (rows: HTMLElement, i: number) => void,
+  ): void {
+    const rows = wrap.createDiv({ cls: 'fitkit-set-rows' })
+    for (let i = 0; i < count; i++) {
+      renderRow(rows, i)
+    }
+    const expanded = this.expandedSetLists
+    const refit = capSetList(wrap, rows, count, {
+      expanded: () => expanded.has(ex),
+      setExpanded: (next) => {
+        if (next) {
+          expanded.add(ex)
+        } else {
+          expanded.delete(ex)
+        }
+      },
+    })
+    ;(this.setListRefits ??= []).push(refit)
+  }
+
   private renderStrengthTable(card: HTMLElement, ex: ExerciseCard, exerciseIndex: number): void {
     const wrap = card.createDiv({ cls: 'fitkit-set-area' })
 
@@ -678,9 +710,9 @@ export class WorkoutEditorView extends FileView {
     header.createSpan({ cls: 'fitkit-set-label', text: 'Weight' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Reps' })
 
-    for (let i = 0; i < ex.strengthSets.length; i++) {
-      this.renderStrengthRow(wrap, ex, i)
-    }
+    this.renderSetRows(wrap, ex, ex.strengthSets.length, (rows, i) =>
+      this.renderStrengthRow(rows, ex, i),
+    )
 
     const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
     const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
@@ -792,9 +824,9 @@ export class WorkoutEditorView extends FileView {
     }
     header.createSpan({ cls: 'fitkit-bodyweight-head-spacer', attr: { 'aria-hidden': 'true' } })
 
-    for (let i = 0; i < ex.bodyweightSets.length; i++) {
-      this.renderBodyweightRow(wrap, ex, i, levels, showLoad)
-    }
+    this.renderSetRows(wrap, ex, ex.bodyweightSets.length, (rows, i) =>
+      this.renderBodyweightRow(rows, ex, i, levels, showLoad),
+    )
 
     const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
     const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
@@ -1036,9 +1068,9 @@ export class WorkoutEditorView extends FileView {
       header.createSpan({ cls: 'fitkit-set-label', text: 'Rest' })
     }
 
-    for (let i = 0; i < ex.durationEntries.length; i++) {
-      this.renderDurationRow(wrap, ex, i, exerciseIndex, columns)
-    }
+    this.renderSetRows(wrap, ex, ex.durationEntries.length, (rows, i) =>
+      this.renderDurationRow(rows, ex, i, exerciseIndex, columns),
+    )
 
     const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
     const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
@@ -1917,6 +1949,11 @@ export class WorkoutEditorView extends FileView {
   }
 
   /** Rows whose weight came from the plan and has not been typed over yet. View state only; never written to the note. */
+  private get expandedSetLists(): WeakSet<ExerciseCard> {
+    this.expandedSetListsStore ??= new WeakSet<ExerciseCard>()
+    return this.expandedSetListsStore
+  }
+
   private get seededWeights(): WeakSet<EditableStrengthSet> {
     this.seededWeightsStore ??= new WeakSet<EditableStrengthSet>()
     return this.seededWeightsStore
@@ -1951,7 +1988,7 @@ export class WorkoutEditorView extends FileView {
     if (!card?.instanceOf(HTMLElement)) {
       return
     }
-    const rows = card.querySelectorAll('.fitkit-set-area > .fitkit-row')
+    const rows = card.querySelectorAll('.fitkit-set-rows > .fitkit-row')
     const row = rows.item(rowIndex)
     if (!row?.instanceOf(HTMLElement)) {
       return

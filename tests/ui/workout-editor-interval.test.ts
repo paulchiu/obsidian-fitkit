@@ -1102,6 +1102,76 @@ describe('WorkoutEditorView interval plans', () => {
     })
   })
 
+  describe('long set lists', () => {
+    const repRows = (count: number): string[] =>
+      Array.from(
+        { length: count },
+        (_, i) =>
+          `- [exercise:: [[Exercise Bike]]] [set:: ${i + 1}] [duration:: 30] [watts:: 300] [rest:: 90]`,
+      )
+
+    const longBike = (count: number): string =>
+      workoutSource(
+        '## [[Exercise Bike]]',
+        '',
+        '- [exercise:: [[Exercise Bike]]] [plan:: 20 x 30s @ 300W, 90s rest]',
+        ...repRows(count),
+      )
+
+    /** jsdom has no layout, so each set row stands 40px tall against the harness's 768px window. */
+    beforeEach(() => {
+      vi.spyOn(harnessWindow.HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(
+        function (this: HTMLElement) {
+          return this.querySelectorAll('.fitkit-row').length * 40
+        },
+      )
+    })
+
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    const toggle = (view: WorkoutEditorView): HTMLButtonElement | null =>
+      view.contentEl.querySelector<HTMLButtonElement>('.fitkit-set-toggle:not([hidden])')
+
+    const capped = (view: WorkoutEditorView): boolean =>
+      view.contentEl.querySelector('.fitkit-set-rows')?.classList.contains('is-capped') ?? false
+
+    it('caps a set list taller than half the screen, and expands and collapses it', async () => {
+      const { view } = await openView(longBike(20))
+
+      const states = [[capped(view), toggle(view)?.textContent]]
+      toggle(view)?.click()
+      states.push([capped(view), toggle(view)?.textContent])
+      toggle(view)?.click()
+      states.push([capped(view), toggle(view)?.textContent])
+
+      expect(states).toEqual([
+        [true, 'Show all 20 sets'],
+        [false, 'Show fewer sets'],
+        [true, 'Show all 20 sets'],
+      ])
+    })
+
+    it('keeps an expanded set list open when a set is added', async () => {
+      const { view } = await openView(longBike(20))
+
+      toggle(view)?.click()
+      const addSet = [...view.contentEl.querySelectorAll('button')].find(
+        (candidate) => candidate.textContent === 'Add set',
+      )
+      addSet?.click()
+
+      expect([capped(view), toggle(view)?.textContent]).toEqual([false, 'Show fewer sets'])
+    })
+
+    it('leaves a set list that fits in half the screen alone', async () => {
+      const { view } = await openView(longBike(3))
+
+      expect([capped(view), toggle(view)]).toEqual([false, null])
+    })
+  })
+
   describe('remembering the interval plan', () => {
     const LAST_BIKE: IndexEntry = {
       path: 'Fitness/Workouts/2026-10-05.md',
