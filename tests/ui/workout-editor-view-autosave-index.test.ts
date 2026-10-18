@@ -139,7 +139,7 @@ vi.mock('obsidian', async () => {
   }
 })
 
-import type { App, TFile } from 'obsidian'
+import { type App, TFile } from 'obsidian'
 
 import type { FitKitIndex } from '../../src/domain/types'
 import FitKitPlugin from '../../src/main'
@@ -234,12 +234,12 @@ interface Harness {
  * cached before the user's edit.
  */
 const createHarness = async (persistenceFailure?: Error): Promise<Harness> => {
-  const file: TestFile = {
+  const file = Object.assign(new TFile(), {
     path: WORKOUT_PATH,
     extension: 'md',
     basename: '2026-08-15',
     stat: { mtime: 1000 },
-  }
+  })
   const contents = new Map<string, string>([[WORKOUT_PATH, initialSource]])
   const vault: TestVault = {
     getFolderByPath: buildMockVaultFolderTree([file]).getFolderByPath,
@@ -261,7 +261,7 @@ const createHarness = async (persistenceFailure?: Error): Promise<Harness> => {
   plugin.cachedIndex = cachedIndex
   plugin.lastDiagnostics = cachedIndex.diagnostics
 
-  const session = new FileSession(app as unknown as App, file as unknown as TFile)
+  const session = new FileSession(app as unknown as App, file)
   await session.load()
 
   const model: TestEditorModel = {
@@ -404,8 +404,8 @@ const buildTeardownSource = (date: string, direction: 'up' | 'down'): string =>
 interface TeardownHarness {
   view: AutosaveIndexView
   plugin: TestPlugin
-  fileA: TestFile
-  fileB: TestFile
+  fileA: TFile
+  fileB: TFile
   /** Unblocks the gated `vault.process` so a paused save can resume. */
   releaseSave: () => void
 }
@@ -416,18 +416,18 @@ interface TeardownHarness {
  * view.session (nulling or reassigning it) before letting the write resume.
  */
 const createTeardownHarness = async (): Promise<TeardownHarness> => {
-  const fileA: TestFile = {
+  const fileA = Object.assign(new TFile(), {
     path: FILE_A_PATH,
     extension: 'md',
     basename: '2026-08-15',
     stat: { mtime: 1000 },
-  }
-  const fileB: TestFile = {
+  })
+  const fileB = Object.assign(new TFile(), {
     path: FILE_B_PATH,
     extension: 'md',
     basename: '2026-08-16',
     stat: { mtime: 1000 },
-  }
+  })
   const contents = new Map<string, string>([
     [FILE_A_PATH, buildTeardownSource('2026-08-15', 'up')],
     [FILE_B_PATH, buildTeardownSource('2026-08-16', 'up')],
@@ -459,7 +459,7 @@ const createTeardownHarness = async (): Promise<TeardownHarness> => {
   plugin.cachedIndex = cachedIndex
   plugin.lastDiagnostics = cachedIndex.diagnostics
 
-  const sessionA = new FileSession(app as unknown as App, fileA as unknown as TFile)
+  const sessionA = new FileSession(app as unknown as App, fileA)
   await sessionA.load()
 
   const model: TestEditorModel = {
@@ -530,7 +530,7 @@ describe('WorkoutEditorView autosave survives teardown races on the shared view'
     const closing = view.onUnloadFile()
 
     /** Mirrors loadFile reassigning the view to a newly opened, unrelated file mid-save. */
-    const sessionB = new FileSession(view.app as unknown as App, fileB as unknown as TFile)
+    const sessionB = new FileSession(view.app as unknown as App, fileB)
     await sessionB.load()
     view.session = sessionB
 

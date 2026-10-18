@@ -1,7 +1,7 @@
 import tseslint from 'typescript-eslint'
 import obsidianmd from 'eslint-plugin-obsidianmd'
 import globals from 'globals'
-import { globalIgnores } from 'eslint/config'
+import { defineConfig, globalIgnores } from 'eslint/config'
 
 /**
  * `import.meta.dirname` is Node-only and this file is typed by the default
@@ -10,7 +10,7 @@ import { globalIgnores } from 'eslint/config'
  */
 const tsconfigRootDir = import.meta.dirname as string
 
-export default tseslint.config(
+export default defineConfig(
   {
     languageOptions: {
       globals: {
@@ -123,6 +123,20 @@ export default tseslint.config(
       // Harness code runs under node during tests and never ships to a mobile device.
       'obsidianmd/no-nodejs-modules': 'off',
       /** The harness implements the `createEl` family, so it cannot call it without recursing. */
+      'obsidianmd/prefer-create-el': 'off',
+    },
+  },
+  {
+    files: ['tests/domain/workout-note-model.test.ts', 'version-bump.mjs'],
+    /** These run only under Node and never ship in the mobile plugin bundle. */
+    rules: {
+      'obsidianmd/no-nodejs-modules': 'off',
+    },
+  },
+  {
+    files: ['tests/ui/workout-editor-view.test.ts'],
+    /** Its TestElement implements createDiv/createSpan through createEl, so replacing it recurses. */
+    rules: {
       'obsidianmd/prefer-create-el': 'off',
     },
   },
