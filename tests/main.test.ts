@@ -1253,7 +1253,11 @@ const makeFreshnessVault = async (): Promise<{
   plugin: FitKitPlugin
   files: Array<{ path: string; extension: string; basename: string; stat: { mtime: number } }>
   contents: Map<string, string>
-  emit: (event: string, file: { path: string; extension?: string }, oldPath?: string) => void
+  emit: (
+    event: string,
+    file: { path: string; extension?: string; children?: unknown[] },
+    oldPath?: string,
+  ) => void
   app: MockApp
 }> => {
   const files = [
@@ -1296,7 +1300,7 @@ describe('Workout index freshness', () => {
     const { plugin, emit, app } = await makeFreshnessVault()
     const index = await plugin.getIndex()
     app.vault.read = async () => freshnessSource(95)
-    emit('create', { path: 'Fitness/Workouts/Empty', children: [] } as { path: string })
+    emit('create', { path: 'Fitness/Workouts/Empty', children: [] })
     expect((await plugin.getIndex()).entries[0]?.exercises[0]?.maxWeightSet?.weight).toBe(50)
     expect(await plugin.getIndex()).toBe(index)
   })
@@ -1423,7 +1427,10 @@ describe('Workout index freshness', () => {
     const { plugin, app } = await makeFreshnessVault()
     const index = await plugin.getIndex()
     app.vault.read = async () => {
-      throw new Error('Unrelated setting read a workout')
+      throw new Error('Unrelated setting must not read workouts')
+    }
+    app.vault.getFolderByPath = () => {
+      throw new Error('Unrelated setting must not enumerate folders')
     }
     plugin.settings.chartSessionsWindow = 10
     plugin.settings.fitnessRoot = '/Fitness/'
@@ -1480,7 +1487,12 @@ describe('Workout index freshness', () => {
   it('preserves the available index for unrelated paths and attachments without reading workouts', async () => {
     const { plugin, emit, app } = await makeFreshnessVault()
     const index = await plugin.getIndex()
-    app.vault.read = async () => freshnessSource(95)
+    app.vault.read = async () => {
+      throw new Error('Unrelated event must not read workouts')
+    }
+    app.vault.getFolderByPath = () => {
+      throw new Error('Unrelated event must not enumerate folders')
+    }
     for (const event of ['modify', 'create', 'delete', 'rename']) {
       emit(event, { path: 'Journal/today.md', extension: 'md' }, 'Notes/yesterday.md')
       emit(
