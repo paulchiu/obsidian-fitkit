@@ -55,13 +55,15 @@ export default class FitKitPlugin extends Plugin {
   cachedIndex: FitKitIndex | null = null
   lastDiagnostics: IndexDiagnostic[] = []
 
+  private indexWorkoutsFolder?: string
+  private indexGeneration = 0
+  private indexBuild: Promise<FitKitIndex> | null = null
+
   /**
    * Chains overlapping calls to refreshIndexEntry, which read-modify-writes
    * cachedIndex across an await, ensuring each runs in order with fresh data.
    * Settled links never reject, so a failed refresh cannot stall later ones.
    */
-  private indexWorkoutsFolder?: string
-
   private indexRefreshQueue: Promise<void> | null = null
 
   /** The workout each tab was switched to markdown for, which file-open routing leaves alone. */
@@ -173,20 +175,41 @@ export default class FitKitPlugin extends Plugin {
       return path === folder || path.startsWith(`${folder}/`) || folder.startsWith(`${path}/`)
     }
     if (relevantPath(file.path) || (oldPath !== undefined && relevantPath(oldPath))) {
-      this.cachedIndex = null
+      this.invalidateIndex()
     }
   }
 
+  private invalidateIndex(): void {
+    this.indexGeneration += 1
+    this.cachedIndex = null
+    this.indexBuild = null
+  }
+
   async getIndex(): Promise<FitKitIndex> {
-    if (this.cachedIndex === null) {
-      this.cachedIndex = await rebuildIndex(this.app, this.settings)
-      this.lastDiagnostics = this.cachedIndex.diagnostics
+    while (this.cachedIndex === null) {
+      const generation = this.indexGeneration
+      const build = (this.indexBuild ??= rebuildIndex(this.app, { ...this.settings }))
+      let index: FitKitIndex
+      try {
+        index = await build
+      } catch (error) {
+        if (generation !== this.indexGeneration) {
+          continue
+        }
+        this.indexBuild = null
+        throw error
+      }
+      if (generation !== this.indexGeneration) {
+        continue
+      }
+      this.cachedIndex = index
+      this.lastDiagnostics = index.diagnostics
     }
     return this.cachedIndex
   }
 
   async rebuildWorkoutIndex(): Promise<void> {
-    this.cachedIndex = null
+    this.invalidateIndex()
     const index = await this.getIndex()
     new Notice(
       `Indexed ${index.entries.length} workout(s)${
@@ -219,7 +242,7 @@ export default class FitKitPlugin extends Plugin {
   }
 
   async rebuildDashboard(): Promise<void> {
-    this.cachedIndex = null
+    this.invalidateIndex()
     const index = await this.getIndex()
     const result = await regenerateDashboard(this.app, this.settings, index)
     new Notice(`Dashboard rebuilt: ${result.sectionCount} section(s) at ${result.path}.`)
@@ -231,7 +254,7 @@ export default class FitKitPlugin extends Plugin {
       delete this.settings.hiddenDashboardSectionsByPath[path]
       await this.saveSettings()
     }
-    this.cachedIndex = null
+    this.invalidateIndex()
     const index = await this.getIndex()
     const result = await regenerateDashboard(this.app, this.settings, index)
     new Notice(`Restored hidden sections; ${result.sectionCount} section(s) now in dashboard.`)
@@ -511,7 +534,7 @@ export default class FitKitPlugin extends Plugin {
   async saveSettings(): Promise<void> {
     const folder = normalizePath(workoutsFolder(this.settings))
     if (this.indexWorkoutsFolder !== folder) {
-      this.cachedIndex = null
+      this.invalidateIndex()
       this.indexWorkoutsFolder = folder
     }
     await this.saveData(this.settings)

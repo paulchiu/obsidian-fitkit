@@ -1290,6 +1290,47 @@ const makeFreshnessVault = async (): Promise<{
 }
 
 describe('Workout index freshness', () => {
+  it.each(['modify', 'settings', 'manual rebuild'] as const)(
+    'returns fresh data to a reader whose full build overlaps %s',
+    async (change) => {
+      const { plugin, files, contents, emit, app } = await makeFreshnessVault()
+      let release!: (source: string) => void
+      let started!: () => void
+      const reading = new Promise<void>((resolve) => {
+        started = resolve
+      })
+      const pendingRead = new Promise<string>((resolve) => {
+        release = resolve
+      })
+      const original = freshnessSource(50)
+      let first = true
+      app.vault.read = async (file) => {
+        if (first) {
+          first = false
+          started()
+          return pendingRead
+        }
+        return contents.get(file.path) ?? ''
+      }
+      const waiting = plugin.getIndex()
+      await reading
+      contents.set(files[0]!.path, freshnessSource(80))
+      if (change === 'settings') {
+        files[0]!.path = 'Training/Workouts/2026-08-15.md'
+        contents.set(files[0]!.path, freshnessSource(80))
+        plugin.settings.fitnessRoot = 'Training'
+        await plugin.saveSettings()
+      } else if (change === 'manual rebuild') {
+        await plugin.rebuildWorkoutIndex()
+      } else {
+        emit('modify', files[0]!)
+      }
+      release(original)
+      expect((await waiting).entries[0]?.exercises[0]?.maxWeightSet?.weight).toBe(80)
+      expect((await plugin.getIndex()).entries[0]?.exercises[0]?.maxWeightSet?.weight).toBe(80)
+    },
+  )
+
   it('uses the saved fitness root on the next index read and persists it', async () => {
     const { plugin, files, contents } = await makeFreshnessVault()
     await plugin.getIndex()
