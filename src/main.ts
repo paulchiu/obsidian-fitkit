@@ -65,17 +65,19 @@ export default class FitKitPlugin extends Plugin {
     await this.loadSettings()
     this.addSettingTab(new FitKitSettingTab(this.app, this))
 
-    this.registerEvent(
-      this.app.vault.on('modify', (file) => {
-        if (
-          file.path.startsWith(`${workoutsFolder(this.settings)}/`) &&
-          'extension' in file &&
-          String(file.extension).toLowerCase() === 'md'
-        ) {
-          this.cachedIndex = null
-        }
-      }),
-    )
+    for (const event of ['create', 'modify'] as const) {
+      this.registerEvent(
+        this.app.vault.on(event, (file) => {
+          if (
+            file.path.startsWith(`${workoutsFolder(this.settings)}/`) &&
+            'extension' in file &&
+            String(file.extension).toLowerCase() === 'md'
+          ) {
+            this.cachedIndex = null
+          }
+        }),
+      )
+    }
 
     this.registerMarkdownCodeBlockProcessor('fitkit-chart', (source, el, ctx) =>
       renderExerciseChartBlock(this, source, el, ctx),

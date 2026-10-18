@@ -1290,6 +1290,19 @@ const makeFreshnessVault = async (): Promise<{
 }
 
 describe('Workout index freshness', () => {
+  it('includes externally created workouts on the next read', async () => {
+    const { plugin, files, contents, emit } = await makeFreshnessVault()
+    await plugin.getIndex()
+    const file = { ...files[0]!, path: 'Fitness/Workouts/2026-08-14.md' }
+    files.push(file)
+    contents.set(file.path, freshnessSource(90))
+    emit('create', file)
+    expect((await plugin.getIndex()).entries.map((entry) => entry.path)).toEqual([
+      'Fitness/Workouts/2026-08-14.md',
+      'Fitness/Workouts/2026-08-15.md',
+    ])
+  })
+
   it('reads externally modified history without rendering an editor', async () => {
     const { plugin, files, contents, emit } = await makeFreshnessVault()
     await plugin.rebuildWorkoutIndex()
