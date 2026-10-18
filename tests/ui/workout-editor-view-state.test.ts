@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const noticeMessages = vi.hoisted(() => [] as string[])
+
 vi.mock('obsidian', async () => {
   const { mixinFileView } = await import('../fixtures/obsidian-file-view')
 
@@ -42,7 +44,9 @@ vi.mock('obsidian', async () => {
   class MarkdownView {}
 
   class Notice {
-    constructor(readonly message: string) {}
+    constructor(readonly message: string) {
+      noticeMessages.push(message)
+    }
   }
 
   class TFile {
@@ -107,7 +111,9 @@ const createWorkoutFile = (path: string): TFile =>
   })
 
 /** A real WorkoutEditorView over an in-memory vault holding one workout note. */
-const createView = (): {
+const createView = (
+  persistenceFailure?: () => Error | null,
+): {
   view: WorkoutEditorView
   contents: Map<string, string>
   vault: { read: (target: TFile) => Promise<string> }
@@ -121,6 +127,8 @@ const createView = (): {
     getFolderByPath: buildMockVaultFolderTree([...files.values()]).getFolderByPath,
     read: async (target: TFile): Promise<string> => contents.get(target.path) ?? '',
     process: async (target: TFile, callback: (text: string) => string): Promise<void> => {
+      const failure = persistenceFailure?.()
+      if (failure) throw failure
       contents.set(target.path, callback(contents.get(target.path) ?? ''))
     },
     getAbstractFileByPath: (path: string): TFile | null => files.get(path) ?? null,
@@ -275,6 +283,56 @@ describe('WorkoutEditorView autosave wiring', () => {
 
   const metaText = (view: WorkoutEditorView): string | undefined =>
     view.contentEl.querySelector('.fitkit-meta-line')?.textContent ?? undefined
+
+  it.each(['background', 'unload'] as const)(
+    'keeps edited fields visibly unsaved after a failed %s save and recovers on another edit',
+    async (savePath) => {
+      const failure = new Error('disk full')
+      let unavailable = true
+      const { view, contents } = createView(() => {
+        if (!unavailable) return null
+        unavailable = false
+        return failure
+      })
+      await editReps(view, '7')
+      noticeMessages.length = 0
+      vi.useFakeTimers()
+      // eslint-disable-next-line obsidianmd/no-global-this -- The test realm supplies the fake timers used by the scheduled save.
+      vi.stubGlobal('window', globalThis)
+      const reps = view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')
+      if (!reps) throw new Error('reps input not rendered')
+      try {
+        if (savePath === 'background') {
+          reps.dispatchEvent(new harnessWindow.Event('input'))
+          await vi.advanceTimersByTimeAsync(DEFAULT_SETTINGS.autosaveDebounceMs)
+        } else {
+          await expect(view.onUnloadFile()).rejects.toBe(failure)
+        }
+        expect(noticeMessages).toEqual([
+          'Could not save workout. Edits are unsaved. Edit again to retry before leaving.',
+        ])
+        expect(metaText(view)).toContain('unsaved')
+        expect(
+          view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')?.value,
+        ).toBe('7')
+        expect(view.contentEl.querySelector('.fitkit-conflict')).toBeNull()
+        expect(contents.get(WORKOUT_PATH)).toContain('[reps:: 5]')
+
+        reps.value = '9'
+        reps.dispatchEvent(new harnessWindow.Event('input'))
+        await vi.advanceTimersByTimeAsync(DEFAULT_SETTINGS.autosaveDebounceMs)
+
+        expect(contents.get(WORKOUT_PATH)).toContain('[reps:: 9]')
+        expect(metaText(view)).not.toContain('unsaved')
+        expect(
+          view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')?.value,
+        ).toBe('9')
+        expect(noticeMessages).toHaveLength(1)
+      } finally {
+        vi.useRealTimers()
+      }
+    },
+  )
 
   it('marks the meta line unsaved after an edit and clears it once the close writes it', async () => {
     const { view, contents } = createView()

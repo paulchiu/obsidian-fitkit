@@ -149,6 +149,10 @@ describe('createAutosaver', () => {
     await Promise.all([first, second])
     expect(onSaveError.mock.calls).toEqual([[failure]])
     expect(autosaver.state()).toEqual({ dirty: true, conflict: false })
+
+    await expect(autosaver.settle()).rejects.toBe(failure)
+    expect(onSaveError.mock.calls).toEqual([[failure], [failure]])
+    expect(autosaver.state()).toEqual({ dirty: true, conflict: false })
   })
 
   it('coalesces a burst of edits into one write of the latest text after the debounce', async () => {
