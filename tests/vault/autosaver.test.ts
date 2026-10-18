@@ -30,6 +30,7 @@ interface Rig {
   autosaver: ReturnType<typeof createAutosaver>
   writes: string[]
   onChange: ReturnType<typeof vi.fn>
+  onSaveError: ReturnType<typeof vi.fn>
   onConflict: ReturnType<typeof vi.fn>
   refreshIndex: ReturnType<typeof vi.fn>
   setText: (next: string | null) => void
@@ -47,6 +48,7 @@ function rig(save?: (text: string, writeNumber: number) => Promise<SaveResult>):
     return save ? save(next, writes.length) : OK
   })
   const onChange = vi.fn()
+  const onSaveError = vi.fn()
   const onConflict = vi.fn()
   const refreshIndex = vi.fn(async () => undefined)
   const deps: AutosaverDeps = {
@@ -55,12 +57,14 @@ function rig(save?: (text: string, writeNumber: number) => Promise<SaveResult>):
     debounceMs: () => debounceMs,
     refreshIndex,
     onChange,
+    onSaveError,
     onConflict,
   }
   return {
     autosaver: createAutosaver(deps),
     writes,
     onChange,
+    onSaveError,
     onConflict,
     refreshIndex,
     setText: (next) => {
@@ -85,6 +89,70 @@ describe('createAutosaver', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
+  })
+
+  it('reports a failed background write while retaining unsaved edits without retrying', async () => {
+    const failure = new Error('disk full')
+    const { autosaver, writes, onSaveError, onChange, onConflict, refreshIndex } = rig(async () => {
+      throw failure
+    })
+    autosaver.markDirty()
+    onChange.mockClear()
+
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS)
+
+    expect(onSaveError.mock.calls).toEqual([[failure]])
+    expect(autosaver.state()).toEqual({ dirty: true, conflict: false })
+    expect(onChange.mock.calls).toEqual([])
+    expect(onConflict.mock.calls).toEqual([])
+    expect(refreshIndex.mock.calls).toEqual([])
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS * 10)
+    expect(writes).toEqual(['a'])
+  })
+
+  it.each(['edit', 'settle'] as const)(
+    'retries the latest text after a failure on a later %s',
+    async (retry) => {
+      let unavailable = true
+      let persisted = ''
+      const { autosaver, setText } = rig(async (text) => {
+        if (unavailable) throw new Error('disk full')
+        persisted = text
+        return OK
+      })
+      autosaver.markDirty()
+      await vi.advanceTimersByTimeAsync(DEBOUNCE_MS)
+      unavailable = false
+      setText('latest')
+      if (retry === 'edit') {
+        autosaver.markDirty()
+        await vi.advanceTimersByTimeAsync(DEBOUNCE_MS)
+      } else {
+        await autosaver.settle()
+      }
+      expect(persisted).toBe('latest')
+      expect(autosaver.state()).toEqual({ dirty: false, conflict: false })
+    },
+  )
+
+  it('reports a shared failing persistence attempt once and rejects both settle callers', async () => {
+    const blocked = gate()
+    const failure = new Error('disk full')
+    const { autosaver, onSaveError } = rig(async () => {
+      await blocked.promise
+      throw failure
+    })
+    autosaver.markDirty()
+    const first = expect(autosaver.settle()).rejects.toBe(failure)
+    const second = expect(autosaver.settle()).rejects.toBe(failure)
+    blocked.open()
+    await Promise.all([first, second])
+    expect(onSaveError.mock.calls).toEqual([[failure]])
+    expect(autosaver.state()).toEqual({ dirty: true, conflict: false })
+
+    await expect(autosaver.settle()).rejects.toBe(failure)
+    expect(onSaveError.mock.calls).toEqual([[failure], [failure]])
+    expect(autosaver.state()).toEqual({ dirty: true, conflict: false })
   })
 
   it('coalesces a burst of edits into one write of the latest text after the debounce', async () => {
@@ -378,6 +446,7 @@ describe('createAutosaver', () => {
       debounceMs: () => DEBOUNCE_MS,
       refreshIndex: async () => undefined,
       onChange: () => undefined,
+      onSaveError: () => undefined,
       onConflict: () => undefined,
     })
 
@@ -427,13 +496,14 @@ describe('createAutosaver', () => {
   })
 
   it('settles normally when the index refresh fails', async () => {
-    const { autosaver, refreshIndex } = rig()
+    const { autosaver, refreshIndex, onSaveError } = rig()
     refreshIndex.mockRejectedValueOnce(new Error('index unavailable'))
 
     autosaver.markDirty()
     await expect(autosaver.settle()).resolves.toBeUndefined()
 
     expect(autosaver.state().dirty).toBe(false)
+    expect(onSaveError.mock.calls).toEqual([])
   })
 
   it('refreshes the note that was saved even if the session is swapped mid-save', async () => {
@@ -450,6 +520,7 @@ describe('createAutosaver', () => {
       debounceMs: () => DEBOUNCE_MS,
       refreshIndex,
       onChange: () => undefined,
+      onSaveError: () => undefined,
       onConflict: () => undefined,
     })
 

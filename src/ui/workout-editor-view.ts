@@ -247,6 +247,9 @@ export class WorkoutEditorView extends FileView {
       debounceMs: () => this.plugin.settings.autosaveDebounceMs,
       refreshIndex: (path) => this.plugin.refreshIndexEntry(path),
       onChange: () => this.updateMetaText(),
+      onSaveError: () => {
+        new Notice('Could not save workout. Edits are unsaved. Edit again to retry before leaving.')
+      },
       onConflict: () => {
         new Notice('File changed on disk. Reload before further edits.')
         this.render()

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { createTestRoot, harnessDocument, harnessWindow } from '../harness/obsidian-dom'
+import { createTestRoot, harnessWindow } from '../harness/obsidian-dom'
 
 vi.mock('obsidian', () => {
   class Modal {
@@ -66,7 +66,7 @@ function row(overrides: Partial<ExerciseImportPlanRow>): ExerciseImportPlanRow {
 
 function actionCellText(row: ExerciseImportPlanRow): string[] {
   const modal = new ImportExercisesModal({ app: {} } as never, {})
-  const actionCell = harnessDocument.createElement('td')
+  const actionCell = createTestRoot().createEl('td')
   actionCell.dataset.label = 'Actions'
   const renderActionsCellContent = (
     modal as unknown as {
