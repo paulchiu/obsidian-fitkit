@@ -1290,6 +1290,70 @@ const makeFreshnessVault = async (): Promise<{
 }
 
 describe('Workout index freshness', () => {
+  it.each([
+    ['delete', 'Fitness/Workouts/2026-08-15.md', null, 'md'],
+    ['rename', 'Fitness/Workouts/2026-08-15.md', 'Fitness/Workouts/renamed.md', 'md'],
+    ['rename', 'Fitness/Workouts/2026-08-15.md', 'Archive/2026-08-15.md', 'md'],
+    ['rename', 'Archive/2026-08-15.md', 'Fitness/Workouts/2026-08-15.md', 'md'],
+    ['rename', 'Fitness/Workouts/2026-08-15.md', 'Fitness/Workouts/2026-08-15.txt', 'txt'],
+    ['delete', 'Fitness/Workouts', null, undefined],
+    ['delete', 'Fitness', null, undefined],
+    ['rename', 'Fitness', 'Archive', undefined],
+    ['rename', 'Fitness/Workouts', 'Fitness/Archive', undefined],
+    ['rename', 'Archive', 'Fitness/Workouts/Imported', undefined],
+    ['delete', 'Fitness/Workouts/Imported', null, undefined],
+  ] as const)('reflects %s from %s to %s', async (event, oldPath, newPath, extension) => {
+    const { plugin, files, contents, emit } = await makeFreshnessVault()
+    const oldFilePath =
+      extension === undefined
+        ? `${oldPath}${oldPath === 'Fitness' ? '/Workouts' : ''}/2026-08-15.md`
+        : oldPath
+    files[0]!.path = oldFilePath
+    contents.set(oldFilePath, freshnessSource(50))
+    await plugin.getIndex()
+    const newFilePath =
+      newPath === null
+        ? null
+        : extension === undefined
+          ? `${newPath}${oldFilePath.slice(oldPath.length)}`
+          : newPath
+    if (newFilePath === null) {
+      files.splice(0)
+    } else {
+      files[0]!.path = newFilePath
+      files[0]!.extension = extension ?? 'md'
+      contents.set(newFilePath, freshnessSource(80))
+    }
+    emit(
+      event,
+      { path: newPath ?? oldPath, ...(extension === undefined ? {} : { extension }) },
+      oldPath,
+    )
+    expect((await plugin.getIndex()).entries.map((entry) => entry.path)).toEqual(
+      newFilePath?.startsWith('Fitness/Workouts/') && newFilePath.endsWith('.md')
+        ? [newFilePath]
+        : [],
+    )
+  })
+
+  it('preserves the available index for unrelated paths and attachments without reading workouts', async () => {
+    const { plugin, emit, app } = await makeFreshnessVault()
+    const index = await plugin.getIndex()
+    app.vault.read = async () => {
+      throw new Error('Unrelated event read a workout')
+    }
+    for (const event of ['modify', 'create', 'delete', 'rename']) {
+      emit(event, { path: 'Journal/today.md', extension: 'md' }, 'Notes/yesterday.md')
+      emit(
+        event,
+        { path: 'Fitness/Workouts/photo.png', extension: 'png' },
+        'Fitness/Workouts/old.png',
+      )
+      emit(event, { path: 'Fitness/Workouts-old' }, 'Fitness/Workouts-new')
+    }
+    expect(await plugin.getIndex()).toBe(index)
+  })
+
   it('includes externally created workouts on the next read', async () => {
     const { plugin, files, contents, emit } = await makeFreshnessVault()
     await plugin.getIndex()

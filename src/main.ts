@@ -1,4 +1,12 @@
-import { MarkdownView, Notice, Plugin, TFile, type WorkspaceLeaf, normalizePath } from 'obsidian'
+import {
+  MarkdownView,
+  Notice,
+  Plugin,
+  TFile,
+  type TAbstractFile,
+  type WorkspaceLeaf,
+  normalizePath,
+} from 'obsidian'
 
 import { formatErrorMessage } from './domain/error'
 import { createRegistry } from './domain/exercise-registry'
@@ -65,19 +73,12 @@ export default class FitKitPlugin extends Plugin {
     await this.loadSettings()
     this.addSettingTab(new FitKitSettingTab(this.app, this))
 
-    for (const event of ['create', 'modify'] as const) {
-      this.registerEvent(
-        this.app.vault.on(event, (file) => {
-          if (
-            file.path.startsWith(`${workoutsFolder(this.settings)}/`) &&
-            'extension' in file &&
-            String(file.extension).toLowerCase() === 'md'
-          ) {
-            this.cachedIndex = null
-          }
-        }),
-      )
+    for (const event of ['create', 'modify', 'delete'] as const) {
+      this.registerEvent(this.app.vault.on(event, (file) => this.invalidateForVaultChange(file)))
     }
+    this.registerEvent(
+      this.app.vault.on('rename', (file, oldPath) => this.invalidateForVaultChange(file, oldPath)),
+    )
 
     this.registerMarkdownCodeBlockProcessor('fitkit-chart', (source, el, ctx) =>
       renderExerciseChartBlock(this, source, el, ctx),
@@ -157,6 +158,19 @@ export default class FitKitPlugin extends Plugin {
       if (view instanceof WorkoutEditorView) {
         view.refreshSettingsDrivenUi()
       }
+    }
+  }
+
+  private invalidateForVaultChange(file: TAbstractFile, oldPath?: string): void {
+    const folder = normalizePath(workoutsFolder(this.settings))
+    const relevantPath = (path: string): boolean => {
+      if ('extension' in file) {
+        return path.startsWith(`${folder}/`) && path.toLowerCase().endsWith('.md')
+      }
+      return path === folder || path.startsWith(`${folder}/`) || folder.startsWith(`${path}/`)
+    }
+    if (relevantPath(file.path) || (oldPath !== undefined && relevantPath(oldPath))) {
+      this.cachedIndex = null
     }
   }
 
