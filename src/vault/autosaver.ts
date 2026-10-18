@@ -18,6 +18,8 @@ export interface AutosaverDeps {
   onChange: () => void
   /** Fires when a save is blocked by a change on disk. Later saves stay blocked until reset. */
   onConflict: () => void
+  /** Reports a failed persistence attempt; explicit settle still rejects. */
+  onSaveError: (error: unknown) => void
 }
 
 export interface Autosaver {
@@ -56,14 +58,17 @@ export function createAutosaver(deps: AutosaverDeps): Autosaver {
     clearTimer()
     timer = window.setTimeout(() => {
       timer = null
-      void flush()
+      void flush().catch(() => undefined)
     }, deps.debounceMs())
   }
 
   const write = async (session: FileSession, text: string, savedEdit: number): Promise<void> => {
     const path = session.file.path
     try {
-      const result = await session.saveIfUnchanged(text)
+      const result = await session.saveIfUnchanged(text).catch((error: unknown) => {
+        deps.onSaveError(error)
+        throw error
+      })
       if (!result.ok) {
         conflict = true
         deps.onConflict()

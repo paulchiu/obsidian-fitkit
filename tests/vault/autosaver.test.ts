@@ -30,6 +30,7 @@ interface Rig {
   autosaver: ReturnType<typeof createAutosaver>
   writes: string[]
   onChange: ReturnType<typeof vi.fn>
+  onSaveError: ReturnType<typeof vi.fn>
   onConflict: ReturnType<typeof vi.fn>
   refreshIndex: ReturnType<typeof vi.fn>
   setText: (next: string | null) => void
@@ -47,6 +48,7 @@ function rig(save?: (text: string, writeNumber: number) => Promise<SaveResult>):
     return save ? save(next, writes.length) : OK
   })
   const onChange = vi.fn()
+  const onSaveError = vi.fn()
   const onConflict = vi.fn()
   const refreshIndex = vi.fn(async () => undefined)
   const deps: AutosaverDeps = {
@@ -55,12 +57,14 @@ function rig(save?: (text: string, writeNumber: number) => Promise<SaveResult>):
     debounceMs: () => debounceMs,
     refreshIndex,
     onChange,
+    onSaveError,
     onConflict,
   }
   return {
     autosaver: createAutosaver(deps),
     writes,
     onChange,
+    onSaveError,
     onConflict,
     refreshIndex,
     setText: (next) => {
@@ -85,6 +89,25 @@ describe('createAutosaver', () => {
   afterEach(() => {
     vi.useRealTimers()
     vi.unstubAllGlobals()
+  })
+
+  it('reports a failed background write while retaining unsaved edits without retrying', async () => {
+    const failure = new Error('disk full')
+    const { autosaver, writes, onSaveError, onChange, onConflict, refreshIndex } = rig(async () => {
+      throw failure
+    })
+    autosaver.markDirty()
+    onChange.mockClear()
+
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS)
+
+    expect(onSaveError.mock.calls).toEqual([[failure]])
+    expect(autosaver.state()).toEqual({ dirty: true, conflict: false })
+    expect(onChange.mock.calls).toEqual([])
+    expect(onConflict.mock.calls).toEqual([])
+    expect(refreshIndex.mock.calls).toEqual([])
+    await vi.advanceTimersByTimeAsync(DEBOUNCE_MS * 10)
+    expect(writes).toEqual(['a'])
   })
 
   it('coalesces a burst of edits into one write of the latest text after the debounce', async () => {
@@ -378,6 +401,7 @@ describe('createAutosaver', () => {
       debounceMs: () => DEBOUNCE_MS,
       refreshIndex: async () => undefined,
       onChange: () => undefined,
+      onSaveError: () => undefined,
       onConflict: () => undefined,
     })
 
@@ -450,6 +474,7 @@ describe('createAutosaver', () => {
       debounceMs: () => DEBOUNCE_MS,
       refreshIndex,
       onChange: () => undefined,
+      onSaveError: () => undefined,
       onConflict: () => undefined,
     })
 

@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Failed workout saves show a notice and keep edits marked unsaved so another edit can retry.
+
 - Closing or switching workout notes waits for edits made during the final save to persist.
 - Workout saves preserve external edits that arrive just before the atomic write, and stay blocked until the note is reloaded.
 - An edit made while the workout editor was still saving the previous one could be dropped, and closing the tab during a save could lose the last edit.
