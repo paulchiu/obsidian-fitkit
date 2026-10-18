@@ -5,6 +5,7 @@ const registeredCommandIds = vi.hoisted(() => [] as string[])
 
 vi.mock('obsidian', async () => {
   const { mixinFileView } = await import('./fixtures/obsidian-file-view')
+  const { createTestRoot } = await import('./harness/obsidian-dom')
 
   class App {}
   class Plugin {
@@ -28,26 +29,18 @@ vi.mock('obsidian', async () => {
 
   class ItemView {
     app: unknown
-    contentEl: {
-      addClass: () => void
-      empty: () => void
-      createDiv: () => { setText: () => void }
-      classList: { toggle: () => void }
-      clientWidth: number
-    }
+    contentEl: HTMLElement
+    leaf: unknown
     constructor(leaf: unknown) {
+      this.leaf = leaf
       this.app =
         leaf && typeof leaf === 'object' && 'app' in leaf
           ? (leaf as { app?: unknown }).app
           : undefined
-      this.contentEl = {
-        addClass: () => {},
-        empty: () => {},
-        createDiv: () => ({ setText: () => {} }),
-        classList: { toggle: () => {} },
-        clientWidth: 0,
-      }
+      this.contentEl = createTestRoot()
     }
+    registerDomEvent(): void {}
+    registerEvent(): void {}
     getState(): Record<string, unknown> {
       return {}
     }
@@ -137,6 +130,7 @@ vi.mock('obsidian', async () => {
     Menu,
     Modal,
     Notice,
+    Platform: { isMobile: false },
     Plugin,
     PluginSettingTab,
     Setting,
@@ -155,7 +149,7 @@ import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from '../src/ui/wo
 import { rebuildIndex } from '../src/vault/index'
 import { exerciseHistoryFromVault } from '../src/vault/exercise-history-vault'
 import { renderExerciseChartBlock } from '../src/ui/exercise-chart-block'
-import { createTestRoot } from './harness/obsidian-dom'
+import { createTestRoot, harnessDocument, harnessWindow } from './harness/obsidian-dom'
 import { buildMockVaultFolderTree, type MockVaultFolder } from './fixtures/mock-vault-folder-tree'
 
 interface SetViewStateArg {
@@ -1261,12 +1255,12 @@ const makeFreshnessVault = async (): Promise<{
   app: MockApp
 }> => {
   const files = [
-    {
+    Object.assign(new TFile(), {
       path: 'Fitness/Workouts/2026-08-15.md',
       extension: 'md',
       basename: '2026-08-15',
       stat: { mtime: 1 },
-    },
+    }),
   ]
   const contents = new Map([[files[0]!.path, freshnessSource(50)]])
   const handlers = new Map<string, (...args: unknown[]) => void>()
@@ -1295,7 +1289,122 @@ const makeFreshnessVault = async (): Promise<{
   }
 }
 
+type FreshnessVault = Awaited<ReturnType<typeof makeFreshnessVault>>
+type IndexChange = 'modify' | 'settings' | 'manual rebuild' | 'cache reset'
+
+const holdNextWorkoutRead = (
+  fixture: FreshnessVault,
+): {
+  started: Promise<void>
+  release: (source: string) => void
+} => {
+  let release!: (source: string) => void
+  let started!: () => void
+  const reading = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  const pendingRead = new Promise<string>((resolve) => {
+    release = resolve
+  })
+  let first = true
+  fixture.app.vault.read = async (file) => {
+    if (first) {
+      first = false
+      started()
+      return pendingRead
+    }
+    return fixture.contents.get(file.path) ?? ''
+  }
+  return { started: reading, release }
+}
+
+const applyIndexChange = async (
+  change: IndexChange,
+  fixture: FreshnessVault,
+  weight: number,
+): Promise<void> => {
+  const { plugin, files, contents, emit } = fixture
+  contents.set(files[0]!.path, freshnessSource(weight))
+  if (change === 'settings') {
+    files[0]!.path = 'Training/Workouts/2026-08-15.md'
+    contents.set(files[0]!.path, freshnessSource(weight))
+    plugin.settings.fitnessRoot = 'Training'
+    await plugin.saveSettings()
+  } else if (change === 'cache reset') {
+    plugin.cachedIndex = null
+  } else if (change === 'manual rebuild') {
+    await plugin.rebuildWorkoutIndex()
+  } else {
+    emit('modify', files[0]!)
+  }
+}
+
 describe('Workout index freshness', () => {
+  it('keeps an open dirty workout draft unsaved while history and charts read external changes', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', { setTimeout, clearTimeout, setInterval, clearInterval })
+    vi.stubGlobal('HTMLElement', harnessWindow.HTMLElement)
+    vi.stubGlobal('HTMLInputElement', harnessWindow.HTMLInputElement)
+    vi.stubGlobal('activeWindow', harnessWindow)
+    vi.stubGlobal('activeDocument', harnessDocument)
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(): void {}
+        disconnect(): void {}
+      },
+    )
+    try {
+      const { plugin, files, contents, emit, app } = await makeFreshnessVault()
+      Object.assign(app.metadataCache, { on: () => ({}) })
+      app.vault.process = async (file, callback) => {
+        contents.set(file.path, callback(contents.get(file.path) ?? ''))
+      }
+      const leaf = { app, view: null as WorkoutEditorView | null }
+      const view = new WorkoutEditorView(
+        leaf as unknown as import('obsidian').WorkspaceLeaf,
+        plugin,
+      )
+      leaf.view = view
+      app.workspace.getLeavesOfType = (type) =>
+        type === VIEW_TYPE_FITKIT_WORKOUT_EDITOR ? [leaf as unknown as MockLeaf] : []
+      await view.onOpen()
+      const loading = view.setState({ file: files[0]!.path }, { history: false })
+      await vi.advanceTimersByTimeAsync(500)
+      await loading
+      const input = view.contentEl.querySelector<HTMLInputElement>(
+        'input[aria-label="Workout name"]',
+      )!
+      input.value = 'My unsaved draft'
+      input.dispatchEvent(new harnessWindow.Event('input'))
+      expect(view.contentEl.querySelector('.fitkit-meta-line')?.textContent).toContain('unsaved')
+      const externalSource = freshnessSource(80)
+      contents.set(files[0]!.path, externalSource)
+      emit('modify', files[0]!)
+      const history = await exerciseHistoryFromVault(plugin, {
+        sourcePath: 'Fitness/Workouts/2026-08-16.md',
+        date: '2026-08-16',
+      })
+      expect(history.get('Squat')?.strength?.personalBest?.weight).toBe(80)
+      const chart = createTestRoot()
+      await renderExerciseChartBlock(
+        plugin,
+        'exercise: Squat\nkind: strength\nmetric: weight',
+        chart,
+        { sourcePath: 'Journal/chart.md' } as Parameters<typeof renderExerciseChartBlock>[3],
+      )
+      expect(chart.querySelector('.fitkit-chart-dot title')?.textContent).toContain('80kg')
+      expect(
+        view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Workout name"]')?.value,
+      ).toBe('My unsaved draft')
+      expect(view.contentEl.querySelector('.fitkit-meta-line')?.textContent).toContain('unsaved')
+      expect(await app.vault.read(files[0]! as TFile)).toBe(externalSource)
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    }
+  })
+
   it('preserves the available index when an empty workout subfolder is created', async () => {
     const { plugin, emit, app } = await makeFreshnessVault()
     const index = await plugin.getIndex()
@@ -1320,84 +1429,33 @@ describe('Workout index freshness', () => {
     expect(el.querySelector('.fitkit-chart-dot title')?.textContent).toContain('80kg')
   })
 
-  it.each(['modify', 'settings', 'manual rebuild'] as const)(
+  it.each(['modify', 'settings', 'manual rebuild', 'cache reset'] as const)(
     'keeps a pending incremental refresh from replacing newer data after %s',
     async (change) => {
-      const { plugin, files, contents, emit, app } = await makeFreshnessVault()
+      const fixture = await makeFreshnessVault()
+      const { plugin, files } = fixture
       await plugin.getIndex()
-      let release!: (source: string) => void
-      let started!: () => void
-      const reading = new Promise<void>((resolve) => {
-        started = resolve
-      })
-      const pendingRead = new Promise<string>((resolve) => {
-        release = resolve
-      })
-      let first = true
-      app.vault.read = async (file) => {
-        if (first) {
-          first = false
-          started()
-          return pendingRead
-        }
-        return contents.get(file.path) ?? ''
-      }
+      const read = holdNextWorkoutRead(fixture)
       const refreshing = plugin.refreshIndexEntry(files[0]!.path)
-      await reading
-      contents.set(files[0]!.path, freshnessSource(90))
-      if (change === 'settings') {
-        files[0]!.path = 'Training/Workouts/2026-08-15.md'
-        contents.set(files[0]!.path, freshnessSource(90))
-        plugin.settings.fitnessRoot = 'Training'
-        await plugin.saveSettings()
-      } else if (change === 'manual rebuild') {
-        await plugin.rebuildWorkoutIndex()
-      } else {
-        emit('modify', files[0]!)
-      }
+      await read.started
+      await applyIndexChange(change, fixture, 90)
       expect((await plugin.getIndex()).entries[0]?.exercises[0]?.maxWeightSet?.weight).toBe(90)
-      release(freshnessSource(60))
+      read.release(freshnessSource(60))
       await refreshing
       expect((await plugin.getIndex()).entries[0]?.exercises[0]?.maxWeightSet?.weight).toBe(90)
     },
   )
 
-  it.each(['modify', 'settings', 'manual rebuild'] as const)(
+  it.each(['modify', 'settings', 'manual rebuild', 'cache reset'] as const)(
     'returns fresh data to a reader whose full build overlaps %s',
     async (change) => {
-      const { plugin, files, contents, emit, app } = await makeFreshnessVault()
-      let release!: (source: string) => void
-      let started!: () => void
-      const reading = new Promise<void>((resolve) => {
-        started = resolve
-      })
-      const pendingRead = new Promise<string>((resolve) => {
-        release = resolve
-      })
-      const original = freshnessSource(50)
-      let first = true
-      app.vault.read = async (file) => {
-        if (first) {
-          first = false
-          started()
-          return pendingRead
-        }
-        return contents.get(file.path) ?? ''
-      }
+      const fixture = await makeFreshnessVault()
+      const { plugin } = fixture
+      const read = holdNextWorkoutRead(fixture)
       const waiting = plugin.getIndex()
-      await reading
-      contents.set(files[0]!.path, freshnessSource(80))
-      if (change === 'settings') {
-        files[0]!.path = 'Training/Workouts/2026-08-15.md'
-        contents.set(files[0]!.path, freshnessSource(80))
-        plugin.settings.fitnessRoot = 'Training'
-        await plugin.saveSettings()
-      } else if (change === 'manual rebuild') {
-        await plugin.rebuildWorkoutIndex()
-      } else {
-        emit('modify', files[0]!)
-      }
-      release(original)
+      await read.started
+      await applyIndexChange(change, fixture, 80)
+      read.release(freshnessSource(50))
       expect((await waiting).entries[0]?.exercises[0]?.maxWeightSet?.weight).toBe(80)
       expect((await plugin.getIndex()).entries[0]?.exercises[0]?.maxWeightSet?.weight).toBe(80)
     },
