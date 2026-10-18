@@ -78,7 +78,14 @@ export default class FitKitPlugin extends Plugin {
     this.indexWorkoutsFolder = normalizePath(workoutsFolder(this.settings))
     this.addSettingTab(new FitKitSettingTab(this.app, this))
 
-    this.registerEvent(this.app.vault.on('create', (file) => this.invalidateForVaultChange(file)))
+    this.registerEvent(
+      this.app.vault.on('create', (file) => {
+        if ('children' in file && Array.isArray(file.children) && file.children.length === 0) {
+          return
+        }
+        this.invalidateForVaultChange(file)
+      }),
+    )
     this.registerEvent(this.app.vault.on('modify', (file) => this.invalidateForVaultChange(file)))
     this.registerEvent(this.app.vault.on('delete', (file) => this.invalidateForVaultChange(file)))
     this.registerEvent(

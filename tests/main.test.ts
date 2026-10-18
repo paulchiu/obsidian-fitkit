@@ -1292,6 +1292,15 @@ const makeFreshnessVault = async (): Promise<{
 }
 
 describe('Workout index freshness', () => {
+  it('preserves the available index when an empty workout subfolder is created', async () => {
+    const { plugin, emit, app } = await makeFreshnessVault()
+    const index = await plugin.getIndex()
+    app.vault.read = async () => freshnessSource(95)
+    emit('create', { path: 'Fitness/Workouts/Empty', children: [] } as { path: string })
+    expect((await plugin.getIndex()).entries[0]?.exercises[0]?.maxWeightSet?.weight).toBe(50)
+    expect(await plugin.getIndex()).toBe(index)
+  })
+
   it('renders a fresh chart after an external edit without writing the vault', async () => {
     const { plugin, files, contents, emit, app } = await makeFreshnessVault()
     await plugin.rebuildWorkoutIndex()
