@@ -1290,6 +1290,38 @@ const makeFreshnessVault = async (): Promise<{
 }
 
 describe('Workout index freshness', () => {
+  it('uses the saved fitness root on the next index read and persists it', async () => {
+    const { plugin, files, contents } = await makeFreshnessVault()
+    await plugin.getIndex()
+    const imported = { ...files[0]!, path: 'Training/Workouts/2026-08-14.md' }
+    files.push(imported)
+    contents.set(imported.path, freshnessSource(90))
+    let saved: unknown
+    vi.spyOn(plugin, 'saveData').mockImplementation(async (data: unknown) => {
+      saved = structuredClone(data)
+    })
+    plugin.settings.fitnessRoot = 'Training'
+    await plugin.saveSettings()
+    vi.spyOn(plugin, 'loadData').mockImplementation(async () => saved)
+    await plugin.loadSettings()
+    expect(plugin.settings.fitnessRoot).toBe('Training')
+    expect((await plugin.getIndex()).entries.map((entry) => entry.path)).toEqual([
+      'Training/Workouts/2026-08-14.md',
+    ])
+  })
+
+  it('preserves the index when saving unrelated settings or an equivalent root', async () => {
+    const { plugin, app } = await makeFreshnessVault()
+    const index = await plugin.getIndex()
+    app.vault.read = async () => {
+      throw new Error('Unrelated setting read a workout')
+    }
+    plugin.settings.chartSessionsWindow = 10
+    plugin.settings.fitnessRoot = '/Fitness/'
+    await plugin.saveSettings()
+    expect(await plugin.getIndex()).toBe(index)
+  })
+
   it.each([
     ['delete', 'Fitness/Workouts/2026-08-15.md', null, 'md'],
     ['rename', 'Fitness/Workouts/2026-08-15.md', 'Fitness/Workouts/renamed.md', 'md'],

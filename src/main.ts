@@ -60,6 +60,8 @@ export default class FitKitPlugin extends Plugin {
    * cachedIndex across an await, ensuring each runs in order with fresh data.
    * Settled links never reject, so a failed refresh cannot stall later ones.
    */
+  private indexWorkoutsFolder?: string
+
   private indexRefreshQueue: Promise<void> | null = null
 
   /** The workout each tab was switched to markdown for, which file-open routing leaves alone. */
@@ -71,6 +73,7 @@ export default class FitKitPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings()
+    this.indexWorkoutsFolder = normalizePath(workoutsFolder(this.settings))
     this.addSettingTab(new FitKitSettingTab(this.app, this))
 
     for (const event of ['create', 'modify', 'delete'] as const) {
@@ -506,6 +509,11 @@ export default class FitKitPlugin extends Plugin {
   }
 
   async saveSettings(): Promise<void> {
+    const folder = normalizePath(workoutsFolder(this.settings))
+    if (this.indexWorkoutsFolder !== folder) {
+      this.cachedIndex = null
+      this.indexWorkoutsFolder = folder
+    }
     await this.saveData(this.settings)
   }
 }
