@@ -40,6 +40,7 @@ export function installObsidianDomExtensions(): void {
     hasClass,
     setText,
     setAttr,
+    setCssProps,
     instanceOf,
     detach,
   }
@@ -245,6 +246,15 @@ function removeClass(this: Element, ...classes: string[]): void {
 
 function hasClass(this: Element, cls: string): boolean {
   return this.classList.contains(cls)
+}
+
+function setCssProps(this: Element, props: Record<string, string>): void {
+  if (!this.instanceOf(harnessWindow.HTMLElement)) {
+    return
+  }
+  for (const [name, value] of Object.entries(props)) {
+    this.style.setProperty(name, value)
+  }
 }
 
 function setText(this: Element, value: string): void {

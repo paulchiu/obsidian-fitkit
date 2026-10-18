@@ -17,7 +17,14 @@ import {
   ZERO_DURATION_DISPLAY,
 } from '../domain/duration-input'
 import { formatErrorMessage } from '../domain/error'
-import { CAUGHT_UP_NOTE, loggedReps, restsAfter, type RunRow } from '../domain/interval-run'
+import {
+  CAUGHT_UP_NOTE,
+  isCaughtUp,
+  loggedReps,
+  marksCaughtUpReps,
+  restsAfter,
+  type RunRow,
+} from '../domain/interval-run'
 import {
   resumeSession,
   startSession,
@@ -472,12 +479,14 @@ export class WorkoutEditorView extends FileView {
 
   private renderEmpty(message: string): void {
     this.contentEl.empty()
+    this.setListRefits = []
     const wrap = this.contentEl.createDiv({ cls: 'fitkit-empty' })
     wrap.setText(message)
   }
 
   private renderSkeleton(): void {
     this.contentEl.empty()
+    this.setListRefits = []
     const wrap = this.contentEl.createDiv({ cls: 'fitkit-skeleton' })
     for (let i = 0; i < 3; i++) {
       const card = wrap.createDiv({ cls: 'fitkit-skeleton-card' })
@@ -688,7 +697,7 @@ export class WorkoutEditorView extends FileView {
       renderRow(rows, i)
     }
     const expanded = this.expandedSetLists
-    const refit = capSetList(wrap, rows, count, {
+    const refit = capSetList(wrap, rows, {
       expanded: () => expanded.has(ex),
       setExpanded: (next) => {
         if (next) {
@@ -723,6 +732,7 @@ export class WorkoutEditorView extends FileView {
         next.weight = last.weight
       }
       ex.strengthSets.push(next)
+      this.expandedSetLists.add(ex)
       this.markDirty()
       this.render()
       this.focusRowCell(exerciseIndex, ex.strengthSets.length - 1, 'Weight')
@@ -736,6 +746,7 @@ export class WorkoutEditorView extends FileView {
         weight: last?.weight,
         reps: last?.reps,
       })
+      this.expandedSetLists.add(ex)
       this.markDirty()
       this.render()
     })
@@ -833,6 +844,7 @@ export class WorkoutEditorView extends FileView {
     addBtn.addEventListener('click', () => {
       const last = ex.bodyweightSets[ex.bodyweightSets.length - 1]
       ex.bodyweightSets.push({ set: nextSetNumber(ex.bodyweightSets), level: last?.level ?? 1 })
+      this.expandedSetLists.add(ex)
       this.markDirty()
       this.render()
       this.focusRowCell(exerciseIndex, ex.bodyweightSets.length - 1, 'Reps')
@@ -847,6 +859,7 @@ export class WorkoutEditorView extends FileView {
         reps: last?.reps,
         load: last?.load,
       })
+      this.expandedSetLists.add(ex)
       this.markDirty()
       this.render()
     })
@@ -1068,9 +1081,7 @@ export class WorkoutEditorView extends FileView {
       header.createSpan({ cls: 'fitkit-set-label', text: 'Rest' })
     }
 
-    /** One caught-up rep keeps its note; several get an asterisk each and one line saying what it means. */
-    const markCaughtUp =
-      ex.durationEntries.filter((entry) => entry.note === CAUGHT_UP_NOTE).length > 1
+    const markCaughtUp = marksCaughtUpReps(ex.durationEntries)
     this.renderSetRows(wrap, ex, ex.durationEntries.length, (rows, i) =>
       this.renderDurationRow(rows, ex, i, exerciseIndex, columns, markCaughtUp),
     )
@@ -1085,6 +1096,7 @@ export class WorkoutEditorView extends FileView {
         this.stopTimer({ write: true })
       }
       ex.durationEntries.push(carriedIntervalFields(ex.durationEntries.at(-1)))
+      this.expandedSetLists.add(ex)
       this.markDirty()
       this.render()
     })
@@ -1100,6 +1112,7 @@ export class WorkoutEditorView extends FileView {
         durationSeconds: last?.durationSeconds,
         ...carriedIntervalFields(last),
       })
+      this.expandedSetLists.add(ex)
       this.markDirty()
       this.render()
     })
@@ -1147,7 +1160,7 @@ export class WorkoutEditorView extends FileView {
 
     const setCell = this.createCell(row, 'Set', 'fitkit-set-figure')
     setCell.setText(String(durationEntry.set ?? i + 1))
-    const marked = markCaughtUp && durationEntry.note === CAUGHT_UP_NOTE
+    const marked = markCaughtUp && isCaughtUp(durationEntry)
     if (marked) {
       setCell.createSpan({
         cls: 'fitkit-set-mark',
@@ -1966,12 +1979,13 @@ export class WorkoutEditorView extends FileView {
     }
   }
 
-  /** Rows whose weight came from the plan and has not been typed over yet. View state only; never written to the note. */
+  /** Cards whose long set list is shown in full; adding a set opens it so the new row shows. */
   private get expandedSetLists(): WeakSet<ExerciseCard> {
     this.expandedSetListsStore ??= new WeakSet<ExerciseCard>()
     return this.expandedSetListsStore
   }
 
+  /** Rows whose weight came from the plan and has not been typed over yet. View state only; never written to the note. */
   private get seededWeights(): WeakSet<EditableStrengthSet> {
     this.seededWeightsStore ??= new WeakSet<EditableStrengthSet>()
     return this.seededWeightsStore

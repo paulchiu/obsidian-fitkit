@@ -12,7 +12,6 @@ export interface SetListExpansion {
 export const capSetList = (
   area: HTMLElement,
   rows: HTMLElement,
-  count: number,
   expansion: SetListExpansion,
 ): (() => void) => {
   const toggle = area.createEl('button', {
@@ -20,7 +19,13 @@ export const capSetList = (
     attr: { type: 'button' },
   })
   const refit = (): void => {
-    const tall = rows.scrollHeight > rows.win.innerHeight / 2
+    /** A phone keyboard shrinks the window; re-capping then would hide the row being typed in. */
+    if (rows.contains(rows.ownerDocument.activeElement)) {
+      return
+    }
+    const limit = Math.round(rows.win.innerHeight / 2)
+    rows.setCssProps({ '--fitkit-set-cap': `${limit}px` })
+    const tall = rows.scrollHeight > limit
     const capped = tall && !expansion.expanded()
     if (capped) {
       rows.addClass('is-capped')
@@ -28,7 +33,7 @@ export const capSetList = (
       rows.removeClass('is-capped')
     }
     toggle.hidden = !tall
-    toggle.setText(capped ? `Show all ${count} sets` : 'Show fewer sets')
+    toggle.setText(capped ? `Show all ${rows.children.length} sets` : 'Show fewer sets')
     toggle.setAttr('aria-expanded', String(!capped))
   }
   toggle.addEventListener('click', () => {

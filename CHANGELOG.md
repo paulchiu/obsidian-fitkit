@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - The plan form edits a plan as rows of steps, rests and nested repeats, or as text, with a live preview of the reps and total time, an info button with worked examples to use as they are, and starter plans for Tabata, EMOM, over-unders, a pyramid, 30/30 and Norwegian 4x4.
 - An interval card shows its plan as a profile of the steps in time, coloured by step, with a strip marking each logged rep on target or short and a line that spells the plan out in the same colours.
 - An interval card's menu records a next-time direction (`Plan: increase`, `Plan: keep` or `Plan: decrease`, written as `[next:: up]`), shown as the `Next` badge on the card and again the next time the exercise comes up.
+- A card whose sets run past half the screen shows only that much, fading out above `Show all N sets`, which opens the whole list until `Show fewer sets`. `Add set` and `Repeat` open it so the new row shows. When several reps were logged while Obsidian was closed, each gets an asterisk by its set number and one line under the sets explains it, in place of a note on every rep.
 - `Interval beeps` in settings beeps the last three seconds of each interval and the change between work and rest, and vibrates where the device can. The runner also keeps the screen awake where the platform allows.
 
 ### Changed

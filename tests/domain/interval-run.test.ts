@@ -19,6 +19,7 @@ import {
   startRun,
   togglePauseRun,
   type RunRow,
+  marksCaughtUpReps,
 } from '../../src/domain/interval-run'
 
 /** Epoch ms for a Brisbane wall-clock time on the workout's day. */
@@ -674,6 +675,19 @@ describe('interval run', () => {
         runPhase(rows, shorter, at('07:15:40')),
         endWork(rows, shorter, at('07:15:40')).finished,
       ]).toEqual([{ kind: 'work', rep: 2, elapsed: 10, remaining: 20, paused: false }, true])
+    })
+  })
+
+  describe('marking caught-up reps', () => {
+    it('marks reps once two or more were caught up, and leaves a lone one or edited notes to read as notes', () => {
+      const caught = { note: 'logged while Obsidian was closed' }
+      const edited = { note: 'logged while Obsidian was closed, felt easy' }
+
+      expect([
+        marksCaughtUpReps([{}, caught, caught]),
+        marksCaughtUpReps([{}, caught]),
+        marksCaughtUpReps([caught, edited]),
+      ]).toEqual([true, false, false])
     })
   })
 })

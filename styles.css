@@ -385,10 +385,12 @@ body.is-mobile .fitkit-editor-root {
   gap: 6px;
 }
 
-/** A long set list stops at half the screen and fades out above its Show all toggle. */
+/** A long set list stops at its measured cap and fades out; clip keeps focus from scrolling hidden rows in. */
 .fitkit-set-rows.is-capped {
-  max-height: 50vh;
+  max-height: var(--fitkit-set-cap, 50vh);
   overflow: hidden;
+  overflow: clip;
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 48px), transparent);
   mask-image: linear-gradient(to bottom, black calc(100% - 48px), transparent);
 }
 

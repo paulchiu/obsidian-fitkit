@@ -255,6 +255,7 @@ class TestElement {
   scrollHeight = 0
   hidden = false
   readonly win = { innerHeight: 768 }
+  readonly ownerDocument = { activeElement: null }
   rect: DOMRect = testRect({ left: 10, bottom: 20, width: 10 })
 
   constructor(readonly tagName: string) {}
@@ -315,6 +316,12 @@ class TestElement {
   removeClass(cls: string): void {
     this.classes.delete(cls)
   }
+
+  contains(_other: unknown): boolean {
+    return false
+  }
+
+  setCssProps(_props: Record<string, string>): void {}
 
   setText(text: string): void {
     this.textContent = text

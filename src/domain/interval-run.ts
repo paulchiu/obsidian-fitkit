@@ -325,6 +325,13 @@ export type RunCatchUp =
 
 export const CAUGHT_UP_NOTE = 'logged while Obsidian was closed'
 
+/** Whether a rep was filled in by catching up a run, going by the note catch-up leaves on it. */
+export const isCaughtUp = (row: { note?: string }): boolean => row.note === CAUGHT_UP_NOTE
+
+/** Several caught-up reps read better as an asterisk each and one explanation than as a note per rep. */
+export const marksCaughtUpReps = (rows: ReadonlyArray<{ note?: string }>): boolean =>
+  rows.filter(isCaughtUp).length > 1
+
 /** A plan that ended this recently was probably finished behind a locked screen, not abandoned. */
 const CUT_OFF_GRACE_MS = 2 * 60 * 1000
 

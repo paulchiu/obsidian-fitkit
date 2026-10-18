@@ -15,6 +15,7 @@ declare module 'jsdom' {
     HTMLSpanElement: typeof HTMLSpanElement
     Node: typeof Node
     XMLSerializer: typeof XMLSerializer
+    innerHeight: number
     getComputedStyle(element: Element): CSSStyleDeclaration
   }
 

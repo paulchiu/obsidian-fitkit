@@ -1118,11 +1118,26 @@ describe('WorkoutEditorView interval plans', () => {
         ...repRows(count),
       )
 
-    /** jsdom has no layout, so each set row stands 40px tall against the harness's 768px window. */
+    let resized: () => void = () => {}
+    let windowHeight = 768
+
+    /** jsdom has no layout, so each set row stands 40px tall in a window `windowHeight` tall. */
     beforeEach(() => {
+      windowHeight = 768
       vi.spyOn(harnessWindow.HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(
         function (this: HTMLElement) {
           return this.querySelectorAll('.fitkit-row').length * 40
+        },
+      )
+      vi.spyOn(harnessWindow, 'innerHeight', 'get').mockImplementation(() => windowHeight)
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          constructor(callback: () => void) {
+            resized = callback
+          }
+          observe(): void {}
+          disconnect(): void {}
         },
       )
     })
@@ -1134,41 +1149,97 @@ describe('WorkoutEditorView interval plans', () => {
     const toggle = (view: WorkoutEditorView): HTMLButtonElement | null =>
       view.contentEl.querySelector<HTMLButtonElement>('.fitkit-set-toggle:not([hidden])')
 
-    const capped = (view: WorkoutEditorView): boolean =>
-      view.contentEl.querySelector('.fitkit-set-rows')?.classList.contains('is-capped') ?? false
+    const rows = (view: WorkoutEditorView): HTMLElement => {
+      const found = view.contentEl.querySelector<HTMLElement>('.fitkit-set-rows')
+      if (!found) {
+        throw new Error('set rows not rendered')
+      }
+      return found
+    }
+
+    const capped = (view: WorkoutEditorView): boolean => rows(view).classList.contains('is-capped')
+
+    /** The height the capped list stops at, which the stylesheet reads. */
+    const cap = (view: WorkoutEditorView): string =>
+      rows(view).style.getPropertyValue('--fitkit-set-cap')
+
+    const textButton = (view: WorkoutEditorView, text: string): HTMLButtonElement => {
+      const found = [...view.contentEl.querySelectorAll('button')].find(
+        (candidate) => candidate.textContent === text,
+      )
+      if (!found) {
+        throw new Error(`${text} not rendered`)
+      }
+      return found
+    }
 
     it('caps a set list taller than half the screen, and expands and collapses it', async () => {
       const { view } = await openView(longBike(20))
 
-      const states = [[capped(view), toggle(view)?.textContent]]
-      toggle(view)?.click()
-      states.push([capped(view), toggle(view)?.textContent])
-      toggle(view)?.click()
-      states.push([capped(view), toggle(view)?.textContent])
+      const states = [[capped(view), cap(view), toggle(view)?.textContent]]
+      textButton(view, 'Show all 20 sets').click()
+      states.push([capped(view), cap(view), toggle(view)?.textContent])
+      textButton(view, 'Show fewer sets').click()
+      states.push([capped(view), cap(view), toggle(view)?.textContent])
 
       expect(states).toEqual([
-        [true, 'Show all 20 sets'],
-        [false, 'Show fewer sets'],
-        [true, 'Show all 20 sets'],
+        [true, '384px', 'Show all 20 sets'],
+        [false, '384px', 'Show fewer sets'],
+        [true, '384px', 'Show all 20 sets'],
       ])
     })
 
-    it('keeps an expanded set list open when a set is added', async () => {
+    it('caps a list just past half the screen and leaves one just inside it', async () => {
+      const inside = (await openView(longBike(9))).view
+      const past = (await openView(longBike(10))).view
+
+      expect([
+        [capped(inside), toggle(inside)],
+        [capped(past), toggle(past)?.textContent],
+      ]).toEqual([
+        [false, null],
+        [true, 'Show all 10 sets'],
+      ])
+    })
+
+    it('opens a capped list when a set is added, so the new row shows', async () => {
       const { view } = await openView(longBike(20))
 
-      toggle(view)?.click()
-      const addSet = [...view.contentEl.querySelectorAll('button')].find(
-        (candidate) => candidate.textContent === 'Add set',
-      )
-      addSet?.click()
+      textButton(view, 'Add set').click()
+
+      expect([capped(view), toggle(view)?.textContent, rows(view).children.length]).toEqual([
+        false,
+        'Show fewer sets',
+        21,
+      ])
+    })
+
+    it('keeps an expanded set list open when the card redraws', async () => {
+      const { view } = await openView(longBike(20))
+
+      textButton(view, 'Show all 20 sets').click()
+      view.refreshSettingsDrivenUi()
 
       expect([capped(view), toggle(view)?.textContent]).toEqual([false, 'Show fewer sets'])
     })
 
-    it('leaves a set list that fits in half the screen alone', async () => {
-      const { view } = await openView(longBike(3))
+    it('refits the cap when the window changes height, but not while a set is being typed in', async () => {
+      const { view } = await openView(longBike(20))
+      harnessDocument.body.append(view.contentEl)
+      const input = rows(view).querySelector('input')
+      if (!(input instanceof harnessWindow.HTMLInputElement)) {
+        throw new Error('set input not rendered')
+      }
 
-      expect([capped(view), toggle(view)]).toEqual([false, null])
+      input.focus()
+      windowHeight = 500
+      resized()
+      const whileTyping = cap(view)
+      input.blur()
+      resized()
+      view.contentEl.remove()
+
+      expect([whileTyping, cap(view)]).toEqual(['384px', '250px'])
     })
   })
 
@@ -1203,10 +1274,16 @@ describe('WorkoutEditorView interval plans', () => {
       })
     })
 
-    it('styles the asterisk and its explanation', async () => {
+    it('styles the asterisk and its explanation, which sits under the last set', async () => {
       const { view } = await openView(card(caughtUp(2), caughtUp(3)))
+      const legend = view.contentEl.querySelector('.fitkit-set-legend')
+      const lastRow = [...view.contentEl.querySelectorAll('.fitkit-set-rows > .fitkit-row')].at(-1)
 
-      expect(findUnstyledClasses(view.contentEl)).toEqual([])
+      expect([
+        view.contentEl.querySelectorAll('.fitkit-set-mark').length,
+        lastRow && legend ? lastRow.compareDocumentPosition(legend) : 0,
+        findUnstyledClasses(view.contentEl),
+      ]).toEqual([2, harnessWindow.Node.DOCUMENT_POSITION_FOLLOWING, []])
     })
 
     it('keeps the note on a single caught-up rep', async () => {
