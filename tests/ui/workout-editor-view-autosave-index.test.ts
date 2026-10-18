@@ -233,7 +233,7 @@ interface Harness {
  * seeded by the real rebuildIndex(), matching what the plugin would have
  * cached before the user's edit.
  */
-const createHarness = async (): Promise<Harness> => {
+const createHarness = async (persistenceFailure?: Error): Promise<Harness> => {
   const file: TestFile = {
     path: WORKOUT_PATH,
     extension: 'md',
@@ -245,6 +245,7 @@ const createHarness = async (): Promise<Harness> => {
     getFolderByPath: buildMockVaultFolderTree([file]).getFolderByPath,
     read: async (target) => contents.get(target.path) ?? '',
     process: async (target, callback) => {
+      if (persistenceFailure) throw persistenceFailure
       contents.set(target.path, callback(contents.get(target.path) ?? ''))
     },
     getAbstractFileByPath: (path) => (contents.has(path) ? file : null),
@@ -304,6 +305,33 @@ describe('WorkoutEditorView autosave keeps the cached index in sync', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
+
+  it.each(['background', 'unload'] as const)(
+    'shows an unsaved notice when a %s save fails',
+    async (savePath) => {
+      vi.useFakeTimers()
+      noticeMessages.length = 0
+      const failure = new Error('disk full')
+      const { view } = await createHarness(failure)
+      const model = view.model
+      const session = view.session
+      view.markDirty()
+      try {
+        if (savePath === 'background') {
+          await vi.advanceTimersByTimeAsync(DEFAULT_SETTINGS.autosaveDebounceMs)
+        } else {
+          await expect(view.onUnloadFile()).rejects.toBe(failure)
+        }
+        expect(noticeMessages).toEqual([
+          'Could not save workout. Edits are unsaved. Edit again to retry before leaving.',
+        ])
+        expect(view.model).toBe(model)
+        expect(view.session).toBe(session)
+      } finally {
+        vi.useRealTimers()
+      }
+    },
+  )
 
   it('updates plugin.cachedIndex with the freshly saved next-time plan after a successful autosave', async () => {
     const { view, plugin, contents } = await createHarness()
