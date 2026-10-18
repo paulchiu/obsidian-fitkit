@@ -7,7 +7,7 @@ import {
   type TypeSwitchScope,
 } from '../../src/domain/exercise-type-switch'
 
-const SCOPES: TypeSwitchScope[] = ['workout', 'workout-and-registry', 'registry-known']
+const SCOPES: TypeSwitchScope[] = ['workout', 'workout-and-registry']
 
 function plan(
   loggedType: ExerciseType,
@@ -153,66 +153,6 @@ describe('planTypeSwitch', () => {
         expect(
           plan(target === 'strength' ? 'bodyweight' : 'strength', target, 'workout'),
         ).toMatchObject({ target, announcedAs: target })
-      }
-    })
-  })
-
-  describe('on rename, where the registry already knows the new name', () => {
-    it('changes the kind without recording or opening anything', () => {
-      expect(plan('strength', 'duration', 'registry-known', 'duration')).toEqual({
-        ...NOTHING,
-        target: 'duration',
-        announcedAs: 'duration',
-        changesKind: true,
-      })
-    })
-
-    it('switches a card onto an interval name as plain duration, with no plan form', () => {
-      expect(plan('strength', 'interval', 'registry-known', 'interval')).toEqual({
-        ...NOTHING,
-        target: 'interval',
-        announcedAs: 'duration',
-        changesKind: true,
-      })
-    })
-
-    it('always seeds the ladder and offers the relabel onto a bodyweight name', () => {
-      for (const loggedType of ['strength', 'duration', 'interval'] as const) {
-        expect(plan(loggedType, 'bodyweight', 'registry-known', 'bodyweight')).toEqual({
-          ...NOTHING,
-          target: 'bodyweight',
-          announcedAs: 'bodyweight',
-          changesKind: true,
-          dropsPlan: loggedType === 'interval',
-          seedsLadder: true,
-          offersRelabel: true,
-        })
-      }
-    })
-
-    it('drops the plan only when an interval card changes kind', () => {
-      expect(plan('interval', 'strength', 'registry-known', 'strength')).toMatchObject({
-        changesKind: true,
-        dropsPlan: true,
-      })
-    })
-
-    it('keeps the plan when an interval card takes a plain duration name', () => {
-      expect(plan('interval', 'duration', 'registry-known', 'duration')).toMatchObject(NOTHING)
-    })
-
-    it('leaves a plain duration card alone when it takes an interval name', () => {
-      expect(plan('duration', 'interval', 'registry-known', 'interval')).toMatchObject(NOTHING)
-    })
-
-    it('never records the type or opens the plan form', () => {
-      for (const loggedType of EXERCISE_TYPES) {
-        for (const target of EXERCISE_TYPES) {
-          expect(plan(loggedType, target, 'registry-known', target)).toMatchObject({
-            recordsType: false,
-            opensPlanForm: false,
-          })
-        }
       }
     })
   })

@@ -2450,7 +2450,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
       expect(obsidianMock.notices.join('\n')).not.toContain('records levels')
     })
 
-    it('seeds a ladder and offers the relabel when renaming onto a bodyweight exercise', async () => {
+    it('offers the relabel but seeds no ladder when renaming onto a bodyweight exercise', async () => {
       const { view } = createPersistKindChangeView([], [])
       const renameView = view as unknown as RelabelView & {
         model: {
@@ -2492,9 +2492,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
       expect(card?.bodyweightSets).toEqual([{ level: 1, set: 1, reps: 8, load: 10 }])
       expect(confirm).toHaveBeenCalledTimes(1)
       expect(confirm.mock.calls[0]?.[0]).toContain('1 already-logged set')
-      expect(view.plugin.settings.exerciseRegistry).toMatchObject([
-        { name: 'Push-up', kind: 'bodyweight', levels: ['Push-up'] },
-      ])
+      expect(view.plugin.settings.exerciseRegistry).toEqual([])
     })
   })
 
@@ -2538,7 +2536,7 @@ describe('WorkoutEditorView kind switch persistence', () => {
       obsidianMock.notices = []
     })
 
-    it('lands a strength card renamed onto an interval name as plain duration', async () => {
+    it('switches a strength card renamed onto an interval name and opens the plan form', async () => {
       const view = createRenameView(card({ strengthSets: [{ set: 1, weight: 10, reps: 8 }] }))
       const registry = createRegistry([
         { name: 'Rower', kind: 'duration', interval: true, aliases: [] },
@@ -2548,15 +2546,14 @@ describe('WorkoutEditorView kind switch persistence', () => {
 
       const renamed = view.model.exercises[0]
       expect(renamed).toMatchObject({ name: 'Rower', kind: 'duration', strengthSets: [] })
-      expect(renamed?.plan).toBeUndefined()
-      expect(view.openIntervalPlanModal).not.toHaveBeenCalled()
+      expect(view.openIntervalPlanModal).toHaveBeenCalledWith(renamed)
       expect(view.plugin.saveSettings).not.toHaveBeenCalled()
       expect(obsidianMock.notices).toEqual([
-        'Switched to duration. Previous strength rows were cleared.',
+        'Switched to interval. Previous strength rows were cleared.',
       ])
     })
 
-    it('keeps the plan when an interval card takes a plain duration name', async () => {
+    it('drops the plan when an interval card takes a plain duration name', async () => {
       const view = createRenameView(
         card({ name: 'Bike', kind: 'duration', plan: '8 x 30s, 90s rest' }),
       )
@@ -2564,15 +2561,13 @@ describe('WorkoutEditorView kind switch persistence', () => {
 
       await view.applyRename(0, 'Rower', registry)
 
-      expect(view.model.exercises[0]).toMatchObject({
-        name: 'Rower',
-        kind: 'duration',
-        plan: '8 x 30s, 90s rest',
-      })
+      const renamed = view.model.exercises[0]
+      expect(renamed).toMatchObject({ name: 'Rower', kind: 'duration' })
+      expect(renamed?.plan).toBeUndefined()
       expect(view.openIntervalPlanModal).not.toHaveBeenCalled()
     })
 
-    it('only renames a plain duration card that takes an interval name', async () => {
+    it('opens the plan form on a plain duration card that takes an interval name', async () => {
       const view = createRenameView(
         card({ name: 'Bike', kind: 'duration', durationEntries: [{ durationSeconds: 60 }] }),
       )
@@ -2584,8 +2579,8 @@ describe('WorkoutEditorView kind switch persistence', () => {
 
       const renamed = view.model.exercises[0]
       expect(renamed).toMatchObject({ name: 'Rower', durationEntries: [{ durationSeconds: 60 }] })
-      expect(renamed?.plan).toBeUndefined()
-      expect(view.openIntervalPlanModal).not.toHaveBeenCalled()
+      expect(view.openIntervalPlanModal).toHaveBeenCalledWith(renamed)
+      expect(view.markDirty).toHaveBeenCalled()
       expect(obsidianMock.notices).toEqual([])
     })
   })

@@ -2525,26 +2525,21 @@ export class WorkoutEditorView extends FileView {
       return
     }
     const registryType = typeForName(registry, trimmed)
-    const plan = registryType
-      ? planTypeSwitch({
-          loggedType: loggedTypeOf(target),
-          target: registryType,
-          registryType,
-          scope: 'registry-known',
-        })
-      : null
-    if (plan?.changesKind) {
-      const confirmed = await this.confirmKindSwitch(target, kindOfType(plan.target))
-      if (!confirmed) {
-        return
-      }
-      target.name = trimmed
-      await this.runTypeSwitch(index, plan)
+    const loggedType = loggedTypeOf(target)
+    /** The registry already holds the new name's type, so the switch is the card menu's this-workout one. */
+    const plan =
+      registryType && registryType !== loggedType
+        ? planTypeSwitch({ loggedType, target: registryType, registryType, scope: 'workout' })
+        : null
+    if (plan?.changesKind && !(await this.confirmKindSwitch(target, kindOfType(plan.target)))) {
       return
     }
     target.name = trimmed
     this.markDirty()
     this.render()
+    if (plan) {
+      await this.runTypeSwitch(index, plan)
+    }
   }
 
   private async collectExerciseSuggestions(): Promise<string[]> {

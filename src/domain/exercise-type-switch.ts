@@ -1,10 +1,11 @@
 import { kindOfType, type ExerciseType } from './exercise-type'
 
 /**
- * Where a card's type switch reaches: this workout only, this workout plus
- * the registry, or a rename onto a name the registry already types.
+ * Where a card's type switch reaches: this workout only, or this workout plus
+ * the registry. A rename onto a name the registry already types is a switch
+ * for this workout only.
  */
-export type TypeSwitchScope = 'workout' | 'workout-and-registry' | 'registry-known'
+export type TypeSwitchScope = 'workout' | 'workout-and-registry'
 
 export interface TypeSwitchInput {
   /** What the card shows now, as `loggedTypeOf` reads it. */
@@ -31,25 +32,12 @@ export interface TypeSwitchPlan {
 /**
  * Decides the steps of a card type switch. Only a scope that reaches the
  * registry seeds the ladder, since a ladder in a note still typed otherwise is
- * unreadable. A rename moves only the stored kind, so it never records, opens
- * the plan form or touches a plan within duration.
+ * unreadable.
  */
 export function planTypeSwitch(input: TypeSwitchInput): TypeSwitchPlan {
   const { loggedType, target, registryType, scope } = input
   const changesKind = kindOfType(loggedType) !== kindOfType(target)
   const toBodyweight = target === 'bodyweight' && changesKind
-  if (scope === 'registry-known') {
-    return {
-      target,
-      announcedAs: kindOfType(target),
-      changesKind,
-      dropsPlan: changesKind && loggedType === 'interval',
-      recordsType: false,
-      seedsLadder: toBodyweight,
-      opensPlanForm: false,
-      offersRelabel: toBodyweight,
-    }
-  }
   const switches = loggedType !== target
   return {
     target,

@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - The card menu is shorter. The three `Switch to ...` items sit behind one `Change type...` item, and `Open exercise file`, `Move up` and `Move down` are gone, since tapping the name opens the file and the drag handle reorders cards.
 - The duration timer and the rest timer take over the tab like the interval runner, as a big clock that keeps the screen awake. The duration timer stays open after `Stop`, with `Next set`, `Resume`, `Reset` and `Done`, so a run of stretches is timed set after set without going back to the card.
+- Renaming a card to an exercise the registry already types now switches it the way `Change type...` does for this workout: an interval name opens the plan form, a plain duration name drops the plan, and a bodyweight name offers the level 1 relabel without writing a ladder.
 
 ### Fixed
 
