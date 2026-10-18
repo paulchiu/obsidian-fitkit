@@ -1172,6 +1172,53 @@ describe('WorkoutEditorView interval plans', () => {
     })
   })
 
+  describe('reps logged while Obsidian was closed', () => {
+    const caughtUp = (set: number): string =>
+      `- [exercise:: [[Exercise Bike]]] [set:: ${set}] [duration:: 30] [watts:: 300] [rest:: 90] [notes:: logged while Obsidian was closed]`
+
+    const card = (...rows: string[]): string =>
+      workoutSource(
+        '## [[Exercise Bike]]',
+        '',
+        '- [exercise:: [[Exercise Bike]]] [plan:: 4 x 30s @ 300W, 90s rest]',
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 280] [rest:: 90]',
+        ...rows,
+      )
+
+    const seen = (view: WorkoutEditorView): { sets: string[]; notes: string[] } => ({
+      sets: [...view.contentEl.querySelectorAll('.fitkit-set-rows .fitkit-set-figure')].map(
+        (cell) => cell.textContent ?? '',
+      ),
+      notes: [...view.contentEl.querySelectorAll('.fitkit-note-line')].map(
+        (line) => line.textContent ?? '',
+      ),
+    })
+
+    it('marks several caught-up reps with an asterisk and explains it once under the sets', async () => {
+      const { view } = await openView(card(caughtUp(2), caughtUp(3)))
+
+      expect(seen(view)).toEqual({
+        sets: ['1', '2*', '3*'],
+        notes: ['* logged while Obsidian was closed'],
+      })
+    })
+
+    it('styles the asterisk and its explanation', async () => {
+      const { view } = await openView(card(caughtUp(2), caughtUp(3)))
+
+      expect(findUnstyledClasses(view.contentEl)).toEqual([])
+    })
+
+    it('keeps the note on a single caught-up rep', async () => {
+      const { view } = await openView(card(caughtUp(2)))
+
+      expect(seen(view)).toEqual({
+        sets: ['1', '2'],
+        notes: ['logged while Obsidian was closed'],
+      })
+    })
+  })
+
   describe('remembering the interval plan', () => {
     const LAST_BIKE: IndexEntry = {
       path: 'Fitness/Workouts/2026-10-05.md',

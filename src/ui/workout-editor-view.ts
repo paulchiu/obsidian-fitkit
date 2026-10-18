@@ -17,7 +17,7 @@ import {
   ZERO_DURATION_DISPLAY,
 } from '../domain/duration-input'
 import { formatErrorMessage } from '../domain/error'
-import { loggedReps, restsAfter, type RunRow } from '../domain/interval-run'
+import { CAUGHT_UP_NOTE, loggedReps, restsAfter, type RunRow } from '../domain/interval-run'
 import {
   resumeSession,
   startSession,
@@ -1068,9 +1068,15 @@ export class WorkoutEditorView extends FileView {
       header.createSpan({ cls: 'fitkit-set-label', text: 'Rest' })
     }
 
+    /** One caught-up rep keeps its note; several get an asterisk each and one line saying what it means. */
+    const markCaughtUp =
+      ex.durationEntries.filter((entry) => entry.note === CAUGHT_UP_NOTE).length > 1
     this.renderSetRows(wrap, ex, ex.durationEntries.length, (rows, i) =>
-      this.renderDurationRow(rows, ex, i, exerciseIndex, columns),
+      this.renderDurationRow(rows, ex, i, exerciseIndex, columns, markCaughtUp),
     )
+    if (markCaughtUp) {
+      wrap.createDiv({ cls: 'fitkit-note-line fitkit-set-legend', text: `* ${CAUGHT_UP_NOTE}` })
+    }
 
     const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
     const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
@@ -1126,6 +1132,7 @@ export class WorkoutEditorView extends FileView {
     i: number,
     exerciseIndex: number,
     columns: IntervalColumns = intervalColumns(ex),
+    markCaughtUp = false,
   ): void {
     const durationEntry = ex.durationEntries[i]
     if (!durationEntry) {
@@ -1140,6 +1147,14 @@ export class WorkoutEditorView extends FileView {
 
     const setCell = this.createCell(row, 'Set', 'fitkit-set-figure')
     setCell.setText(String(durationEntry.set ?? i + 1))
+    const marked = markCaughtUp && durationEntry.note === CAUGHT_UP_NOTE
+    if (marked) {
+      setCell.createSpan({
+        cls: 'fitkit-set-mark',
+        text: '*',
+        attr: { 'aria-label': CAUGHT_UP_NOTE },
+      })
+    }
 
     this.renderDurationInput(this.createCell(row, 'Duration'), durationEntry)
     const intensity = columns.intensity
@@ -1163,6 +1178,7 @@ export class WorkoutEditorView extends FileView {
     this.renderRowActions(container, body, {
       label: `duration entry ${i + 1}`,
       currentNote: durationEntry.note,
+      hideNoteLine: marked,
       onDelete: () => {
         if (this.runningSetTimer()?.entry === durationEntry) {
           this.abortTimer()
@@ -1375,6 +1391,8 @@ export class WorkoutEditorView extends FileView {
     opts: {
       label: string
       currentNote: string | undefined
+      /** The note stays editable from the menu; the row shows it some other way. */
+      hideNoteLine?: boolean
       onDelete: () => void
       onNoteSave: (next: string | undefined) => void
       onRenumber?: () => void
@@ -1401,7 +1419,7 @@ export class WorkoutEditorView extends FileView {
       opts.loadMenu,
     )
 
-    if (opts.currentNote && opts.currentNote.length > 0) {
+    if (opts.currentNote && opts.currentNote.length > 0 && !opts.hideNoteLine) {
       const line = container.createDiv({
         cls: 'fitkit-note-line',
         attr: { role: 'button', tabindex: '0' },

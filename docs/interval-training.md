@@ -174,7 +174,7 @@ With `Interval beeps` on (see [Settings](settings.md)), the last three seconds o
 
 ### If Obsidian closes mid-run
 
-A run lives in the note, not in memory, so a phone closing Obsidian in the background does not lose it. Reopening the workout picks the run up from the clock: reps that finished while Obsidian was closed are filled with the target, flagged `logged while Obsidian was closed`, and counted in a notice so you can check them.
+A run lives in the note, not in memory, so a phone closing Obsidian in the background does not lose it. Reopening the workout picks the run up from the clock: reps that finished while Obsidian was closed are filled with the target, flagged `logged while Obsidian was closed`, and counted in a notice so you can check them. When several reps were caught up, the editor marks each one with an asterisk by its set number and explains the asterisk once under the sets.
 
 If the plan ended more than two minutes before you came back, FitKit does not make up reps. It shows `Run cut off at rep N` with `Resume rep N` and `End run here`. Closing the tab yourself pauses the run.
 

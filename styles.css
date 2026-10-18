@@ -637,6 +637,17 @@ body.is-mobile .fitkit-editor-root {
   outline: none;
 }
 
+/** Explains the asterisk on caught-up reps; read-only, unlike a note line. */
+.fitkit-set-legend,
+.fitkit-set-legend:hover {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.fitkit-set-mark {
+  color: var(--text-accent);
+}
+
 /** Exercise-level notes keep the same inset as the set-level note they vary from. */
 .fitkit-exercise-note-line {
   padding-inline: var(--size-4-2, 8px);
