@@ -82,6 +82,9 @@ function createPlugin(
     },
     settings,
     cachedIndex: emptyIndex,
+    getIndex(this: { cachedIndex: FitKitIndex }): Promise<FitKitIndex> {
+      return Promise.resolve(this.cachedIndex)
+    },
     lastDiagnostics: [],
   } as unknown as ChartBlockPlugin
 }

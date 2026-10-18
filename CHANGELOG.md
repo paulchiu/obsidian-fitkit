@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Charts and workout history use current workout files after external edits, moves, deletions or a saved fitness folder change, without requiring an editor render or manual index rebuild.
+
 - Failed workout saves show a notice and keep edits marked unsaved so another edit can retry.
 
 - Closing or switching workout notes waits for edits made during the final save to persist.
