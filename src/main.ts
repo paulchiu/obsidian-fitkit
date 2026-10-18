@@ -78,9 +78,9 @@ export default class FitKitPlugin extends Plugin {
     this.indexWorkoutsFolder = normalizePath(workoutsFolder(this.settings))
     this.addSettingTab(new FitKitSettingTab(this.app, this))
 
-    for (const event of ['create', 'modify', 'delete'] as const) {
-      this.registerEvent(this.app.vault.on(event, (file) => this.invalidateForVaultChange(file)))
-    }
+    this.registerEvent(this.app.vault.on('create', (file) => this.invalidateForVaultChange(file)))
+    this.registerEvent(this.app.vault.on('modify', (file) => this.invalidateForVaultChange(file)))
+    this.registerEvent(this.app.vault.on('delete', (file) => this.invalidateForVaultChange(file)))
     this.registerEvent(
       this.app.vault.on('rename', (file, oldPath) => this.invalidateForVaultChange(file, oldPath)),
     )
@@ -225,7 +225,8 @@ export default class FitKitPlugin extends Plugin {
    */
   async refreshIndexEntry(path: string): Promise<void> {
     const previous = this.indexRefreshQueue ?? Promise.resolve()
-    const run = previous.then(() => this.applyIndexRefresh(path))
+    const generation = this.indexGeneration
+    const run = previous.then(() => this.applyIndexRefresh(path, generation))
     this.indexRefreshQueue = run.then(
       () => undefined,
       () => undefined,
@@ -233,12 +234,16 @@ export default class FitKitPlugin extends Plugin {
     return run
   }
 
-  private async applyIndexRefresh(path: string): Promise<void> {
-    if (this.cachedIndex === null) {
+  private async applyIndexRefresh(path: string, generation: number): Promise<void> {
+    const index = this.cachedIndex
+    if (index === null || generation !== this.indexGeneration) {
       return
     }
-    this.cachedIndex = await updateIndexEntry(this.app, this.settings, this.cachedIndex, path)
-    this.lastDiagnostics = this.cachedIndex.diagnostics
+    const updated = await updateIndexEntry(this.app, this.settings, index, path)
+    if (generation === this.indexGeneration && this.cachedIndex === index) {
+      this.cachedIndex = updated
+      this.lastDiagnostics = updated.diagnostics
+    }
   }
 
   async rebuildDashboard(): Promise<void> {
