@@ -1,4 +1,4 @@
-import type { FileSession } from './file-session'
+import type { FileSession, SaveResult } from './file-session'
 
 /** What the view shows: the `unsaved` marker and the conflict banner. */
 export interface AutosaveState {
@@ -65,10 +65,13 @@ export function createAutosaver(deps: AutosaverDeps): Autosaver {
   const write = async (session: FileSession, text: string, savedEdit: number): Promise<void> => {
     const path = session.file.path
     try {
-      const result = await session.saveIfUnchanged(text).catch((error: unknown) => {
+      let result: SaveResult
+      try {
+        result = await session.saveIfUnchanged(text)
+      } catch (error: unknown) {
         deps.onSaveError(error)
         throw error
-      })
+      }
       if (!result.ok) {
         conflict = true
         deps.onConflict()
