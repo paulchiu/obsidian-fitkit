@@ -378,3 +378,10 @@ export const pickerModal = async (): Promise<{ inputEl: HTMLInputElement }> => {
   await settle()
   return obsidianRecord.modals.at(-1) as unknown as { inputEl: HTMLInputElement }
 }
+
+/** Deletes a row through its menu and the confirm that follows. */
+export const deleteRow = async (row: Element): Promise<void> => {
+  openRowMenu(row)
+  chooseMenuItem('Delete row')
+  await choose('Remove row?', 'Remove')
+}

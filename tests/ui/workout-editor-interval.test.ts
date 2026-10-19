@@ -1320,9 +1320,7 @@ describe('WorkoutEditorView interval plans', () => {
       await vi.waitFor(() => expect(obsidian.modals.at(-1)?.titleEl).toBeDefined())
       const picker = obsidian.modals.at(-1) as unknown as { inputEl: HTMLInputElement }
       picker.inputEl.value = 'Exercise Bike'
-      picker.inputEl.dispatchEvent(
-        new (harnessWindow.KeyboardEvent as typeof KeyboardEvent)('keydown', { key: 'Enter' }),
-      )
+      picker.inputEl.dispatchEvent(new harnessWindow.KeyboardEvent('keydown', { key: 'Enter' }))
 
       await vi.waitFor(() => expect(button(view, 'Start interval plan').textContent).toBe('Start'))
       await vi.waitFor(() =>
@@ -1380,9 +1378,7 @@ describe('WorkoutEditorView interval plans', () => {
       await vi.waitFor(() => expect(obsidian.modals.at(-1)?.titleEl).toBeDefined())
       const picker = obsidian.modals.at(-1) as unknown as { inputEl: HTMLInputElement }
       picker.inputEl.value = name
-      picker.inputEl.dispatchEvent(
-        new (harnessWindow.KeyboardEvent as typeof KeyboardEvent)('keydown', { key: 'Enter' }),
-      )
+      picker.inputEl.dispatchEvent(new harnessWindow.KeyboardEvent('keydown', { key: 'Enter' }))
     }
 
     it('opens the plan form with the starters when an interval exercise with no plan yet is added', async () => {

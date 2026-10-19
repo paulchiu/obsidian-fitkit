@@ -134,13 +134,6 @@ export default defineConfig(
     },
   },
   {
-    files: ['tests/ui/workout-editor-view.test.ts'],
-    /** Its TestElement implements createDiv/createSpan through createEl, so replacing it recurses. */
-    rules: {
-      'obsidianmd/prefer-create-el': 'off',
-    },
-  },
-  {
     files: ['version-bump.mjs'],
     languageOptions: {
       globals: {

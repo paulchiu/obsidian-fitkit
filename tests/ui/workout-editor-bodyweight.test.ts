@@ -12,6 +12,7 @@ import {
   cellInput,
   choose,
   chooseMenuItem,
+  deleteRow,
   headLabels,
   lastMenu,
   menuTitles,
@@ -61,13 +62,6 @@ const levelLabel = (row: Element | undefined): HTMLButtonElement => {
 
 const levelText = (row: Element | undefined): string | null | undefined =>
   row?.querySelector('.fitkit-bodyweight-level-full')?.textContent
-
-/** Deletes a row through its menu and the confirm that follows. */
-const deleteRow = async (row: Element): Promise<void> => {
-  openRowMenu(row)
-  chooseMenuItem('Delete row')
-  await choose('Remove row?', 'Remove')
-}
 
 /** Saves `levels` through the card menu's Edit levels form. */
 const editLevels = async (view: Parameters<typeof card>[0], levels: string[]): Promise<void> => {
