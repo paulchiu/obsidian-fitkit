@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [1.9.0] - 2026-10-19
+
+### Added
+
 - Interval training. `Switch to interval`, under `Change type...` in the card menu beside the other exercise types, gives the card a plan such as `[plan:: (x 8 (work 30s 300W) (rest 90s))]`, with watts, load or level targets, open work, and `every` for EMOM. The card then shows each rep's intensity and rest, and `Add set` and `Repeat` carry both forward. Adding the exercise to a later workout starts it with the plan it last ran. A new [Interval training](docs/interval-training.md) page covers planning a session, common sessions to start from, and running a plan.
 - `Start` on a planned card takes over the editor tab with a big clock and one big button, which reads `Rest` while you work (ending the rep with the time you actually did) and `Skip` while you rest. Each rep is written to the note as it finishes, with a stepper during rest to correct the intensity you just held. Pause, End run, rep dots and a finished screen with the reps on target round it out.
 - A run survives Obsidian being closed or killed. The note holds one start stamp, so reopening it catches up reps that finished meanwhile (filled with the target and flagged `logged while Obsidian was closed`), or offers to resume or end a run whose plan has long since ended. Closing the tab pauses the run.
