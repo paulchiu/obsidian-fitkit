@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ChartSeries } from '../../../src/domain/exercise-chart'
-import { renderExerciseChartSvg } from '../../../src/ui/obsidian/exercise-chart-svg'
+import { renderChart } from '../../harness/render-chart'
 import { createTestRoot } from '../../harness/obsidian-dom'
 
 function render(series: ChartSeries, options: { ladder?: readonly string[] } = {}): HTMLElement {
   const root = createTestRoot()
-  renderExerciseChartSvg(root, series, options)
+  renderChart(root, series, options)
   return root
 }
 

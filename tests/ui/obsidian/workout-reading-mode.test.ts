@@ -1,3 +1,4 @@
+import { options } from 'preact'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createTestRoot } from '../../harness/obsidian-dom'
@@ -14,16 +15,26 @@ vi.mock('obsidian', () => {
     }
   }
 
-  return { TFile }
+  class MarkdownRenderChild {
+    private cleanups: Array<() => void> = []
+    constructor(readonly containerEl: HTMLElement) {}
+    register(cleanup: () => void): void {
+      this.cleanups.push(cleanup)
+    }
+    unload(): void {
+      ;(this as unknown as { onunload(): void }).onunload()
+      this.cleanups.forEach((cleanup) => cleanup())
+    }
+  }
+
+  return { MarkdownRenderChild, TFile }
 })
 
 import type { MarkdownPostProcessorContext } from 'obsidian'
 
 import type FitKitPlugin from '../../../src/main'
-import {
-  formatDurationSeconds,
-  renderWorkoutReadingModeSection,
-} from '../../../src/ui/obsidian/workout-reading-mode'
+import { formatDurationSeconds } from '../../../src/ui/model/reading-preview'
+import { renderWorkoutReadingModeSection } from '../../../src/ui/obsidian/workout-reading-mode'
 
 const strengthSection = [
   '## [[Squat]]',
@@ -54,16 +65,19 @@ function createPlugin(): FitKitPlugin {
 function createContext(
   sectionText: string,
   frontmatter: Record<string, unknown> | null = { type: 'workout' },
-): MarkdownPostProcessorContext {
+): MarkdownPostProcessorContext & { children: Array<{ unload(): void }> } {
+  const children: Array<{ unload(): void }> = []
   return {
+    children,
     sourcePath: 'Fitness/Workouts/2026-05-01.md',
     frontmatter,
+    addChild: (child: { unload(): void }) => children.push(child),
     getSectionInfo: () => ({
       text: sectionText,
       lineStart: 0,
       lineEnd: sectionText.split(/\r?\n/).length - 1,
     }),
-  } as unknown as MarkdownPostProcessorContext
+  } as unknown as MarkdownPostProcessorContext & { children: Array<{ unload(): void }> }
 }
 
 function createRenderedSection(lines: string[]): HTMLElement {
@@ -448,5 +462,29 @@ describe('workout reading mode structure', () => {
         ],
       }),
     ).toMatchSnapshot()
+  })
+
+  it('unmounts the preview when Obsidian unloads the section', () => {
+    const root = createRenderedSection([
+      '[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '[exercise:: [[Squat]]] [set:: 2] [weight:: 105] [reps:: 3] [notes:: smooth]',
+    ])
+    const ctx = createContext(strengthSection)
+    renderWorkoutReadingModeSection(createPlugin(), root, ctx)
+    const unmounted: string[] = []
+    const previous = { ...options }
+    options.unmount = (vnode) => {
+      if (typeof vnode.type === 'string') unmounted.push(vnode.type)
+      previous.unmount?.(vnode)
+    }
+    try {
+      for (const child of ctx.children) child.unload()
+    } finally {
+      Object.assign(options, previous)
+    }
+
+    expect(unmounted).toContain('table')
+    expect(root.querySelector('.fitkit-reading-preview')).toBeNull()
+    expect(root.querySelector('table')).toBeNull()
   })
 })

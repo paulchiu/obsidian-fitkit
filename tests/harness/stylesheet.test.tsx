@@ -26,7 +26,11 @@ vi.mock('obsidian', () => {
 })
 
 import type { ChartSeries } from '../../src/domain/exercise-chart'
-import { renderExerciseChartSvg } from '../../src/ui/obsidian/exercise-chart-svg'
+import { render } from 'preact'
+
+import { ReadingPreviewBody } from '../../src/ui/components/reading-preview'
+import { buildReadingPreview } from '../../src/ui/model/reading-preview'
+import { renderChart } from './render-chart'
 import { PlanStepModal } from '../../src/ui/obsidian/plan-step-modal'
 
 beforeAll(() => {
@@ -149,7 +153,7 @@ describe('unstyled render', () => {
   it('finds no unstyled class in a rendered chart', () => {
     const root = createTestRoot()
     harnessDocument.body.appendChild(root)
-    renderExerciseChartSvg(root, chartSeries(), { notes: ['note one'] })
+    renderChart(root, chartSeries(), { notes: ['note one'] })
 
     expect(findUnstyledClasses(root)).toEqual([])
   })
@@ -157,8 +161,24 @@ describe('unstyled render', () => {
   it('finds no unstyled class in a rendered empty chart', () => {
     const root = createTestRoot()
     harnessDocument.body.appendChild(root)
-    renderExerciseChartSvg(root, { ...chartSeries(), points: [] })
+    renderChart(root, { ...chartSeries(), points: [] })
 
+    expect(findUnstyledClasses(root)).toEqual([])
+  })
+
+  it('finds no unstyled class in a rendered reading-mode preview', () => {
+    const root = createTestRoot().createDiv({ cls: 'fitkit-reading-preview' })
+    harnessDocument.body.appendChild(root)
+    const exercise = {
+      kind: 'strength',
+      exerciseName: 'Squat',
+      note: 'felt strong',
+      next: { direction: 'up', step: 2.5 },
+      strengthSets: [{ set: 1, weight: 100, reps: 5 }],
+    } as unknown as Parameters<typeof buildReadingPreview>[0]
+    render(<ReadingPreviewBody preview={buildReadingPreview(exercise, 'kg', undefined)} />, root)
+
+    expect(root.querySelector('table')).not.toBeNull()
     expect(findUnstyledClasses(root)).toEqual([])
   })
 

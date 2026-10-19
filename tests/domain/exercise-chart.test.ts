@@ -13,7 +13,7 @@ import {
   chartYAxisTitle,
   formatChartTooltip,
   formatChartValue,
-} from '../../src/ui/obsidian/exercise-chart-svg'
+} from '../../src/ui/model/exercise-chart-layout'
 
 function fitKitIndex(entries: IndexEntry[]): FitKitIndex {
   return {

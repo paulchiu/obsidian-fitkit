@@ -7,6 +7,10 @@ vi.mock('obsidian', () => {
     constructor(readonly message: string) {}
   }
 
+  class MarkdownRenderChild {
+    constructor(readonly containerEl: HTMLElement) {}
+  }
+
   class TFile {
     basename: string
     extension: string
@@ -18,6 +22,7 @@ vi.mock('obsidian', () => {
   }
 
   return {
+    MarkdownRenderChild,
     Notice,
     TFile,
     normalizePath: (path: string) => path.replace(/\/+/g, '/'),

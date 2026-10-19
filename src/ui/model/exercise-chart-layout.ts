@@ -15,6 +15,54 @@ const LEVEL_MARGIN_LEFT = 140
 const MAX_LEVEL_TICKS = Y_TICKS + 1
 /** Rung-name characters a level label shows before shortening. SVG has no measuring path, so a fixed budget stands in for the widened margin. */
 const LEVEL_LABEL_MAX_CHARS = 20
+export const DOT_RADIUS = 3.5
+
+export interface ChartLine {
+  x1: number
+  x2: number
+  y1: number
+  y2: number
+}
+
+export interface ChartText {
+  x: number
+  y: number
+  text: string
+}
+
+export interface ChartYLabel extends ChartText {
+  /** The rung name in full, set when `text` shortens it. */
+  fullName?: string
+}
+
+export interface ChartXLabel extends ChartText {
+  anchor: 'middle' | 'end'
+}
+
+export interface ChartDot {
+  cx: number
+  cy: number
+  tooltip: string
+}
+
+/** Everything the chart svg draws, in the order it draws it. */
+export interface ChartLayout {
+  title: string
+  viewBox: string
+  grid: ChartLine[]
+  axes: ChartLine[]
+  metricLabel: ChartText | null
+  yLabels: ChartYLabel[]
+  xLabels: ChartXLabel[]
+  /** `points` of the series line; null for a lone session. */
+  linePoints: string | null
+  dots: ChartDot[]
+}
+
+interface Range {
+  min: number
+  max: number
+}
 
 /** Shorten a rung name past the axis budget, keeping the distinguishing start and marking the cut. */
 function shortenLevelLabel(name: string): string {
@@ -34,54 +82,22 @@ function plotWidth(series: ChartSeries): number {
   return VIEW_WIDTH - marginLeft(series) - MARGIN_RIGHT
 }
 
-export interface RenderChartOptions {
-  notes?: string[]
-  ladder?: BodyweightLadder
+/** The chart's geometry and text for a series with at least one point. */
+export function buildChartLayout(series: ChartSeries, ladder?: BodyweightLadder): ChartLayout {
+  const range = niceRange(series.points.map((point) => point.value))
+  return {
+    title: chartTitle(series),
+    viewBox: `0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`,
+    grid: gridLines(range, series),
+    axes: axisLines(series),
+    metricLabel: metricLabel(series),
+    yLabels: yLabels(range, series, ladder),
+    xLabels: xLabels(series),
+    ...seriesMarks(series, range, ladder),
+  }
 }
 
-export function renderExerciseChartSvg(
-  container: HTMLElement,
-  series: ChartSeries,
-  options: RenderChartOptions = {},
-): void {
-  container.empty()
-  container.addClass('fitkit-chart')
-
-  for (const note of options.notes ?? []) {
-    container.createDiv({ cls: 'fitkit-chart-note', text: note })
-  }
-
-  container.createDiv({ cls: 'fitkit-chart-title', text: buildTitle(series) })
-
-  if (series.points.length === 0) {
-    container.createDiv({
-      cls: 'fitkit-chart-empty',
-      text: emptyMessage(series),
-    })
-    return
-  }
-
-  const svg = container.createSvg('svg', {
-    cls: 'fitkit-chart-svg',
-    attr: {
-      viewBox: `0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`,
-      preserveAspectRatio: 'xMidYMid meet',
-      role: 'img',
-      'aria-label': buildTitle(series),
-    },
-  })
-
-  const values = series.points.map((point) => point.value)
-  const range = niceRange(values)
-  drawGrid(svg, range, series)
-  drawAxes(svg, series)
-  drawMetricLabel(svg, series)
-  drawYLabels(svg, range, series, options.ladder)
-  drawXLabels(svg, series)
-  drawSeries(svg, series, range, options.ladder)
-}
-
-function buildTitle(series: ChartSeries): string {
+export function chartTitle(series: ChartSeries): string {
   const count = series.points.length
   if (count === 0) {
     return series.exerciseName
@@ -92,129 +108,76 @@ function buildTitle(series: ChartSeries): string {
   return `${series.exerciseName} · last ${count} session${count === 1 ? '' : 's'}`
 }
 
-function emptyMessage(series: ChartSeries): string {
+export function chartEmptyMessage(series: ChartSeries): string {
   return `No ${series.kind} sessions found for this exercise yet.`
 }
 
-/** Gridlines sit on the labelled ticks: whole rungs for a level axis, even fractions otherwise. */
-function drawGrid(
-  svg: SVGSVGElement,
-  range: { min: number; max: number },
-  series: ChartSeries,
-): void {
-  if (series.metric === 'level') {
-    for (const level of pickLevelTickLevels(range, series)) {
-      const y = computeY(level, range)
-      svg.createSvg('line', {
-        cls: 'fitkit-chart-grid',
-        attr: {
-          x1: marginLeft(series),
-          x2: marginLeft(series) + plotWidth(series),
-          y1: y,
-          y2: y,
-        },
-      })
-    }
-    return
-  }
-  for (let tick = 0; tick <= Y_TICKS; tick++) {
-    const ratio = tick / Y_TICKS
-    const y = MARGIN_TOP + (1 - ratio) * PLOT_HEIGHT
-    svg.createSvg('line', {
-      cls: 'fitkit-chart-grid',
-      attr: {
-        x1: marginLeft(series),
-        x2: marginLeft(series) + plotWidth(series),
-        y1: y,
-        y2: y,
-      },
-    })
+function horizontalLine(series: ChartSeries, y: number): ChartLine {
+  return {
+    x1: marginLeft(series),
+    x2: marginLeft(series) + plotWidth(series),
+    y1: y,
+    y2: y,
   }
 }
 
-function drawAxes(svg: SVGSVGElement, series: ChartSeries): void {
-  svg.createSvg('line', {
-    cls: 'fitkit-chart-axis',
-    attr: {
+/** Gridlines sit on the labelled ticks: whole rungs for a level axis, even fractions otherwise. */
+function gridLines(range: Range, series: ChartSeries): ChartLine[] {
+  if (series.metric === 'level') {
+    return pickLevelTickLevels(range, series).map((level) =>
+      horizontalLine(series, computeY(level, range)),
+    )
+  }
+  return numericTicks().map((ratio) => horizontalLine(series, tickY(ratio)))
+}
+
+function axisLines(series: ChartSeries): ChartLine[] {
+  return [
+    {
       x1: marginLeft(series),
       x2: marginLeft(series),
       y1: MARGIN_TOP,
       y2: MARGIN_TOP + PLOT_HEIGHT,
     },
-  })
-  svg.createSvg('line', {
-    cls: 'fitkit-chart-axis',
-    attr: {
-      x1: marginLeft(series),
-      x2: marginLeft(series) + plotWidth(series),
-      y1: MARGIN_TOP + PLOT_HEIGHT,
-      y2: MARGIN_TOP + PLOT_HEIGHT,
-    },
-  })
+    horizontalLine(series, MARGIN_TOP + PLOT_HEIGHT),
+  ]
 }
 
-function drawYLabels(
-  svg: SVGSVGElement,
-  range: { min: number; max: number },
-  series: ChartSeries,
-  ladder: BodyweightLadder | undefined,
-): void {
+/** Tick positions as fractions of the axis, bottom to top. */
+function numericTicks(): number[] {
+  return Array.from({ length: Y_TICKS + 1 }, (_unused, tick) => tick / Y_TICKS)
+}
+
+function tickY(ratio: number): number {
+  return MARGIN_TOP + (1 - ratio) * PLOT_HEIGHT
+}
+
+function yLabels(range: Range, series: ChartSeries, ladder?: BodyweightLadder): ChartYLabel[] {
   if (series.metric === 'level') {
-    drawLevelYLabels(svg, range, series, ladder)
-    return
-  }
-  for (let tick = 0; tick <= Y_TICKS; tick++) {
-    const ratio = tick / Y_TICKS
-    const value = range.min + (range.max - range.min) * ratio
-    const y = MARGIN_TOP + (1 - ratio) * PLOT_HEIGHT
-    const label = svg.createSvg('text', {
-      cls: 'fitkit-chart-axis-label',
-      attr: {
+    return pickLevelTickLevels(range, series).map((level) => {
+      const fullName = bodyweightLevelName(ladder, level)
+      const text = shortenLevelLabel(fullName)
+      return {
         x: marginLeft(series) - 8,
-        y: y + 4,
-        'text-anchor': 'end',
-        'data-axis': 'y',
-      },
+        y: computeY(level, range) + 4,
+        text,
+        ...(text === fullName ? {} : { fullName }),
+      }
     })
-    label.textContent = formatChartValue(value, series, undefined)
   }
-}
-
-/**
- * Integer rung ticks for a level axis. Rungs are 1-based, so the axis never
- * labels a rung zero; a span longer than the label budget keeps its ends
- * and the rungs the series visits, thinned evenly.
- */
-function drawLevelYLabels(
-  svg: SVGSVGElement,
-  range: { min: number; max: number },
-  series: ChartSeries,
-  ladder: BodyweightLadder | undefined,
-): void {
-  for (const level of pickLevelTickLevels(range, series)) {
-    const y = computeY(level, range)
-    const fullName = bodyweightLevelName(ladder, level)
-    const label = svg.createSvg('text', {
-      cls: 'fitkit-chart-axis-label',
-      attr: {
-        x: marginLeft(series) - 8,
-        y: y + 4,
-        'text-anchor': 'end',
-        'data-axis': 'y',
-      },
-    })
-    label.textContent = shortenLevelLabel(fullName)
-    if (label.textContent !== fullName) {
-      label.createSvg('title').textContent = fullName
-    }
-  }
+  return numericTicks().map((ratio) => ({
+    x: marginLeft(series) - 8,
+    y: tickY(ratio) + 4,
+    text: formatChartValue(range.min + (range.max - range.min) * ratio, series, undefined),
+  }))
 }
 
 /**
  * Rungs a level axis labels: every rung spanned while the span fits the
- * budget, otherwise the span ends plus the rungs the series visits.
+ * budget, otherwise the span ends plus the rungs the series visits. Rungs
+ * are 1-based, so the axis never labels a rung zero.
  */
-function pickLevelTickLevels(range: { min: number; max: number }, series: ChartSeries): number[] {
+function pickLevelTickLevels(range: Range, series: ChartSeries): number[] {
   const low = Math.max(1, Math.ceil(range.min))
   const high = Math.floor(range.max)
   if (high <= low) {
@@ -253,91 +216,51 @@ function thinTicksToBudget(ordered: number[]): number[] {
   return thinned
 }
 
-function drawMetricLabel(svg: SVGSVGElement, series: ChartSeries): void {
-  const label = chartYAxisTitle(series)
-  if (!label) {
-    return
-  }
-  const title = svg.createSvg('text', {
-    cls: 'fitkit-chart-axis-label',
-    attr: {
-      x: marginLeft(series),
-      y: MARGIN_TOP - 4,
-      'text-anchor': 'start',
-    },
-  })
-  title.textContent = label
+function metricLabel(series: ChartSeries): ChartText | null {
+  const text = chartYAxisTitle(series)
+  return text ? { x: marginLeft(series), y: MARGIN_TOP - 4, text } : null
 }
 
-function drawXLabels(svg: SVGSVGElement, series: ChartSeries): void {
-  const indices = pickXTickIndices(series.points.length)
-  const condensed = series.points.length >= 8
-  for (const index of indices) {
+function xLabels(series: ChartSeries): ChartXLabel[] {
+  const count = series.points.length
+  const condensed = count >= 8
+  return pickXTickIndices(count).flatMap((index) => {
     const point = series.points[index]
     if (!point) {
-      continue
+      return []
     }
-    const x = computeX(index, series.points.length, series)
-    const label = svg.createSvg('text', {
-      cls: 'fitkit-chart-axis-label',
-      attr: {
-        x,
+    return [
+      {
+        x: computeX(index, count, series),
         y: MARGIN_TOP + PLOT_HEIGHT + 18,
-        'text-anchor': xLabelAnchor(index, series.points.length),
-        'data-axis': 'x',
+        /** The last label anchors inward: its tick sits one margin from the viewBox edge, so a centred label would hang off. */
+        anchor: index === count - 1 ? ('end' as const) : ('middle' as const),
+        text: condensed ? point.date.slice(5) : point.date,
       },
-    })
-    label.textContent = condensed ? point.date.slice(5) : point.date
-  }
-}
-
-/**
- * The last date label anchors inward. Its tick sits one margin from the
- * viewBox, so a centred label half wider than that margin hangs off the edge.
- */
-function xLabelAnchor(index: number, count: number): string {
-  if (index === count - 1) {
-    return 'end'
-  }
-  return 'middle'
-}
-
-function drawSeries(
-  svg: SVGSVGElement,
-  series: ChartSeries,
-  range: { min: number; max: number },
-  ladder: BodyweightLadder | undefined,
-): void {
-  const points = series.points
-  const coords = points.map((point, index) => {
-    const x = computeX(index, points.length, series)
-    const y = computeY(point.value, range)
-    return { x, y, point }
+    ]
   })
+}
 
-  if (coords.length > 1) {
-    const linePoints =
-      series.metric === 'level' ? stepLinePoints(coords) : coords.map(({ x, y }) => `${x},${y}`)
-    svg.createSvg('polyline', {
-      cls: 'fitkit-chart-line',
-      attr: {
-        points: linePoints.join(' '),
-        fill: 'none',
-      },
-    })
-  }
-
-  for (const { x, y, point } of coords) {
-    const dot = svg.createSvg('circle', {
-      cls: 'fitkit-chart-dot',
-      attr: {
-        cx: x,
-        cy: y,
-        r: 3.5,
-      },
-    })
-    const titleEl = dot.createSvg('title')
-    titleEl.textContent = formatChartTooltip(point.date, point.value, series, ladder)
+function seriesMarks(
+  series: ChartSeries,
+  range: Range,
+  ladder: BodyweightLadder | undefined,
+): Pick<ChartLayout, 'linePoints' | 'dots'> {
+  const points = series.points
+  const coords = points.map((point, index) => ({
+    x: computeX(index, points.length, series),
+    y: computeY(point.value, range),
+    point,
+  }))
+  const linePoints =
+    series.metric === 'level' ? stepLinePoints(coords) : coords.map(({ x, y }) => `${x},${y}`)
+  return {
+    linePoints: coords.length > 1 ? linePoints.join(' ') : null,
+    dots: coords.map(({ x, y, point }) => ({
+      cx: x,
+      cy: y,
+      tooltip: formatChartTooltip(point.date, point.value, series, ladder),
+    })),
   }
 }
 
@@ -369,7 +292,7 @@ function computeX(index: number, count: number, series: ChartSeries): number {
   return left + ratio * width
 }
 
-function computeY(value: number, range: { min: number; max: number }): number {
+function computeY(value: number, range: Range): number {
   const span = range.max - range.min
   const safeSpan = span === 0 ? 1 : span
   const ratio = (value - range.min) / safeSpan

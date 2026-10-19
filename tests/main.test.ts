@@ -8,6 +8,9 @@ vi.mock('obsidian', async () => {
   const { createTestRoot } = await import('./harness/obsidian-dom')
 
   class App {}
+  class MarkdownRenderChild {
+    constructor(readonly containerEl: HTMLElement) {}
+  }
   class Plugin {
     app: unknown
     constructor(app: unknown) {
@@ -126,6 +129,7 @@ vi.mock('obsidian', async () => {
     App,
     FileView,
     ItemView,
+    MarkdownRenderChild,
     MarkdownView,
     Menu,
     Modal,
@@ -1394,7 +1398,9 @@ describe('Workout index freshness', () => {
         plugin,
         'exercise: Squat\nkind: strength\nmetric: weight',
         chart,
-        { sourcePath: 'Journal/chart.md' } as Parameters<typeof renderExerciseChartBlock>[3],
+        { sourcePath: 'Journal/chart.md', addChild: () => {} } as unknown as Parameters<
+          typeof renderExerciseChartBlock
+        >[3],
       )
       expect(chart.querySelector('.fitkit-chart-dot title')?.textContent).toContain('80kg')
       expect(
@@ -1432,7 +1438,8 @@ describe('Workout index freshness', () => {
     const el = createTestRoot()
     await renderExerciseChartBlock(plugin, 'exercise: Squat\nkind: strength\nmetric: weight', el, {
       sourcePath: 'Journal/chart.md',
-    } as Parameters<typeof renderExerciseChartBlock>[3])
+      addChild: () => {},
+    } as unknown as Parameters<typeof renderExerciseChartBlock>[3])
     expect(el.querySelector('.fitkit-chart-dot title')?.textContent).toContain('80kg')
   })
 

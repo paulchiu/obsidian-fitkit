@@ -13,7 +13,7 @@
  *
  * DOM polyfill:
  * - Covers only what the current renderer uses.
- * - Inspect src/ui/obsidian/exercise-chart-svg.ts before extending the renderer.
+ * - Inspect src/ui/components/exercise-chart.tsx before extending the renderer.
  * - If the renderer touches a new Obsidian element extension, extend this polyfill to match it.
  */
 
@@ -23,12 +23,13 @@ import { JSDOM } from 'jsdom'
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-const jiti = createJiti(import.meta.url)
+const jiti = createJiti(import.meta.url, { jsx: { runtime: 'automatic', importSource: 'preact' } })
 const { buildExerciseChartSeries } = await jiti.import('../src/domain/exercise-chart.ts')
 const { createRegistry } = await jiti.import('../src/domain/exercise-registry.ts')
 const { pickBestSet, pickHeaviestSet } = await jiti.import('../src/domain/epley.ts')
 const { parseWorkoutNote } = await jiti.import('../src/domain/workout-note-model.ts')
-const { renderExerciseChartSvg } = await jiti.import('../src/ui/obsidian/exercise-chart-svg.ts')
+const { h, render } = await jiti.import('preact')
+const { ExerciseChart } = await jiti.import('../src/ui/components/exercise-chart.tsx')
 const { extractChartCss } = await jiti.import('../src/domain/chart-css.ts')
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..')
@@ -58,7 +59,8 @@ const outputs = []
 for (const metric of ['e1rm', 'weight']) {
   const series = buildExerciseChartSeries(index, registry, EXERCISE_NAME, 'strength', 30, metric)
   const container = activeDocument.createElement('div')
-  renderExerciseChartSvg(container, series)
+  container.classList.add('fitkit-chart')
+  render(h(ExerciseChart, { series }), container)
   const svg = serializeRenderedSvg(container)
   const metricName = metric === 'e1rm' ? 'e1rm' : 'Weight'
   const outputPath = path.join(

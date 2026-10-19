@@ -1,3 +1,4 @@
+import { options } from 'preact'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createTestRoot, harnessWindow } from '../../harness/obsidian-dom'
@@ -5,6 +6,10 @@ import { createTestRoot, harnessWindow } from '../../harness/obsidian-dom'
 vi.mock('obsidian', () => {
   class Notice {
     constructor(readonly message: string) {}
+  }
+
+  class MarkdownRenderChild {
+    constructor(readonly containerEl: HTMLElement) {}
   }
 
   class TFile {
@@ -18,6 +23,7 @@ vi.mock('obsidian', () => {
   }
 
   return {
+    MarkdownRenderChild,
     Notice,
     TFile,
     normalizePath: (path: string) => path.replace(/\/+/g, '/'),
@@ -177,5 +183,43 @@ describe('exercise chart block structure', () => {
     plugin.getIndex = (): Promise<FitKitIndex> => Promise.reject(new Error('index unavailable'))
 
     expect(await draw(plugin, 'exercise: Bench Press')).toMatchSnapshot()
+  })
+
+  it('unmounts the chart when Obsidian unloads the block', async () => {
+    const el = createTestRoot()
+    const ctx = createContext('Fitness/Dashboard.md')
+    await renderExerciseChartBlock(
+      withIndex(strengthIndex([80, 85])),
+      'exercise: Bench Press\nkind: strength',
+      el,
+      ctx,
+    )
+    const unmounted: string[] = []
+    const previous = { ...options }
+    options.unmount = (vnode) => {
+      if (typeof vnode.type === 'string') unmounted.push(vnode.type)
+      previous.unmount?.(vnode)
+    }
+    try {
+      for (const child of ctx.children) child.onunload()
+    } finally {
+      Object.assign(options, previous)
+    }
+
+    expect(unmounted).toContain('svg')
+    expect(el.querySelector('.fitkit-chart-svg')).toBeNull()
+    expect(el.children).toHaveLength(0)
+  })
+
+  it('unmounts the failure message when Obsidian unloads the block', async () => {
+    const el = createTestRoot()
+    const ctx = createContext('Fitness/Dashboard.md')
+    const plugin = withIndex(strengthIndex([]))
+    plugin.getIndex = (): Promise<FitKitIndex> => Promise.reject(new Error('index unavailable'))
+    await renderExerciseChartBlock(plugin, 'exercise: Bench Press', el, ctx)
+
+    for (const child of ctx.children) child.onunload()
+
+    expect(el.children).toHaveLength(0)
   })
 })
