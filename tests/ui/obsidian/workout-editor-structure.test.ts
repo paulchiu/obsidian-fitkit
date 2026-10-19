@@ -91,6 +91,17 @@ describe('WorkoutEditorView structure', () => {
     },
     { article: 'a', kind: 'duration', options: { body: DURATION } },
     { article: 'an', kind: 'interval plan', options: { body: INTERVAL } },
+    {
+      article: 'an',
+      kind: 'empty strength',
+      options: { body: ['## [[Squat]]', '', '- [exercise:: [[Squat]]] [notes:: Warm up first]'] },
+    },
+    {
+      article: 'a',
+      kind: 'bodyweight without load, with a set note',
+      options: { body: BODYWEIGHT_NOTED, exerciseNotes: PUSH_UP_NOTE },
+    },
+    { article: 'an', kind: 'interval plan with caught-up reps', options: { body: CAUGHT_UP } },
   ])('draws $article $kind card', async ({ options }) => {
     const { view } = await openEditor(options)
 
@@ -148,4 +159,20 @@ const INTERVAL = [
   '',
   '- [exercise:: [[Exercise Bike]]] [plan:: 3 x 30s @ 300W, 90s rest]',
   '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 305] [rest:: 90]',
+]
+
+const BODYWEIGHT_NOTED = [
+  '## [[Push-up]]',
+  '',
+  '- [exercise:: [[Push-up]]] [set:: 1] [level:: 2] [reps:: 10] [notes:: Slow tempo]',
+]
+
+/** A rep logged while Obsidian was closed, which draws the asterisk and its legend. */
+const CAUGHT_UP = [
+  '## [[Exercise Bike]]',
+  '',
+  '- [exercise:: [[Exercise Bike]]] [plan:: 3 x 30s @ 300W, 90s rest]',
+  '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 280] [rest:: 90]',
+  '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 30] [watts:: 300] [rest:: 90] [notes:: logged while Obsidian was closed]',
+  '- [exercise:: [[Exercise Bike]]] [set:: 3] [duration:: 30] [watts:: 300] [rest:: 90] [notes:: logged while Obsidian was closed]',
 ]

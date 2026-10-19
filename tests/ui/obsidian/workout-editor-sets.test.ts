@@ -404,6 +404,21 @@ describe('WorkoutEditorView duration rows', () => {
     },
   )
 
+  it.each(['1.', '90'])(
+    'leaves "%s" as typed in the duration input once the autosave completes',
+    async (typed) => {
+      const { view } = await openEditor({
+        body: exercise('Plank', ['[set:: 1] [duration:: 0]']),
+      })
+      const input = cellInput(firstRow(view), 'Duration') as HTMLInputElement
+
+      typeInto(input, typed)
+      await settle()
+
+      expect([input.value, cellInput(firstRow(view), 'Duration')]).toEqual([typed, input])
+    },
+  )
+
   it('keeps the stored seconds while the duration text is invalid', async () => {
     const { view, contents } = await openEditor({
       body: exercise('Plank', ['[set:: 1] [duration:: 90]']),
