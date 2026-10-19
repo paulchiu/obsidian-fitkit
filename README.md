@@ -22,7 +22,7 @@ For beta builds with BRAT or a manual install from a GitHub release, see [Instal
 
 The defaults are designed so you can log a workout the moment FitKit is enabled. No setup is required.
 
-![Workout editor with a strength card, a duration card, and the rest timer](docs/images/workout-editor.png)
+![Workout editor with a strength card and an interval card part way through its plan](docs/images/workout-editor.png)
 
 1. Run `Open today's workout` from the command palette. FitKit creates today's note under `Fitness/Workouts/` and opens it in the editor.
 2. Add an exercise. Type the name, for example `Squat`. If it is new, FitKit asks whether to create an exercise note for it; say yes for anything you want to chart and revisit later.
@@ -53,7 +53,11 @@ name: Squat Day
 
 For timed sessions such as Tabata, over-unders or EMOMs, switch a duration card to interval with `Change type...` in the card menu. The plan form opens with common sessions to start from, or you can build your own from steps, rests and repeats, with a watts, load or level target on each step.
 
-`Start` then takes over the tab with a big clock: it counts each step down, beeps the last three seconds, and writes every rep to the note as it finishes, with the time you did and the intensity you held. The plan and the rows are plain inline fields too:
+`Start` then takes over the tab with a big clock: it counts each step down, beeps the last three seconds, and writes every rep to the note as it finishes, with the time you did and the intensity you held.
+
+![An interval card on a phone with its plan profile and logged reps, beside the runner counting down an over step](docs/images/interval-mobile.png)
+
+The plan and the rows are plain inline fields too:
 
 ```markdown
 ## [[Indoor Bike]]

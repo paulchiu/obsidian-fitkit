@@ -23,6 +23,8 @@ To go back, `Switch to duration` under `Change type...` keeps the logged rows an
 
 The plan form opens from `Switch to interval`, from `Edit interval plan` in the card menu, or by tapping the plan on the card. From top to bottom it holds the presets, the plan itself, a preview, and the `Save` bar.
 
+![The plan form in Steps, holding over-unders as a warm-up, two nested repeats and a cool-down](images/interval-plan-form.png)
+
 ### Starting from a preset
 
 `Start from` fills the plan with a common session in one tap: Tabata, EMOM, over-unders, a pyramid, 30/30 and Norwegian 4x4. The list is yours to change under `Interval presets` in [Settings](settings.md), and clearing it hides `Start from`.
@@ -163,6 +165,8 @@ Once it has a plan, the card shows it above the rows:
 Tap any of it to edit the plan. The rows gain intensity and rest columns, and `Add set` and `Repeat` carry both forward, so a session done without the runner can still be logged by hand.
 
 ## Running a plan
+
+![The runner on a phone, counting down an over step with its target, round, next step and rep dots](images/interval-runner.png)
 
 An interval card swaps the play button for `Start`, which reads `Start from rep N` once some reps are done. A row with no work time and no rest is not done, even with watts or a note typed in it, so the run starts on it and keeps what was typed. `Start` takes over the tab:
 
