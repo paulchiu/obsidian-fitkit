@@ -398,6 +398,11 @@ body.is-mobile .fitkit-editor-root {
   justify-self: start;
 }
 
+/** Obsidian's button display outranks the hidden attribute, so a short list's toggle needs this to hide. */
+.fitkit-set-toggle[hidden] {
+  display: none;
+}
+
 /** The row being logged right now gets a larger target than the finished rows above it. */
 .fitkit-row--live .fitkit-input {
   min-height: 36px;
