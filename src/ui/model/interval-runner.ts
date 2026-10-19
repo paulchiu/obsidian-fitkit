@@ -1,4 +1,4 @@
-import type { IntensityKind } from '../../domain/interval-plan'
+import { formatTarget, type IntensityKind } from '../../domain/interval-plan'
 import type { IntervalProgram, PlanStep } from '../../domain/interval-program'
 import {
   hasOpenRep,
@@ -6,6 +6,8 @@ import {
   repsWithWorkDone,
   restsAfter,
   runPhase,
+  targetedSteps,
+  type RunPhase,
   type RunRow,
 } from '../../domain/interval-run'
 
@@ -16,22 +18,38 @@ export interface RunnerTimeline {
   now: number
 }
 
+/** A planned step's dot: on target, short of it, done with no target, under way, or to come. */
+export type DotState = 'hit' | 'miss' | 'done' | 'current' | 'pending'
+
 /** How far one tap of the rest stepper moves each kind of intensity. */
-export const ADJUST_STEP: Record<IntensityKind, number> = { watts: 5, load: 2.5, level: 1 }
+const ADJUST_STEP: Record<IntensityKind, number> = { watts: 5, load: 2.5, level: 1 }
 
 const UNIT: Record<IntensityKind, string> = { watts: ' W', load: ' kg', level: '' }
 
-/** The big clock's value: time left, or time so far for open work. */
-export function clockSeconds({ rows, program, now }: RunnerTimeline): number {
-  const phase = runPhase(rows, program, now)
-  if (phase.kind === 'idle') {
-    return 0
-  }
-  return phase.remaining ?? phase.elapsed
+/** The big clock's value for `phase`: time left, or time so far for open work. */
+export function phaseSeconds(phase: RunPhase): number {
+  return phase.kind === 'idle' ? 0 : (phase.remaining ?? phase.elapsed)
 }
 
-export function formatIntensity(kind: IntensityKind, value: number): string {
+/** {@link phaseSeconds} for the timeline as it stands at `now`. */
+export function clockSeconds({ rows, program, now }: RunnerTimeline): number {
+  return phaseSeconds(runPhase(rows, program, now))
+}
+
+function formatIntensity(kind: IntensityKind, value: number): string {
   return kind === 'level' ? `L${value}` : `${value}${UNIT[kind]}`
+}
+
+export function phaseLabel(resting: boolean, rep: number, program: IntervalProgram): string {
+  return `${resting ? 'Rest' : 'Work'} · rep ${rep} of ${program.steps.length}`
+}
+
+/** What the clock is counting towards: rest, the step's target, or nothing for an untargeted step. */
+export function targetLabel(resting: boolean, step: PlanStep): string | null {
+  if (resting) {
+    return 'rest'
+  }
+  return step.target ? `${formatTarget(step.target)} target` : null
 }
 
 /** Skip during rest; during work, Rest when a rest follows, Next when a step does, Finish on the last. */
@@ -67,16 +85,16 @@ export function roundsLabel(step: PlanStep, program: IntervalProgram): string | 
   return step.rounds.map(({ round, of }) => `${round}/${of}`).join(' · ')
 }
 
-/** One state per planned step: on target, short of it, done with no target, under way, or to come (''). */
-export function dotStates({ rows, program }: RunnerTimeline): string[] {
+/** One dot per planned step. */
+export function dotStates({ rows, program }: RunnerTimeline): DotState[] {
   const done = repsWithWorkDone(rows)
   const working = hasOpenRep(rows) && done.length < rows.length
   return program.steps.map((step, i) => {
     const row = done[i]
     if (row) {
-      return !step.target ? 'is-done' : isOnTarget(row, step) ? 'is-hit' : 'is-miss'
+      return !step.target ? 'done' : isOnTarget(row, step) ? 'hit' : 'miss'
     }
-    return working && i === done.length ? 'is-current' : ''
+    return working && i === done.length ? 'current' : 'pending'
   })
 }
 
@@ -97,9 +115,42 @@ export function statsLabel({ rows, program }: RunnerTimeline): string | null {
   return `Last ${formatIntensity(kind, last)} · avg ${formatIntensity(kind, Math.round(average * 10) / 10)}`
 }
 
-/** The rep the rest stepper corrects, or '' when it has no value yet. */
-export function stepperValue({ rows, program }: RunnerTimeline): string {
+/** The rest stepper for the rep just done: how far a tap moves it and its value, or null for a plan with no intensity. */
+export function restStepper({
+  rows,
+  program,
+}: RunnerTimeline): { step: number; value: string } | null {
   const kind = program.intensity
-  const value = kind ? rows[rows.length - 1]?.[kind] : undefined
-  return kind && value !== undefined ? `Rep ${rows.length}: ${formatIntensity(kind, value)}` : ''
+  if (!kind) {
+    return null
+  }
+  const value = rows[rows.length - 1]?.[kind]
+  return {
+    step: ADJUST_STEP[kind],
+    value: value === undefined ? '' : `Rep ${rows.length}: ${formatIntensity(kind, value)}`,
+  }
+}
+
+/** The big number and its caption once a run is over. */
+export function finishedScore(
+  { rows, program }: RunnerTimeline,
+  hits: number,
+): { count: string; caption: string } {
+  const targeted = targetedSteps(program)
+  return targeted > 0
+    ? { count: `${hits}/${targeted}`, caption: 'reps on target' }
+    : { count: String(rows.length), caption: 'reps done' }
+}
+
+/** The banner and resume button for a run Obsidian closed on until the plan was over. */
+export function cutOffLabels(
+  cut: { rep: number; resting: boolean },
+  exerciseName: string,
+): { phase: string; note: string; resume: string } {
+  const where = cut.resting ? `rep ${cut.rep} rest` : `rep ${cut.rep}`
+  return {
+    phase: `Run cut off at ${where}`,
+    note: `Obsidian closed during ${where} of ${exerciseName}, and the clock has since passed the end of the plan, so no reps were filled in.`,
+    resume: `Resume rep ${cut.resting ? cut.rep + 1 : cut.rep}`,
+  }
 }

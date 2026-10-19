@@ -1,23 +1,24 @@
-import { createRef, render, type JSX, type RefObject } from 'preact'
-import { useLayoutEffect } from 'preact/hooks'
+import type { JSX, RefObject } from 'preact'
 
-import { formatTarget } from '../../domain/interval-plan'
-import { formatStep, type IntervalProgram } from '../../domain/interval-program'
-import { runPhase, stepAt, targetedSteps } from '../../domain/interval-run'
+import { formatStep } from '../../domain/interval-program'
+import { runPhase, stepAt } from '../../domain/interval-run'
 import type { RunScreen } from '../../domain/interval-session'
-import { formatClock } from '../model/clock'
 import {
-  ADJUST_STEP,
-  clockSeconds,
+  cutOffLabels,
   dotStates,
+  finishedScore,
+  phaseLabel,
+  phaseSeconds,
   primaryLabel,
+  restStepper,
   roundsLabel,
   statsLabel,
-  stepperValue,
+  targetLabel,
+  type DotState,
   type RunnerTimeline,
 } from '../model/interval-runner'
 import { HostContext, type Host } from './host'
-import { Control } from './timer-screen'
+import { Clock, Control, mountScreen, type ScreenMount } from './screen-parts'
 
 export interface RunnerModel extends RunnerTimeline {
   exerciseName: string
@@ -34,27 +35,18 @@ export interface RunnerHandlers {
   back: () => void
 }
 
-/** A drawn runner: the clock the view refreshes every tick (null off the running screen), and how to take it down. */
-export interface RunnerMount {
-  clock: HTMLElement | null
-  unmount: () => void
-}
-
-/** Draws the run screen that takes over the editor tab. */
+/** Draws the run screen that takes over the editor tab; only the running screen has a clock. */
 export function renderRunner(
   parent: HTMLElement,
   model: RunnerModel,
   handlers: RunnerHandlers,
   host: Host,
-): RunnerMount {
-  const clock = createRef<HTMLDivElement>()
-  render(
+): ScreenMount {
+  return mountScreen(parent, (clock) => (
     <HostContext.Provider value={host}>
       <Runner model={model} handlers={handlers} clock={clock} />
-    </HostContext.Provider>,
-    parent,
-  )
-  return { clock: clock.current, unmount: () => render(null, parent) }
+    </HostContext.Provider>
+  ))
 }
 
 function Runner({
@@ -71,7 +63,14 @@ function Runner({
     case 'finished':
       return <Finished model={model} hits={screen.hits} back={handlers.back} />
     case 'cut-off':
-      return <CutOff model={model} cut={screen} handlers={handlers} />
+      return (
+        <CutOff
+          exerciseName={model.exerciseName}
+          cut={screen}
+          resume={handlers.resumeCut}
+          end={handlers.endCut}
+        />
+      )
     case 'running':
       return <Running model={model} handlers={handlers} clock={clock} />
   }
@@ -94,30 +93,28 @@ function Running({
   }
   const resting = phase.kind === 'rest'
   const upcoming = program.steps[phase.rep]
-  const target = resting ? 'rest' : step.target ? `${formatTarget(step.target)} target` : null
+  const target = targetLabel(resting, step)
   const rounds = roundsLabel(step, program)
   const stats = statsLabel(model)
-  const stepper = resting && program.intensity ? program.intensity : null
+  const stepper = resting ? restStepper(model) : null
   return (
     <div
       class={`fitkit-runner ${resting ? 'is-rest' : 'is-work'}${phase.paused ? ' is-paused' : ''}`}
     >
       <div class="fitkit-runner-top">
-        <span class="fitkit-runner-phase">
-          {`${resting ? 'Rest' : 'Work'} · rep ${phase.rep} of ${program.steps.length}`}
-        </span>
+        <span class="fitkit-runner-phase">{phaseLabel(resting, phase.rep, program)}</span>
         <span class="fitkit-runner-name">{model.exerciseName}</span>
       </div>
       <div class="fitkit-runner-center">
         {!resting && step.name !== undefined && <div class="fitkit-runner-step">{step.name}</div>}
-        <Clock seconds={clockSeconds(model)} clock={clock} />
+        <Clock seconds={phaseSeconds(phase)} clock={clock} />
         {target !== null && <div class="fitkit-runner-target">{target}</div>}
         {rounds !== null && <div class="fitkit-runner-rounds">{rounds}</div>}
         {upcoming && <div class="fitkit-runner-next">{`Next: ${formatStep(upcoming)}`}</div>}
-        <Dots model={model} />
+        <Dots states={dotStates(model)} />
         {stats !== null && <div class="fitkit-runner-stats">{stats}</div>}
         {phase.paused && <div class="fitkit-runner-note">Paused</div>}
-        {stepper !== null && <Stepper model={model} kind={stepper} adjust={handlers.adjust} />}
+        {stepper !== null && <Stepper {...stepper} adjust={handlers.adjust} />}
       </div>
       <button
         type="button"
@@ -140,25 +137,19 @@ function Running({
   )
 }
 
-/** The clock's text is set outside the render, since the view rewrites it on every tick. */
-function Clock({
-  seconds,
-  clock,
-}: {
-  seconds: number
-  clock: RefObject<HTMLDivElement>
-}): JSX.Element {
-  useLayoutEffect(() => {
-    if (clock.current) clock.current.textContent = formatClock(seconds)
-  }, [seconds])
-  return <div class="fitkit-runner-clock" ref={clock} />
+const DOT_CLASS: Record<DotState, string> = {
+  hit: 'fitkit-runner-dot is-hit',
+  miss: 'fitkit-runner-dot is-miss',
+  done: 'fitkit-runner-dot is-done',
+  current: 'fitkit-runner-dot is-current',
+  pending: 'fitkit-runner-dot',
 }
 
-function Dots({ model }: { model: RunnerModel }): JSX.Element {
+function Dots({ states }: { states: readonly DotState[] }): JSX.Element {
   return (
     <div class="fitkit-runner-dots">
-      {dotStates(model).map((state, i) => (
-        <span key={i} class={`fitkit-runner-dot ${state}`.trim()} />
+      {states.map((state, i) => (
+        <span key={i} class={DOT_CLASS[state]} />
       ))}
     </div>
   )
@@ -166,12 +157,12 @@ function Dots({ model }: { model: RunnerModel }): JSX.Element {
 
 /** During rest, corrects the rep just done, read off the machine's console. */
 function Stepper({
-  model,
-  kind,
+  step,
+  value,
   adjust,
 }: {
-  model: RunnerModel
-  kind: NonNullable<IntervalProgram['intensity']>
+  step: number
+  value: string
   adjust: (delta: number) => void
 }): JSX.Element {
   return (
@@ -180,16 +171,16 @@ function Stepper({
         type="button"
         class="fitkit-btn"
         aria-label="Lower last rep"
-        onClick={() => adjust(-ADJUST_STEP[kind])}
+        onClick={() => adjust(-step)}
       >
         −
       </button>
-      <span class="fitkit-runner-stepper-value">{stepperValue(model)}</span>
+      <span class="fitkit-runner-stepper-value">{value}</span>
       <button
         type="button"
         class="fitkit-btn"
         aria-label="Raise last rep"
-        onClick={() => adjust(ADJUST_STEP[kind])}
+        onClick={() => adjust(step)}
       >
         +
       </button>
@@ -206,11 +197,7 @@ function Finished({
   hits: number
   back: () => void
 }): JSX.Element {
-  const targeted = targetedSteps(model.program)
-  const [count, label] =
-    targeted > 0
-      ? [`${hits}/${targeted}`, 'reps on target']
-      : [String(model.rows.length), 'reps done']
+  const { count, caption } = finishedScore(model, hits)
   return (
     <div class="fitkit-runner is-finished">
       <div class="fitkit-runner-top">
@@ -219,8 +206,8 @@ function Finished({
       </div>
       <div class="fitkit-runner-center">
         <div class="fitkit-runner-hits">{count}</div>
-        <div class="fitkit-runner-target">{label}</div>
-        <Dots model={model} />
+        <div class="fitkit-runner-target">{caption}</div>
+        <Dots states={dotStates(model)} />
       </div>
       <button
         type="button"
@@ -234,31 +221,31 @@ function Finished({
 }
 
 function CutOff({
-  model,
+  exerciseName,
   cut,
-  handlers,
+  resume,
+  end,
 }: {
-  model: RunnerModel
+  exerciseName: string
   cut: { rep: number; resting: boolean }
-  handlers: RunnerHandlers
+  resume: () => void
+  end: () => void
 }): JSX.Element {
-  const where = cut.resting ? `rep ${cut.rep} rest` : `rep ${cut.rep}`
+  const labels = cutOffLabels(cut, exerciseName)
   return (
     <div class="fitkit-runner is-cut-off">
       <div class="fitkit-runner-banner">
-        <div class="fitkit-runner-phase">{`Run cut off at ${where}`}</div>
-        <div class="fitkit-runner-note">
-          {`Obsidian closed during ${where} of ${model.exerciseName}, and the clock has since passed the end of the plan, so no reps were filled in.`}
-        </div>
+        <div class="fitkit-runner-phase">{labels.phase}</div>
+        <div class="fitkit-runner-note">{labels.note}</div>
       </div>
       <button
         type="button"
         class="fitkit-btn fitkit-btn-primary fitkit-runner-primary"
-        onClick={handlers.resumeCut}
+        onClick={resume}
       >
-        {`Resume rep ${cut.resting ? cut.rep + 1 : cut.rep}`}
+        {labels.resume}
       </button>
-      <button type="button" class="fitkit-btn" onClick={handlers.endCut}>
+      <button type="button" class="fitkit-btn" onClick={end}>
         End run here
       </button>
     </div>

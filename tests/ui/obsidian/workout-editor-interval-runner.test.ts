@@ -1,331 +1,89 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-interface MockMenuItem {
-  title?: string
-  disabled?: boolean
-  onClick?: () => void
-}
+vi.mock('obsidian', async () =>
+  (await import('../../fixtures/obsidian-editor-mock')).createObsidianMock(),
+)
 
-const obsidian = vi.hoisted(() => ({
-  createRoot: (): HTMLElement => undefined as never,
-  menus: [] as Array<{ items: MockMenuItem[] }>,
-  modals: [] as Array<{ contentEl: HTMLElement; titleEl: HTMLElement; close: () => void }>,
-  notices: [] as string[],
-}))
-
-vi.mock('obsidian', async () => {
-  const { mixinFileView } = await import('../../fixtures/obsidian-file-view')
-
-  class ItemView {
-    app: unknown
-    leaf: unknown
-    contentEl: HTMLElement
-    constructor(leaf: unknown) {
-      this.leaf = leaf
-      this.app =
-        leaf && typeof leaf === 'object' && 'app' in leaf
-          ? (leaf as { app?: unknown }).app
-          : undefined
-      this.contentEl = obsidian.createRoot()
-    }
-    registerDomEvent(): void {}
-    registerEvent(): void {}
-    getState(): Record<string, unknown> {
-      return {}
-    }
-    async setState(_state: unknown, _result: unknown): Promise<void> {}
-  }
-
-  class Plugin {}
-
-  class MenuItem {
-    constructor(private state: MockMenuItem) {}
-    setTitle(title: string): this {
-      this.state.title = title
-      return this
-    }
-    setIcon(): this {
-      return this
-    }
-    setWarning(): this {
-      return this
-    }
-    setChecked(): this {
-      return this
-    }
-    setSection(): this {
-      return this
-    }
-    setDisabled(disabled: boolean): this {
-      this.state.disabled = disabled
-      return this
-    }
-    onClick(callback: () => void): this {
-      this.state.onClick = callback
-      return this
-    }
-  }
-
-  class Menu {
-    items: MockMenuItem[] = []
-    constructor() {
-      obsidian.menus.push(this)
-    }
-    addItem(callback: (item: MenuItem) => void): this {
-      const state: MockMenuItem = {}
-      callback(new MenuItem(state))
-      this.items.push(state)
-      return this
-    }
-    addSeparator(): this {
-      return this
-    }
-    showAtPosition(): void {}
-    showAtMouseEvent(): void {}
-  }
-
-  class Modal {
-    contentEl = obsidian.createRoot()
-    modalEl = obsidian.createRoot()
-    titleEl = obsidian.createRoot()
-    constructor(readonly app: unknown) {}
-    setTitle(title: string): this {
-      this.titleEl.textContent = title
-      return this
-    }
-    open(): void {
-      obsidian.modals.push(this)
-      ;(this as { onOpen?: () => void }).onOpen?.()
-    }
-    close(): void {
-      ;(this as { onClose?: () => void }).onClose?.()
-    }
-  }
-  class SuggestModal extends Modal {
-    inputEl = obsidian.createRoot().createEl('input')
-    setPlaceholder(): void {}
-    async onOpen(): Promise<void> {}
-    onClose(): void {}
-  }
-  class PluginSettingTab {}
-  class Setting {}
-  class MarkdownView {}
-
-  class Notice {
-    constructor(readonly message: string) {
-      obsidian.notices.push(message)
-    }
-  }
-
-  class TFile {
-    path = ''
-    extension = 'md'
-    basename = ''
-    stat = { mtime: 1000 }
-  }
-
-  const FileView = mixinFileView(ItemView, (value): value is TFile => value instanceof TFile)
-
-  return {
-    FileView,
-    ItemView,
-    MarkdownView,
-    Menu,
-    Modal,
-    Notice,
-    Platform: { isMobile: false },
-    Plugin,
-    PluginSettingTab,
-    Setting,
-    SuggestModal,
-    TFile,
-    normalizePath: (path: string) => path.replace(/\/+/g, '/'),
-    /** Marks where an icon lands, so structure snapshots pin it. */
-    setIcon: (el: HTMLElement, name: string) => el.setAttribute('data-icon', name),
-  }
-})
-
-import { TFile } from 'obsidian'
-import type { App, WorkspaceLeaf } from 'obsidian'
 import { options } from 'preact'
 
-import FitKitPlugin from '../../../src/main'
-import { DEFAULT_SETTINGS } from '../../../src/settings'
-import { WorkoutEditorView } from '../../../src/ui/obsidian/workout-editor-view'
-import { buildMockVaultFolderTree } from '../../fixtures/mock-vault-folder-tree'
-import { createTestRoot, harnessDocument, harnessWindow } from '../../harness/obsidian-dom'
+import type { WorkoutEditorView } from '../../../src/ui/obsidian/workout-editor-view'
+import {
+  button,
+  openEditor,
+  tick,
+  useEditorEnvironment,
+  WORKOUT_DATE,
+} from '../../fixtures/workout-editor'
+import { harnessWindow } from '../../harness/obsidian-dom'
 import { outline } from '../../harness/outline'
 import { findUnstyledClasses } from '../../harness/stylesheet'
 
-obsidian.createRoot = createTestRoot
-
-const WORKOUT_PATH = 'Fitness/Workouts/2026-10-12.md'
-
-const workoutSource = (...body: string[]): string =>
-  ['---', 'type: workout', 'date: 2026-10-12', 'name: Intervals', '---', '', ...body, ''].join('\n')
-
-/** Interval callbacks the view registered; `tick()` runs them as time passing would. */
-let intervals = new Map<number, () => void>()
-
-const tick = (): void => {
-  for (const callback of [...intervals.values()]) {
-    callback()
-  }
-}
+useEditorEnvironment()
 
 /** Moves the wall clock to a Brisbane time on the workout's day and fires the view's ticks. */
 const at = (time: string): void => {
-  vi.setSystemTime(new Date(`2026-10-12T${time}+10:00`))
+  vi.setSystemTime(new Date(`${WORKOUT_DATE}T${time}+10:00`))
   tick()
 }
 
 /** Walks the clock forward a second at a time to `time`, the way the view's ticks would see it. */
 const runTo = (time: string): void => {
-  const target = Date.parse(`2026-10-12T${time}+10:00`)
+  const target = Date.parse(`${WORKOUT_DATE}T${time}+10:00`)
   while (Date.now() < target) {
     vi.setSystemTime(Math.min(Date.now() + 1000, target))
     tick()
   }
 }
 
-/** A real WorkoutEditorView over an in-memory vault holding one workout note. */
-const openView = async (
-  source: string,
-  settings: Partial<typeof DEFAULT_SETTINGS> = {},
-): Promise<{ view: WorkoutEditorView; contents: Map<string, string>; plugin: FitKitPlugin }> => {
-  const file = Object.assign(new TFile(), { path: WORKOUT_PATH, basename: '2026-10-12' })
-  const contents = new Map([[WORKOUT_PATH, source]])
-  const vault = {
-    getFolderByPath: buildMockVaultFolderTree([file]).getFolderByPath,
-    read: async (target: TFile): Promise<string> => contents.get(target.path) ?? '',
-    process: async (target: TFile, callback: (text: string) => string): Promise<void> => {
-      contents.set(target.path, callback(contents.get(target.path) ?? ''))
-    },
-    getAbstractFileByPath: (path: string): TFile | null => (path === WORKOUT_PATH ? file : null),
-  }
-  const app = {
-    vault,
-    metadataCache: { getFileCache: () => null, on: () => ({}) },
-  }
-  const plugin = Object.create(FitKitPlugin.prototype) as FitKitPlugin
-  plugin.app = app as unknown as App
-  plugin.settings = { ...DEFAULT_SETTINGS, ...settings }
-  plugin.refreshIndexEntry = async (): Promise<void> => {}
-  plugin.saveData = async (): Promise<void> => {}
-  plugin.cachedIndex = { schemaVersion: 1, builtAt: 0, entries: [], diagnostics: [] }
-  const view = new WorkoutEditorView({ app } as unknown as WorkspaceLeaf, plugin)
-  await view.onOpen()
-  await view.setState({ file: WORKOUT_PATH }, { history: false })
-  return { view, contents, plugin }
+const bike = (plan: string, ...rows: string[]): string[] => [
+  '## [[Exercise Bike]]',
+  '',
+  `- [exercise:: [[Exercise Bike]]] [plan:: ${plan}]`,
+  ...rows.map((row) => `- [exercise:: [[Exercise Bike]]] ${row}`),
+]
+
+const BIKE = '3 x 30s @ 300W, 90s rest'
+const WARMUP = '(warmup 30s)'
+const REP_1_RESTING = `[set:: 1] [duration:: 30] [watts:: 300] [rest:: 0] [started:: ${WORKOUT_DATE}T07:15:30+10:00]`
+const REP_1_WORKING = `[set:: 1] [duration:: 0] [started:: ${WORKOUT_DATE}T07:15:00+10:00]`
+
+const open = async (body: string[]): Promise<WorkoutEditorView> => (await openEditor({ body })).view
+
+const start = async (body: string[]): Promise<WorkoutEditorView> => {
+  const view = await open(body)
+  button(view.contentEl, 'Start interval plan').click()
+  return view
 }
-const button = (view: WorkoutEditorView, label: string): HTMLButtonElement => {
-  const found = view.contentEl.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
-  if (!found) {
-    throw new Error(`${label} button not rendered`)
+
+/** Opens the note at `time`, so a run in its rows reopens as the view loads. */
+const reopen = async (time: string, body: string[]): Promise<WorkoutEditorView> => {
+  vi.setSystemTime(new Date(`${WORKOUT_DATE}T${time}+10:00`))
+  return open(body)
+}
+
+const runner = (view: WorkoutEditorView): HTMLElement => {
+  const el = view.contentEl.querySelector<HTMLElement>('.fitkit-runner')
+  if (!el) {
+    throw new Error('No runner rendered')
   }
-  return found
+  return el
+}
+
+const runnerText = (view: WorkoutEditorView, cls: string): string | null | undefined =>
+  runner(view).querySelector(`.${cls}`)?.textContent
+
+/** Moves into rep 1's rest after 20 s of work. */
+const restAfterRep1 = (view: WorkoutEditorView): void => {
+  at('07:15:20')
+  button(runner(view), 'Rest').click()
 }
 
 describe('WorkoutEditorView interval runner', () => {
-  beforeEach(() => {
-    vi.stubEnv('TZ', 'Australia/Brisbane')
-    vi.useFakeTimers({ toFake: ['Date'] })
-    vi.setSystemTime(new Date('2026-10-12T07:15:00+10:00'))
-    intervals = new Map()
-    obsidian.menus.length = 0
-    obsidian.modals.length = 0
-    obsidian.notices.length = 0
-    vi.stubGlobal('HTMLElement', harnessWindow.HTMLElement)
-    vi.stubGlobal('HTMLInputElement', harnessWindow.HTMLInputElement)
-    vi.stubGlobal('activeWindow', harnessWindow)
-    let nextId = 1
-    /** Run the skeleton delay and autosave debounce at once; intervals run only on `tick()`. */
-    vi.stubGlobal('window', {
-      setTimeout: (callback: () => void): number => {
-        callback()
-        return 0
-      },
-      clearTimeout: (): void => {},
-      setInterval: (callback: () => void): number => {
-        const id = nextId++
-        intervals.set(id, callback)
-        return id
-      },
-      clearInterval: (id: number): void => {
-        intervals.delete(id)
-      },
-    })
-    vi.stubGlobal('activeDocument', harnessDocument)
-    vi.stubGlobal(
-      'ResizeObserver',
-      class {
-        observe(): void {}
-        disconnect(): void {}
-      },
-    )
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
-    vi.unstubAllGlobals()
-    vi.unstubAllEnvs()
-  })
-
-  const BIKE = [
-    '## [[Exercise Bike]]',
-    '',
-    '- [exercise:: [[Exercise Bike]]] [plan:: 3 x 30s @ 300W, 90s rest]',
-  ]
-  const ON_OFF = [
-    '## [[Exercise Bike]]',
-    '',
-    '- [exercise:: [[Exercise Bike]]] [plan:: (x 2 (on 30s 350W) (off 30s 150W))]',
-  ]
-  const WARMUP = [
-    '## [[Exercise Bike]]',
-    '',
-    '- [exercise:: [[Exercise Bike]]] [plan:: (warmup 30s)]',
-  ]
-  const NESTED = [
-    '## [[Exercise Bike]]',
-    '',
-    '- [exercise:: [[Exercise Bike]]] [plan:: (x 2 (x 2 (over 1m 300W) (under 1m 220W)) (rest 2m))]',
-  ]
-  const BIKE_REP_1 =
-    '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 0] [started:: 2026-10-12T07:15:30+10:00]'
-
-  const runner = (view: WorkoutEditorView): HTMLElement => {
-    const el = view.contentEl.querySelector<HTMLElement>('.fitkit-runner')
-    if (!el) {
-      throw new Error('No runner rendered')
-    }
-    return el
-  }
-
-  const runnerButton = (view: WorkoutEditorView, text: string): HTMLButtonElement => {
-    const found = [
-      ...view.contentEl.querySelectorAll<HTMLButtonElement>('.fitkit-runner button'),
-    ].find((candidate) => candidate.textContent === text)
-    if (!found) {
-      throw new Error(`${text} not on the runner`)
-    }
-    return found
-  }
-
-  const start = async (...body: string[]): Promise<WorkoutEditorView> => {
-    const { view } = await openView(workoutSource(...body))
-    button(view, 'Start interval plan').click()
-    return view
-  }
-
-  const SCREENS: ReadonlyArray<{
-    screen: string
-    open: () => Promise<WorkoutEditorView>
-  }> = [
+  const SCREENS: ReadonlyArray<{ screen: string; open: () => Promise<WorkoutEditorView> }> = [
     {
       screen: 'working, no step name or stats yet',
       open: async () => {
-        const view = await start(...BIKE)
+        const view = await start(bike(BIKE))
         at('07:15:10')
         return view
       },
@@ -333,31 +91,28 @@ describe('WorkoutEditorView interval runner', () => {
     {
       screen: 'working a named step with rounds',
       open: async () => {
-        const view = await start(...ON_OFF)
+        const view = await start(bike('(x 2 (on 30s 350W) (off 30s 150W))'))
         at('07:15:10')
         return view
       },
     },
     {
       screen: 'working a step in nested repeats',
-      open: async () => {
-        const { view } = await openView(
-          workoutSource(
-            ...NESTED,
-            '- [exercise:: [[Exercise Bike]]] [set:: 1] [step:: over] [duration:: 60] [watts:: 300]',
-            '- [exercise:: [[Exercise Bike]]] [set:: 2] [step:: under] [duration:: 60] [watts:: 220]',
-            '- [exercise:: [[Exercise Bike]]] [set:: 3] [step:: over] [duration:: 60] [watts:: 300]',
-            '- [exercise:: [[Exercise Bike]]] [set:: 4] [step:: under] [duration:: 60] [watts:: 220] [rest:: 120]',
+      open: () =>
+        start(
+          bike(
+            '(x 2 (x 2 (over 1m 300W) (under 1m 220W)) (rest 2m))',
+            '[set:: 1] [step:: over] [duration:: 60] [watts:: 300]',
+            '[set:: 2] [step:: under] [duration:: 60] [watts:: 220]',
+            '[set:: 3] [step:: over] [duration:: 60] [watts:: 300]',
+            '[set:: 4] [step:: under] [duration:: 60] [watts:: 220] [rest:: 120]',
           ),
-        )
-        button(view, 'Start interval plan').click()
-        return view
-      },
+        ),
     },
     {
       screen: 'working the last step',
       open: async () => {
-        const view = await start(...WARMUP)
+        const view = await start(bike(WARMUP))
         at('07:15:10')
         return view
       },
@@ -365,18 +120,17 @@ describe('WorkoutEditorView interval runner', () => {
     {
       screen: 'working while paused',
       open: async () => {
-        const view = await start(...BIKE)
+        const view = await start(bike(BIKE))
         at('07:15:12')
-        button(view, 'Pause run').click()
+        button(view.contentEl, 'Pause run').click()
         return view
       },
     },
     {
       screen: 'resting with the stepper and stats',
       open: async () => {
-        const view = await start(...BIKE)
-        at('07:15:20')
-        runnerButton(view, 'Rest').click()
+        const view = await start(bike(BIKE))
+        restAfterRep1(view)
         at('07:15:25')
         return view
       },
@@ -384,24 +138,30 @@ describe('WorkoutEditorView interval runner', () => {
     {
       screen: 'resting while paused',
       open: async () => {
-        const view = await start(...BIKE)
-        at('07:15:20')
-        runnerButton(view, 'Rest').click()
-        button(view, 'Pause run').click()
+        const view = await start(bike(BIKE))
+        restAfterRep1(view)
+        button(view.contentEl, 'Pause run').click()
+        return view
+      },
+    },
+    {
+      screen: 'resting on a plan with no intensity',
+      open: async () => {
+        const view = await start(bike('(x 3 (work 30s) (rest 90s))'))
+        runTo('07:15:31')
         return view
       },
     },
     {
       screen: 'finished, scored against targets',
       open: async () => {
-        const { view } = await openView(
-          workoutSource(
-            ...BIKE,
-            '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 30] [watts:: 300] [rest:: 90]',
-            '- [exercise:: [[Exercise Bike]]] [set:: 2] [duration:: 30] [watts:: 250] [rest:: 90]',
+        const view = await start(
+          bike(
+            BIKE,
+            '[set:: 1] [duration:: 30] [watts:: 300] [rest:: 90]',
+            '[set:: 2] [duration:: 30] [watts:: 250] [rest:: 90]',
           ),
         )
-        button(view, 'Start interval plan').click()
         runTo('07:15:31')
         return view
       },
@@ -409,26 +169,18 @@ describe('WorkoutEditorView interval runner', () => {
     {
       screen: 'finished with no targets',
       open: async () => {
-        const view = await start(...WARMUP)
+        const view = await start(bike(WARMUP))
         runTo('07:15:31')
         return view
       },
     },
     {
       screen: 'cut off during rest',
-      open: async () => {
-        vi.setSystemTime(new Date('2026-10-12T08:00:00+10:00'))
-        return (await openView(workoutSource(...BIKE, BIKE_REP_1))).view
-      },
+      open: () => reopen('08:00:00', bike(BIKE, REP_1_RESTING)),
     },
     {
       screen: 'cut off during work',
-      open: async () => {
-        vi.setSystemTime(new Date('2026-10-12T08:00:00+10:00'))
-        const row =
-          '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 0] [started:: 2026-10-12T07:15:00+10:00]'
-        return (await openView(workoutSource(...BIKE, row))).view
-      },
+      open: () => reopen('08:00:00', bike(BIKE, REP_1_WORKING)),
     },
   ]
 
@@ -440,7 +192,7 @@ describe('WorkoutEditorView interval runner', () => {
   })
 
   it('moves only the clock text on a tick', async () => {
-    const view = await start(...BIKE)
+    const view = await start(bike(BIKE))
     const before = runner(view)
     const clock = before.querySelector('.fitkit-runner-clock')
     const children = [...before.querySelectorAll('*')]
@@ -456,19 +208,16 @@ describe('WorkoutEditorView interval runner', () => {
   })
 
   it('steps the dots and rep label as the run moves on', async () => {
-    const view = await start(...BIKE)
+    const view = await start(bike(BIKE))
 
     runTo('07:15:31')
-    const rest = [
-      runner(view).className,
-      runner(view).querySelector('.fitkit-runner-phase')?.textContent,
-    ]
-    runnerButton(view, 'Skip').click()
+    const rest = [runner(view).className, runnerText(view, 'fitkit-runner-phase')]
+    button(runner(view), 'Skip').click()
 
     expect([
       rest,
       runner(view).className,
-      runner(view).querySelector('.fitkit-runner-phase')?.textContent,
+      runnerText(view, 'fitkit-runner-phase'),
       [...runner(view).querySelectorAll('.fitkit-runner-dot')].map((dot) => dot.className),
     ]).toEqual([
       ['fitkit-runner is-rest', 'Rest · rep 1 of 3'],
@@ -478,34 +227,52 @@ describe('WorkoutEditorView interval runner', () => {
     ])
   })
 
-  it('keeps the pause button live across the redraw it causes', async () => {
-    const view = await start(...BIKE)
+  it('disables the primary button while paused and enables it on resume', async () => {
+    const view = await start(bike(BIKE))
     at('07:15:12')
 
-    button(view, 'Pause run').click()
-    const paused = [
-      runnerButton(view, 'Rest').disabled,
-      runner(view).classList.contains('is-paused'),
-    ]
-    button(view, 'Resume run').click()
+    button(view.contentEl, 'Pause run').click()
+    const paused = button(runner(view), 'Rest').disabled
+    button(view.contentEl, 'Resume run').click()
 
-    expect([
-      paused,
-      runnerButton(view, 'Rest').disabled,
-      runner(view).classList.contains('is-paused'),
-    ]).toEqual([[true, true], false, false])
+    expect([paused, button(runner(view), 'Rest').disabled]).toEqual([true, false])
   })
 
-  it('raises the last rep from the stepper', async () => {
-    const view = await start(...BIKE)
-    at('07:15:20')
-    runnerButton(view, 'Rest').click()
+  it.each([
+    { kind: 'watts', plan: BIKE, control: 'Raise last rep', value: 'Rep 1: 305 W' },
+    { kind: 'watts', plan: BIKE, control: 'Lower last rep', value: 'Rep 1: 295 W' },
+    {
+      kind: 'load',
+      plan: '3 x 30s @ 100kg, 90s rest',
+      control: 'Raise last rep',
+      value: 'Rep 1: 102.5 kg',
+    },
+    {
+      kind: 'level',
+      plan: '3 x 30s @ L4, 90s rest',
+      control: 'Raise last rep',
+      value: 'Rep 1: L5',
+    },
+  ])('steps $kind with $control during rest', async ({ plan, control, value }) => {
+    const view = await start(bike(plan))
+    restAfterRep1(view)
 
-    button(view, 'Raise last rep').click()
+    button(view.contentEl, control).click()
 
-    expect(runner(view).querySelector('.fitkit-runner-stepper-value')?.textContent).toBe(
-      'Rep 1: 305 W',
+    expect(runnerText(view, 'fitkit-runner-stepper-value')).toBe(value)
+  })
+
+  it('averages the reps done to one decimal place', async () => {
+    const view = await start(
+      bike(
+        '4 x 30s @ 300W, 90s rest',
+        '[set:: 1] [duration:: 30] [watts:: 300] [rest:: 90]',
+        '[set:: 2] [duration:: 30] [watts:: 300] [rest:: 90]',
+        '[set:: 3] [duration:: 30] [watts:: 301] [rest:: 90]',
+      ),
     )
+
+    expect(runnerText(view, 'fitkit-runner-stats')).toBe('Last 301 W · avg 300.3 W')
   })
 
   describe('priming audio', () => {
@@ -533,70 +300,57 @@ describe('WorkoutEditorView interval runner', () => {
       Reflect.deleteProperty(harnessWindow, 'AudioContext')
     })
 
-    /** A run reopened from the note has no audio until a tap. */
-    const reopened = async (): Promise<WorkoutEditorView> => {
-      vi.setSystemTime(new Date('2026-10-12T07:15:10+10:00'))
-      const { view } = await openView(
-        workoutSource(
-          ...BIKE,
-          '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 0] [started:: 2026-10-12T07:15:00+10:00]',
-        ),
-      )
-      return view
-    }
-
     it.each([
       { control: 'Rest', primes: 1 },
       { control: 'Pause', primes: 1 },
       { control: 'End run', primes: 0 },
-    ])('$control primes audio before acting: $primes', async ({ control, primes }) => {
-      const view = await reopened()
-      const before = contexts
+    ])('$control on a reopened run primes audio $primes time(s)', async ({ control, primes }) => {
+      const view = await reopen('07:15:10', bike(BIKE, REP_1_WORKING))
 
-      runnerButton(view, control).click()
+      button(runner(view), control).click()
 
-      expect(contexts - before).toBe(primes)
+      expect(contexts).toBe(primes)
     })
 
     it('primes on Resume of a cut-off run', async () => {
-      vi.setSystemTime(new Date('2026-10-12T08:00:00+10:00'))
-      const { view } = await openView(workoutSource(...BIKE, BIKE_REP_1))
-      const before = contexts
+      const view = await reopen('08:00:00', bike(BIKE, REP_1_RESTING))
 
-      runnerButton(view, 'Resume rep 2').click()
+      button(runner(view), 'Resume rep 2').click()
 
-      expect(contexts - before).toBe(1)
+      expect(contexts).toBe(1)
     })
 
-    it('does not prime on End run here or Back to workout', async () => {
-      vi.setSystemTime(new Date('2026-10-12T08:00:00+10:00'))
-      const { view } = await openView(workoutSource(...BIKE, BIKE_REP_1))
-      const before = contexts
+    it('ends a cut-off run on End run here without priming', async () => {
+      const view = await reopen('08:00:00', bike(BIKE, REP_1_RESTING))
 
-      runnerButton(view, 'End run here').click()
+      button(runner(view), 'End run here').click()
 
-      expect(contexts - before).toBe(0)
+      expect([
+        contexts,
+        view.contentEl.querySelector('.fitkit-runner'),
+        view.contentEl.querySelectorAll('.fitkit-card').length,
+      ]).toEqual([0, null, 1])
+    })
+
+    it('returns to the workout on Back to workout without priming', async () => {
+      const view = await reopen('07:15:10', bike(WARMUP, REP_1_WORKING))
+      runTo('07:15:31')
+      const phase = runnerText(view, 'fitkit-runner-phase')
+
+      button(runner(view), 'Back to workout').click()
+
+      expect([
+        phase,
+        contexts,
+        view.contentEl.querySelector('.fitkit-runner'),
+        view.contentEl.querySelectorAll('.fitkit-card').length,
+      ]).toEqual(['Run finished', 0, null, 1])
     })
   })
 
   describe('leaving', () => {
-    const LEAVE: ReadonlyArray<{
-      leaving: string
-      leave: (view: WorkoutEditorView) => Promise<void> | void
-    }> = [
-      { leaving: 'End run', leave: (view) => button(view, 'End run').click() },
-      {
-        leaving: 'finishing',
-        leave: (view) => {
-          runTo('07:20:00')
-          runnerButton(view, 'Back to workout').click()
-        },
-      },
-      { leaving: 'closing the tab', leave: (view) => view.onClose() },
-    ]
-
-    it.each(LEAVE)('unmounts the runner on $leaving', async ({ leave }) => {
-      const view = await start(...BIKE)
+    /** Records the classes of every vnode Preact unmounts while `act` runs. */
+    const unmountedDuring = async (act: () => Promise<void> | void): Promise<string[]> => {
       const unmounted: string[] = []
       const previous = { ...options }
       options.unmount = (vnode) => {
@@ -606,30 +360,43 @@ describe('WorkoutEditorView interval runner', () => {
         }
         previous.unmount?.(vnode)
       }
-
       try {
-        await leave(view)
+        await act()
       } finally {
         Object.assign(options, previous)
       }
+      return unmounted
+    }
+
+    it.each([
+      { leaving: 'End run', reach: () => {}, label: 'End run' },
+      { leaving: 'Back to workout', reach: () => runTo('07:15:31'), label: 'Back to workout' },
+    ])('unmounts the runner on $leaving', async ({ reach, label }) => {
+      const view = await start(bike(WARMUP))
+      reach()
+
+      const unmounted = await unmountedDuring(() => button(runner(view), label).click())
 
       expect(unmounted.some((cls) => cls.split(' ').includes('fitkit-runner'))).toBe(true)
     })
 
-    it('leaves the tab empty when it closes on the runner', async () => {
-      const view = await start(...BIKE)
+    it('unmounts the runner when the tab closes', async () => {
+      const view = await start(bike(BIKE))
 
-      await view.onClose()
+      const unmounted = await unmountedDuring(() => view.onClose())
 
-      expect(view.contentEl.childNodes).toHaveLength(0)
+      expect([
+        unmounted.some((cls) => cls.split(' ').includes('fitkit-runner')),
+        view.contentEl.childNodes.length,
+      ]).toEqual([true, 0])
     })
 
     it('draws a fresh runner when it is opened again after leaving', async () => {
-      const view = await start(...BIKE)
+      const view = await start(bike(BIKE))
       const first = runner(view)
-      button(view, 'End run').click()
+      button(view.contentEl, 'End run').click()
 
-      button(view, 'Start interval plan').click()
+      button(view.contentEl, 'Start interval plan').click()
 
       expect([runner(view) === first, first.isConnected]).toEqual([false, false])
     })

@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
 import { parseIntervalProgram } from '../../../src/domain/interval-program'
+import type { RunRow } from '../../../src/domain/interval-run'
 import {
+  cutOffLabels,
   dotStates,
-  formatIntensity,
+  finishedScore,
   primaryLabel,
+  restStepper,
   roundsLabel,
   statsLabel,
-  stepperValue,
+  targetLabel,
 } from '../../../src/ui/model/interval-runner'
 
 const program = (plan: string) => {
@@ -18,65 +21,124 @@ const program = (plan: string) => {
   return parsed.program
 }
 
-describe('formatIntensity', () => {
-  it.each([
-    ['watts', 300, '300 W'],
-    ['load', 22.5, '22.5 kg'],
-    ['level', 4, 'L4'],
-  ] as const)('shows %s %s as %s', (kind, value, text) => {
-    expect(formatIntensity(kind, value)).toBe(text)
-  })
+const timeline = (plan: string, rows: RunRow[]) => ({
+  program: program(plan),
+  rows,
+  now: Date.parse('2026-10-12T07:15:10+10:00'),
 })
+
+const done = (fields: RunRow): RunRow => ({ durationSeconds: 30, restSeconds: 90, ...fields })
 
 describe('roundsLabel', () => {
   it.each([
-    ['(x 3 (work 30s 300W))', 0, null],
-    ['(x 2 (on 30s 350W) (off 30s 150W))', 0, 'Round 1 of 2'],
-    ['(x 2 (x 2 (over 1m 300W) (under 1m 220W)) (rest 2m))', 0, 'Set 1 of 2 · round 1 of 2'],
-  ])('labels %s step %s', (plan, index, label) => {
+    ['(x 3 (work 30s 300W))', null],
+    ['(x 2 (on 30s 350W) (off 30s 150W))', 'Round 1 of 2'],
+    ['(x 2 (x 2 (over 1m 300W) (under 1m 220W)) (rest 2m))', 'Set 1 of 2 · round 1 of 2'],
+    ['(x 2 (x 3 (x 4 (sprint 10s 400W))))', '1/2 · 1/3 · 1/4'],
+  ])('labels the first step of %s', (plan, label) => {
     const parsed = program(plan)
-    expect(roundsLabel(parsed.steps[index]!, parsed)).toBe(label)
+    expect(roundsLabel(parsed.steps[0]!, parsed)).toBe(label)
   })
 })
 
 describe('primaryLabel', () => {
   it('skips during rest, finishes on the last step and otherwise rests or moves on', () => {
     const parsed = program('(x 2 (on 30s 350W) (off 30s 150W))')
-    const [first, , , last] = parsed.steps
+    const [first, second, , last] = parsed.steps
     expect([
-      primaryLabel(true, first!, parsed.steps[1]),
+      primaryLabel(true, first!, second),
       primaryLabel(false, last!, undefined),
-      primaryLabel(false, first!, parsed.steps[1]),
+      primaryLabel(false, first!, second),
     ]).toEqual(['Skip', 'Finish', 'Next'])
   })
 })
 
-describe('run progress', () => {
-  const timeline = (plan: string, rows: object[]) => ({
-    program: program(plan),
-    rows,
-    now: Date.parse('2026-10-12T07:15:10+10:00'),
+describe('targetLabel', () => {
+  it('names rest, the step target, or nothing for an untargeted step', () => {
+    const [targeted, untargeted] = program('(hard 30s 300W) (easy 30s)').steps
+    expect([
+      targetLabel(true, targeted!),
+      targetLabel(false, targeted!),
+      targetLabel(false, untargeted!),
+    ]).toEqual(['rest', '300W target', null])
+  })
+})
+
+describe('dotStates', () => {
+  it('marks done reps by target, the open one as current and the rest as pending', () => {
+    const t = timeline(
+      '(hard 30s 300W) (hard 30s 300W) (easy 30s) (hard 30s 300W) (hard 30s 300W)',
+      [
+        done({ watts: 300 }),
+        done({ watts: 250 }),
+        done({}),
+        { durationSeconds: 0, startedAt: '2026-10-12T07:15:00+10:00' },
+      ],
+    )
+    expect(dotStates(t)).toEqual(['hit', 'miss', 'done', 'current', 'pending'])
+  })
+})
+
+describe('statsLabel', () => {
+  it.each([
+    ['3 x 30s @ 300W, 90s rest', 'watts', [300, 300, 301], 'Last 301 W · avg 300.3 W'],
+    ['3 x 30s @ 100kg, 90s rest', 'load', [100, 102.5], 'Last 102.5 kg · avg 101.3 kg'],
+    ['3 x 30s @ L4, 90s rest', 'level', [4, 5], 'Last L5 · avg L4.5'],
+  ] as const)('quotes the last %s rep and the rounded average', (plan, kind, values, label) => {
+    const t = timeline(
+      plan,
+      values.map((value) => done({ [kind]: value })),
+    )
+    expect(statsLabel(t)).toBe(label)
   })
 
-  it('marks done reps by target and the open one as current', () => {
-    const t = timeline('(x 3 (work 30s 300W) (rest 90s))', [
-      { durationSeconds: 30, watts: 300, restSeconds: 90 },
-      { durationSeconds: 30, watts: 250, restSeconds: 90 },
-      { durationSeconds: 0, startedAt: '2026-10-12T07:15:00+10:00' },
+  it('is null before a rep has a value, or with no intensity', () => {
+    expect([
+      statsLabel(timeline('3 x 30s @ 300W, 90s rest', [])),
+      statsLabel(timeline('(x 2 (work 30s))', [done({})])),
+    ]).toEqual([null, null])
+  })
+})
+
+describe('restStepper', () => {
+  it.each([
+    ['3 x 30s @ 300W, 90s rest', { watts: 300 }, { step: 5, value: 'Rep 1: 300 W' }],
+    ['3 x 30s @ 100kg, 90s rest', { load: 100 }, { step: 2.5, value: 'Rep 1: 100 kg' }],
+    ['3 x 30s @ L4, 90s rest', { level: 4 }, { step: 1, value: 'Rep 1: L4' }],
+    ['3 x 30s @ 300W, 90s rest', {}, { step: 5, value: '' }],
+  ])('steps %s by its kind', (plan, fields, stepper) => {
+    expect(restStepper(timeline(plan, [done(fields)]))).toEqual(stepper)
+  })
+
+  it('is null for a plan with no intensity', () => {
+    expect(restStepper(timeline('(x 2 (work 30s))', [done({})]))).toBeNull()
+  })
+})
+
+describe('finishedScore', () => {
+  it('scores hits against targeted steps, or counts reps when none are targeted', () => {
+    expect([
+      finishedScore(timeline('3 x 30s @ 300W, 90s rest', []), 2),
+      finishedScore(timeline('(x 2 (work 30s))', [done({}), done({})]), 0),
+    ]).toEqual([
+      { count: '2/3', caption: 'reps on target' },
+      { count: '2', caption: 'reps done' },
     ])
-    expect(dotStates(t)).toEqual(['is-hit', 'is-miss', 'is-current'])
   })
+})
 
-  it('averages the finished reps and quotes the last', () => {
-    const t = timeline('(x 3 (work 30s 300W) (rest 90s))', [
-      { durationSeconds: 30, watts: 300, restSeconds: 90 },
-      { durationSeconds: 30, watts: 255, restSeconds: 90 },
+describe('cutOffLabels', () => {
+  it('resumes the cut rep during work, and the next one during rest', () => {
+    expect([
+      cutOffLabels({ rep: 2, resting: false }, 'Bike').resume,
+      cutOffLabels({ rep: 2, resting: true }, 'Bike'),
+    ]).toEqual([
+      'Resume rep 2',
+      {
+        phase: 'Run cut off at rep 2 rest',
+        note: 'Obsidian closed during rep 2 rest of Bike, and the clock has since passed the end of the plan, so no reps were filled in.',
+        resume: 'Resume rep 3',
+      },
     ])
-    expect([statsLabel(t), stepperValue(t)]).toEqual(['Last 255 W · avg 277.5 W', 'Rep 2: 255 W'])
-  })
-
-  it('has no stats or stepper value before a rep is done', () => {
-    const t = timeline('(x 3 (work 30s 300W) (rest 90s))', [])
-    expect([statsLabel(t), stepperValue(t)]).toEqual([null, ''])
   })
 })

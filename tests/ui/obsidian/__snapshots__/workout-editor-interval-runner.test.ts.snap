@@ -64,6 +64,37 @@ exports[`WorkoutEditorView interval runner > draws the runner finished, scored a
     "Back to workout""
 `;
 
+exports[`WorkoutEditorView interval runner > draws the runner resting on a plan with no intensity 1`] = `
+"div.fitkit-runner.is-rest
+  div.fitkit-runner-top
+    span.fitkit-runner-phase
+      "Rest · rep 1 of 3"
+    span.fitkit-runner-name
+      "Exercise Bike"
+  div.fitkit-runner-center
+    div.fitkit-runner-clock
+      "1:29"
+    div.fitkit-runner-target
+      "rest"
+    div.fitkit-runner-next
+      "Next: work 30s"
+    div.fitkit-runner-dots
+      span.fitkit-runner-dot.is-done
+      span.fitkit-runner-dot
+      span.fitkit-runner-dot
+  button.fitkit-btn.fitkit-runner-primary[type=button]
+    "Skip"
+  div.fitkit-runner-controls
+    button.fitkit-btn[aria-label=Pause run][type=button]
+      span.fitkit-runner-icon[data-icon=pause]
+      span
+        "Pause"
+    button.fitkit-btn[aria-label=End run][type=button]
+      span.fitkit-runner-icon[data-icon=square]
+      span
+        "End run""
+`;
+
 exports[`WorkoutEditorView interval runner > draws the runner resting while paused 1`] = `
 "div.fitkit-runner.is-rest.is-paused
   div.fitkit-runner-top
