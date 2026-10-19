@@ -1,0 +1,27 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`plan step modal > draws the labelled field and actions for bodyweight 1`] = `
+"div.fitkit-set-note-modal
+  div.fitkit-set-note-field
+    label.fitkit-label[for=fitkit-plan-step-input]
+      "Rung change"
+    input.fitkit-input[id=fitkit-plan-step-input][inputmode=decimal][placeholder=rungs][type=text]
+  div.fitkit-confirm-actions.fitkit-set-note-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Save""
+`;
+
+exports[`plan step modal > draws the labelled field and actions for strength 1`] = `
+"div.fitkit-set-note-modal
+  div.fitkit-set-note-field
+    label.fitkit-label[for=fitkit-plan-step-input]
+      "Weight change"
+    input.fitkit-input[id=fitkit-plan-step-input][inputmode=decimal][placeholder=kg][type=text]
+  div.fitkit-confirm-actions.fitkit-set-note-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Save""
+`;

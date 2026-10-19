@@ -1,0 +1,318 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ImportExercisesModal > keeps the modal open with a warning when applying fails 1`] = `
+"div.fitkit-import-modal
+  p.fitkit-import-muted
+    "Review exercise names found in workout notes and choose which exercise notes or no-note registry entries to create."
+  div.fitkit-warn
+    "Import failed before settings were saved. The modal stayed open so you can review selections before applying again."
+  table.fitkit-import-table
+    thead
+      tr
+        th
+          "Exercise"
+        th
+          "Kind"
+        th
+          "Registry"
+        th
+          "Note file"
+        th
+          "Actions"
+    tbody
+      tr
+        td[data-label=Exercise]
+          span.fitkit-import-cell-label
+            "Exercise"
+          span
+            "Fresh"
+        td[data-label=Kind]
+          span.fitkit-import-cell-label
+            "Kind"
+          select.fitkit-import-select[aria-label=Kind for Fresh]
+            option[value=strength]
+              "Strength"
+            option[value=duration]
+              "Duration"
+            option[value=interval]
+              "Interval"
+            option[value=bodyweight]
+              "Bodyweight"
+        td.fitkit-import-status-unknown[data-label=Registry]
+          span.fitkit-import-cell-label
+            "Registry"
+          span
+            "Missing"
+        td.fitkit-import-status-unknown[data-label=Note file]
+          span.fitkit-import-cell-label
+            "Note file"
+          span
+            "Missing"
+        td[data-label=Actions]
+          span.fitkit-import-cell-label
+            "Actions"
+          label.fitkit-import-checkbox-row
+            input[type=checkbox]
+            span
+              "Create note"
+          label.fitkit-import-checkbox-row
+            input[type=checkbox]
+            span
+              "No-note entry"
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Apply""
+`;
+
+exports[`ImportExercisesModal > lists every kind of row with its status cells and actions 1`] = `
+"div.fitkit-import-modal
+  p.fitkit-import-muted
+    "Review exercise names found in workout notes and choose which exercise notes or no-note registry entries to create."
+  table.fitkit-import-table
+    thead
+      tr
+        th
+          "Exercise"
+        th
+          "Kind"
+        th
+          "Registry"
+        th
+          "Note file"
+        th
+          "Actions"
+    tbody
+      tr
+        td[data-label=Exercise]
+          span.fitkit-import-cell-label
+            "Exercise"
+          span
+            "Matched"
+        td[data-label=Kind]
+          span.fitkit-import-cell-label
+            "Kind"
+          span
+            "strength"
+        td.fitkit-import-status-match[data-label=Registry]
+          span.fitkit-import-cell-label
+            "Registry"
+          span
+            "Matched Foam roll thigh"
+        td.fitkit-import-status-unknown[data-label=Note file]
+          span.fitkit-import-cell-label
+            "Note file"
+          span
+            "Missing"
+        td[data-label=Actions]
+          span.fitkit-import-cell-label
+            "Actions"
+          label.fitkit-import-checkbox-row
+            input[type=checkbox]
+            span
+              "Create note"
+      tr
+        td[data-label=Exercise]
+          span.fitkit-import-cell-label
+            "Exercise"
+          span
+            "Fresh"
+        td[data-label=Kind]
+          span.fitkit-import-cell-label
+            "Kind"
+          select.fitkit-import-select[aria-label=Kind for Fresh]
+            option[value=strength]
+              "Strength"
+            option[value=duration]
+              "Duration"
+            option[value=interval]
+              "Interval"
+            option[value=bodyweight]
+              "Bodyweight"
+        td.fitkit-import-status-unknown[data-label=Registry]
+          span.fitkit-import-cell-label
+            "Registry"
+          span
+            "Missing"
+        td.fitkit-import-status-unknown[data-label=Note file]
+          span.fitkit-import-cell-label
+            "Note file"
+          span
+            "Missing"
+        td[data-label=Actions]
+          span.fitkit-import-cell-label
+            "Actions"
+          label.fitkit-import-checkbox-row
+            input[type=checkbox]
+            span
+              "Create note"
+          label.fitkit-import-checkbox-row
+            input[type=checkbox]
+            span
+              "No-note entry"
+      tr
+        td[data-label=Exercise]
+          span.fitkit-import-cell-label
+            "Exercise"
+          span
+            "Alias"
+        td[data-label=Kind]
+          span.fitkit-import-cell-label
+            "Kind"
+          span
+            "duration"
+        td.fitkit-import-status-match[data-label=Registry]
+          span.fitkit-import-cell-label
+            "Registry"
+          span
+            "Matched Alias Full"
+        td.fitkit-import-status-match[data-label=Note file]
+          span.fitkit-import-cell-label
+            "Note file"
+          span
+            "Exists"
+        td[data-label=Actions]
+          span.fitkit-import-cell-label
+            "Actions"
+          span
+            "No action"
+      tr
+        td[data-label=Exercise]
+          span.fitkit-import-cell-label
+            "Exercise"
+          span
+            "Gone"
+        td[data-label=Kind]
+          span.fitkit-import-cell-label
+            "Kind"
+          select.fitkit-import-select[aria-label=Kind for Gone]
+            option[value=strength]
+              "Strength"
+            option[value=duration]
+              "Duration"
+            option[value=interval]
+              "Interval"
+            option[value=bodyweight]
+              "Bodyweight"
+        td.fitkit-import-status-unknown[data-label=Registry]
+          span.fitkit-import-cell-label
+            "Registry"
+          span
+            "Ignored"
+        td.fitkit-import-status-unknown[data-label=Note file]
+          span.fitkit-import-cell-label
+            "Note file"
+          span
+            "Missing"
+        td[data-label=Actions]
+          span.fitkit-import-cell-label
+            "Actions"
+          label.fitkit-import-checkbox-row
+            input[type=checkbox]
+            span
+              "Restore"
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Apply""
+`;
+
+exports[`ImportExercisesModal > offers Restore for an ignored exercise and reveals its choices when ticked 1`] = `
+"div.fitkit-import-modal
+  p.fitkit-import-muted
+    "Review exercise names found in workout notes and choose which exercise notes or no-note registry entries to create."
+  table.fitkit-import-table
+    thead
+      tr
+        th
+          "Exercise"
+        th
+          "Kind"
+        th
+          "Registry"
+        th
+          "Note file"
+        th
+          "Actions"
+    tbody
+      tr
+        td[data-label=Exercise]
+          span.fitkit-import-cell-label
+            "Exercise"
+          span
+            "Gone"
+        td[data-label=Kind]
+          span.fitkit-import-cell-label
+            "Kind"
+          select.fitkit-import-select[aria-label=Kind for Gone]
+            option[value=strength]
+              "Strength"
+            option[value=duration]
+              "Duration"
+            option[value=interval]
+              "Interval"
+            option[value=bodyweight]
+              "Bodyweight"
+        td.fitkit-import-status-unknown[data-label=Registry]
+          span.fitkit-import-cell-label
+            "Registry"
+          span
+            "Ignored"
+        td.fitkit-import-status-unknown[data-label=Note file]
+          span.fitkit-import-cell-label
+            "Note file"
+          span
+            "Missing"
+        td[data-label=Actions]
+          span.fitkit-import-cell-label
+            "Actions"
+          label.fitkit-import-checkbox-row
+            input[type=checkbox]
+            span
+              "Restore"
+          label.fitkit-import-checkbox-row
+            input[type=checkbox]
+            span
+              "Create note"
+          label.fitkit-import-checkbox-row
+            input[type=checkbox]
+            span
+              "No-note entry"
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Apply""
+`;
+
+exports[`ImportExercisesModal > says so when there are no exercises 1`] = `
+"div.fitkit-import-modal
+  p.fitkit-import-muted
+    "Review exercise names found in workout notes and choose which exercise notes or no-note registry entries to create."
+  div.fitkit-import-muted
+    "No exercises found."
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Apply""
+`;
+
+exports[`ImportExercisesModal > shows the description and a loading line until the plan arrives 1`] = `
+"div.fitkit-import-modal
+  p.fitkit-import-muted
+    "Review exercise names found in workout notes and choose which exercise notes or no-note registry entries to create."
+  div.fitkit-import-muted
+    "Loading exercises...""
+`;
+
+exports[`ImportExercisesModal > shows the load error with a Close button 1`] = `
+"div.fitkit-import-modal
+  div.fitkit-warn
+    "Could not load exercises: Vault unreadable."
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Close""
+`;

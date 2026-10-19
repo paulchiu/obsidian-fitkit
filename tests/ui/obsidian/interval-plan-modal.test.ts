@@ -6,6 +6,8 @@ import {
   harnessDocument,
   harnessWindow,
 } from '../../harness/obsidian-dom'
+import { outline } from '../../harness/outline'
+import { findUnstyledClasses } from '../../harness/stylesheet'
 
 const menus = vi.hoisted((): Array<Array<{ title: string; click: () => void }>> => [])
 
@@ -556,6 +558,59 @@ describe('interval plan modal', () => {
         afterSteps: [false, false],
         note: "This plan can't be shown as steps, so edit it as text.",
       })
+    })
+  })
+
+  describe('structure', () => {
+    it('draws the step editor with presets, a repeat and every row kind', () => {
+      const { modal } = open('(warmup 10m 150W) (x 3 (over 1m 300W) (rest 2m))')
+
+      expect(outline(modal.contentEl)).toMatchSnapshot()
+      expect(findUnstyledClasses(modal.contentEl)).toEqual([])
+    })
+
+    it('draws the step editor with a repeat that starts each round on the clock', () => {
+      const { modal } = open('6 x open @ 120kg, every 2m')
+
+      expect(outline(modal.contentEl)).toMatchSnapshot()
+    })
+
+    it('draws a plan the rows cannot show as text, with its note and Clear plan', () => {
+      const { modal } = open('(every 1m (work 40s 300W))', [])
+
+      expect(outline(modal.contentEl)).toMatchSnapshot()
+      expect(findUnstyledClasses(modal.contentEl)).toEqual([])
+    })
+
+    it('draws the examples once opened', () => {
+      const { modal } = open('(every 1m (work 40s 300W))', [])
+
+      modal.contentEl
+        .querySelector<HTMLButtonElement>('button[aria-label="Plan examples"]')
+        ?.click()
+
+      expect(outline(modal.contentEl)).toMatchSnapshot()
+      expect(findUnstyledClasses(modal.contentEl)).toEqual([])
+    })
+
+    it('draws the reason in place of the preview when the plan cannot run', () => {
+      const { modal } = open('(x 3 (over 1m 300W))')
+
+      type(modal, '(x 3 (over 1m 300W)')
+
+      expect(outline(modal.contentEl)).toMatchSnapshot()
+    })
+
+    it('marks the shell classes on the sheet and the form', () => {
+      const { modal } = open(undefined)
+
+      expect([
+        modal.modalEl.classList.contains('fitkit-set-note-modal-shell'),
+        modal.contentEl.classList.contains('fitkit-set-note-modal'),
+      ]).toEqual([true, true])
+      modal.close()
+      expect(modal.modalEl.classList.contains('fitkit-set-note-modal-shell')).toBe(false)
+      expect(modal.contentEl.children).toHaveLength(0)
     })
   })
 

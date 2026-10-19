@@ -1,0 +1,307 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ExerciseRenameModal confirm > disables the actions and says Applying while the rename runs 1`] = `
+"div.fitkit-import-modal
+  p
+    "Renaming 'Row' to 'Barbell Row'."
+  h3
+    "Exercise note file"
+  p
+    "Rename: 'Fitness/Exercises/Row.md' → 'Fitness/Exercises/Barbell Row.md'."
+  h3
+    "Workout notes (1)"
+  table.fitkit-import-table
+    tr
+      th
+        "Workout note"
+      th
+        "Rows changed"
+      th
+        "Left stale"
+    tr
+      td
+        "Fitness/Workouts/2026-05-08.md"
+      td
+        "3"
+      td
+  p.fitkit-import-muted
+    "3 row(s) across 1 workout note(s) will be updated."
+  h3
+    "Alias"
+  p
+    "'Row' will be kept as an alias of 'Barbell Row', so existing references still resolve."
+  h3
+    "Left stale"
+  p
+    "No references will be left stale."
+  div.fitkit-import-actions
+    button.fitkit-btn[disabled=]
+      "Back"
+    button.fitkit-btn[disabled=]
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary[disabled=]
+      "Applying...""
+`;
+
+exports[`ExerciseRenameModal confirm > keeps the modal open with a warning banner and a refreshed preview on partial failure 1`] = `
+"div.fitkit-import-modal
+  div.fitkit-warn
+    "Rename only partly completed: could not finish rewriting the workout note for 'Fitness/Workouts/2026-05-08.md' (Disk full). Changes made so far were saved; confirm again to finish the rest."
+  p
+    "Renaming 'Row' to 'Barbell Row'."
+  h3
+    "Exercise note file"
+  p
+    "Rename: 'Fitness/Exercises/Row.md' → 'Fitness/Exercises/Barbell Row.md'."
+  h3
+    "Workout notes (1)"
+  table.fitkit-import-table
+    tr
+      th
+        "Workout note"
+      th
+        "Rows changed"
+      th
+        "Left stale"
+    tr
+      td
+        "Fitness/Workouts/2026-05-08.md"
+      td
+        "3"
+      td
+  p.fitkit-import-muted
+    "3 row(s) across 1 workout note(s) will be updated."
+  h3
+    "Alias"
+  p
+    "'Row' will be kept as an alias of 'Barbell Row', so existing references still resolve."
+  h3
+    "Left stale"
+  p
+    "No references will be left stale."
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Back"
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Confirm rename""
+`;
+
+exports[`ExerciseRenameModal input stage > draws the explanation, the name field and the actions 1`] = `
+"div.fitkit-import-modal
+  p.fitkit-import-muted
+    "Renaming 'Row' updates its exercise note file, rewrites '[exercise:: [[Row]]]' references in workout notes, and keeps 'Row' as an alias. Renaming onto a name already in use merges the two."
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "New name"
+    input.fitkit-registry-input[type=text]
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Preview changes""
+`;
+
+exports[`ExerciseRenameModal input stage > returns to the input with the error when the vault cannot be read 1`] = `
+"div.fitkit-import-modal
+  p.fitkit-import-muted
+    "Renaming 'Row' updates its exercise note file, rewrites '[exercise:: [[Row]]]' references in workout notes, and keeps 'Row' as an alias. Renaming onto a name already in use merges the two."
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "New name"
+    input.fitkit-registry-input[type=text]
+  div.fitkit-warn
+    "Could not check the vault: Disk gone."
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Preview changes""
+`;
+
+exports[`ExerciseRenameModal input stage > shows a checking line while the vault is read 1`] = `
+"div.fitkit-import-modal
+  div.fitkit-import-muted
+    "Checking workout notes...""
+`;
+
+exports[`ExerciseRenameModal preview > names what happens to the losing note and its prose on a merge 1`] = `
+"div.fitkit-import-modal
+  p
+    "Merging 'Row' into 'Barbell Row'."
+  h3
+    "Exercise note file"
+  p
+    "'Fitness/Exercises/Row.md' will be removed after merging into 'Fitness/Exercises/Barbell Row.md'."
+  h3
+    "Workout notes (1)"
+  table.fitkit-import-table
+    tr
+      th
+        "Workout note"
+      th
+        "Rows changed"
+      th
+        "Left stale"
+    tr
+      td
+        "Fitness/Workouts/2026-05-08.md"
+      td
+        "3"
+      td
+  p.fitkit-import-muted
+    "3 row(s) across 1 workout note(s) will be updated."
+  h3
+    "Alias"
+  p
+    "'Row' will be kept as an alias of 'Barbell Row', so existing references still resolve."
+  p.fitkit-import-muted
+    "Other aliases carried over: Rows."
+  h3
+    "Left stale"
+  p
+    "No references will be left stale."
+  h3
+    "Merge"
+  p.fitkit-warn
+    "'Fitness/Exercises/Row.md' will be removed. Its Notes section has text, which will be copied into 'Fitness/Exercises/Barbell Row.md' under a 'Merged from Row' heading first."
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Back"
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Confirm merge""
+`;
+
+exports[`ExerciseRenameModal preview > shows the refusal message and no confirm action when the plan refuses 1`] = `
+"div.fitkit-import-modal
+  h3
+    "Can't rename this exercise"
+  p
+    "New name is identical to the current name."
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Back"
+    button.fitkit-btn
+      "Cancel""
+`;
+
+exports[`ExerciseRenameModal preview > shows the rename with no note file and no workout notes 1`] = `
+"div.fitkit-import-modal
+  p
+    "Renaming 'Row' to 'Barbell Row'."
+  h3
+    "Exercise note file"
+  p
+    "No exercise note file exists for 'Row'; only the registry entry and workout note references will change."
+  h3
+    "Workout notes (0)"
+  p
+    "No workout notes reference 'Row'."
+  h3
+    "Alias"
+  p
+    "'Row' will be kept as an alias of 'Barbell Row', so existing references still resolve."
+  p.fitkit-import-muted
+    "Other aliases carried over: Rows."
+  h3
+    "Left stale"
+  p
+    "No references will be left stale."
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Back"
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Confirm rename""
+`;
+
+exports[`ExerciseRenameModal preview > states the note file rename with both paths, row counts, and the kept alias for a plain rename 1`] = `
+"div.fitkit-import-modal
+  p
+    "Renaming 'Row' to 'Barbell Row'."
+  h3
+    "Exercise note file"
+  p
+    "Rename: 'Fitness/Exercises/Row.md' → 'Fitness/Exercises/Barbell Row.md'."
+  h3
+    "Workout notes (1)"
+  table.fitkit-import-table
+    tr
+      th
+        "Workout note"
+      th
+        "Rows changed"
+      th
+        "Left stale"
+    tr
+      td
+        "Fitness/Workouts/2026-05-08.md"
+      td
+        "3"
+      td
+  p.fitkit-import-muted
+    "3 row(s) across 1 workout note(s) will be updated."
+  h3
+    "Alias"
+  p
+    "'Row' will be kept as an alias of 'Barbell Row', so existing references still resolve."
+  h3
+    "Left stale"
+  p
+    "No references will be left stale."
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Back"
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Confirm rename""
+`;
+
+exports[`ExerciseRenameModal preview > warns plainly about stale pathed/aliased occurrences instead of silently dropping them 1`] = `
+"div.fitkit-import-modal
+  p
+    "Renaming 'Row' to 'Barbell Row'."
+  h3
+    "Exercise note file"
+  p
+    "Rename: 'Fitness/Exercises/Row.md' → 'Fitness/Exercises/Barbell Row.md'."
+  h3
+    "Workout notes (1)"
+  table.fitkit-import-table
+    tr
+      th
+        "Workout note"
+      th
+        "Rows changed"
+      th
+        "Left stale"
+    tr
+      td
+        "Fitness/Workouts/2026-05-08.md"
+      td
+        "0"
+      td
+        "2"
+  p.fitkit-import-muted
+    "3 row(s) across 1 workout note(s) will be updated."
+  h3
+    "Alias"
+  p
+    "'Row' will be kept as an alias of 'Barbell Row', so existing references still resolve."
+  h3
+    "Left stale"
+  p.fitkit-warn
+    "2 reference(s) use a pathed or aliased wikilink (for example '[[Folder/Row]]' or '[[Row|Display]]') and will not be rewritten here. Obsidian's own link updater may fix these when the note file is renamed; check them if not."
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Back"
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Confirm rename""
+`;
