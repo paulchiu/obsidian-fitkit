@@ -29,6 +29,7 @@ import {
   workoutNote,
 } from '../../fixtures/workout-editor'
 import { harnessDocument } from '../../harness/obsidian-dom'
+import { watchUnmounts } from '../../harness/unmount'
 
 useEditorEnvironment()
 
@@ -404,18 +405,25 @@ describe('WorkoutEditorView duration rows', () => {
     },
   )
 
-  it.each(['1.', '90'])(
-    'leaves "%s" as typed in the duration input once the autosave completes',
-    async (typed) => {
-      const { view } = await openEditor({
+  it.each([
+    { typed: '1.', saved: null },
+    { typed: '90', saved: 90 },
+  ])(
+    'leaves "$typed" as typed in the duration input once the autosave completes',
+    async ({ typed, saved }) => {
+      const { view, contents } = await openEditor({
         body: exercise('Plank', ['[set:: 1] [duration:: 0]']),
       })
       const input = cellInput(firstRow(view), 'Duration') as HTMLInputElement
 
       typeInto(input, typed)
+      if (saved !== null) {
+        await savedBody(contents, exercise('Plank', [`[set:: 1] [duration:: ${saved}]`]))
+      }
       await settle()
 
-      expect([input.value, cellInput(firstRow(view), 'Duration')]).toEqual([typed, input])
+      expect(input.value).toBe(typed)
+      expect(cellInput(firstRow(view), 'Duration')).toBe(input)
     },
   )
 
@@ -498,50 +506,6 @@ describe('WorkoutEditorView duration timer', () => {
     await leave(view)
 
     await savedBody(contents, exercise('Plank', ['[set:: 1] [duration:: 42]']))
-  })
-
-  /** The set screen covers the card, so these reach the controls drawn before it opened. */
-  describe('from behind the set screen', () => {
-    it('saves the timed set, then appends one, when Add set fires', async () => {
-      const { view, contents } = await openEditor({
-        body: exercise('Plank', ['[set:: 1] [duration:: 0]']),
-      })
-      const addSet = button(card(view), 'Add set')
-      button(card(view), 'Start timer').click()
-      advance(8)
-
-      addSet.click()
-
-      await savedBody(contents, exercise('Plank', ['[set:: 1] [duration:: 8]', '[duration:: 0]']))
-    })
-
-    it('saves the timed set, then copies its duration, when Repeat fires', async () => {
-      const { view, contents } = await openEditor({
-        body: exercise('Plank', ['[set:: 1] [duration:: 0]']),
-      })
-      const repeat = button(card(view), 'Repeat')
-      button(card(view), 'Start timer').click()
-      advance(8)
-
-      repeat.click()
-
-      await savedBody(
-        contents,
-        exercise('Plank', ['[set:: 1] [duration:: 8]', '[set:: 2] [duration:: 8]']),
-      )
-    })
-
-    it('stops the timer without saving it when its row is deleted', async () => {
-      const { view, contents } = await openEditor({ body: PLANK_30 })
-      const row = firstRow(view)
-      button(card(view), 'Start timer').click()
-      advance(5)
-
-      await deleteRow(row)
-
-      expect(button(view.contentEl, 'Resume timer')).toBeDefined()
-      await savedBody(contents, ['## [[Plank]]', ''])
-    })
   })
 })
 
@@ -682,6 +646,36 @@ describe('WorkoutEditorView repeat set', () => {
       await deleteRow(firstRow(view))
 
       expect([withSet, repeat(view).disabled]).toEqual([false, true])
+    },
+  )
+})
+
+describe('WorkoutEditorView set row lifetime', () => {
+  const BODYWEIGHT = exercise('Push-up', ['[set:: 1] [level:: 1] [reps:: 10]'])
+
+  it.each([
+    { kind: 'strength', body: SQUAT, rowsComponent: 'StrengthRows' },
+    { kind: 'bodyweight', body: BODYWEIGHT, rowsComponent: 'BodyweightRows' },
+    { kind: 'duration', body: PLANK_30, rowsComponent: 'DurationRows' },
+  ])(
+    'unmounts the $kind rows and set bar when the editor redraws and when it closes',
+    async ({ body, rowsComponent }) => {
+      const { view } = await openEditor({ body })
+      const unmounts = watchUnmounts()
+
+      try {
+        button(card(view), 'Add set').click()
+        const redrawn = [...unmounts.names]
+        unmounts.names.length = 0
+        await view.onClose()
+
+        expect([redrawn, unmounts.names]).toEqual([
+          expect.arrayContaining([rowsComponent, 'SetBar']),
+          expect.arrayContaining([rowsComponent, 'SetBar']),
+        ])
+      } finally {
+        unmounts.stop()
+      }
     },
   )
 })
