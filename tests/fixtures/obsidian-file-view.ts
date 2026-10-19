@@ -30,8 +30,7 @@ export const mixinFileView = <TBase extends ViewBaseClass>(
       if (!('file' in state)) {
         return
       }
-      const vault = (this.app as { vault: { getAbstractFileByPath: (p: string) => unknown } })
-        .vault
+      const vault = (this.app as { vault: { getAbstractFileByPath: (p: string) => unknown } }).vault
       const target = vault.getAbstractFileByPath(state.file ?? '')
       if (await this.loadFile(isFile(target) ? target : null)) {
         result.layout = true

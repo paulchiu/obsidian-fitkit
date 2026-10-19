@@ -1,0 +1,295 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`WorkoutEditorView structure > draws a bodyweight card 1`] = `
+"div.fitkit-card.fitkit-bodyweight-card[data-exercise-index=0]
+  div.fitkit-card-top
+    button.fitkit-drag-handle[aria-label=Drag to reorder][data-icon=grip-vertical][tabindex=0][type=button]
+    button.fitkit-name-button[aria-label=Open exercise file for Push-up][type=button]
+      span.fitkit-name-button-text
+        "Push-up"
+      span.fitkit-name-button-icon[aria-hidden=true][data-icon=arrow-up-right]
+    button.fitkit-btn.fitkit-btn-muted.fitkit-card-icon-button.fitkit-gear-button[aria-label=Exercise options][data-icon=settings][type=button]
+  div.fitkit-set-area
+    div.fitkit-bodyweight-row.fitkit-set-head.has-load
+      span.fitkit-set-label.fitkit-set-figure
+      span.fitkit-set-label
+        "Level"
+      span.fitkit-set-label
+        "Reps"
+      span.fitkit-set-label
+        "Load"
+      span.fitkit-bodyweight-head-spacer[aria-hidden=true]
+    div.fitkit-set-rows[style=--fitkit-set-cap: 384px;]
+      div.fitkit-row
+        div.fitkit-row-body
+          div.fitkit-bodyweight-row.has-load
+            div.fitkit-cell.fitkit-set-figure[data-label=Set]
+              "1"
+            div.fitkit-cell[data-label=Level]
+              div.fitkit-bodyweight-stepper
+                button.fitkit-btn.fitkit-bodyweight-step[aria-label=Lower level for set 1][data-icon=minus][type=button]
+                button.fitkit-bodyweight-level-label[aria-haspopup=menu][aria-label=Level for set 1: 2 · Incline push-up][type=button]
+                  span.fitkit-bodyweight-level-full
+                    "2 · Incline push-up"
+                  span.fitkit-bodyweight-level-short
+                    "L2"
+                  span.fitkit-bodyweight-level-chevron[aria-hidden=true][data-icon=chevron-down]
+                button.fitkit-btn.fitkit-bodyweight-step[aria-label=Raise level for set 1][data-icon=plus][type=button]
+            div.fitkit-cell[data-label=Reps]
+              input.fitkit-input[aria-label=Reps][inputmode=numeric][type=number]
+            div.fitkit-cell.fitkit-bodyweight-load[data-label=Load]
+              input.fitkit-input[aria-label=Load][inputmode=decimal][step=0.1][type=number]
+          button.fitkit-btn.fitkit-btn-muted.fitkit-row-kebab[aria-label=Options for bodyweight entry 1][data-icon=more-vertical][type=button]
+      div.fitkit-row
+        div.fitkit-row-body
+          div.fitkit-bodyweight-row.has-load
+            div.fitkit-cell.fitkit-set-figure[data-label=Set]
+              "2"
+            div.fitkit-cell[data-label=Level]
+              div.fitkit-bodyweight-stepper
+                button.fitkit-btn.fitkit-bodyweight-step[aria-label=Lower level for set 2][data-icon=minus][type=button]
+                button.fitkit-bodyweight-level-label[aria-haspopup=menu][aria-label=Level for set 2: 3 · Knee push-up][type=button]
+                  span.fitkit-bodyweight-level-full
+                    "3 · Knee push-up"
+                  span.fitkit-bodyweight-level-short
+                    "L3"
+                  span.fitkit-bodyweight-level-chevron[aria-hidden=true][data-icon=chevron-down]
+                button.fitkit-btn.fitkit-bodyweight-step[aria-label=Raise level for set 2][data-icon=plus][disabled=][type=button]
+            div.fitkit-cell[data-label=Reps]
+              input.fitkit-input[aria-label=Reps][inputmode=numeric][type=number]
+            div.fitkit-cell.fitkit-bodyweight-load[data-label=Load]
+          button.fitkit-btn.fitkit-btn-muted.fitkit-row-kebab[aria-label=Options for bodyweight entry 2][data-icon=more-vertical][type=button]
+    button.fitkit-btn.fitkit-btn-muted.fitkit-set-toggle[aria-expanded=true][hidden=][type=button]
+      "Show fewer sets"
+    div.fitkit-row-actions
+      button.fitkit-btn
+        "Add set"
+      button.fitkit-btn
+        "Repeat""
+`;
+
+exports[`WorkoutEditorView structure > draws a duration card 1`] = `
+"div.fitkit-card[data-exercise-index=0]
+  div.fitkit-card-top
+    button.fitkit-drag-handle[aria-label=Drag to reorder][data-icon=grip-vertical][tabindex=0][type=button]
+    button.fitkit-name-button[aria-label=Open exercise file for Plank][type=button]
+      span.fitkit-name-button-text
+        "Plank"
+      span.fitkit-name-button-icon[aria-hidden=true][data-icon=arrow-up-right]
+    button.fitkit-btn.fitkit-btn-muted.fitkit-card-icon-button.fitkit-gear-button[aria-label=Exercise options][data-icon=settings][type=button]
+  div.fitkit-set-area
+    div.fitkit-set-row.fitkit-duration-row.fitkit-set-head
+      span.fitkit-set-label.fitkit-set-figure
+      span.fitkit-set-label
+        "Duration"
+    div.fitkit-set-rows[style=--fitkit-set-cap: 384px;]
+      div.fitkit-row[data-fitkit-timer-row=0:0]
+        div.fitkit-row-body
+          div.fitkit-set-row.fitkit-duration-row
+            div.fitkit-cell.fitkit-set-figure[data-label=Set]
+              "1"
+            div.fitkit-cell[data-label=Duration]
+              input.fitkit-input.fitkit-duration-input[aria-label=Duration][data-fitkit-default-focus=true][inputmode=text][placeholder=0s][type=text]
+          button.fitkit-btn.fitkit-btn-muted.fitkit-row-kebab[aria-label=Options for duration entry 1][data-icon=more-vertical][type=button]
+      div.fitkit-row[data-fitkit-timer-row=0:1]
+        div.fitkit-row-body
+          div.fitkit-set-row.fitkit-duration-row
+            div.fitkit-cell.fitkit-set-figure[data-label=Set]
+              "2"
+            div.fitkit-cell[data-label=Duration]
+              input.fitkit-input.fitkit-duration-input[aria-label=Duration][data-fitkit-default-focus=true][inputmode=text][placeholder=0s][type=text]
+          button.fitkit-btn.fitkit-btn-muted.fitkit-row-kebab[aria-label=Options for duration entry 2][data-icon=more-vertical][type=button]
+    button.fitkit-btn.fitkit-btn-muted.fitkit-set-toggle[aria-expanded=true][hidden=][type=button]
+      "Show fewer sets"
+    div.fitkit-row-actions
+      button.fitkit-btn
+        "Add set"
+      button.fitkit-btn
+        "Repeat"
+      button.fitkit-btn.fitkit-timer-button[aria-label=Start timer][data-icon=play]
+        "Start timer""
+`;
+
+exports[`WorkoutEditorView structure > draws a strength card 1`] = `
+"div.fitkit-card[data-exercise-index=0]
+  div.fitkit-card-top
+    button.fitkit-drag-handle[aria-label=Drag to reorder][data-icon=grip-vertical][tabindex=0][type=button]
+    button.fitkit-name-button[aria-label=Open exercise file for Squat][type=button]
+      span.fitkit-name-button-text
+        "Squat"
+      span.fitkit-name-button-icon[aria-hidden=true][data-icon=arrow-up-right]
+    button.fitkit-btn.fitkit-btn-muted.fitkit-card-icon-button.fitkit-gear-button[aria-label=Exercise options][data-icon=settings][type=button]
+  div.fitkit-card-history
+    span.fitkit-card-badge[aria-label=PB 100: Heaviest weight lifted (not 1RM): 100 kg x 5][title=Heaviest weight lifted (not 1RM): 100 kg x 5]
+      "PB 100"
+    span.fitkit-card-badge[aria-label=last 100x5: Heaviest weight in latest prior session: 100 kg x 5 (2026-06-01)][title=Heaviest weight in latest prior session: 100 kg x 5 (2026-06-01)]
+      "last 100x5"
+    span.fitkit-card-badge.fitkit-plan-badge[aria-label=Next: 102.5 kg: Planned for next time: up 2.5 kg from 100 kg][title=Planned for next time: up 2.5 kg from 100 kg]
+      span.fitkit-plan-badge-icon[aria-hidden=true][data-icon=arrow-up]
+      span
+        "Next: 102.5 kg"
+  div.fitkit-note-line.fitkit-exercise-note-line[role=button][tabindex=0]
+    "Belt on from set 2"
+  div.fitkit-set-area
+    div.fitkit-set-row.fitkit-set-head
+      span.fitkit-set-label.fitkit-set-figure
+      span.fitkit-set-label
+        "Weight"
+      span.fitkit-set-label
+        "Reps"
+    div.fitkit-set-rows[style=--fitkit-set-cap: 384px;]
+      div.fitkit-row
+        div.fitkit-row-body
+          div.fitkit-set-row
+            div.fitkit-cell.fitkit-set-figure[data-label=Set]
+              "1"
+            div.fitkit-cell[data-label=Weight]
+              input.fitkit-input[aria-label=Weight][inputmode=decimal][step=0.1][type=number]
+            div.fitkit-cell[data-label=Reps]
+              input.fitkit-input[aria-label=Reps][inputmode=numeric][type=number]
+          button.fitkit-btn.fitkit-btn-muted.fitkit-row-kebab[aria-label=Options for set 1][data-icon=more-vertical][type=button]
+        div.fitkit-note-line[role=button][tabindex=0]
+          "Felt heavy"
+      div.fitkit-row.fitkit-row--live
+        div.fitkit-row-body
+          div.fitkit-set-row
+            div.fitkit-cell.fitkit-set-figure[data-label=Set]
+              "2"
+            div.fitkit-cell[data-label=Weight]
+              input.fitkit-input[aria-label=Weight][inputmode=decimal][step=0.1][type=number]
+            div.fitkit-cell[data-label=Reps]
+              input.fitkit-input[aria-label=Reps][inputmode=numeric][type=number]
+          button.fitkit-btn.fitkit-btn-muted.fitkit-row-kebab[aria-label=Options for set 2][data-icon=more-vertical][type=button]
+    button.fitkit-btn.fitkit-btn-muted.fitkit-set-toggle[aria-expanded=true][hidden=][type=button]
+      "Show fewer sets"
+    div.fitkit-row-actions
+      button.fitkit-btn
+        "Add set"
+      button.fitkit-btn
+        "Repeat""
+`;
+
+exports[`WorkoutEditorView structure > draws an interval plan card 1`] = `
+"div.fitkit-card[data-exercise-index=0]
+  div.fitkit-card-top
+    button.fitkit-drag-handle[aria-label=Drag to reorder][data-icon=grip-vertical][tabindex=0][type=button]
+    button.fitkit-name-button[aria-label=Open exercise file for Exercise Bike][type=button]
+      span.fitkit-name-button-text
+        "Exercise Bike"
+      span.fitkit-name-button-icon[aria-hidden=true][data-icon=arrow-up-right]
+    button.fitkit-btn.fitkit-btn-muted.fitkit-card-icon-button.fitkit-gear-button[aria-label=Exercise options][data-icon=settings][type=button]
+  div.fitkit-plan-line[aria-label=Edit interval plan][role=button][tabindex=0]
+    svg.fitkit-plan-profile[aria-hidden=true][preserveAspectRatio=none][viewBox=0 0 270 40] {3 children}
+    svg.fitkit-plan-strip[aria-hidden=true][preserveAspectRatio=none][viewBox=0 0 270 6] {4 children}
+    div.fitkit-plan-legend
+      span.fitkit-plan-count
+        "3×"
+      span.fitkit-plan-muted
+      span.fitkit-plan-step
+        span.fitkit-plan-swatch.is-key-1
+        span
+          "work"
+        span.fitkit-plan-muted
+          "30s"
+        span
+          "300W"
+      span.fitkit-plan-muted
+        "·"
+      span.fitkit-plan-muted
+        "rest 90s"
+    div.fitkit-plan-totals
+      span
+        "3 reps · 4m30s"
+      span
+        "1 of 3 done"
+  div.fitkit-set-area
+    div.fitkit-set-row.fitkit-duration-row.fitkit-set-head.has-intensity.has-rest
+      span.fitkit-set-label.fitkit-set-figure
+      span.fitkit-set-label
+        "Duration"
+      span.fitkit-set-label
+        "Watts"
+      span.fitkit-set-label
+        "Rest"
+    div.fitkit-set-rows[style=--fitkit-set-cap: 384px;]
+      div.fitkit-row[data-fitkit-timer-row=0:0]
+        div.fitkit-row-body
+          div.fitkit-set-row.fitkit-duration-row.has-intensity.has-rest
+            div.fitkit-cell.fitkit-set-figure[data-label=Set]
+              "1"
+            div.fitkit-cell[data-label=Duration]
+              input.fitkit-input.fitkit-duration-input[aria-label=Duration][data-fitkit-default-focus=true][inputmode=text][placeholder=0s][type=text]
+            div.fitkit-cell[data-label=Watts]
+              input.fitkit-input[aria-label=Watts][inputmode=decimal][step=0.1][type=number]
+            div.fitkit-cell[data-label=Rest]
+              input.fitkit-input.fitkit-duration-input[aria-label=Rest][placeholder=0s][type=text]
+          button.fitkit-btn.fitkit-btn-muted.fitkit-row-kebab[aria-label=Options for duration entry 1][data-icon=more-vertical][type=button]
+    button.fitkit-btn.fitkit-btn-muted.fitkit-set-toggle[aria-expanded=true][hidden=][type=button]
+      "Show fewer sets"
+    div.fitkit-row-actions
+      button.fitkit-btn
+        "Add set"
+      button.fitkit-btn
+        "Repeat"
+      button.fitkit-btn.fitkit-btn-primary.fitkit-run-button[aria-label=Start interval plan]
+        "Start from rep 2""
+`;
+
+exports[`WorkoutEditorView structure > draws the conflict banner when the note changed on disk under an edit 1`] = `
+"div.fitkit-conflict
+  span
+    "File changed on disk. Reload to pick up external edits before continuing."
+  button.fitkit-btn.fitkit-btn-warn
+    "Reload from disk""
+`;
+
+exports[`WorkoutEditorView structure > draws the empty state before a workout is loaded 1`] = `
+"div.fitkit-empty
+  "Open a workout note to edit.""
+`;
+
+exports[`WorkoutEditorView structure > draws the footer with the last rest beside the rest button 1`] = `
+"div.fitkit-footer
+  button.fitkit-btn
+    "Add exercise"
+  div.fitkit-rest-timer-control
+    button.fitkit-btn.fitkit-btn-muted.fitkit-rest-timer-button[aria-label=Start rest timer][data-icon=timer][type=button]
+      span.fitkit-rest-timer-label
+        "Start rest"
+    span.fitkit-rest-timer-last
+      "Last rest 1m15s""
+`;
+
+exports[`WorkoutEditorView structure > draws the header with the workout name and meta line 1`] = `
+"div.fitkit-header
+  div.fitkit-meta
+    div.fitkit-name-field
+      input.fitkit-workout-name-input[aria-label=Workout name][id=fitkit-workout-name][placeholder=Untitled workout][type=text]
+    span.fitkit-meta-line
+      "2026-06-15""
+`;
+
+exports[`WorkoutEditorView structure > draws the loading skeleton while the workout is read 1`] = `
+"div.fitkit-skeleton
+  div.fitkit-skeleton-card
+    div.fitkit-skeleton-row
+      div.fitkit-skeleton-line.is-tall.is-medium
+      div.fitkit-skeleton-line.is-tall.is-short
+    div.fitkit-skeleton-line.is-short
+    div.fitkit-skeleton-line
+    div.fitkit-skeleton-line.is-medium
+  div.fitkit-skeleton-card
+    div.fitkit-skeleton-row
+      div.fitkit-skeleton-line.is-tall.is-medium
+      div.fitkit-skeleton-line.is-tall.is-short
+    div.fitkit-skeleton-line.is-short
+    div.fitkit-skeleton-line
+    div.fitkit-skeleton-line.is-medium
+  div.fitkit-skeleton-card
+    div.fitkit-skeleton-row
+      div.fitkit-skeleton-line.is-tall.is-medium
+      div.fitkit-skeleton-line.is-tall.is-short
+    div.fitkit-skeleton-line.is-short
+    div.fitkit-skeleton-line
+    div.fitkit-skeleton-line.is-medium"
+`;
