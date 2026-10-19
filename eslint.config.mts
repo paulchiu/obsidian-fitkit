@@ -25,59 +25,137 @@ const recommendedOptions = (rule: string): object[] => {
 }
 
 interface Banned {
-  paths: { name: string; message: string }[]
-  patterns: { group: string[]; message: string }[]
+  group: string[]
+  message: string
 }
 
+/** Import patterns for the module or folder `name` at any depth, with or without an extension. */
+const anyDepth = (...names: string[]): string[] =>
+  names.flatMap((name) => [`**/${name}`, `**/${name}.*`, `**/${name}/**`])
+
 /** Bans imports across a tier boundary, on top of obsidianmd's own restricted imports. */
-const fence = ({ paths, patterns }: Banned): Linter.RuleEntry => [
+const fence = (...patterns: Banned[]): Linter.RuleEntry => [
   'error',
-  {
-    paths: [...recommendedOptions('@typescript-eslint/no-restricted-imports'), ...paths],
-    patterns,
-  },
+  { paths: recommendedOptions('@typescript-eslint/no-restricted-imports'), patterns },
 ]
 
-/** Obsidian's own globals, banned where code must run without Obsidian. */
-const NO_OBSIDIAN_GLOBALS: Linter.RuleEntry = [
+/** `src/main.ts` and `src/settings.ts`, which import `obsidian`; `settings-paths` is pure and allowed. */
+const PLUGIN_SHELL: Banned = {
+  group: anyDepth('main', 'settings'),
+  message: 'The plugin shell imports obsidian; take what you need as an argument.',
+}
+
+/** Dynamic and type-query imports, which `no-restricted-imports` cannot see. */
+const STATIC_IMPORTS_ONLY: Linter.RuleEntry = [
   'error',
-  ...recommendedOptions('no-restricted-globals'),
-  ...['activeDocument', 'activeWindow', 'createFragment'].map((name) => ({
-    name,
-    message: 'Only src/ui/obsidian uses Obsidian globals; reach the document through an element.',
+  ...['ImportExpression', 'TSImportType'].map((selector) => ({
+    selector,
+    message: 'Use a static import, so the tier fence can check it.',
   })),
 ]
 
-/**
- * The plugin shell modules outside `src/ui/obsidian`, which import `obsidian`, as a fenced folder
- * reaches them; listed by path, since a bare `settings` pattern would catch `domain/settings`.
- */
-const shells = (up: string): Banned['paths'] =>
-  ['settings', 'main'].map((m) => ({
-    name: `${up}${m}`,
-    message: 'The plugin shell imports obsidian; take what you need as an argument.',
-  }))
+/** Obsidian's own globals, banned where code must run without Obsidian. */
+const OBSIDIAN_GLOBALS = [
+  'activeDocument',
+  'activeWindow',
+  'createFragment',
+  'createEl',
+  'createDiv',
+  'createSpan',
+  'createSvg',
+  'fish',
+  'fishAll',
+  'sleep',
+  'nextFrame',
+  'ready',
+  'ajax',
+  'ajaxPromise',
+].map((name) => ({
+  name,
+  message: 'Only src/ui/obsidian uses Obsidian globals; reach the document through an element.',
+}))
 
-/** Obsidian's DOM prototype extensions, banned where code must run on a plain DOM. */
+/** Obsidian's DOM prototype extensions, minus names generic enough to hit arrays (`find`, `indexOf`). */
 const NO_OBSIDIAN_DOM: Linter.RuleEntry = [
   'error',
   ...[
-    'empty',
-    'createEl',
+    'addClass',
+    'addClasses',
+    'appendText',
+    'constructorWin',
     'createDiv',
+    'createEl',
     'createSpan',
     'createSvg',
-    'addClass',
-    'removeClass',
-    'toggleClass',
-    'setCssProps',
-    'setAttr',
+    'detach',
     'doc',
+    'empty',
+    'findAll',
+    'findAllSelf',
+    'getAttr',
+    'getCssPropertyValue',
+    'getText',
+    'hasClass',
+    'insertAfter',
+    'instanceOf',
+    'isActiveElement',
+    'isShown',
+    'matchParent',
+    'onClickEvent',
+    'onNodeInserted',
+    'onWindowMigrated',
+    'removeClass',
+    'removeClasses',
+    'setAttr',
+    'setAttrs',
+    'setChildrenInPlace',
+    'setCssProps',
+    'setCssStyles',
+    'setText',
+    'toggleClass',
+    'toggleVisibility',
     'win',
   ].map((property) => ({
     property,
     message: 'An Obsidian DOM extension; use the standard DOM, or JSX in a component.',
   })),
+]
+
+/** The globals, syntax and properties every tier that runs without Obsidian is held to. */
+const pureTier = (
+  extraGlobals: { name: string; message: string }[] = [],
+  extraSyntax: { selector: string; message: string }[] = [],
+): Linter.RulesRecord => ({
+  'no-restricted-globals': [
+    'error',
+    ...recommendedOptions('no-restricted-globals'),
+    ...OBSIDIAN_GLOBALS,
+    ...extraGlobals,
+  ],
+  'no-restricted-properties': NO_OBSIDIAN_DOM,
+  'no-restricted-syntax': [...STATIC_IMPORTS_ONLY, ...extraSyntax],
+})
+
+/** The browser globals `src/ui/model` may not touch, since it holds no DOM. */
+const DOM_GLOBALS = [
+  'document',
+  'window',
+  'navigator',
+  'Document',
+  'Element',
+  'HTMLElement',
+  'SVGElement',
+  'Node',
+  'Event',
+].map((name) => ({ name, message: 'src/ui/model holds no DOM; src/ui/components draws it.' }))
+
+/** DOM types, which `no-restricted-globals` does not see in type positions. */
+const DOM_TYPES = [
+  {
+    selector:
+      'TSTypeReference > Identifier[name=/^(Document|Element|Node|Event|Window|(HTML|SVG)\\w*Element)$/]',
+    message: 'src/ui/model holds no DOM; src/ui/components draws it.',
+  },
 ]
 
 export default defineConfig(
@@ -174,79 +252,67 @@ export default defineConfig(
   },
   {
     /** The domain runs without Obsidian, Preact, the vault or the UI, and lint holds it to that. */
-    files: ['src/domain/**/*.ts'],
+    files: ['src/domain/**/*.{ts,tsx}'],
     rules: {
-      '@typescript-eslint/no-restricted-imports': fence({
-        paths: [
-          { name: 'obsidian', message: 'src/domain never imports obsidian.' },
-          { name: 'preact', message: 'src/domain returns data; src/ui/components draws it.' },
-          ...shells('../'),
-        ],
-        patterns: [
-          {
-            group: ['preact/*', '**/ui/*', '**/vault/*'],
-            message: 'src/domain imports only itself.',
-          },
-        ],
-      }),
-      'no-restricted-globals': NO_OBSIDIAN_GLOBALS,
-      'no-restricted-properties': NO_OBSIDIAN_DOM,
+      '@typescript-eslint/no-restricted-imports': fence(
+        { group: anyDepth('obsidian'), message: 'src/domain never imports obsidian.' },
+        {
+          group: anyDepth('preact'),
+          message: 'src/domain returns data; src/ui/components draws it.',
+        },
+        {
+          group: anyDepth('ui', 'vault'),
+          message: 'src/domain imports only itself and src/settings-paths.',
+        },
+        PLUGIN_SHELL,
+      ),
+      ...pureTier(),
     },
   },
   {
     /** The UI model is pure data over the domain: no DOM, Preact or Obsidian. */
-    files: ['src/ui/model/**/*.ts'],
+    files: ['src/ui/model/**/*.{ts,tsx}'],
     rules: {
-      '@typescript-eslint/no-restricted-imports': fence({
-        paths: [
-          { name: 'obsidian', message: 'src/ui/model never imports obsidian.' },
-          {
-            name: 'preact',
-            message: 'src/ui/model returns data; src/ui/components draws it.',
-          },
-          ...shells('../../'),
-        ],
-        patterns: [
-          {
-            group: ['preact/*', '**/components/*', '**/obsidian/*', '**/vault/*'],
-            message: 'src/ui/model imports only src/domain and itself.',
-          },
-        ],
-      }),
-      'no-restricted-globals': NO_OBSIDIAN_GLOBALS,
-      'no-restricted-properties': NO_OBSIDIAN_DOM,
+      '@typescript-eslint/no-restricted-imports': fence(
+        {
+          group: anyDepth('preact'),
+          message: 'src/ui/model returns data; src/ui/components draws it.',
+        },
+        {
+          group: anyDepth('obsidian', 'components', 'vault'),
+          message: 'src/ui/model imports only src/domain, src/settings-paths and itself.',
+        },
+        PLUGIN_SHELL,
+      ),
+      ...pureTier(DOM_GLOBALS, DOM_TYPES),
     },
   },
   {
     files: ['src/ui/components/**/*.{ts,tsx}'],
     rules: {
-      '@typescript-eslint/no-restricted-imports': fence({
-        paths: [
-          {
-            name: 'obsidian',
-            message:
-              'Components reach Obsidian through the Host context; only src/ui/obsidian imports it.',
-          },
-          ...shells('../../'),
-        ],
-        patterns: [
-          {
-            group: ['**/obsidian/*', '**/vault/*'],
-            message: 'Components take what they need as props or from the Host context.',
-          },
-        ],
-      }),
-      'no-restricted-globals': NO_OBSIDIAN_GLOBALS,
-      'no-restricted-properties': NO_OBSIDIAN_DOM,
+      '@typescript-eslint/no-restricted-imports': fence(
+        {
+          group: anyDepth('obsidian'),
+          message:
+            'Components reach Obsidian through the Host context; only src/ui/obsidian imports it.',
+        },
+        {
+          group: anyDepth('vault'),
+          message: 'Components take what they need as props or from the Host context.',
+        },
+        PLUGIN_SHELL,
+      ),
+      ...pureTier(),
     },
   },
   {
-    files: ['src/vault/**/*.ts'],
+    files: ['src/vault/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-restricted-imports': fence({
-        paths: [],
-        patterns: [{ group: ['**/ui/*'], message: 'The vault tier never imports from src/ui.' }],
+        group: anyDepth('ui'),
+        message: 'The vault tier never imports from src/ui.',
       }),
+      'no-restricted-syntax': STATIC_IMPORTS_ONLY,
     },
   },
   {

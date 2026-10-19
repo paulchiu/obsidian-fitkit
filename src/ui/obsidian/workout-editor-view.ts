@@ -527,14 +527,9 @@ export class WorkoutEditorView extends FileView {
       return
     }
     if (screen?.kind === 'rest') {
-      const mounted = renderRestTimer(
-        container,
-        this.liveRestSeconds(screen),
-        {
-          stop: () => this.stopRestTimer(),
-        },
-        obsidianHost,
-      )
+      const mounted = renderRestTimer(container, this.liveRestSeconds(screen), {
+        stop: () => this.stopRestTimer(),
+      })
       screen.clockEl = mounted.clock
       this.unmountScreen = mounted.unmount
       return

@@ -38,8 +38,10 @@ export function renderSetTimer(
   handlers: SetTimerHandlers,
   host: Host,
 ): TimerScreenMount {
-  return mount(parent, host, (clock) => (
-    <SetTimer model={model} handlers={handlers} clock={clock} />
+  return mount(parent, (clock) => (
+    <HostContext.Provider value={host}>
+      <SetTimer model={model} handlers={handlers} clock={clock} />
+    </HostContext.Provider>
   ))
 }
 
@@ -48,20 +50,18 @@ export function renderRestTimer(
   parent: HTMLElement,
   seconds: number,
   handlers: { stop: () => void },
-  host: Host,
 ): TimerScreenMount {
-  return mount(parent, host, (clock) => (
+  return mount(parent, (clock) => (
     <RestTimer seconds={seconds} stop={handlers.stop} clock={clock} />
   ))
 }
 
 function mount(
   parent: HTMLElement,
-  host: Host,
   screen: (clock: RefObject<HTMLDivElement>) => JSX.Element,
 ): TimerScreenMount {
   const clock = createRef<HTMLDivElement>()
-  render(<HostContext.Provider value={host}>{screen(clock)}</HostContext.Provider>, parent)
+  render(screen(clock), parent)
   if (!clock.current) {
     throw new Error('Timer screen drew no clock')
   }
