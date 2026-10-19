@@ -1831,6 +1831,10 @@ body.is-mobile .fitkit-editor-root {
   min-height: 48px;
 }
 
+.fitkit-runner-icon {
+  display: inline-flex;
+}
+
 .fitkit-runner-banner {
   display: grid;
   gap: 6px;

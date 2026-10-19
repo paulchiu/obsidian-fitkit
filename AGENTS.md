@@ -10,6 +10,7 @@
 - **Runtime:** Loads inside Obsidian (Electron). Desktop and mobile both supported unless a feature needs `isDesktopOnly`.
 - **Bundler:** esbuild (CJS, bundled to `main.js`).
 - **Package manager:** npm.
+- **JSX:** `.tsx` files compile with Preact's automatic runtime (`jsx: react-jsx`, `jsxImportSource: preact` in `tsconfig.json`, and the matching options in `esbuild.config.mjs` and `vitest.config.ts`). Preact is a pinned devDependency, since esbuild bundles it.
 - **Testing:** Vitest for pure modules (parsers, serializers, registry logic) and for UI through the offline render harness in `tests/harness/` (see its README). The harness renders the real components against the real `styles.css` in jsdom and measures chart SVG geometry with resvg, so it checks structure, cascade, stylesheet coverage and SVG geometry. It never checks HTML layout (jsdom has no layout engine). Manual passes against a dev vault (see `/Users/paul/dev-misc/dev-vault/dev`) still cover flows the harness cannot reach.
 - **Related work:** De-risking POCs live in `/Users/paul/dev-misc/fitkit-pocs`. Product spec lives in the user's Obsidian vault at `Quartz/Projects/FitKit/`. Consult those before introducing new patterns.
 
@@ -26,6 +27,9 @@
   - `src/vault/` - Obsidian-aware, non-UI helpers (vault scanner, file session, dashboard generator, vault-backed registry, vault utilities). May import from `obsidian` and `src/domain/`. Must not import from `src/ui/`.
   - `src/ui/` - Obsidian UI surfaces (views, modals). May import from anywhere.
   - Within a tier, imports use `./` relative paths. Cross-tier, use `../<tier>/` (e.g. `../domain/types`). Keep modules at the tier root: avoid deeper nesting until the codebase justifies it.
+- **Drawing the UI with Preact:** the UI is moving from `createEl` builders to Preact function components, one surface at a time. The set and rest timer screens (`src/ui/timer-screen.tsx`) are drawn this way so far.
+  - The Obsidian class holds the state and mounts the component with Preact `render`, and unmounts it with `render(null, el)` before it empties or closes the pane (`clearContent` in the editor view). Components keep no state of their own.
+  - `setIcon` runs only through `useDomEffect` (`src/ui/dom-effect.ts`), on an element of its own, since it replaces the element's children. Text the view rewrites between renders (a timer's clock) is set in a layout effect, never drawn as a Preact child.
 - **State:**
   - Plugin settings persisted via `loadData` / `saveData`.
   - Derived state recomputed from files/settings on demand; avoid long-lived in-memory caches unless profiling demands them.
@@ -71,7 +75,7 @@ Official references (authoritative):
 - **Commands:** don't include the word "command" or duplicate the plugin id in command IDs/names. Don't set default hotkeys.
 - **Vault I/O:** use `vault.process(file, current => next)` for background rewrites and the `Editor` API for active-file edits. Use `fileManager.trashFile(file)` for deletes. Look files up with `vault.getAbstractFileByPath(path)`. Normalize all user-supplied paths with `normalizePath()`. Never touch the filesystem directly. Use `markdownFilesInFolder` (`src/vault/folder-scan.ts`) for folder scans rather than `vault.getMarkdownFiles()`, which enumerates the whole vault.
 - **Popout safety:** use `activeWindow` / `activeDocument` (declared as ESLint readonly globals here) for DOM lookups and event targets, but `window.setTimeout` / `setInterval` / `clearTimeout` / `clearInterval` for timers, since a timer owned by a popout dies when that popout closes. Bare `document` / `setTimeout` break in popout windows.
-- **DOM:** build elements via Obsidian helpers (`createEl`, `createDiv`, `createSpan`). Never use `document.createElement`, `innerHTML`, `outerHTML`, or inline styles. All styling lives in `styles.css` using Obsidian CSS variables.
+- **DOM:** build elements via Obsidian helpers (`createEl`, `createDiv`, `createSpan`), or JSX in a Preact component. Never use `document.createElement`, `innerHTML`, `outerHTML`, or inline styles. All styling lives in `styles.css` using Obsidian CSS variables.
 - **Network & platform:** `requestUrl()` over `fetch()`; `Platform.isMobile` over `navigator.userAgent`.
 - **Lifecycle:** register subscriptions with `this.registerEvent / registerDomEvent / registerInterval`. Don't store view references on the plugin or call `detachLeavesOfType` in `onunload`.
 - **Logging:** no `console.log` in `onload` / `onunload`. Use `Notice` for user feedback.
