@@ -5,7 +5,7 @@ import type { App, WorkspaceLeaf } from 'obsidian'
 import type { IndexEntry } from '../../src/domain/types'
 import FitKitPlugin from '../../src/main'
 import { DEFAULT_SETTINGS, type FitKitSettings } from '../../src/settings'
-import { WorkoutEditorView } from '../../src/ui/workout-editor-view'
+import { WorkoutEditorView } from '../../src/ui/obsidian/workout-editor-view'
 import { harnessDocument, harnessWindow } from '../harness/obsidian-dom'
 import { buildMockVaultFolderTree } from './mock-vault-folder-tree'
 import {
