@@ -105,7 +105,8 @@ import { ensureParentFolder } from '../../vault/vault-utils'
 import { ConfirmModal } from './confirm-modal'
 import { EditLevelsModal } from './edit-levels-modal'
 import { createCuePlayer, type CuePlayer } from './interval-cues'
-import { clockSeconds, renderRunner } from './interval-runner'
+import { renderRunner } from '../components/interval-runner'
+import { clockSeconds } from '../model/interval-runner'
 import { renderRestTimer, renderSetTimer } from '../components/timer-screen'
 import { formatClock } from '../model/clock'
 import { obsidianHost } from './host'
@@ -1703,7 +1704,7 @@ export class WorkoutEditorView extends FileView {
       run.cues.prime()
       this.sendRun(event)
     }
-    run.clockEl = renderRunner(
+    const mounted = renderRunner(
       container,
       {
         exerciseName: run.card.name,
@@ -1721,7 +1722,10 @@ export class WorkoutEditorView extends FileView {
         endCut: () => this.sendRun({ kind: 'end-cut' }),
         back: () => this.sendRun({ kind: 'back' }),
       },
+      obsidianHost,
     )
+    run.clockEl = mounted.clock
+    this.unmountScreen = mounted.unmount
   }
 
   private sendRun(event: RunEvent): void {
