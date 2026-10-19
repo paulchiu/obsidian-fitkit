@@ -2,7 +2,7 @@
 
 An interval card is a duration exercise with a plan. The plan says what to do and for how long, such as eight rounds of 20 seconds hard and 10 seconds easy, and FitKit times it for you, one full-screen clock per step. Each rep you finish is written to the workout note as its own row, with the time you did and the intensity you held.
 
-This page covers setting a card up, writing a plan, a set of common sessions to start from, and what happens when you run one.
+This page covers setting a card up, writing a plan, a set of common sessions to start from, what happens when you run one, and looking after an interval exercise from one session to the next.
 
 ## Setting up an interval card
 
@@ -12,6 +12,8 @@ Open the card menu on any exercise, choose `Change type...`, then `Switch to int
 - `Update registry too` also records the exercise as interval (see [Exercise registry](exercise-registry.md#kinds-and-units)), so it starts as an interval card each time you add it.
 
 The plan form opens straight after.
+
+`Rename exercise` gets there too: renaming a card to an exercise already recorded as interval makes it an interval card for this workout and opens the plan form, offering the plan that exercise last ran.
 
 You only set this up once per exercise. Adding an exercise to a later workout starts its card with the plan it last ran, and an exercise recorded as interval with no plan yet opens the plan form as soon as you add it. A session logged without a plan starts the card plain.
 
@@ -178,7 +180,19 @@ A run lives in the note, not in memory, so a phone closing Obsidian in the backg
 
 If the plan ended more than two minutes before you came back, FitKit does not make up reps. It shows `Run cut off at rep N` with `Resume rep N` and `End run here`. Closing the tab yourself pauses the run.
 
-## Planning the next session
+## Managing interval exercises
+
+Once an exercise is recorded as interval, most of the work is changing its plan as you get fitter:
+
+- To change the plan, choose `Edit interval plan` in the card menu or tap the plan on the card. The change is saved on this workout's card, and the next workout that adds the exercise starts from it.
+- To keep plans you reuse across exercises, add them to `Interval presets` in [Settings](settings.md), one per line as `Label: plan`. They appear under `Start from` in the plan form.
+- A long session's rows fold away once they pass half the screen, behind `Show all N sets`, so the card stays short while you work.
+- To stop treating an exercise as interval, choose `Switch to duration` under `Change type...` with `Update registry too`. The logged rows stay, and the exercise starts as a plain duration card from then on. The type can also be changed in the [Exercise registry](exercise-registry.md#kinds-and-units).
+- To rename an interval exercise everywhere, use the registry, as for any other exercise (see [Exercise registry](exercise-registry.md#renaming-an-exercise)). `Rename exercise` on the card changes only this workout.
+
+Interval reps count towards the exercise's duration PB and charts like any duration row, leaving out untargeted steps such as a warm-up when the plan has targeted ones (see [Dashboard and charts](dashboard-and-charts.md)).
+
+### Planning the next session
 
 The card menu records which way to take the plan next session: `Plan: increase`, `Plan: keep` or `Plan: decrease`, written as `[next:: up]` and shown as the `Next` badge. An interval card takes the direction alone, with no step size, since each step of the plan has its own target; keep reads `Same target`. See [Workout editor](workout-editor.md#planning-your-next-session).
 

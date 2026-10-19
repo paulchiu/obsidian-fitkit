@@ -49,6 +49,22 @@ name: Squat Day
 - [exercise:: [[Push Up]]] [set:: 2] [level:: 2] [reps:: 6] [load:: 10]
 ```
 
+## Run an interval session
+
+For timed sessions such as Tabata, over-unders or EMOMs, switch a duration card to interval with `Change type...` in the card menu. The plan form opens with common sessions to start from, or you can build your own from steps, rests and repeats, with a watts, load or level target on each step.
+
+`Start` then takes over the tab with a big clock: it counts each step down, beeps the last three seconds, and writes every rep to the note as it finishes, with the time you did and the intensity you held. The plan and the rows are plain inline fields too:
+
+```markdown
+## [[Indoor Bike]]
+
+- [exercise:: [[Indoor Bike]]] [plan:: (x 8 (work 20s 400W) (rest 10s))]
+- [exercise:: [[Indoor Bike]]] [set:: 1] [step:: work] [duration:: 20] [watts:: 405] [rest:: 10]
+- [exercise:: [[Indoor Bike]]] [set:: 2] [step:: work] [duration:: 20] [watts:: 398] [rest:: 10]
+```
+
+Because the run lives in the note, a phone closing Obsidian mid-session does not lose it: reopening the workout picks up from the clock. See [Interval training](docs/interval-training.md) for writing plans, the runner, and managing interval exercises over time.
+
 ## After a few sessions
 
 Run `Rebuild dashboard` from FitKit's settings to generate `Fitness/Fitness Dashboard.md`. It lists your recent sessions, a personal best per exercise, and any next-session plans you recorded, followed by a per-exercise section backed by a Dataview query.
@@ -70,7 +86,7 @@ Renaming from here renames the exercise note, rewrites every reference across yo
 | Page                                                 | What it covers                                                                   |
 | ---------------------------------------------------- | -------------------------------------------------------------------------------- |
 | [Workout editor](docs/workout-editor.md)             | Cards, sets, durations, the rest timer, next-session plans, autosave.            |
-| [Interval training](docs/interval-training.md)       | Planning interval sessions, common sessions to start from, and running a plan.   |
+| [Interval training](docs/interval-training.md)       | Setting up interval cards, writing plans, common sessions, running and managing. |
 | [Exercise registry](docs/exercise-registry.md)       | Where exercises come from, rebuilding, renaming, consolidating, kinds and units. |
 | [Dashboard and charts](docs/dashboard-and-charts.md) | What the dashboard generates, how a PB is chosen, `fitkit-chart` options.        |
 | [Note format](docs/note-format.md)                   | Frontmatter, inline fields, and exactly what survives a save.                    |
@@ -83,6 +99,7 @@ Renaming from here renames the exercise note, rewrites every reference across yo
 - Splitting one exercise into two is not implemented. Consolidating two into one is.
 - Repeat-last-workout is not implemented.
 - Inline fields FitKit does not recognise, such as `[rpe:: 7]`, are dropped the next time the editor saves that note. Everything else in a workout note is preserved, see [Note format](docs/note-format.md#what-survives-a-save).
+- Interval beeps cannot sound while a phone has Obsidian suspended in the background. The run itself catches up when you return.
 - A per-exercise weight unit (`kg` or `lbs`) only changes labels. There is no numeric conversion.
 - SQL/WASM analytics and a custom fenced source format are not implemented.
 

@@ -27,7 +27,7 @@ Each exercise gets a card. The header holds the name and the card menu, plus a d
 
 Tap the name to open the exercise file, and drag the handle to reorder cards. The card menu covers `Rename exercise`, `Add exercise note` / `Edit exercise note`, `Edit levels` on a bodyweight card or `Edit interval plan` on an interval card, the plan items described under [Planning your next session](#planning-your-next-session), `Change type...`, which opens a second menu with `Switch to ...` for each other type, and `Remove exercise`.
 
-`Rename exercise` is scoped to this workout: it points the card at a different exercise. It suggests names already in your exercises folder or workout history, and if the name you pick is a different kind it asks before switching the card over. To rename an exercise everywhere, use the registry instead, see [Exercise registry](exercise-registry.md#renaming-an-exercise).
+`Rename exercise` is scoped to this workout: it points the card at a different exercise. It suggests names already in your exercises folder or workout history. When the name you pick is recorded as a different type, the card switches the way `Change type...` does with `Just this workout`: it asks first if the kind changes, a name recorded as interval opens the plan form, and a plain duration name drops the card's plan. To rename an exercise everywhere, use the registry instead, see [Exercise registry](exercise-registry.md#renaming-an-exercise).
 
 Under the header sit the history badges:
 
@@ -71,6 +71,8 @@ Each row carries a level stepper: minus and plus move one rung, stopping at the 
 The card menu holds `Edit levels`, which edits the ladder one rung per line. An edit that changes what an already-logged level means lists each affected level with its old and new rung, and applies only once confirmed. Appending a rung at the end changes nothing logged and does not prompt.
 
 A rung name too long for its cell shortens to a compact form (`L2`), and grows back into the full name when the cell has room again.
+
+A card whose sets run past half the screen shows only that much, fading out above `Show all N sets`, so one long card does not take over the workout. `Show all N sets` opens the whole list until `Show fewer sets`, and `Add set` and `Repeat` open it so the new row shows.
 
 ## Interval training
 
