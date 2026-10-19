@@ -1,0 +1,302 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`WorkoutEditorView interval runner > draws the runner cut off during rest 1`] = `
+"div.fitkit-runner.is-cut-off
+  div.fitkit-runner-banner
+    div.fitkit-runner-phase
+      "Run cut off at rep 1 rest"
+    div.fitkit-runner-note
+      "Obsidian closed during rep 1 rest of Exercise Bike, and the clock has since passed the end of the plan, so no reps were filled in."
+  button.fitkit-btn.fitkit-btn-primary.fitkit-runner-primary[type=button]
+    "Resume rep 2"
+  button.fitkit-btn[type=button]
+    "End run here""
+`;
+
+exports[`WorkoutEditorView interval runner > draws the runner cut off during work 1`] = `
+"div.fitkit-runner.is-cut-off
+  div.fitkit-runner-banner
+    div.fitkit-runner-phase
+      "Run cut off at rep 1"
+    div.fitkit-runner-note
+      "Obsidian closed during rep 1 of Exercise Bike, and the clock has since passed the end of the plan, so no reps were filled in."
+  button.fitkit-btn.fitkit-btn-primary.fitkit-runner-primary[type=button]
+    "Resume rep 1"
+  button.fitkit-btn[type=button]
+    "End run here""
+`;
+
+exports[`WorkoutEditorView interval runner > draws the runner finished with no targets 1`] = `
+"div.fitkit-runner.is-finished
+  div.fitkit-runner-top
+    span.fitkit-runner-phase
+      "Run finished"
+    span.fitkit-runner-name
+      "Exercise Bike"
+  div.fitkit-runner-center
+    div.fitkit-runner-hits
+      "1"
+    div.fitkit-runner-target
+      "reps done"
+    div.fitkit-runner-dots
+      span.fitkit-runner-dot.is-done
+  button.fitkit-btn.fitkit-btn-primary.fitkit-runner-primary[type=button]
+    "Back to workout""
+`;
+
+exports[`WorkoutEditorView interval runner > draws the runner finished, scored against targets 1`] = `
+"div.fitkit-runner.is-finished
+  div.fitkit-runner-top
+    span.fitkit-runner-phase
+      "Run finished"
+    span.fitkit-runner-name
+      "Exercise Bike"
+  div.fitkit-runner-center
+    div.fitkit-runner-hits
+      "2/3"
+    div.fitkit-runner-target
+      "reps on target"
+    div.fitkit-runner-dots
+      span.fitkit-runner-dot.is-hit
+      span.fitkit-runner-dot.is-miss
+      span.fitkit-runner-dot.is-hit
+  button.fitkit-btn.fitkit-btn-primary.fitkit-runner-primary[type=button]
+    "Back to workout""
+`;
+
+exports[`WorkoutEditorView interval runner > draws the runner resting while paused 1`] = `
+"div.fitkit-runner.is-rest.is-paused
+  div.fitkit-runner-top
+    span.fitkit-runner-phase
+      "Rest · rep 1 of 3"
+    span.fitkit-runner-name
+      "Exercise Bike"
+  div.fitkit-runner-center
+    div.fitkit-runner-clock
+      "1:30"
+    div.fitkit-runner-target
+      "rest"
+    div.fitkit-runner-next
+      "Next: 30s @ 300W"
+    div.fitkit-runner-dots
+      span.fitkit-runner-dot.is-miss
+      span.fitkit-runner-dot
+      span.fitkit-runner-dot
+    div.fitkit-runner-stats
+      "Last 300 W · avg 300 W"
+    div.fitkit-runner-note
+      "Paused"
+    div.fitkit-runner-stepper
+      button.fitkit-btn[aria-label=Lower last rep][type=button]
+        "−"
+      span.fitkit-runner-stepper-value
+        "Rep 1: 300 W"
+      button.fitkit-btn[aria-label=Raise last rep][type=button]
+        "+"
+  button.fitkit-btn.fitkit-runner-primary[disabled=][type=button]
+    "Skip"
+  div.fitkit-runner-controls
+    button.fitkit-btn[aria-label=Resume run][data-icon=play][type=button]
+      span
+        "Resume"
+    button.fitkit-btn[aria-label=End run][data-icon=square][type=button]
+      span
+        "End run""
+`;
+
+exports[`WorkoutEditorView interval runner > draws the runner resting with the stepper and stats 1`] = `
+"div.fitkit-runner.is-rest
+  div.fitkit-runner-top
+    span.fitkit-runner-phase
+      "Rest · rep 1 of 3"
+    span.fitkit-runner-name
+      "Exercise Bike"
+  div.fitkit-runner-center
+    div.fitkit-runner-clock
+      "1:25"
+    div.fitkit-runner-target
+      "rest"
+    div.fitkit-runner-next
+      "Next: 30s @ 300W"
+    div.fitkit-runner-dots
+      span.fitkit-runner-dot.is-miss
+      span.fitkit-runner-dot
+      span.fitkit-runner-dot
+    div.fitkit-runner-stats
+      "Last 300 W · avg 300 W"
+    div.fitkit-runner-stepper
+      button.fitkit-btn[aria-label=Lower last rep][type=button]
+        "−"
+      span.fitkit-runner-stepper-value
+        "Rep 1: 300 W"
+      button.fitkit-btn[aria-label=Raise last rep][type=button]
+        "+"
+  button.fitkit-btn.fitkit-runner-primary[type=button]
+    "Skip"
+  div.fitkit-runner-controls
+    button.fitkit-btn[aria-label=Pause run][data-icon=pause][type=button]
+      span
+        "Pause"
+    button.fitkit-btn[aria-label=End run][data-icon=square][type=button]
+      span
+        "End run""
+`;
+
+exports[`WorkoutEditorView interval runner > draws the runner working a named step with rounds 1`] = `
+"div.fitkit-runner.is-work
+  div.fitkit-runner-top
+    span.fitkit-runner-phase
+      "Work · rep 1 of 4"
+    span.fitkit-runner-name
+      "Exercise Bike"
+  div.fitkit-runner-center
+    div.fitkit-runner-step
+      "on"
+    div.fitkit-runner-clock
+      "0:20"
+    div.fitkit-runner-target
+      "350W target"
+    div.fitkit-runner-rounds
+      "Round 1 of 2"
+    div.fitkit-runner-next
+      "Next: off 30s @ 150W"
+    div.fitkit-runner-dots
+      span.fitkit-runner-dot.is-current
+      span.fitkit-runner-dot
+      span.fitkit-runner-dot
+      span.fitkit-runner-dot
+  button.fitkit-btn.fitkit-runner-primary.fitkit-btn-primary[type=button]
+    "Next"
+  div.fitkit-runner-controls
+    button.fitkit-btn[aria-label=Pause run][data-icon=pause][type=button]
+      span
+        "Pause"
+    button.fitkit-btn[aria-label=End run][data-icon=square][type=button]
+      span
+        "End run""
+`;
+
+exports[`WorkoutEditorView interval runner > draws the runner working a step in nested repeats 1`] = `
+"div.fitkit-runner.is-work
+  div.fitkit-runner-top
+    span.fitkit-runner-phase
+      "Work · rep 5 of 8"
+    span.fitkit-runner-name
+      "Exercise Bike"
+  div.fitkit-runner-center
+    div.fitkit-runner-step
+      "over"
+    div.fitkit-runner-clock
+      "1:00"
+    div.fitkit-runner-target
+      "300W target"
+    div.fitkit-runner-rounds
+      "Set 2 of 2 · round 1 of 2"
+    div.fitkit-runner-next
+      "Next: under 1m @ 220W"
+    div.fitkit-runner-dots
+      span.fitkit-runner-dot.is-hit
+      span.fitkit-runner-dot.is-hit
+      span.fitkit-runner-dot.is-hit
+      span.fitkit-runner-dot.is-hit
+      span.fitkit-runner-dot.is-current
+      span.fitkit-runner-dot
+      span.fitkit-runner-dot
+      span.fitkit-runner-dot
+    div.fitkit-runner-stats
+      "Last 220 W · avg 260 W"
+  button.fitkit-btn.fitkit-runner-primary.fitkit-btn-primary[type=button]
+    "Next"
+  div.fitkit-runner-controls
+    button.fitkit-btn[aria-label=Pause run][data-icon=pause][type=button]
+      span
+        "Pause"
+    button.fitkit-btn[aria-label=End run][data-icon=square][type=button]
+      span
+        "End run""
+`;
+
+exports[`WorkoutEditorView interval runner > draws the runner working the last step 1`] = `
+"div.fitkit-runner.is-work
+  div.fitkit-runner-top
+    span.fitkit-runner-phase
+      "Work · rep 1 of 1"
+    span.fitkit-runner-name
+      "Exercise Bike"
+  div.fitkit-runner-center
+    div.fitkit-runner-step
+      "warmup"
+    div.fitkit-runner-clock
+      "0:20"
+    div.fitkit-runner-dots
+      span.fitkit-runner-dot.is-current
+  button.fitkit-btn.fitkit-runner-primary.fitkit-btn-primary[type=button]
+    "Finish"
+  div.fitkit-runner-controls
+    button.fitkit-btn[aria-label=Pause run][data-icon=pause][type=button]
+      span
+        "Pause"
+    button.fitkit-btn[aria-label=End run][data-icon=square][type=button]
+      span
+        "End run""
+`;
+
+exports[`WorkoutEditorView interval runner > draws the runner working while paused 1`] = `
+"div.fitkit-runner.is-work.is-paused
+  div.fitkit-runner-top
+    span.fitkit-runner-phase
+      "Work · rep 1 of 3"
+    span.fitkit-runner-name
+      "Exercise Bike"
+  div.fitkit-runner-center
+    div.fitkit-runner-clock
+      "0:18"
+    div.fitkit-runner-target
+      "300W target"
+    div.fitkit-runner-next
+      "Next: 30s @ 300W"
+    div.fitkit-runner-dots
+      span.fitkit-runner-dot.is-current
+      span.fitkit-runner-dot
+      span.fitkit-runner-dot
+    div.fitkit-runner-note
+      "Paused"
+  button.fitkit-btn.fitkit-runner-primary.fitkit-btn-primary[disabled=][type=button]
+    "Rest"
+  div.fitkit-runner-controls
+    button.fitkit-btn[aria-label=Resume run][data-icon=play][type=button]
+      span
+        "Resume"
+    button.fitkit-btn[aria-label=End run][data-icon=square][type=button]
+      span
+        "End run""
+`;
+
+exports[`WorkoutEditorView interval runner > draws the runner working, no step name or stats yet 1`] = `
+"div.fitkit-runner.is-work
+  div.fitkit-runner-top
+    span.fitkit-runner-phase
+      "Work · rep 1 of 3"
+    span.fitkit-runner-name
+      "Exercise Bike"
+  div.fitkit-runner-center
+    div.fitkit-runner-clock
+      "0:20"
+    div.fitkit-runner-target
+      "300W target"
+    div.fitkit-runner-next
+      "Next: 30s @ 300W"
+    div.fitkit-runner-dots
+      span.fitkit-runner-dot.is-current
+      span.fitkit-runner-dot
+      span.fitkit-runner-dot
+  button.fitkit-btn.fitkit-runner-primary.fitkit-btn-primary[type=button]
+    "Rest"
+  div.fitkit-runner-controls
+    button.fitkit-btn[aria-label=Pause run][data-icon=pause][type=button]
+      span
+        "Pause"
+    button.fitkit-btn[aria-label=End run][data-icon=square][type=button]
+      span
+        "End run""
+`;
