@@ -1,0 +1,336 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`exercise chart block structure > asks for an exercise when the block names none 1`] = `
+"div.fitkit-chart
+  div.fitkit-chart-empty
+    "fitkit-chart: set 'exercise: <name>' or place this block inside an exercise note."
+
+(no svg)"
+`;
+
+exports[`exercise chart block structure > draws a bodyweight level chart as a step line with ladder rung labels 1`] = `
+"div.fitkit-chart
+  div.fitkit-chart-title
+    "Push-Up · last 4 sessions"
+  svg.fitkit-chart-svg[aria-label=Push-Up · last 4 sessions][preserveAspectRatio=xMidYMid meet][role=img][viewBox=0 0 800 320] {20 children}
+
+<svg xmlns="http://www.w3.org/2000/svg" class="fitkit-chart-svg" viewBox="0 0 800 320" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Push-Up · last 4 sessions">
+<line class="fitkit-chart-grid" x1="140" x2="784" y1="276" y2="276"/>
+<line class="fitkit-chart-grid" x1="140" x2="784" y1="189.33333333333334" y2="189.33333333333334"/>
+<line class="fitkit-chart-grid" x1="140" x2="784" y1="102.66666666666667" y2="102.66666666666667"/>
+<line class="fitkit-chart-grid" x1="140" x2="784" y1="16" y2="16"/>
+<line class="fitkit-chart-axis" x1="140" x2="140" y1="16" y2="276"/>
+<line class="fitkit-chart-axis" x1="140" x2="784" y1="276" y2="276"/>
+<text class="fitkit-chart-axis-label" x="140" y="12" text-anchor="start">level</text>
+<text class="fitkit-chart-axis-label" x="132" y="280" text-anchor="end" data-axis="y">Wall push-up</text>
+<text class="fitkit-chart-axis-label" x="132" y="193.33333333333334" text-anchor="end" data-axis="y">Knee push-up</text>
+<text class="fitkit-chart-axis-label" x="132" y="106.66666666666667" text-anchor="end" data-axis="y">Push-up</text>
+<text class="fitkit-chart-axis-label" x="132" y="20" text-anchor="end" data-axis="y">Diamond push-up xxx…<title>Diamond push-up xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</title>
+</text>
+<text class="fitkit-chart-axis-label" x="140" y="294" text-anchor="middle" data-axis="x">2026-04-10</text>
+<text class="fitkit-chart-axis-label" x="354.66666666666663" y="294" text-anchor="middle" data-axis="x">2026-04-11</text>
+<text class="fitkit-chart-axis-label" x="569.3333333333333" y="294" text-anchor="middle" data-axis="x">2026-04-12</text>
+<text class="fitkit-chart-axis-label" x="784" y="294" text-anchor="end" data-axis="x">2026-04-13</text>
+<polyline class="fitkit-chart-line" points="140,276 354.66666666666663,276 354.66666666666663,189.33333333333334 569.3333333333333,189.33333333333334 569.3333333333333,189.33333333333334 784,189.33333333333334 784,16" fill="none"/>
+<circle class="fitkit-chart-dot" cx="140" cy="276" r="3.5">
+<title>2026-04-10: Wall push-up</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="354.66666666666663" cy="189.33333333333334" r="3.5">
+<title>2026-04-11: Knee push-up</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="569.3333333333333" cy="189.33333333333334" r="3.5">
+<title>2026-04-12: Knee push-up</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="784" cy="16" r="3.5">
+<title>2026-04-13: Diamond push-up xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</title>
+</circle>
+</svg>"
+`;
+
+exports[`exercise chart block structure > draws a bodyweight reps chart 1`] = `
+"div.fitkit-chart
+  div.fitkit-chart-title
+    "Push-Up · last 3 sessions"
+  svg.fitkit-chart-svg[aria-label=Push-Up · last 3 sessions][preserveAspectRatio=xMidYMid meet][role=img][viewBox=0 0 800 320] {20 children}
+
+<svg xmlns="http://www.w3.org/2000/svg" class="fitkit-chart-svg" viewBox="0 0 800 320" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Push-Up · last 3 sessions">
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="276" y2="276"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="211" y2="211"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="146" y2="146"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="81" y2="81"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="16" y2="16"/>
+<line class="fitkit-chart-axis" x1="56" x2="56" y1="16" y2="276"/>
+<line class="fitkit-chart-axis" x1="56" x2="784" y1="276" y2="276"/>
+<text class="fitkit-chart-axis-label" x="56" y="12" text-anchor="start">reps</text>
+<text class="fitkit-chart-axis-label" x="48" y="280" text-anchor="end" data-axis="y">2 reps</text>
+<text class="fitkit-chart-axis-label" x="48" y="215" text-anchor="end" data-axis="y">4 reps</text>
+<text class="fitkit-chart-axis-label" x="48" y="150" text-anchor="end" data-axis="y">6 reps</text>
+<text class="fitkit-chart-axis-label" x="48" y="85" text-anchor="end" data-axis="y">8 reps</text>
+<text class="fitkit-chart-axis-label" x="48" y="20" text-anchor="end" data-axis="y">10 reps</text>
+<text class="fitkit-chart-axis-label" x="56" y="294" text-anchor="middle" data-axis="x">2026-04-10</text>
+<text class="fitkit-chart-axis-label" x="420" y="294" text-anchor="middle" data-axis="x">2026-04-11</text>
+<text class="fitkit-chart-axis-label" x="784" y="294" text-anchor="end" data-axis="x">2026-04-12</text>
+<polyline class="fitkit-chart-line" points="56,243.5 420,146 784,48.5" fill="none"/>
+<circle class="fitkit-chart-dot" cx="56" cy="243.5" r="3.5">
+<title>2026-04-10: 3 reps</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="420" cy="146" r="3.5">
+<title>2026-04-11: 6 reps</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="784" cy="48.5" r="3.5">
+<title>2026-04-12: 9 reps</title>
+</circle>
+</svg>"
+`;
+
+exports[`exercise chart block structure > draws a duration chart with the condensed date labels of a long series 1`] = `
+"div.fitkit-chart
+  div.fitkit-chart-title
+    "Plank · last 9 sessions"
+  svg.fitkit-chart-svg[aria-label=Plank · last 9 sessions][preserveAspectRatio=xMidYMid meet][role=img][viewBox=0 0 800 320] {27 children}
+
+<svg xmlns="http://www.w3.org/2000/svg" class="fitkit-chart-svg" viewBox="0 0 800 320" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Plank · last 9 sessions">
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="276" y2="276"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="211" y2="211"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="146" y2="146"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="81" y2="81"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="16" y2="16"/>
+<line class="fitkit-chart-axis" x1="56" x2="56" y1="16" y2="276"/>
+<line class="fitkit-chart-axis" x1="56" x2="784" y1="276" y2="276"/>
+<text class="fitkit-chart-axis-label" x="48" y="280" text-anchor="end" data-axis="y">0s</text>
+<text class="fitkit-chart-axis-label" x="48" y="215" text-anchor="end" data-axis="y">16m 40s</text>
+<text class="fitkit-chart-axis-label" x="48" y="150" text-anchor="end" data-axis="y">33m 20s</text>
+<text class="fitkit-chart-axis-label" x="48" y="85" text-anchor="end" data-axis="y">50m</text>
+<text class="fitkit-chart-axis-label" x="48" y="20" text-anchor="end" data-axis="y">66m 40s</text>
+<text class="fitkit-chart-axis-label" x="56" y="294" text-anchor="middle" data-axis="x">04-10</text>
+<text class="fitkit-chart-axis-label" x="238" y="294" text-anchor="middle" data-axis="x">04-12</text>
+<text class="fitkit-chart-axis-label" x="420" y="294" text-anchor="middle" data-axis="x">04-14</text>
+<text class="fitkit-chart-axis-label" x="602" y="294" text-anchor="middle" data-axis="x">04-16</text>
+<text class="fitkit-chart-axis-label" x="784" y="294" text-anchor="end" data-axis="x">04-18</text>
+<polyline class="fitkit-chart-line" points="56,274.05 147,273.075 238,272.1 329,271.125 420,270.15 511,268.2 602,266.25 693,41.99999999999999 784,38.099999999999994" fill="none"/>
+<circle class="fitkit-chart-dot" cx="56" cy="274.05" r="3.5">
+<title>2026-04-10: 30s</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="147" cy="273.075" r="3.5">
+<title>2026-04-11: 45s</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="238" cy="272.1" r="3.5">
+<title>2026-04-12: 1m</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="329" cy="271.125" r="3.5">
+<title>2026-04-13: 1m 15s</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="420" cy="270.15" r="3.5">
+<title>2026-04-14: 1m 30s</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="511" cy="268.2" r="3.5">
+<title>2026-04-15: 2m</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="602" cy="266.25" r="3.5">
+<title>2026-04-16: 2m 30s</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="693" cy="41.99999999999999" r="3.5">
+<title>2026-04-17: 60m</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="784" cy="38.099999999999994" r="3.5">
+<title>2026-04-18: 61m</title>
+</circle>
+</svg>"
+`;
+
+exports[`exercise chart block structure > draws a single session as a lone dot 1`] = `
+"div.fitkit-chart
+  div.fitkit-chart-title
+    "Bench Press · last 1 session"
+  svg.fitkit-chart-svg[aria-label=Bench Press · last 1 session][preserveAspectRatio=xMidYMid meet][role=img][viewBox=0 0 800 320] {15 children}
+
+<svg xmlns="http://www.w3.org/2000/svg" class="fitkit-chart-svg" viewBox="0 0 800 320" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Bench Press · last 1 session">
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="276" y2="276"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="211" y2="211"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="146" y2="146"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="81" y2="81"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="16" y2="16"/>
+<line class="fitkit-chart-axis" x1="56" x2="56" y1="16" y2="276"/>
+<line class="fitkit-chart-axis" x1="56" x2="784" y1="276" y2="276"/>
+<text class="fitkit-chart-axis-label" x="56" y="12" text-anchor="start">e1rm (kg)</text>
+<text class="fitkit-chart-axis-label" x="48" y="280" text-anchor="end" data-axis="y">84.0kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="215" text-anchor="end" data-axis="y">88.7kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="150" text-anchor="end" data-axis="y">93.3kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="85" text-anchor="end" data-axis="y">98.0kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="20" text-anchor="end" data-axis="y">102.7kg</text>
+<text class="fitkit-chart-axis-label" x="420" y="294" text-anchor="end" data-axis="x">2026-04-10</text>
+<circle class="fitkit-chart-dot" cx="420" cy="146" r="3.5">
+<title>2026-04-10: e1rm 93.3kg</title>
+</circle>
+</svg>"
+`;
+
+exports[`exercise chart block structure > draws a strength e1rm chart with its kind note 1`] = `
+"div.fitkit-chart
+  div.fitkit-chart-note
+    "No 'kind:' supplied; defaulting to strength. Add 'kind: strength' or 'kind: duration' or 'kind: bodyweight' to be explicit."
+  div.fitkit-chart-title
+    "Bench Press · last 5 sessions"
+  svg.fitkit-chart-svg[aria-label=Bench Press · last 5 sessions][preserveAspectRatio=xMidYMid meet][role=img][viewBox=0 0 800 320] {24 children}
+
+<svg xmlns="http://www.w3.org/2000/svg" class="fitkit-chart-svg" viewBox="0 0 800 320" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Bench Press · last 5 sessions">
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="276" y2="276"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="211" y2="211"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="146" y2="146"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="81" y2="81"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="16" y2="16"/>
+<line class="fitkit-chart-axis" x1="56" x2="56" y1="16" y2="276"/>
+<line class="fitkit-chart-axis" x1="56" x2="784" y1="276" y2="276"/>
+<text class="fitkit-chart-axis-label" x="56" y="12" text-anchor="start">e1rm (kg)</text>
+<text class="fitkit-chart-axis-label" x="48" y="280" text-anchor="end" data-axis="y">90.0kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="215" text-anchor="end" data-axis="y">93.8kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="150" text-anchor="end" data-axis="y">97.5kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="85" text-anchor="end" data-axis="y">101.3kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="20" text-anchor="end" data-axis="y">105.0kg</text>
+<text class="fitkit-chart-axis-label" x="56" y="294" text-anchor="middle" data-axis="x">2026-04-10</text>
+<text class="fitkit-chart-axis-label" x="238" y="294" text-anchor="middle" data-axis="x">2026-04-11</text>
+<text class="fitkit-chart-axis-label" x="420" y="294" text-anchor="middle" data-axis="x">2026-04-12</text>
+<text class="fitkit-chart-axis-label" x="602" y="294" text-anchor="middle" data-axis="x">2026-04-13</text>
+<text class="fitkit-chart-axis-label" x="784" y="294" text-anchor="end" data-axis="x">2026-04-14</text>
+<polyline class="fitkit-chart-line" points="56,218.22222222222206 238,167.66666666666666 420,117.11111111111104 602,66.5555555555554 784,16" fill="none"/>
+<circle class="fitkit-chart-dot" cx="56" cy="218.22222222222206" r="3.5">
+<title>2026-04-10: e1rm 93.3kg</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="238" cy="167.66666666666666" r="3.5">
+<title>2026-04-11: e1rm 96.3kg</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="420" cy="117.11111111111104" r="3.5">
+<title>2026-04-12: e1rm 99.2kg</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="602" cy="66.5555555555554" r="3.5">
+<title>2026-04-13: e1rm 102.1kg</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="784" cy="16" r="3.5">
+<title>2026-04-14: e1rm 105.0kg</title>
+</circle>
+</svg>"
+`;
+
+exports[`exercise chart block structure > draws a strength reps chart in pounds 1`] = `
+"div.fitkit-chart
+  div.fitkit-chart-note
+    "Ignored invalid metric value 'reps'; using e1rm."
+  div.fitkit-chart-title
+    "Bench Press · last 2 sessions"
+  svg.fitkit-chart-svg[aria-label=Bench Press · last 2 sessions][preserveAspectRatio=xMidYMid meet][role=img][viewBox=0 0 800 320] {18 children}
+
+<svg xmlns="http://www.w3.org/2000/svg" class="fitkit-chart-svg" viewBox="0 0 800 320" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Bench Press · last 2 sessions">
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="276" y2="276"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="211" y2="211"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="146" y2="146"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="81" y2="81"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="16" y2="16"/>
+<line class="fitkit-chart-axis" x1="56" x2="56" y1="16" y2="276"/>
+<line class="fitkit-chart-axis" x1="56" x2="784" y1="276" y2="276"/>
+<text class="fitkit-chart-axis-label" x="56" y="12" text-anchor="start">e1rm (lbs)</text>
+<text class="fitkit-chart-axis-label" x="48" y="280" text-anchor="end" data-axis="y">92.0lbs</text>
+<text class="fitkit-chart-axis-label" x="48" y="215" text-anchor="end" data-axis="y">94.0lbs</text>
+<text class="fitkit-chart-axis-label" x="48" y="150" text-anchor="end" data-axis="y">96.0lbs</text>
+<text class="fitkit-chart-axis-label" x="48" y="85" text-anchor="end" data-axis="y">98.0lbs</text>
+<text class="fitkit-chart-axis-label" x="48" y="20" text-anchor="end" data-axis="y">100.0lbs</text>
+<text class="fitkit-chart-axis-label" x="56" y="294" text-anchor="middle" data-axis="x">2026-04-10</text>
+<text class="fitkit-chart-axis-label" x="784" y="294" text-anchor="end" data-axis="x">2026-04-11</text>
+<polyline class="fitkit-chart-line" points="56,232.66666666666634 784,43.08333333333318" fill="none"/>
+<circle class="fitkit-chart-dot" cx="56" cy="232.66666666666634" r="3.5">
+<title>2026-04-10: e1rm 93.3lbs</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="784" cy="43.08333333333318" r="3.5">
+<title>2026-04-11: e1rm 99.2lbs</title>
+</circle>
+</svg>"
+`;
+
+exports[`exercise chart block structure > draws a strength weight chart 1`] = `
+"div.fitkit-chart
+  div.fitkit-chart-title
+    "Bench Press · last 3 sessions"
+  svg.fitkit-chart-svg[aria-label=Bench Press · last 3 sessions][preserveAspectRatio=xMidYMid meet][role=img][viewBox=0 0 800 320] {20 children}
+
+<svg xmlns="http://www.w3.org/2000/svg" class="fitkit-chart-svg" viewBox="0 0 800 320" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Bench Press · last 3 sessions">
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="276" y2="276"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="211" y2="211"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="146" y2="146"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="81" y2="81"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="16" y2="16"/>
+<line class="fitkit-chart-axis" x1="56" x2="56" y1="16" y2="276"/>
+<line class="fitkit-chart-axis" x1="56" x2="784" y1="276" y2="276"/>
+<text class="fitkit-chart-axis-label" x="56" y="12" text-anchor="start">weight (kg)</text>
+<text class="fitkit-chart-axis-label" x="48" y="280" text-anchor="end" data-axis="y">80kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="215" text-anchor="end" data-axis="y">81.5kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="150" text-anchor="end" data-axis="y">83kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="85" text-anchor="end" data-axis="y">84.5kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="20" text-anchor="end" data-axis="y">86kg</text>
+<text class="fitkit-chart-axis-label" x="56" y="294" text-anchor="middle" data-axis="x">2026-04-10</text>
+<text class="fitkit-chart-axis-label" x="420" y="294" text-anchor="middle" data-axis="x">2026-04-11</text>
+<text class="fitkit-chart-axis-label" x="784" y="294" text-anchor="end" data-axis="x">2026-04-12</text>
+<polyline class="fitkit-chart-line" points="56,276 420,167.66666666666666 784,59.33333333333332" fill="none"/>
+<circle class="fitkit-chart-dot" cx="56" cy="276" r="3.5">
+<title>2026-04-10: 80kg</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="420" cy="167.66666666666666" r="3.5">
+<title>2026-04-11: 82.5kg</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="784" cy="59.33333333333332" r="3.5">
+<title>2026-04-12: 85kg</title>
+</circle>
+</svg>"
+`;
+
+exports[`exercise chart block structure > draws the empty state for an exercise with no sessions 1`] = `
+"div.fitkit-chart
+  div.fitkit-chart-title
+    "Bench Press"
+  div.fitkit-chart-empty
+    "No strength sessions found for this exercise yet."
+
+(no svg)"
+`;
+
+exports[`exercise chart block structure > draws the failure state when the chart cannot be built 1`] = `
+"div.fitkit-chart
+  div.fitkit-chart-empty
+    "fitkit-chart: failed to render."
+
+(no svg)"
+`;
+
+exports[`exercise chart block structure > names the window when sessions were trimmed 1`] = `
+"div.fitkit-chart
+  div.fitkit-chart-title
+    "Bench Press · last 3 of 5 sessions"
+  svg.fitkit-chart-svg[aria-label=Bench Press · last 3 of 5 sessions][preserveAspectRatio=xMidYMid meet][role=img][viewBox=0 0 800 320] {20 children}
+
+<svg xmlns="http://www.w3.org/2000/svg" class="fitkit-chart-svg" viewBox="0 0 800 320" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Bench Press · last 3 of 5 sessions">
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="276" y2="276"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="211" y2="211"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="146" y2="146"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="81" y2="81"/>
+<line class="fitkit-chart-grid" x1="56" x2="784" y1="16" y2="16"/>
+<line class="fitkit-chart-axis" x1="56" x2="56" y1="16" y2="276"/>
+<line class="fitkit-chart-axis" x1="56" x2="784" y1="276" y2="276"/>
+<text class="fitkit-chart-axis-label" x="56" y="12" text-anchor="start">e1rm (kg)</text>
+<text class="fitkit-chart-axis-label" x="48" y="280" text-anchor="end" data-axis="y">98.0kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="215" text-anchor="end" data-axis="y">100.0kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="150" text-anchor="end" data-axis="y">102.0kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="85" text-anchor="end" data-axis="y">104.0kg</text>
+<text class="fitkit-chart-axis-label" x="48" y="20" text-anchor="end" data-axis="y">106.0kg</text>
+<text class="fitkit-chart-axis-label" x="56" y="294" text-anchor="middle" data-axis="x">2026-04-12</text>
+<text class="fitkit-chart-axis-label" x="420" y="294" text-anchor="middle" data-axis="x">2026-04-13</text>
+<text class="fitkit-chart-axis-label" x="784" y="294" text-anchor="end" data-axis="x">2026-04-14</text>
+<polyline class="fitkit-chart-line" points="56,238.08333333333317 420,143.29166666666634 784,48.5" fill="none"/>
+<circle class="fitkit-chart-dot" cx="56" cy="238.08333333333317" r="3.5">
+<title>2026-04-12: e1rm 99.2kg</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="420" cy="143.29166666666634" r="3.5">
+<title>2026-04-13: e1rm 102.1kg</title>
+</circle>
+<circle class="fitkit-chart-dot" cx="784" cy="48.5" r="3.5">
+<title>2026-04-14: e1rm 105.0kg</title>
+</circle>
+</svg>"
+`;

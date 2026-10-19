@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { createTestRoot } from '../../harness/obsidian-dom'
+import { outline } from '../../harness/outline'
 
 vi.mock('obsidian', () => {
   class TFile {
@@ -364,5 +365,88 @@ describe('workout reading mode rendering', () => {
     expect(formatDurationSeconds(65)).toBe('1m5s')
     expect(formatDurationSeconds(3600)).toBe('1h')
     expect(formatDurationSeconds(3660)).toBe('1h1m')
+  })
+})
+
+describe('workout reading mode structure', () => {
+  /** Renders `rows` as the one-exercise section Obsidian would hand the post-processor. */
+  const preview = (
+    name: string,
+    rows: string[],
+    settings: Partial<FitKitPlugin['settings']> = {},
+  ): string => {
+    const section = [`## [[${name}]]`, '', ...rows.map((row) => `- ${row}`)].join('\n')
+    const root = createRenderedSection(rows)
+    const plugin = createPlugin()
+    Object.assign(plugin.settings, settings)
+
+    renderWorkoutReadingModeSection(plugin, root, createContext(section))
+
+    return outline(root)
+  }
+
+  it('draws a strength table with a note and a next-time plan', () => {
+    expect(
+      preview(
+        'Squat',
+        [
+          '[exercise:: [[Squat]]] [next:: up 2.5] [notes:: felt strong]',
+          '[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+          '[exercise:: [[Squat]]] [set:: 2] [weight:: 105.5] [reps:: 3] [notes:: smooth]',
+        ],
+        { exerciseRegistry: [{ name: 'Squat', kind: 'strength', unit: 'lbs', aliases: [] }] },
+      ),
+    ).toMatchSnapshot()
+  })
+
+  it('draws a bodyweight table with rung names and a load column', () => {
+    expect(
+      preview(
+        'Push-up',
+        [
+          '[exercise:: [[Push-up]]] [next:: up 1]',
+          '[exercise:: [[Push-up]]] [set:: 1] [level:: 2] [reps:: 10] [load:: 5]',
+          '[exercise:: [[Push-up]]] [set:: 2] [level:: 4] [reps:: 8] [notes:: slow]',
+        ],
+        {
+          exerciseRegistry: [
+            { name: 'Push-up', kind: 'bodyweight', levels: ['Wall', 'Knee'], aliases: [] },
+          ],
+        },
+      ),
+    ).toMatchSnapshot()
+  })
+
+  it('draws a duration table under its plan', () => {
+    expect(
+      preview('Bike', [
+        '[exercise:: [[Bike]]] [plan:: 3 x 1m @ 300W, 30s rest] [next:: stay 5]',
+        '[exercise:: [[Bike]]] [set:: 1] [duration:: 95]',
+        '[exercise:: [[Bike]]] [set:: 2] [duration:: 3660] [notes:: hard]',
+      ]),
+    ).toMatchSnapshot()
+  })
+
+  it('draws one row as a singular count', () => {
+    expect(
+      preview('Squat', ['[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]']),
+    ).toMatchSnapshot()
+  })
+
+  it.each([
+    ['strength', 'Squat', '[exercise:: [[Squat]]] [next:: up 2.5]'],
+    ['duration', 'Plank', '[exercise:: [[Plank]]] [plan:: 3 x 1m]'],
+  ])('draws the empty message for a %s exercise without rows', (kind, name, row) => {
+    expect(
+      preview(name, [row], {
+        exerciseRegistry: [
+          {
+            name,
+            kind: kind as 'strength' | 'bodyweight' | 'duration',
+            aliases: [],
+          },
+        ],
+      }),
+    ).toMatchSnapshot()
   })
 })
