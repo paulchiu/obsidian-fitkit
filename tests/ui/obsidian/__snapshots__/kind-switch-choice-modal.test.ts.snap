@@ -1,0 +1,40 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`kind switch choice modal > draws the explanation and choices when it clears rows and the registry differs 1`] = `
+"div.fitkit-kind-confirm-modal
+  p
+    "Existing strength rows in this workout will be cleared."
+  p
+    "The exercise registry currently records Plank as strength. New cards default their type from the registry."
+  div.fitkit-confirm-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn
+      "Just this workout"
+    button.fitkit-btn.fitkit-btn-primary
+      "Update registry too""
+`;
+
+exports[`kind switch choice modal > draws the explanation and choices when it keeps rows and the registry already agrees 1`] = `
+"div.fitkit-kind-confirm-modal
+  p
+    "The exercise registry already records Plank as duration. New cards default their type from the registry."
+  div.fitkit-confirm-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn
+      "Just this workout""
+`;
+
+exports[`kind switch choice modal > draws the explanation and choices when it keeps rows and the registry is missing 1`] = `
+"div.fitkit-kind-confirm-modal
+  p
+    "Plank is not yet in the exercise registry. New cards default their type from the registry."
+  div.fitkit-confirm-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn
+      "Just this workout"
+    button.fitkit-btn.fitkit-btn-primary
+      "Update registry too""
+`;

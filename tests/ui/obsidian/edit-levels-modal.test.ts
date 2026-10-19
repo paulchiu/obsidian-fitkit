@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createTestRoot, findButtons, harnessDocument } from '../../harness/obsidian-dom'
+import { outline } from '../../harness/outline'
+import { findUnstyledClasses } from '../../harness/stylesheet'
 
 const notices: string[] = []
 
@@ -106,5 +108,34 @@ describe('edit levels modal', () => {
     expect(onSave).not.toHaveBeenCalled()
     expect(close).not.toHaveBeenCalled()
     expect(notices).toEqual(['Enter at least one level.'])
+  })
+
+  it('draws the labelled text box and action row under the exercise title', () => {
+    const { modal, contentEl } = openModal()
+
+    expect(modal.titleEl.textContent).toBe('Edit levels for Push-up')
+    expect(modal.modalEl.classList.contains('fitkit-set-note-modal-shell')).toBe(true)
+    expect(outline(contentEl)).toMatchSnapshot()
+    expect(findUnstyledClasses(contentEl)).toEqual([])
+  })
+
+  it('closes without saving from Cancel and clears the shell class', () => {
+    const { modal, contentEl, onSave } = openModal()
+
+    findButtons(contentEl, 'Cancel')[0]?.click()
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect(modal.modalEl.classList.contains('fitkit-set-note-modal-shell')).toBe(false)
+    expect(contentEl.children).toHaveLength(0)
+  })
+
+  it('saves once even if Save is pressed again after closing', () => {
+    const { contentEl, onSave } = openModal()
+
+    const [save] = findButtons(contentEl, 'Save')
+    save?.click()
+    save?.click()
+
+    expect(onSave).toHaveBeenCalledTimes(1)
   })
 })

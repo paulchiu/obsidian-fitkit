@@ -1,0 +1,22 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`parse diagnostics modal > lists each warning under its path, name or a general heading 1`] = `
+"div
+  h3
+    "Workouts/a.md"
+  ul
+    li
+      "Bad set"
+    li
+      "Bad weight"
+  h3
+    "Plank"
+  ul
+    li
+      "Unknown kind"
+  h3
+    "General diagnostic"
+  ul
+    li
+      "Something else""
+`;

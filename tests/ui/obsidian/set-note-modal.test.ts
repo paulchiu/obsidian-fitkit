@@ -6,6 +6,8 @@ import {
   harnessDocument,
   modalElements,
 } from '../../harness/obsidian-dom'
+import { outline } from '../../harness/outline'
+import { findUnstyledClasses } from '../../harness/stylesheet'
 
 vi.mock('obsidian', () => {
   class Modal {
@@ -116,5 +118,44 @@ describe('set note modal', () => {
     save.click()
 
     expect(onSave).toHaveBeenCalledWith(undefined)
+  })
+
+  it('draws the labelled text box and action row', () => {
+    const modal = openModal({ title: 'Note for set 2', initial: 'Set bar down', onSave: vi.fn() })
+
+    const { contentEl } = modalElements(modal)
+    expect(outline(contentEl)).toMatchSnapshot()
+    expect(findUnstyledClasses(contentEl)).toEqual([])
+  })
+
+  it('prefills the note and puts the caret at its end', () => {
+    const modal = openModal({ title: 'Note for set 2', initial: 'Set bar down', onSave: vi.fn() })
+
+    const textarea = modalElements(modal).contentEl.querySelector('textarea')
+    expect(textarea?.value).toBe('Set bar down')
+    expect(textarea?.selectionStart).toBe(12)
+  })
+
+  it('closes without saving from Cancel', () => {
+    const onSave = vi.fn()
+    const modal = openModal({ title: 'Note for set 2', initial: 'x', onSave })
+
+    const { contentEl, modalEl } = modalElements(modal)
+    findButtons(contentEl, 'Cancel')[0]?.click()
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect(modalEl.classList.contains('fitkit-set-note-modal-shell')).toBe(false)
+    expect(contentEl.children).toHaveLength(0)
+  })
+
+  it('saves once even if Save is pressed again after closing', () => {
+    const onSave = vi.fn()
+    const modal = openModal({ title: 'Note for set 2', initial: 'x', onSave })
+
+    const [save] = findButtons(modalElements(modal).contentEl, 'Save')
+    save?.click()
+    save?.click()
+
+    expect(onSave).toHaveBeenCalledTimes(1)
   })
 })
