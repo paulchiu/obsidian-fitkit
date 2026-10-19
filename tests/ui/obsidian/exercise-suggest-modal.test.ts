@@ -60,6 +60,33 @@ describe('exercise suggest modal rows', () => {
     )
   })
 
+  it('clears whatever a row element already held before drawing into it', () => {
+    const modal = new ExerciseSuggestModal({} as never, ['Plank'], vi.fn())
+    const el = harnessDocument.body.createDiv()
+    el.createSpan({ text: 'stale' })
+
+    modal.renderSuggestion({ type: 'existing', name: 'Plank' }, el)
+
+    expect(outline(el)).toBe('div\n  div.fitkit-suggest-title\n    "Plank"')
+  })
+
+  it('unmounts rows the results list has dropped once it draws again', () => {
+    const modal = new ExerciseSuggestModal({} as never, ['Plank'], vi.fn())
+    const list = harnessDocument.body.createDiv()
+    const first = list.createDiv()
+    modal.renderSuggestion({ type: 'existing', name: 'Plank' }, first)
+    list.empty()
+
+    const unmounts = watchUnmounts()
+    try {
+      modal.renderSuggestion({ type: 'existing', name: 'Plank' }, list.createDiv())
+    } finally {
+      unmounts.stop()
+    }
+
+    expect(unmounts.names).toEqual(['ExerciseSuggestion'])
+  })
+
   it('unmounts every row it drew when it closes', () => {
     const modal = new ExerciseSuggestModal({} as never, ['Plank'], vi.fn())
     const rows = [harnessDocument.body.createDiv(), harnessDocument.body.createDiv()]

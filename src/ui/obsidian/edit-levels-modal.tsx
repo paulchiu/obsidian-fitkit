@@ -35,10 +35,10 @@ export class EditLevelsModal extends Modal {
         initial={this.options.initial.join('\n')}
         onSave={this.commit}
         onCancel={this.cancel}
+        onFilled={focusTextAreaAtEnd}
       />,
       contentEl,
     )
-    focusTextAreaAtEnd(contentEl)
   }
 
   onClose(): void {

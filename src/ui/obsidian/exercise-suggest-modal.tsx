@@ -3,8 +3,6 @@ import { render } from 'preact'
 
 import { ExerciseSuggestion, type ExerciseChoice } from '../components/exercise-suggestion'
 
-export type { ExerciseChoice }
-
 export class ExerciseSuggestModal extends SuggestModal<ExerciseChoice> {
   private rows = new Set<HTMLElement>()
 
@@ -64,10 +62,21 @@ export class ExerciseSuggestModal extends SuggestModal<ExerciseChoice> {
   }
 
   renderSuggestion(item: ExerciseChoice, el: HTMLElement): void {
+    this.unmountDiscardedRows()
     render(null, el)
     el.empty()
     this.rows.add(el)
     render(<ExerciseSuggestion item={item} />, el)
+  }
+
+  /** Obsidian empties the results list before redrawing it, which leaves old rows parentless. */
+  private unmountDiscardedRows(): void {
+    for (const row of this.rows) {
+      if (!row.parentElement) {
+        render(null, row)
+        this.rows.delete(row)
+      }
+    }
   }
 
   onChooseSuggestion(item: ExerciseChoice): void {

@@ -1,7 +1,7 @@
 import { Modal, type App } from 'obsidian'
 import { render } from 'preact'
 
-import { ParseDiagnosticsBody, type DiagnosticsItem } from '../components/parse-diagnostics'
+import { ParseDiagnosticsBody, type DiagnosticsItem } from '../components/parse-diagnostics-body'
 
 export class ParseDiagnosticsModal extends Modal {
   private readonly diagnostics: readonly DiagnosticsItem[]

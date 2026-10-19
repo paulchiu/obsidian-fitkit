@@ -76,6 +76,17 @@ describe('delete registry entry modal', () => {
     expect(resolve).toHaveBeenCalledExactlyOnceWith({ confirmed: true, alsoDeleteFile: true })
   })
 
+  it('keeps the note when the box is ticked then unticked before Delete', () => {
+    const { contentEl, resolve } = openModal('Exercises/Plank.md')
+
+    const checkbox = contentEl.querySelector<HTMLInputElement>('input[type=checkbox]')
+    checkbox?.click()
+    checkbox?.click()
+    findButtons(contentEl, 'Delete')[0]?.click()
+
+    expect(resolve).toHaveBeenCalledExactlyOnceWith({ confirmed: true, alsoDeleteFile: false })
+  })
+
   it('names the checkbox through its label', () => {
     const { contentEl } = openModal('Exercises/Plank.md')
 

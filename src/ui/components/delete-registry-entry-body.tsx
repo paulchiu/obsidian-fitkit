@@ -1,6 +1,6 @@
 import type { JSX } from 'preact'
 
-import { ActionBar } from './action-bar'
+import { DestructiveActions } from './action-bar'
 
 export interface DeleteRegistryEntryProps {
   entryName: string
@@ -41,14 +41,7 @@ export function DeleteRegistryEntryBody({
           from the registry.
         </p>
       )}
-      <ActionBar>
-        <button class="fitkit-btn" onClick={() => onChoose(false)}>
-          Cancel
-        </button>
-        <button class="fitkit-btn fitkit-destructive-button" onClick={() => onChoose(true)}>
-          Delete
-        </button>
-      </ActionBar>
+      <DestructiveActions cancelText="Cancel" confirmText="Delete" onChoose={onChoose} />
     </>
   )
 }

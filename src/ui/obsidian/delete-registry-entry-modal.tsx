@@ -1,7 +1,7 @@
 import { Modal, type App } from 'obsidian'
 import { render } from 'preact'
 
-import { DeleteRegistryEntryBody } from '../components/delete-registry-entry'
+import { DeleteRegistryEntryBody } from '../components/delete-registry-entry-body'
 
 export interface DeleteRegistryEntryModalOptions {
   entryName: string

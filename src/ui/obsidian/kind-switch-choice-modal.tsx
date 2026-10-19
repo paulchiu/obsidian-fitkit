@@ -1,19 +1,15 @@
 import { Modal, type App } from 'obsidian'
 import { render } from 'preact'
 
-import type { ExerciseType } from '../../domain/exercise-type'
-import { KindSwitchChoiceBody, type KindSwitchChoice } from '../components/kind-switch-choice'
+import {
+  KindSwitchChoiceBody,
+  type KindSwitchChoice,
+  type KindSwitchChoiceProps,
+} from '../components/kind-switch-choice-body'
 
 export type { KindSwitchChoice }
 
-export interface KindSwitchChoiceModalOptions {
-  exerciseName: string
-  currentType: ExerciseType
-  nextType: ExerciseType
-  /** True when the switch changes the stored kind and the card has rows to lose. */
-  clearsRows: boolean
-  registryType: ExerciseType | null
-}
+export type KindSwitchChoiceModalOptions = Omit<KindSwitchChoiceProps, 'onChoose'>
 
 export class KindSwitchChoiceModal extends Modal {
   private settled = false

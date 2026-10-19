@@ -1,6 +1,6 @@
 import type { ComponentChildren, JSX } from 'preact'
 
-/** The bottom button row every simple modal ends with; `cls` adds the sheet-pinned variant. */
+/** A modal's bottom button row; `cls` adds a variant such as the sheet-pinned bar. */
 export function ActionBar({
   cls,
   children,
@@ -10,5 +10,27 @@ export function ActionBar({
 }): JSX.Element {
   return (
     <div class={cls ? `fitkit-confirm-actions ${cls}` : 'fitkit-confirm-actions'}>{children}</div>
+  )
+}
+
+/** A neutral cancel button beside a destructive confirm button, reporting which was pressed. */
+export function DestructiveActions({
+  cancelText,
+  confirmText,
+  onChoose,
+}: {
+  cancelText: string
+  confirmText: string
+  onChoose: (confirmed: boolean) => void
+}): JSX.Element {
+  return (
+    <ActionBar>
+      <button class="fitkit-btn" onClick={() => onChoose(false)}>
+        {cancelText}
+      </button>
+      <button class="fitkit-btn fitkit-destructive-button" onClick={() => onChoose(true)}>
+        {confirmText}
+      </button>
+    </ActionBar>
   )
 }

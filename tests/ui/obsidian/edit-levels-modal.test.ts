@@ -38,6 +38,10 @@ vi.mock('obsidian', () => {
 
 import { EditLevelsModal } from '../../../src/ui/obsidian/edit-levels-modal'
 
+/** The stubbed `window.setTimeout` queues here so a test can see what waits for the next tick. */
+const timers: (() => void)[] = []
+const flushTimers = (): void => timers.splice(0).forEach((run) => run())
+
 function openModal(options?: { initial?: string[]; onSave?: (levels: string[]) => void }): {
   modal: EditLevelsModal
   contentEl: HTMLElement
@@ -57,11 +61,9 @@ function openModal(options?: { initial?: string[]; onSave?: (levels: string[]) =
 describe('edit levels modal', () => {
   beforeEach(() => {
     notices.length = 0
+    timers.length = 0
     vi.stubGlobal('window', {
-      setTimeout: (callback: () => void): number => {
-        callback()
-        return 1
-      },
+      setTimeout: (callback: () => void): number => timers.push(callback),
     })
   })
 
@@ -70,12 +72,21 @@ describe('edit levels modal', () => {
     vi.unstubAllGlobals()
   })
 
-  it('prefills one rung per line and focuses the end of the text', () => {
+  it('prefills one rung per line, then on the next tick focuses the end of the text', () => {
     const { contentEl } = openModal()
 
     const textarea = contentEl.querySelector('textarea')
-    expect(textarea?.value).toBe('Wall push-up\nKnee push-up')
+    if (!textarea) {
+      throw new Error('Expected a textarea.')
+    }
+    textarea.setSelectionRange(0, 0)
+    expect(textarea.value).toBe('Wall push-up\nKnee push-up')
+    expect(harnessDocument.activeElement).not.toBe(textarea)
+
+    flushTimers()
+
     expect(harnessDocument.activeElement).toBe(textarea)
+    expect([textarea.selectionStart, textarea.selectionEnd]).toEqual([25, 25])
   })
 
   it('saves trimmed rungs with blanks dropped', () => {
@@ -130,8 +141,9 @@ describe('edit levels modal', () => {
     expect(contentEl.children).toHaveLength(0)
   })
 
-  it('saves once even if Save is pressed again after closing', () => {
-    const { contentEl, onSave } = openModal()
+  it('saves once when Save is pressed again while the close is still under way', () => {
+    const { modal, contentEl, onSave } = openModal()
+    vi.spyOn(modal, 'close').mockImplementation(() => {})
 
     const [save] = findButtons(contentEl, 'Save')
     save?.click()

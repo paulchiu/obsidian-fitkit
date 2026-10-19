@@ -10,9 +10,14 @@ export interface TextAreaFormProps {
   initial: string
   onSave: (text: string) => void
   onCancel: () => void
+  /** Receives the text box once it holds `initial`, so the shell can focus it. */
+  onFilled: (textarea: HTMLTextAreaElement) => void
 }
 
-/** A labelled text box over Cancel and Save, for the modals that edit one block of text. */
+/**
+ * A labelled text box over Cancel and Save. It wears the set note modal's classes, which every
+ * one-text-box modal shares for its keyboard-safe sheet layout.
+ */
 export function TextAreaForm({
   label,
   id,
@@ -20,10 +25,12 @@ export function TextAreaForm({
   initial,
   onSave,
   onCancel,
+  onFilled,
 }: TextAreaFormProps): JSX.Element {
   const textarea = useDomEffect<HTMLTextAreaElement>(
     (el) => {
       el.value = initial
+      onFilled(el)
     },
     [initial],
   )

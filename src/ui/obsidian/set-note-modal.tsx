@@ -34,10 +34,10 @@ export class SetNoteModal extends Modal {
         initial={this.options.initial}
         onSave={this.commit}
         onCancel={this.cancel}
+        onFilled={focusTextAreaAtEnd}
       />,
       contentEl,
     )
-    focusTextAreaAtEnd(contentEl)
   }
 
   onClose(): void {

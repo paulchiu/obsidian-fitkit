@@ -1,6 +1,6 @@
 import type { JSX } from 'preact'
 
-import { ActionBar } from './action-bar'
+import { DestructiveActions } from './action-bar'
 
 export interface ConfirmBodyProps {
   message: string
@@ -19,14 +19,7 @@ export function ConfirmBody({
   return (
     <>
       <p>{message}</p>
-      <ActionBar>
-        <button class="fitkit-btn" onClick={() => onChoose(false)}>
-          {cancelText}
-        </button>
-        <button class="fitkit-btn fitkit-destructive-button" onClick={() => onChoose(true)}>
-          {confirmText}
-        </button>
-      </ActionBar>
+      <DestructiveActions cancelText={cancelText} confirmText={confirmText} onChoose={onChoose} />
     </>
   )
 }
