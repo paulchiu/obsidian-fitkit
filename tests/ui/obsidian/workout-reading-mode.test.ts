@@ -1,6 +1,8 @@
+import { options } from 'preact'
 import { describe, expect, it, vi } from 'vitest'
 
 import { createTestRoot } from '../../harness/obsidian-dom'
+import { outline } from '../../harness/outline'
 
 vi.mock('obsidian', () => {
   class TFile {
@@ -13,16 +15,25 @@ vi.mock('obsidian', () => {
     }
   }
 
-  return { TFile }
+  class MarkdownRenderChild {
+    private cleanups: Array<() => void> = []
+    constructor(readonly containerEl: HTMLElement) {}
+    register(cleanup: () => void): void {
+      this.cleanups.push(cleanup)
+    }
+    unload(): void {
+      ;(this as unknown as { onunload(): void }).onunload()
+      this.cleanups.forEach((cleanup) => cleanup())
+    }
+  }
+
+  return { MarkdownRenderChild, TFile }
 })
 
 import type { MarkdownPostProcessorContext } from 'obsidian'
 
 import type FitKitPlugin from '../../../src/main'
-import {
-  formatDurationSeconds,
-  renderWorkoutReadingModeSection,
-} from '../../../src/ui/obsidian/workout-reading-mode'
+import { renderWorkoutReadingModeSection } from '../../../src/ui/obsidian/workout-reading-mode'
 
 const strengthSection = [
   '## [[Squat]]',
@@ -53,16 +64,19 @@ function createPlugin(): FitKitPlugin {
 function createContext(
   sectionText: string,
   frontmatter: Record<string, unknown> | null = { type: 'workout' },
-): MarkdownPostProcessorContext {
+): MarkdownPostProcessorContext & { children: Array<{ unload(): void }> } {
+  const children: Array<{ unload(): void }> = []
   return {
+    children,
     sourcePath: 'Fitness/Workouts/2026-05-01.md',
     frontmatter,
+    addChild: (child: { unload(): void }) => children.push(child),
     getSectionInfo: () => ({
       text: sectionText,
       lineStart: 0,
       lineEnd: sectionText.split(/\r?\n/).length - 1,
     }),
-  } as unknown as MarkdownPostProcessorContext
+  } as unknown as MarkdownPostProcessorContext & { children: Array<{ unload(): void }> }
 }
 
 function createRenderedSection(lines: string[]): HTMLElement {
@@ -340,6 +354,21 @@ describe('workout reading mode rendering', () => {
     expect(root.querySelectorAll('.fitkit-reading-hidden-source-row')).toHaveLength(0)
   })
 
+  it('draws one preview when the post-processor runs twice on the same section', () => {
+    const root = createRenderedSection([
+      '[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '[exercise:: [[Squat]]] [set:: 2] [weight:: 105] [reps:: 3] [notes:: smooth]',
+    ])
+    const plugin = createPlugin()
+    const ctx = createContext(strengthSection)
+
+    renderWorkoutReadingModeSection(plugin, root, ctx)
+    renderWorkoutReadingModeSection(plugin, root, ctx)
+
+    expect(root.querySelectorAll('.fitkit-reading-preview')).toHaveLength(1)
+    expect(ctx.children).toHaveLength(1)
+  })
+
   it('skips non-workout notes', () => {
     const root = createRenderedSection([
       '[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
@@ -355,14 +384,124 @@ describe('workout reading mode rendering', () => {
     expect(root.querySelector('.fitkit-reading-preview')).toBeNull()
     expect(root.querySelectorAll('.fitkit-reading-hidden-source-row')).toHaveLength(0)
   })
+})
 
-  it('formats durations across minute and hour boundaries', () => {
-    expect(formatDurationSeconds(undefined)).toBe('-')
-    expect(formatDurationSeconds(1)).toBe('1s')
-    expect(formatDurationSeconds(45)).toBe('45s')
-    expect(formatDurationSeconds(60)).toBe('1m')
-    expect(formatDurationSeconds(65)).toBe('1m5s')
-    expect(formatDurationSeconds(3600)).toBe('1h')
-    expect(formatDurationSeconds(3660)).toBe('1h1m')
+describe('workout reading mode structure', () => {
+  /** Renders `rows` as the one-exercise section Obsidian would hand the post-processor. */
+  const preview = (
+    name: string,
+    rows: string[],
+    settings: Partial<FitKitPlugin['settings']> = {},
+  ): string => {
+    const section = [`## [[${name}]]`, '', ...rows.map((row) => `- ${row}`)].join('\n')
+    const root = createRenderedSection(rows)
+    const plugin = createPlugin()
+    Object.assign(plugin.settings, settings)
+
+    renderWorkoutReadingModeSection(plugin, root, createContext(section))
+
+    return outline(root)
+  }
+
+  it('draws a strength table with a note and a next-time plan', () => {
+    expect(
+      preview(
+        'Squat',
+        [
+          '[exercise:: [[Squat]]] [next:: up 2.5] [notes:: felt strong]',
+          '[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+          '[exercise:: [[Squat]]] [set:: 2] [weight:: 105.5] [reps:: 3] [notes:: smooth]',
+        ],
+        { exerciseRegistry: [{ name: 'Squat', kind: 'strength', unit: 'lbs', aliases: [] }] },
+      ),
+    ).toMatchSnapshot()
+  })
+
+  it('draws a bodyweight table with rung names and a load column', () => {
+    expect(
+      preview(
+        'Push-up',
+        [
+          '[exercise:: [[Push-up]]] [next:: up 1]',
+          '[exercise:: [[Push-up]]] [set:: 1] [level:: 2] [reps:: 10] [load:: 5]',
+          '[exercise:: [[Push-up]]] [set:: 2] [level:: 4] [reps:: 8] [notes:: slow]',
+        ],
+        {
+          exerciseRegistry: [
+            { name: 'Push-up', kind: 'bodyweight', levels: ['Wall', 'Knee'], aliases: [] },
+          ],
+        },
+      ),
+    ).toMatchSnapshot()
+  })
+
+  it('draws a duration table under its plan', () => {
+    expect(
+      preview('Bike', [
+        '[exercise:: [[Bike]]] [plan:: 3 x 1m @ 300W, 30s rest] [next:: stay 5]',
+        '[exercise:: [[Bike]]] [set:: 1] [duration:: 95]',
+        '[exercise:: [[Bike]]] [set:: 2] [duration:: 3660] [notes:: hard]',
+      ]),
+    ).toMatchSnapshot()
+  })
+
+  it('draws one row as a singular count', () => {
+    expect(
+      preview('Squat', ['[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]']),
+    ).toMatchSnapshot()
+  })
+
+  it('draws only the note when an exercise has a note and no plans', () => {
+    expect(
+      preview('Plank', [
+        '[exercise:: [[Plank]]] [notes:: steady]',
+        '[exercise:: [[Plank]]] [set:: 1] [duration:: 60]',
+      ]),
+    ).toMatchSnapshot()
+  })
+
+  it('draws neither note nor plan lines for a bare duration exercise', () => {
+    expect(preview('Plank', ['[exercise:: [[Plank]]] [set:: 1] [duration:: 60]'])).toMatchSnapshot()
+  })
+
+  it.each([
+    ['strength', 'Squat', '[exercise:: [[Squat]]] [next:: up 2.5]'],
+    ['duration', 'Plank', '[exercise:: [[Plank]]] [plan:: 3 x 1m]'],
+  ])('draws the empty message for a %s exercise without rows', (kind, name, row) => {
+    expect(
+      preview(name, [row], {
+        exerciseRegistry: [
+          {
+            name,
+            kind: kind as 'strength' | 'bodyweight' | 'duration',
+            aliases: [],
+          },
+        ],
+      }),
+    ).toMatchSnapshot()
+  })
+
+  it('unmounts the preview when Obsidian unloads the section', () => {
+    const root = createRenderedSection([
+      '[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '[exercise:: [[Squat]]] [set:: 2] [weight:: 105] [reps:: 3] [notes:: smooth]',
+    ])
+    const ctx = createContext(strengthSection)
+    renderWorkoutReadingModeSection(createPlugin(), root, ctx)
+    const unmounted: string[] = []
+    const previous = { ...options }
+    options.unmount = (vnode) => {
+      if (typeof vnode.type === 'string') unmounted.push(vnode.type)
+      previous.unmount?.(vnode)
+    }
+    try {
+      for (const child of ctx.children) child.unload()
+    } finally {
+      Object.assign(options, previous)
+    }
+
+    expect(unmounted).toContain('table')
+    expect(root.querySelector('.fitkit-reading-preview')).toBeNull()
+    expect(root.querySelector('table')).toBeNull()
   })
 })

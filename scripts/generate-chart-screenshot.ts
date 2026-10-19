@@ -13,7 +13,7 @@
  *
  * DOM polyfill:
  * - Covers only what the current renderer uses.
- * - Inspect src/ui/obsidian/exercise-chart-svg.ts before extending the renderer.
+ * - Inspect src/ui/components/exercise-chart.tsx before extending the renderer.
  * - If the renderer touches a new Obsidian element extension, extend this polyfill to match it.
  */
 
@@ -23,12 +23,12 @@ import { JSDOM } from 'jsdom'
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-const jiti = createJiti(import.meta.url)
+const jiti = createJiti(import.meta.url, { jsx: { runtime: 'automatic', importSource: 'preact' } })
 const { buildExerciseChartSeries } = await jiti.import('../src/domain/exercise-chart.ts')
 const { createRegistry } = await jiti.import('../src/domain/exercise-registry.ts')
 const { pickBestSet, pickHeaviestSet } = await jiti.import('../src/domain/epley.ts')
 const { parseWorkoutNote } = await jiti.import('../src/domain/workout-note-model.ts')
-const { renderExerciseChartSvg } = await jiti.import('../src/ui/obsidian/exercise-chart-svg.ts')
+const { renderExerciseChart } = await jiti.import('../src/ui/components/exercise-chart.tsx')
 const { extractChartCss } = await jiti.import('../src/domain/chart-css.ts')
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..')
@@ -58,7 +58,7 @@ const outputs = []
 for (const metric of ['e1rm', 'weight']) {
   const series = buildExerciseChartSeries(index, registry, EXERCISE_NAME, 'strength', 30, metric)
   const container = activeDocument.createElement('div')
-  renderExerciseChartSvg(container, series)
+  renderExerciseChart(container, { series })
   const svg = serializeRenderedSvg(container)
   const metricName = metric === 'e1rm' ? 'e1rm' : 'Weight'
   const outputPath = path.join(
@@ -203,58 +203,6 @@ function setupDom() {
   globalThis.document = dom.window.document
   globalThis.activeWindow = dom.window
   globalThis.activeDocument = dom.window.document
-
-  installElementHelpers(dom.window.HTMLElement.prototype)
-  installElementHelpers(dom.window.SVGElement.prototype)
-}
-
-function installElementHelpers(prototype) {
-  prototype.empty = function empty() {
-    this.replaceChildren()
-  }
-  prototype.addClass = function addClass(className) {
-    this.classList.add(className)
-  }
-  prototype.addClasses = function addClasses(classNames) {
-    this.classList.add(...classNames.split(/\s+/).filter(Boolean))
-  }
-  prototype.setText = function setText(text) {
-    this.textContent = text
-  }
-  prototype.setAttr = function setAttr(name, value) {
-    this.setAttribute(name, String(value))
-  }
-  prototype.createDiv = function createDiv(options = {}) {
-    return this.createEl('div', options)
-  }
-  prototype.createSpan = function createSpan(options = {}) {
-    return this.createEl('span', options)
-  }
-  prototype.createEl = function createEl(tagName, options = {}) {
-    const child = activeDocument.createElement(tagName)
-    applyElementOptions(child, options)
-    this.appendChild(child)
-    return child
-  }
-  prototype.createSvg = function createSvg(tagName, options = {}) {
-    const child = activeDocument.createElementNS('http://www.w3.org/2000/svg', tagName)
-    applyElementOptions(child, options)
-    this.appendChild(child)
-    return child
-  }
-}
-
-function applyElementOptions(element, options) {
-  const classes = options.cls
-  if (classes) {
-    element.classList.add(...classes.split(/\s+/).filter(Boolean))
-  }
-  if (options.text !== undefined) {
-    element.textContent = options.text
-  }
-  for (const [name, value] of Object.entries(options.attr ?? {})) {
-    element.setAttribute(name, String(value))
-  }
 }
 
 function serializeRenderedSvg(container) {

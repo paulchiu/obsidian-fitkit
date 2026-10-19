@@ -1,0 +1,284 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`workout reading mode structure > draws a bodyweight table with rung names and a load column 1`] = `
+"div
+  ul
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Push-up]]] [next:: up 1]"
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Push-up]]] [set:: 1] [level:: 2] [reps:: 10] [load:: 5]"
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Push-up]]] [set:: 2] [level:: 4] [reps:: 8] [notes:: slow]"
+  div.fitkit-reading-preview
+    div.fitkit-reading-summary
+      span.fitkit-reading-kind
+        "Bodyweight"
+      span.fitkit-reading-count
+        "2 rows"
+    div.fitkit-reading-plan
+      "Next time: up 1 rung"
+    table.fitkit-reading-table
+      thead
+        tr
+          th
+            "Set"
+          th
+            "Level"
+          th
+            "Reps"
+          th
+            "Load"
+          th
+            "Notes"
+      tbody
+        tr
+          td
+            "1"
+          td
+            "Knee"
+          td
+            "10"
+          td
+            "5 kg"
+          td
+            "-"
+        tr
+          td
+            "2"
+          td
+            "Level 4"
+          td
+            "8"
+          td
+            "-"
+          td
+            "slow""
+`;
+
+exports[`workout reading mode structure > draws a duration table under its plan 1`] = `
+"div
+  ul
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Bike]]] [plan:: 3 x 1m @ 300W, 30s rest] [next:: stay 5]"
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Bike]]] [set:: 1] [duration:: 95]"
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Bike]]] [set:: 2] [duration:: 3660] [notes:: hard]"
+  div.fitkit-reading-preview
+    div.fitkit-reading-summary
+      span.fitkit-reading-kind
+        "Interval"
+      span.fitkit-reading-count
+        "2 rows"
+    div.fitkit-reading-plan
+      "Plan: 3 x 1m @ 300W, 30s rest"
+    div.fitkit-reading-plan
+      "Next time: same target"
+    table.fitkit-reading-table
+      thead
+        tr
+          th
+            "Set"
+          th
+            "Duration"
+          th
+            "Notes"
+      tbody
+        tr
+          td
+            "1"
+          td
+            "1m35s"
+          td
+            "-"
+        tr
+          td
+            "2"
+          td
+            "1h1m"
+          td
+            "hard""
+`;
+
+exports[`workout reading mode structure > draws a strength table with a note and a next-time plan 1`] = `
+"div
+  ul
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Squat]]] [next:: up 2.5] [notes:: felt strong]"
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]"
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Squat]]] [set:: 2] [weight:: 105.5] [reps:: 3] [notes:: smooth]"
+  div.fitkit-reading-preview
+    div.fitkit-reading-summary
+      span.fitkit-reading-kind
+        "Strength"
+      span.fitkit-reading-count
+        "2 rows"
+    div.fitkit-reading-note
+      "felt strong"
+    div.fitkit-reading-plan
+      "Next time: up 2.5 lbs"
+    table.fitkit-reading-table
+      thead
+        tr
+          th
+            "Set"
+          th
+            "Weight"
+          th
+            "Reps"
+          th
+            "Notes"
+      tbody
+        tr
+          td
+            "1"
+          td
+            "100 lbs"
+          td
+            "5"
+          td
+            "-"
+        tr
+          td
+            "2"
+          td
+            "105.5 lbs"
+          td
+            "3"
+          td
+            "smooth""
+`;
+
+exports[`workout reading mode structure > draws neither note nor plan lines for a bare duration exercise 1`] = `
+"div
+  ul
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Plank]]] [set:: 1] [duration:: 60]"
+  div.fitkit-reading-preview
+    div.fitkit-reading-summary
+      span.fitkit-reading-kind
+        "Duration"
+      span.fitkit-reading-count
+        "1 row"
+    table.fitkit-reading-table
+      thead
+        tr
+          th
+            "Set"
+          th
+            "Duration"
+          th
+            "Notes"
+      tbody
+        tr
+          td
+            "1"
+          td
+            "1m"
+          td
+            "-""
+`;
+
+exports[`workout reading mode structure > draws one row as a singular count 1`] = `
+"div
+  ul
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]"
+  div.fitkit-reading-preview
+    div.fitkit-reading-summary
+      span.fitkit-reading-kind
+        "Strength"
+      span.fitkit-reading-count
+        "1 row"
+    table.fitkit-reading-table
+      thead
+        tr
+          th
+            "Set"
+          th
+            "Weight"
+          th
+            "Reps"
+          th
+            "Notes"
+      tbody
+        tr
+          td
+            "1"
+          td
+            "100 kg"
+          td
+            "5"
+          td
+            "-""
+`;
+
+exports[`workout reading mode structure > draws only the note when an exercise has a note and no plans 1`] = `
+"div
+  ul
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Plank]]] [notes:: steady]"
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Plank]]] [set:: 1] [duration:: 60]"
+  div.fitkit-reading-preview
+    div.fitkit-reading-summary
+      span.fitkit-reading-kind
+        "Duration"
+      span.fitkit-reading-count
+        "1 row"
+    div.fitkit-reading-note
+      "steady"
+    table.fitkit-reading-table
+      thead
+        tr
+          th
+            "Set"
+          th
+            "Duration"
+          th
+            "Notes"
+      tbody
+        tr
+          td
+            "1"
+          td
+            "1m"
+          td
+            "-""
+`;
+
+exports[`workout reading mode structure > draws the empty message for a duration exercise without rows 1`] = `
+"div
+  ul
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Plank]]] [plan:: 3 x 1m]"
+  div.fitkit-reading-preview
+    div.fitkit-reading-summary
+      span.fitkit-reading-kind
+        "Interval"
+      span.fitkit-reading-count
+        "0 rows"
+    div.fitkit-reading-plan
+      "Plan: 3 x 1m"
+    div.fitkit-reading-empty
+      "No duration rows recorded.""
+`;
+
+exports[`workout reading mode structure > draws the empty message for a strength exercise without rows 1`] = `
+"div
+  ul
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Squat]]] [next:: up 2.5]"
+  div.fitkit-reading-preview
+    div.fitkit-reading-summary
+      span.fitkit-reading-kind
+        "Strength"
+      span.fitkit-reading-count
+        "0 rows"
+    div.fitkit-reading-plan
+      "Next time: up 2.5 kg"
+    div.fitkit-reading-empty
+      "No strength rows recorded.""
+`;
