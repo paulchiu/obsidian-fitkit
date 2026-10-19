@@ -29,7 +29,7 @@
   - Within a tier, imports use `./` relative paths. Cross-tier, use `../<tier>/` (e.g. `../domain/types`). Keep modules at the tier root: avoid deeper nesting until the codebase justifies it.
 - **Drawing the UI with Preact:** the UI is moving from `createEl` builders to Preact function components, one surface at a time. The set and rest timer screens (`src/ui/timer-screen.tsx`) are drawn this way so far.
   - The Obsidian class holds the state and mounts the component with Preact `render`, and unmounts it with `render(null, el)` before it empties or closes the pane (`clearContent` in the editor view). Components keep no state of their own.
-  - Imperative DOM helpers (`setIcon`, text a timer rewrites between renders) run only through `useDomEffect` (`src/ui/dom-effect.ts`). `setIcon` replaces an element's children, so an icon gets its own element rather than sharing one Preact draws into.
+  - `setIcon` runs only through `useDomEffect` (`src/ui/dom-effect.ts`), on an element of its own, since it replaces the element's children. Text the view rewrites between renders (a timer's clock) is set in a layout effect, never drawn as a Preact child.
 - **State:**
   - Plugin settings persisted via `loadData` / `saveData`.
   - Derived state recomputed from files/settings on demand; avoid long-lived in-memory caches unless profiling demands them.

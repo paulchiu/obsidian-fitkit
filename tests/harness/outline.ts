@@ -1,9 +1,6 @@
 /**
- * `el` and everything under it as indented lines, so a snapshot pins the structure `styles.css` and
- * the focus code depend on rather than how the DOM was built. An element reads
- * `tag.cls1.cls2[attr=value]` with its other attributes sorted by name; an `<svg>` is one line with
- * a child count, since its drawing is tested elsewhere; a run of adjacent text nodes is joined,
- * trimmed and quoted, blanks skipped.
+ * `el` as indented `tag.cls[attr=value]` lines with adjacent text joined, so a snapshot pins the
+ * structure the stylesheet relies on rather than how the DOM was built. An `<svg>` is one line.
  */
 export function outline(el: Element): string {
   return lines(el, 0).join('\n')

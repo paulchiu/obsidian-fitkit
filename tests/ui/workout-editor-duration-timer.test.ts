@@ -612,15 +612,18 @@ describe('WorkoutEditorView timer screen structure', () => {
     expect(clockEl?.textContent).toBe(clock)
   })
 
-  it('draws a fresh set timer when the timer is opened again after Done', async () => {
+  it.each([
+    { screen: 'set timer', open: 'Start timer', leave: 'Close timer' },
+    { screen: 'rest timer', open: 'Start rest timer', leave: 'Stop rest timer' },
+  ])('draws a fresh $screen when it is opened again after leaving', async ({ open, leave }) => {
     const { view } = await openView(
       workoutSource('- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90]'),
     )
-    clickButton(view, 'Start timer')
+    clickButton(view, open)
     const first = runner(view)
-    clickButton(view, 'Close timer')
+    clickButton(view, leave)
 
-    clickButton(view, 'Start timer')
+    clickButton(view, open)
 
     expect(runner(view)).not.toBe(first)
     expect(first.isConnected).toBe(false)
