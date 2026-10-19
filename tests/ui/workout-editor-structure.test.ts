@@ -39,22 +39,15 @@ describe('WorkoutEditorView structure', () => {
   })
 
   it('draws the loading skeleton while the workout is read', async () => {
-    const { view } = createEditor({ body: [] })
+    const { view, releaseRead } = createEditor({ body: [], deferRead: true })
     await view.onOpen()
-    const { vault } = view.app as unknown as { vault: { read: (file: unknown) => Promise<string> } }
-    let release = (): void => {}
-    const read = vault.read
-    vault.read = (file) =>
-      new Promise((resolve) => {
-        release = () => void read(file).then(resolve)
-      })
 
     const loading = view.setState({ file: WORKOUT_PATH }, { history: false })
 
     const skeleton = part(view.contentEl, '.fitkit-skeleton')
     expect(outline(skeleton)).toMatchSnapshot()
     expect(findUnstyledClasses(skeleton)).toEqual([])
-    release()
+    releaseRead()
     await loading
   })
 
@@ -90,11 +83,15 @@ describe('WorkoutEditorView structure', () => {
   })
 
   it.each([
-    { kind: 'strength', options: { body: STRENGTH, history: STRENGTH_HISTORY } },
-    { kind: 'bodyweight', options: { body: BODYWEIGHT, exerciseNotes: PUSH_UP_NOTE } },
-    { kind: 'duration', options: { body: DURATION } },
-    { kind: 'interval plan', options: { body: INTERVAL } },
-  ])('draws a $kind card', async ({ options }) => {
+    { article: 'a', kind: 'strength', options: { body: STRENGTH, history: STRENGTH_HISTORY } },
+    {
+      article: 'a',
+      kind: 'bodyweight',
+      options: { body: BODYWEIGHT, exerciseNotes: PUSH_UP_NOTE },
+    },
+    { article: 'a', kind: 'duration', options: { body: DURATION } },
+    { article: 'an', kind: 'interval plan', options: { body: INTERVAL } },
+  ])('draws $article $kind card', async ({ options }) => {
     const { view } = await openEditor(options)
 
     expect(outline(card(view))).toMatchSnapshot()

@@ -6,6 +6,7 @@ vi.mock('obsidian', async () =>
 
 import type { ExerciseRegistryEntry } from '../../src/domain/exercise-registry'
 import { obsidianRecord } from '../fixtures/obsidian-editor-mock'
+import type { WorkoutEditorView } from '../../src/ui/workout-editor-view'
 import {
   button,
   card,
@@ -64,7 +65,7 @@ const levelText = (row: Element | undefined): string | null | undefined =>
   row?.querySelector('.fitkit-bodyweight-level-full')?.textContent
 
 /** Saves `levels` through the card menu's Edit levels form. */
-const editLevels = async (view: Parameters<typeof card>[0], levels: string[]): Promise<void> => {
+const editLevels = async (view: WorkoutEditorView, levels: string[]): Promise<void> => {
   openCardMenu(view)
   chooseMenuItem('Edit levels')
   const form = await openedModal('Edit levels for Push-up')
@@ -187,6 +188,22 @@ describe('WorkoutEditorView bodyweight card', () => {
     expect(card(view)).toBe(before)
     expect(levelText(rows(before)[0])).toBe('1 · Level 1')
     expect(contents.get(view.file?.path ?? '')).toBe(note)
+  })
+
+  it.each([
+    { step: 'Raise', level: 3, rung: 'Knee push-up' },
+    { step: 'Lower', level: 1, rung: 'Wall push-up' },
+  ])('saves the next rung when $step level is pressed', async ({ step, level, rung }) => {
+    const { view, contents } = await openEditor(pushUps(['[set:: 1] [level:: 2] [reps:: 10]']))
+
+    button(card(view), `${step} level for set 1`).click()
+
+    expect(levelText(rows(card(view))[0])).toBe(`${level} · ${rung}`)
+    await savedBody(contents, [
+      '## [[Push-up]]',
+      '',
+      `- [exercise:: [[Push-up]]] [set:: 1] [level:: ${level}] [reps:: 10]`,
+    ])
   })
 
   it('lists every rung in the level menu and sets only the chosen row', async () => {
@@ -334,7 +351,7 @@ describe('WorkoutEditorView bodyweight level labels', () => {
   const OVERRUNS = { available: 50, content: 120 }
   const FITS = { available: 200, content: 120 }
 
-  const shortened = (view: Parameters<typeof card>[0]): boolean[] =>
+  const shortened = (view: WorkoutEditorView): boolean[] =>
     rows(card(view)).map((row) => levelLabel(row).classList.contains('is-label-short'))
 
   const TWO_ROWS = pushUps([

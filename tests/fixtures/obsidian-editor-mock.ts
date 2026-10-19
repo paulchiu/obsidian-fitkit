@@ -32,8 +32,9 @@ export interface MockModal {
 }
 
 /**
- * What the view asked Obsidian to show: menus, modals and notices. Menus stay
- * mocked since they are Obsidian's; modals draw into harness elements.
+ * What the view asked Obsidian to show: menus, the modals still open, and
+ * notices. Menus stay mocked since they are Obsidian's; modals draw into
+ * harness elements.
  */
 export const obsidianRecord = {
   menus: [] as MockMenu[],
@@ -141,7 +142,12 @@ export function createObsidianMock(): Record<string, unknown> {
       obsidianRecord.modals.push(this)
       void (this as { onOpen?: () => unknown }).onOpen?.()
     }
+    /** Closed modals leave the record, so it lists only what is still on screen. */
     close(): void {
+      const index = obsidianRecord.modals.indexOf(this)
+      if (index >= 0) {
+        obsidianRecord.modals.splice(index, 1)
+      }
       ;(this as { onClose?: () => void }).onClose?.()
     }
   }

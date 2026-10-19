@@ -8,7 +8,12 @@ import { DEFAULT_SETTINGS, type FitKitSettings } from '../../src/settings'
 import { WorkoutEditorView } from '../../src/ui/workout-editor-view'
 import { harnessDocument, harnessWindow } from '../harness/obsidian-dom'
 import { buildMockVaultFolderTree } from './mock-vault-folder-tree'
-import { obsidianRecord, resetObsidianRecord, type MockMenu, type MockMenuItem } from './obsidian-editor-mock'
+import {
+  obsidianRecord,
+  resetObsidianRecord,
+  type MockMenu,
+  type MockMenuItem,
+} from './obsidian-editor-mock'
 
 /** The day every editor fixture's workout is dated, after any history a test logs. */
 export const WORKOUT_DATE = '2026-06-15'
@@ -22,7 +27,9 @@ export const workoutNote = (body: string[], date = WORKOUT_DATE): string =>
 /** An exercise note's text for `frontmatter`, the shape the exercise store rewrites. */
 const exerciseNoteText = (frontmatter: Record<string, unknown>): string => {
   const lines = Object.entries(frontmatter).flatMap(([key, value]) =>
-    Array.isArray(value) ? [`${key}:`, ...value.map((item) => `  - ${String(item)}`)] : [`${key}: ${String(value)}`],
+    Array.isArray(value)
+      ? [`${key}:`, ...value.map((item) => `  - ${String(item)}`)]
+      : [`${key}: ${String(value)}`],
   )
   return ['---', ...lines, '---', ''].join('\n')
 }
@@ -37,6 +44,8 @@ export interface EditorOptions {
   exerciseNotes?: Record<string, Record<string, unknown>>
   /** Other workout notes by path, with their text. */
   workouts?: Record<string, string>
+  /** Holds every read of the vault until `releaseRead()`, so a test can see the view mid-load. */
+  deferRead?: boolean
 }
 
 export interface Editor {
@@ -49,6 +58,8 @@ export interface Editor {
   saved: FitKitSettings[]
   created: string[]
   folders: string[]
+  /** Lets reads held by `deferRead` finish. */
+  releaseRead: () => void
   workspace: {
     setActiveLeaf: ReturnType<typeof vi.fn>
     openLinkText: ReturnType<typeof vi.fn>
@@ -94,7 +105,17 @@ export const createEditor = (options: EditorOptions): Editor => {
   }
   const created: string[] = []
   const folders: string[] = []
-  const read = async (target: TFile): Promise<string> => contents.get(target.path) ?? ''
+  let held: Promise<void> = Promise.resolve()
+  let releaseRead = (): void => {}
+  if (options.deferRead) {
+    held = new Promise((resolve) => {
+      releaseRead = resolve
+    })
+  }
+  const read = async (target: TFile): Promise<string> => {
+    await held
+    return contents.get(target.path) ?? ''
+  }
   const vault = {
     getFolderByPath: buildMockVaultFolderTree(
       [...filesByPath.values()].map(({ path, basename }) => ({ path, basename })),
@@ -149,7 +170,7 @@ export const createEditor = (options: EditorOptions): Editor => {
   const view = new WorkoutEditorView(leaf as unknown as WorkspaceLeaf, plugin)
   harnessDocument.body.appendChild(view.contentEl)
   opened.push(view)
-  return { view, plugin, leaf, contents, saved, created, folders, workspace }
+  return { view, plugin, leaf, contents, saved, created, folders, releaseRead, workspace }
 }
 
 /** Interval callbacks the view registered; `tick()` runs them as time passing would. */
@@ -245,7 +266,9 @@ export const button = (root: Element, label: string): HTMLButtonElement => {
 
 /** The exercise card at `index` in the list. */
 export const card = (view: WorkoutEditorView, index = 0): HTMLElement => {
-  const found = view.contentEl.querySelectorAll<HTMLElement>('.fitkit-exercise-list > .fitkit-card')[index]
+  const found = view.contentEl.querySelectorAll<HTMLElement>(
+    '.fitkit-exercise-list > .fitkit-card',
+  )[index]
   if (!found) {
     throw new Error(`no card at ${index}`)
   }
@@ -253,6 +276,15 @@ export const card = (view: WorkoutEditorView, index = 0): HTMLElement => {
 }
 
 /** A card's set rows, in order. */
+/** A card's first set row. */
+export const firstRow = (view: WorkoutEditorView, index = 0): HTMLElement => {
+  const [row] = rows(card(view, index))
+  if (!row) {
+    throw new Error('card has no rows')
+  }
+  return row
+}
+
 export const rows = (cardEl: Element): HTMLElement[] => [
   ...cardEl.querySelectorAll<HTMLElement>('.fitkit-set-rows > .fitkit-row'),
 ]
@@ -263,7 +295,9 @@ export const cellInput = (row: Element, label: string): HTMLInputElement | null 
 
 /** The labels across a card's set header. */
 export const headLabels = (cardEl: Element): string[] =>
-  [...(cardEl.querySelector('.fitkit-set-head')?.children ?? [])].map((cell) => cell.textContent ?? '')
+  [...(cardEl.querySelector('.fitkit-set-head')?.children ?? [])].map(
+    (cell) => cell.textContent ?? '',
+  )
 
 export const typeInto = (input: HTMLInputElement, value: string): void => {
   input.value = value
@@ -275,9 +309,7 @@ export const blur = (input: HTMLInputElement): void => {
 }
 
 export const pressKey = (target: Element, key: string): void => {
-  target.dispatchEvent(
-    new harnessWindow.KeyboardEvent('keydown', { key, bubbles: true }),
-  )
+  target.dispatchEvent(new harnessWindow.KeyboardEvent('keydown', { key, bubbles: true }))
 }
 
 export const lastMenu = (): MockMenu => {
@@ -334,7 +366,9 @@ export const openedModal = async (
   title: string,
 ): Promise<{ contentEl: HTMLElement; modalEl: HTMLElement; titleEl: HTMLElement }> => {
   await vi.waitFor(() => expect(modalTitles()).toContain(title))
-  const modal = [...obsidianRecord.modals].reverse().find((candidate) => candidate.titleEl.textContent === title)
+  const modal = [...obsidianRecord.modals]
+    .reverse()
+    .find((candidate) => candidate.titleEl.textContent === title)
   if (!modal) {
     throw new Error(`${title} modal not opened`)
   }
@@ -351,7 +385,10 @@ export const noteBody = (contents: Map<string, string>, path = WORKOUT_PATH): st
   (contents.get(path) ?? '').split('\n').slice(6, -1)
 
 /** Waits for autosave to leave the workout's body equal to `expected`. */
-export const savedBody = async (contents: Map<string, string>, expected: string[]): Promise<void> => {
+export const savedBody = async (
+  contents: Map<string, string>,
+  expected: string[],
+): Promise<void> => {
   await vi.waitFor(() => expect(noteBody(contents)).toEqual(expected))
 }
 
@@ -363,7 +400,11 @@ export const settle = async (): Promise<void> => {
 }
 
 /** The rename picker, prefilled with the card's name, renaming it to `name` on Enter. */
-export const renameCard = async (view: WorkoutEditorView, name: string, index = 0): Promise<void> => {
+export const renameCard = async (
+  view: WorkoutEditorView,
+  name: string,
+  index = 0,
+): Promise<void> => {
   openCardMenu(view, index)
   chooseMenuItem('Rename exercise')
   const picker = await pickerModal()

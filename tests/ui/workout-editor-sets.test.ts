@@ -4,16 +4,20 @@ vi.mock('obsidian', async () =>
   (await import('../fixtures/obsidian-editor-mock')).createObsidianMock(),
 )
 
+import type { WorkoutEditorView } from '../../src/ui/workout-editor-view'
 import {
   advance,
   blur,
   button,
   card,
   cellInput,
+  choose,
   chooseMenuItem,
   deleteRow,
+  firstRow,
   headLabels,
   noteBody,
+  openedModal,
   openEditor,
   openRowMenu,
   rows,
@@ -46,12 +50,6 @@ const text = (root: Element, cls: string): string | null =>
 
 const runner = (root: Element): Element | null => root.querySelector('.fitkit-runner')
 
-const firstRow = (view: Parameters<typeof card>[0]): Element => {
-  const [row] = rows(card(view))
-  if (!row) throw new Error('card has no rows')
-  return row
-}
-
 describe('WorkoutEditorView strength rows', () => {
   it('keeps strength rows to Set, Weight, and Reps without per-row rest controls', async () => {
     const { view } = await openEditor({ body: SQUAT })
@@ -70,6 +68,56 @@ describe('WorkoutEditorView strength rows', () => {
     expect(actions.map((action) => action.textContent)).not.toContain('Duplicate last set')
     expect(harnessDocument.activeElement).toBe(cellInput(rows(card(view))[1] as Element, 'Weight'))
     await savedBody(contents, [...SQUAT, '- [exercise:: [[Squat]]] [set:: 2] [weight:: 80]'])
+  })
+
+  it('shows the weight and reps the note logs', async () => {
+    const { view } = await openEditor({
+      body: exercise('Squat', ['[set:: 1] [weight:: 100] [reps:: 5]']),
+    })
+
+    expect([
+      cellInput(firstRow(view), 'Weight')?.value,
+      cellInput(firstRow(view), 'Reps')?.value,
+    ]).toEqual(['100', '5'])
+  })
+
+  it('saves typed weight and reps into the note', async () => {
+    const { view, contents } = await openEditor({ body: SQUAT })
+
+    typeInto(cellInput(firstRow(view), 'Weight') as HTMLInputElement, '82.5')
+    typeInto(cellInput(firstRow(view), 'Reps') as HTMLInputElement, '6')
+
+    await savedBody(contents, exercise('Squat', ['[set:: 1] [weight:: 82.5] [reps:: 6]']))
+  })
+
+  it('keeps the row when deleting it is cancelled', async () => {
+    const { view, contents } = await openEditor({ body: SQUAT })
+
+    openRowMenu(firstRow(view))
+    chooseMenuItem('Delete row')
+    await choose('Remove row?', 'Cancel')
+    await settle()
+
+    expect(rows(card(view))).toHaveLength(1)
+    expect(noteBody(contents)).toEqual(SQUAT)
+  })
+
+  it('saves a set note written in its note form, and shows it under the row', async () => {
+    const { view, contents } = await openEditor({ body: SQUAT })
+
+    openRowMenu(firstRow(view))
+    chooseMenuItem('Edit note')
+    const form = await openedModal('Note for set 1')
+    const textarea = form.contentEl.querySelector('textarea')
+    if (!textarea) throw new Error('no note box drawn')
+    textarea.value = 'Belt on'
+    button(form.contentEl, 'Save').click()
+
+    await savedBody(
+      contents,
+      exercise('Squat', ['[set:: 1] [weight:: 80] [reps:: 5] [notes:: Belt on]']),
+    )
+    expect(text(firstRow(view), 'fitkit-note-line')).toBe('Belt on')
   })
 
   it('never starts the rest timer from reps entry, since rest is started by hand', async () => {
@@ -100,7 +148,7 @@ describe('WorkoutEditorView strength rows', () => {
 })
 
 describe('WorkoutEditorView rest timer', () => {
-  const footer = (view: Parameters<typeof card>[0]): Element => {
+  const footer = (view: WorkoutEditorView): Element => {
     const found = view.contentEl.querySelector('.fitkit-footer')
     if (!found) throw new Error('no footer drawn')
     return found
@@ -161,7 +209,21 @@ describe('WorkoutEditorView rest timer', () => {
     expect(contents.get(WORKOUT_PATH)).toBe(note)
   })
 
-  it('clears the last rest when another rest starts', async () => {
+  it('replaces the last rest with the next one when that rest stops', async () => {
+    const { view } = await openEditor({ body: SQUAT })
+    button(footer(view), 'Start rest timer').click()
+    advance(9)
+    button(view.contentEl, 'Stop rest timer').click()
+
+    button(footer(view), 'Start rest timer').click()
+    advance(3)
+    button(view.contentEl, 'Stop rest timer').click()
+
+    expect(text(footer(view), 'fitkit-rest-timer-last')).toBe('Last rest 3s')
+  })
+
+  /** Stop rest always writes a new last rest, so only a reload shows the start cleared it. */
+  it('clears the last rest when another rest starts, even if a reload ends that rest', async () => {
     const { view } = await openEditor({ body: SQUAT })
     button(footer(view), 'Start rest timer').click()
     advance(9)
@@ -407,10 +469,9 @@ describe('WorkoutEditorView duration timer', () => {
   it.each([
     {
       leaving: 'switching to another workout',
-      leave: (view: Parameters<typeof card>[0]) =>
-        view.setState({ file: OTHER_PATH }, { history: false }),
+      leave: (view: WorkoutEditorView) => view.setState({ file: OTHER_PATH }, { history: false }),
     },
-    { leaving: 'closing the tab', leave: (view: Parameters<typeof card>[0]) => view.onClose() },
+    { leaving: 'closing the tab', leave: (view: WorkoutEditorView) => view.onClose() },
   ])('saves the time timed on $leaving', async ({ leave }) => {
     const { view, contents } = await openEditor({
       body: PLANK_30,
@@ -470,19 +531,42 @@ describe('WorkoutEditorView duration timer', () => {
 })
 
 describe('WorkoutEditorView repeat set', () => {
-  const repeat = (view: Parameters<typeof card>[0]): HTMLButtonElement =>
-    button(card(view), 'Repeat')
+  const repeat = (view: WorkoutEditorView): HTMLButtonElement => button(card(view), 'Repeat')
 
   it.each([
-    { kind: 'strength', body: exercise('Squat', ['[set:: 1] [weight:: 60] [reps:: 8]']) },
-    { kind: 'bodyweight', body: exercise('Push-up', ['[set:: 1] [level:: 1] [reps:: 8]']) },
-  ])('places Repeat right after Add set on a $kind card', async ({ body }) => {
-    const { view } = await openEditor({ body })
+    {
+      kind: 'strength',
+      body: exercise('Squat', ['[set:: 1] [weight:: 60] [reps:: 8]']),
+      empty: false,
+    },
+    {
+      kind: 'bodyweight',
+      body: exercise('Push-up', ['[set:: 1] [level:: 1] [reps:: 8]']),
+      empty: false,
+    },
+    {
+      kind: 'strength',
+      body: exercise('Squat', ['[set:: 1] [weight:: 60] [reps:: 8]']),
+      empty: true,
+    },
+    {
+      kind: 'bodyweight',
+      body: exercise('Push-up', ['[set:: 1] [level:: 1] [reps:: 8]']),
+      empty: true,
+    },
+  ])(
+    'places Repeat right after Add set on a $kind card (emptied: $empty)',
+    async ({ body, empty }) => {
+      const { view } = await openEditor({ body })
+      if (empty) {
+        await deleteRow(firstRow(view))
+      }
 
-    const actions = [...(card(view).querySelector('.fitkit-row-actions')?.children ?? [])]
+      const actions = [...(card(view).querySelector('.fitkit-row-actions')?.children ?? [])]
 
-    expect(actions.map((action) => action.textContent)).toEqual(['Add set', 'Repeat'])
-  })
+      expect(actions.map((action) => action.textContent)).toEqual(['Add set', 'Repeat'])
+    },
+  )
 
   it('appends a strength set with the last weight and reps, leaving its note behind', async () => {
     const body = exercise('Squat', [

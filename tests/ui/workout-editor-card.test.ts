@@ -5,15 +5,20 @@ vi.mock('obsidian', async () =>
 )
 
 import type { IndexEntry } from '../../src/domain/types'
+import type { WorkoutEditorView } from '../../src/ui/workout-editor-view'
 import { obsidianRecord, type MockMenuPosition } from '../fixtures/obsidian-editor-mock'
 import {
   button,
   card,
+  cellInput,
+  choose,
   chooseMenuItem,
+  firstRow,
   lastMenu,
   menuItem,
   menuTitles,
   modalTitles,
+  noteBody,
   openCardMenu,
   openEditor,
   openRowMenu,
@@ -22,9 +27,12 @@ import {
   rows,
   savedBody,
   settle,
+  typeInto,
   useEditorEnvironment,
   WORKOUT_PATH,
+  workoutNote,
 } from '../fixtures/workout-editor'
+import { harnessWindow } from '../harness/obsidian-dom'
 
 useEditorEnvironment()
 
@@ -55,6 +63,28 @@ describe('WorkoutEditorView card chrome', () => {
       { title: 'Delete row', icon: 'trash-2', warning: true },
     ])
     expect(menuTitles()).not.toContain('Open exercise file')
+  })
+
+  it('installs no swipe on mobile, so dragging a row body reveals nothing', async () => {
+    obsidianRecord.platform.isMobile = true
+    const { view, contents } = await openEditor({ body: SQUAT })
+    const before = card(view)
+    const body = before.querySelector('.fitkit-row-body')
+    if (!body) throw new Error('no row body drawn')
+    const pointer = (type: string, clientX: number): Event =>
+      new harnessWindow.MouseEvent(type, { clientX, clientY: 20, bubbles: true })
+
+    body.dispatchEvent(pointer('pointerdown', 240))
+    body.dispatchEvent(pointer('pointermove', 160))
+    body.dispatchEvent(pointer('pointermove', 60))
+    body.dispatchEvent(pointer('pointerup', 60))
+    await settle()
+
+    expect(card(view)).toBe(before)
+    expect(before.querySelector('.fitkit-row-track, .fitkit-row-reveal')).toBeNull()
+    expect(body.getAttribute('style')).toBeNull()
+    expect(obsidianRecord.menus).toEqual([])
+    expect(noteBody(contents)).toEqual(SQUAT)
   })
 
   it('lists the card actions, leaving opening the file to the name and moving to the drag handle', async () => {
@@ -124,6 +154,48 @@ describe('WorkoutEditorView card chrome', () => {
     )
     expect(card(view).querySelector('.fitkit-rename-button')).toBeNull()
     expect(card(view).querySelector('.fitkit-card-top')?.children).toHaveLength(3)
+  })
+
+  it('removes the exercise from the card menu once the removal is confirmed', async () => {
+    const { view, contents } = await openEditor({
+      body: [
+        ...SQUAT,
+        '',
+        '## [[Plank]]',
+        '',
+        '- [exercise:: [[Plank]]] [set:: 1] [duration:: 60]',
+      ],
+    })
+
+    openCardMenu(view)
+    chooseMenuItem('Remove exercise')
+    await choose('Remove exercise?', 'Remove')
+
+    expect(view.contentEl.querySelectorAll('.fitkit-exercise-list > .fitkit-card')).toHaveLength(1)
+    await savedBody(contents, [
+      '## [[Plank]]',
+      '',
+      '- [exercise:: [[Plank]]] [set:: 1] [duration:: 60]',
+    ])
+  })
+
+  it('reloads the note from disk from the conflict banner', async () => {
+    const { view, contents } = await openEditor({ body: SQUAT })
+    const deadlift = [
+      '## [[Deadlift]]',
+      '',
+      '- [exercise:: [[Deadlift]]] [set:: 1] [weight:: 140] [reps:: 3]',
+    ]
+    contents.set(WORKOUT_PATH, workoutNote(deadlift))
+    typeInto(cellInput(firstRow(view), 'Reps') as HTMLInputElement, '7')
+    await vi.waitFor(() => expect(view.contentEl.querySelector('.fitkit-conflict')).not.toBeNull())
+
+    button(view.contentEl, 'Reload from disk').click()
+
+    await vi.waitFor(() => expect(view.contentEl.querySelector('.fitkit-conflict')).toBeNull())
+    expect(card(view).querySelector('.fitkit-name-button-text')?.textContent).toBe('Deadlift')
+    expect(obsidianRecord.notices).toContain('Reloaded from disk.')
+    expect(noteBody(contents)).toEqual(deadlift)
   })
 
   it('renames the exercise through the card menu, starting from its current name', async () => {
@@ -270,6 +342,7 @@ describe('WorkoutEditorView card history and notes', () => {
         }),
       ],
       texts: ['PB 95', 'last 90x8'],
+      date: '2026-04-20',
     },
     {
       kind: 'duration',
@@ -287,19 +360,24 @@ describe('WorkoutEditorView card history and notes', () => {
         }),
       ],
       texts: ['PB 4m30s', 'last 4m'],
+      date: '2026-04-20',
     },
-  ])('draws $kind PB and last badges under the card top', async ({ body, history, texts }) => {
-    const { view } = await openEditor({ body, history })
+  ])(
+    'draws $kind PB and last badges under the card top',
+    async ({ body, history, texts, date }) => {
+      const { view } = await openEditor({ body, history })
 
-    const top = card(view).querySelector('.fitkit-card-top')
-    const historyRow = top?.nextElementSibling
-    expect(historyRow?.classList.contains('fitkit-card-history')).toBe(true)
-    const badges = [...(historyRow?.querySelectorAll('.fitkit-card-badge') ?? [])]
-    expect(badges.map((badge) => badge.textContent)).toEqual(texts)
-    expect(
-      badges.some((badge) => /\d{4}-\d{2}-\d{2}/.test(badge.getAttribute('title') ?? '')),
-    ).toBe(true)
-  })
+      const top = card(view).querySelector('.fitkit-card-top')
+      const historyRow = top?.nextElementSibling
+      expect(historyRow?.classList.contains('fitkit-card-history')).toBe(true)
+      const badges = [...(historyRow?.querySelectorAll('.fitkit-card-badge') ?? [])]
+      expect(badges.map((badge) => badge.textContent)).toEqual(texts)
+      expect(badges.map((badge) => badge.getAttribute('title')?.endsWith(`(${date})`))).toEqual([
+        false,
+        true,
+      ])
+    },
+  )
 
   it('draws no history row when the exercise has no history', async () => {
     const { view } = await openEditor({ body: SQUAT })
@@ -371,7 +449,7 @@ describe('WorkoutEditorView card history and notes', () => {
 })
 
 describe('WorkoutEditorView next-time plan', () => {
-  const planItems = (view: Parameters<typeof openCardMenu>[0]) =>
+  const planItems = (view: WorkoutEditorView) =>
     openCardMenu(view).items.filter((item) => item.title?.startsWith('Plan') === true)
 
   const squatWith = (next: string): string[] => [

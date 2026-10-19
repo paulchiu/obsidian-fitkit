@@ -11,6 +11,7 @@ import {
   card,
   cellInput,
   choose,
+  firstRow,
   modalTitles,
   noteBody,
   openEditor,
@@ -153,12 +154,6 @@ describe('WorkoutEditorView set seeding', () => {
     switchCardType(editor.view, 'strength')
     await choose('Switch Squat to strength?', 'Just this workout')
     return editor
-  }
-
-  const firstRow = (view: Parameters<typeof card>[0]): Element => {
-    const [row] = rows(card(view))
-    if (!row) throw new Error('no row seeded')
-    return row
   }
 
   it('seeds the plan target as the first set weight, and never seeds reps', async () => {

@@ -110,7 +110,66 @@ exports[`WorkoutEditorView structure > draws a duration card 1`] = `
         "Start timer""
 `;
 
-exports[`WorkoutEditorView structure > draws a interval plan card 1`] = `
+exports[`WorkoutEditorView structure > draws a strength card 1`] = `
+"div.fitkit-card[data-exercise-index=0]
+  div.fitkit-card-top
+    button.fitkit-drag-handle[aria-label=Drag to reorder][data-icon=grip-vertical][tabindex=0][type=button]
+    button.fitkit-name-button[aria-label=Open exercise file for Squat][type=button]
+      span.fitkit-name-button-text
+        "Squat"
+      span.fitkit-name-button-icon[aria-hidden=true][data-icon=arrow-up-right]
+    button.fitkit-btn.fitkit-btn-muted.fitkit-card-icon-button.fitkit-gear-button[aria-label=Exercise options][data-icon=settings][type=button]
+  div.fitkit-card-history
+    span.fitkit-card-badge[aria-label=PB 100: Heaviest weight lifted (not 1RM): 100 kg x 5][title=Heaviest weight lifted (not 1RM): 100 kg x 5]
+      "PB 100"
+    span.fitkit-card-badge[aria-label=last 100x5: Heaviest weight in latest prior session: 100 kg x 5 (2026-06-01)][title=Heaviest weight in latest prior session: 100 kg x 5 (2026-06-01)]
+      "last 100x5"
+    span.fitkit-card-badge.fitkit-plan-badge[aria-label=Next: 102.5 kg: Planned for next time: up 2.5 kg from 100 kg][title=Planned for next time: up 2.5 kg from 100 kg]
+      span.fitkit-plan-badge-icon[aria-hidden=true][data-icon=arrow-up]
+      span
+        "Next: 102.5 kg"
+  div.fitkit-note-line.fitkit-exercise-note-line[role=button][tabindex=0]
+    "Belt on from set 2"
+  div.fitkit-set-area
+    div.fitkit-set-row.fitkit-set-head
+      span.fitkit-set-label.fitkit-set-figure
+      span.fitkit-set-label
+        "Weight"
+      span.fitkit-set-label
+        "Reps"
+    div.fitkit-set-rows[style=--fitkit-set-cap: 384px;]
+      div.fitkit-row
+        div.fitkit-row-body
+          div.fitkit-set-row
+            div.fitkit-cell.fitkit-set-figure[data-label=Set]
+              "1"
+            div.fitkit-cell[data-label=Weight]
+              input.fitkit-input[aria-label=Weight][inputmode=decimal][step=0.1][type=number]
+            div.fitkit-cell[data-label=Reps]
+              input.fitkit-input[aria-label=Reps][inputmode=numeric][type=number]
+          button.fitkit-btn.fitkit-btn-muted.fitkit-row-kebab[aria-label=Options for set 1][data-icon=more-vertical][type=button]
+        div.fitkit-note-line[role=button][tabindex=0]
+          "Felt heavy"
+      div.fitkit-row.fitkit-row--live
+        div.fitkit-row-body
+          div.fitkit-set-row
+            div.fitkit-cell.fitkit-set-figure[data-label=Set]
+              "2"
+            div.fitkit-cell[data-label=Weight]
+              input.fitkit-input[aria-label=Weight][inputmode=decimal][step=0.1][type=number]
+            div.fitkit-cell[data-label=Reps]
+              input.fitkit-input[aria-label=Reps][inputmode=numeric][type=number]
+          button.fitkit-btn.fitkit-btn-muted.fitkit-row-kebab[aria-label=Options for set 2][data-icon=more-vertical][type=button]
+    button.fitkit-btn.fitkit-btn-muted.fitkit-set-toggle[aria-expanded=true][hidden=][type=button]
+      "Show fewer sets"
+    div.fitkit-row-actions
+      button.fitkit-btn
+        "Add set"
+      button.fitkit-btn
+        "Repeat""
+`;
+
+exports[`WorkoutEditorView structure > draws an interval plan card 1`] = `
 "div.fitkit-card[data-exercise-index=0]
   div.fitkit-card-top
     button.fitkit-drag-handle[aria-label=Drag to reorder][data-icon=grip-vertical][tabindex=0][type=button]
@@ -174,65 +233,6 @@ exports[`WorkoutEditorView structure > draws a interval plan card 1`] = `
         "Repeat"
       button.fitkit-btn.fitkit-btn-primary.fitkit-run-button[aria-label=Start interval plan]
         "Start from rep 2""
-`;
-
-exports[`WorkoutEditorView structure > draws a strength card 1`] = `
-"div.fitkit-card[data-exercise-index=0]
-  div.fitkit-card-top
-    button.fitkit-drag-handle[aria-label=Drag to reorder][data-icon=grip-vertical][tabindex=0][type=button]
-    button.fitkit-name-button[aria-label=Open exercise file for Squat][type=button]
-      span.fitkit-name-button-text
-        "Squat"
-      span.fitkit-name-button-icon[aria-hidden=true][data-icon=arrow-up-right]
-    button.fitkit-btn.fitkit-btn-muted.fitkit-card-icon-button.fitkit-gear-button[aria-label=Exercise options][data-icon=settings][type=button]
-  div.fitkit-card-history
-    span.fitkit-card-badge[aria-label=PB 100: Heaviest weight lifted (not 1RM): 100 kg x 5][title=Heaviest weight lifted (not 1RM): 100 kg x 5]
-      "PB 100"
-    span.fitkit-card-badge[aria-label=last 100x5: Heaviest weight in latest prior session: 100 kg x 5 (2026-06-01)][title=Heaviest weight in latest prior session: 100 kg x 5 (2026-06-01)]
-      "last 100x5"
-    span.fitkit-card-badge.fitkit-plan-badge[aria-label=Next: 102.5 kg: Planned for next time: up 2.5 kg from 100 kg][title=Planned for next time: up 2.5 kg from 100 kg]
-      span.fitkit-plan-badge-icon[aria-hidden=true][data-icon=arrow-up]
-      span
-        "Next: 102.5 kg"
-  div.fitkit-note-line.fitkit-exercise-note-line[role=button][tabindex=0]
-    "Belt on from set 2"
-  div.fitkit-set-area
-    div.fitkit-set-row.fitkit-set-head
-      span.fitkit-set-label.fitkit-set-figure
-      span.fitkit-set-label
-        "Weight"
-      span.fitkit-set-label
-        "Reps"
-    div.fitkit-set-rows[style=--fitkit-set-cap: 384px;]
-      div.fitkit-row
-        div.fitkit-row-body
-          div.fitkit-set-row
-            div.fitkit-cell.fitkit-set-figure[data-label=Set]
-              "1"
-            div.fitkit-cell[data-label=Weight]
-              input.fitkit-input[aria-label=Weight][inputmode=decimal][step=0.1][type=number]
-            div.fitkit-cell[data-label=Reps]
-              input.fitkit-input[aria-label=Reps][inputmode=numeric][type=number]
-          button.fitkit-btn.fitkit-btn-muted.fitkit-row-kebab[aria-label=Options for set 1][data-icon=more-vertical][type=button]
-        div.fitkit-note-line[role=button][tabindex=0]
-          "Felt heavy"
-      div.fitkit-row.fitkit-row--live
-        div.fitkit-row-body
-          div.fitkit-set-row
-            div.fitkit-cell.fitkit-set-figure[data-label=Set]
-              "2"
-            div.fitkit-cell[data-label=Weight]
-              input.fitkit-input[aria-label=Weight][inputmode=decimal][step=0.1][type=number]
-            div.fitkit-cell[data-label=Reps]
-              input.fitkit-input[aria-label=Reps][inputmode=numeric][type=number]
-          button.fitkit-btn.fitkit-btn-muted.fitkit-row-kebab[aria-label=Options for set 2][data-icon=more-vertical][type=button]
-    button.fitkit-btn.fitkit-btn-muted.fitkit-set-toggle[aria-expanded=true][hidden=][type=button]
-      "Show fewer sets"
-    div.fitkit-row-actions
-      button.fitkit-btn
-        "Add set"
-      button.fitkit-btn
-        "Repeat""
 `;
 
 exports[`WorkoutEditorView structure > draws the conflict banner when the note changed on disk under an edit 1`] = `

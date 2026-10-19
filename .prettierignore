@@ -6,5 +6,7 @@ coverage
 package-lock.json
 .obsidian
 data.json
-tests/fixtures
+tests/fixtures/dashboard
+tests/fixtures/exercises
+tests/fixtures/workouts
 
