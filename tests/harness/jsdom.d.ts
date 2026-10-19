@@ -13,6 +13,8 @@ declare module 'jsdom' {
     HTMLDivElement: typeof HTMLDivElement
     HTMLInputElement: typeof HTMLInputElement
     HTMLSpanElement: typeof HTMLSpanElement
+    KeyboardEvent: typeof KeyboardEvent
+    MouseEvent: typeof MouseEvent
     Node: typeof Node
     XMLSerializer: typeof XMLSerializer
     innerHeight: number
