@@ -1,5 +1,6 @@
 import { setIcon } from 'obsidian'
 
+import { formatClock } from '../model/clock'
 import { formatTarget, type IntensityKind } from '../../domain/interval-plan'
 import { formatStep, type IntervalProgram, type PlanStep } from '../../domain/interval-program'
 import {
@@ -57,12 +58,6 @@ export function renderRunner(
     case 'running':
       return renderRunning(runner, model, handlers)
   }
-}
-
-/** `m:ss` for the big clock. */
-export function formatClock(seconds: number): string {
-  const whole = Math.max(0, Math.ceil(seconds))
-  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`
 }
 
 /** The big clock's value: time left, or time so far for open work. */

@@ -1,10 +1,9 @@
-import { setIcon } from 'obsidian'
 import { createRef, render, type JSX, type RefObject } from 'preact'
 import { useLayoutEffect } from 'preact/hooks'
 
 import { formatDurationInput } from '../../domain/duration-input'
-import { useDomEffect } from './dom-effect'
-import { formatClock } from '../obsidian/interval-runner'
+import { HostContext, useIcon, type Host } from './host'
+import { formatClock } from '../model/clock'
 
 export interface SetTimerModel {
   exerciseName: string
@@ -37,8 +36,11 @@ export function renderSetTimer(
   parent: HTMLElement,
   model: SetTimerModel,
   handlers: SetTimerHandlers,
+  host: Host,
 ): TimerScreenMount {
-  return mount(parent, (clock) => <SetTimer model={model} handlers={handlers} clock={clock} />)
+  return mount(parent, host, (clock) => (
+    <SetTimer model={model} handlers={handlers} clock={clock} />
+  ))
 }
 
 /** The runner screen as a plain count-up rest clock; stopping it returns to the workout. */
@@ -46,18 +48,20 @@ export function renderRestTimer(
   parent: HTMLElement,
   seconds: number,
   handlers: { stop: () => void },
+  host: Host,
 ): TimerScreenMount {
-  return mount(parent, (clock) => (
+  return mount(parent, host, (clock) => (
     <RestTimer seconds={seconds} stop={handlers.stop} clock={clock} />
   ))
 }
 
 function mount(
   parent: HTMLElement,
+  host: Host,
   screen: (clock: RefObject<HTMLDivElement>) => JSX.Element,
 ): TimerScreenMount {
   const clock = createRef<HTMLDivElement>()
-  render(screen(clock), parent)
+  render(<HostContext.Provider value={host}>{screen(clock)}</HostContext.Provider>, parent)
   if (!clock.current) {
     throw new Error('Timer screen drew no clock')
   }
@@ -149,7 +153,7 @@ function Clock({
   clock: RefObject<HTMLDivElement>
 }): JSX.Element {
   useLayoutEffect(() => {
-    clock.current?.setText(formatClock(seconds))
+    if (clock.current) clock.current.textContent = formatClock(seconds)
   }, [seconds])
   return <div class="fitkit-runner-clock" ref={clock} />
 }
@@ -165,7 +169,7 @@ function Control({
   label: string
   onClick: () => void
 }): JSX.Element {
-  const glyph = useDomEffect<HTMLSpanElement>((el) => setIcon(el, icon), [icon])
+  const glyph = useIcon<HTMLSpanElement>(icon)
   return (
     <button type="button" class="fitkit-btn" aria-label={label} onClick={onClick}>
       <span class="fitkit-runner-icon" ref={glyph} />

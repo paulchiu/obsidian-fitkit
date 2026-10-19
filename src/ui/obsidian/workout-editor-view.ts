@@ -105,8 +105,10 @@ import { ensureParentFolder } from '../../vault/vault-utils'
 import { ConfirmModal } from './confirm-modal'
 import { EditLevelsModal } from './edit-levels-modal'
 import { createCuePlayer, type CuePlayer } from './interval-cues'
-import { clockSeconds, formatClock, renderRunner } from './interval-runner'
+import { clockSeconds, renderRunner } from './interval-runner'
 import { renderRestTimer, renderSetTimer } from '../components/timer-screen'
+import { formatClock } from '../model/clock'
+import { obsidianHost } from './host'
 import { createTabScreens, type ScreenStop, type TabScreens, type WakeHold } from './tab-screens'
 import { IntervalPlanModal } from './interval-plan-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
@@ -525,9 +527,14 @@ export class WorkoutEditorView extends FileView {
       return
     }
     if (screen?.kind === 'rest') {
-      const mounted = renderRestTimer(container, this.liveRestSeconds(screen), {
-        stop: () => this.stopRestTimer(),
-      })
+      const mounted = renderRestTimer(
+        container,
+        this.liveRestSeconds(screen),
+        {
+          stop: () => this.stopRestTimer(),
+        },
+        obsidianHost,
+      )
       screen.clockEl = mounted.clock
       this.unmountScreen = mounted.unmount
       return
@@ -1576,6 +1583,7 @@ export class WorkoutEditorView extends FileView {
           this.screens.leave()
         },
       },
+      obsidianHost,
     )
     screen.clockEl = mounted.clock
     this.unmountScreen = mounted.unmount
