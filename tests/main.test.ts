@@ -145,10 +145,13 @@ import { MarkdownView, Modal, TFile, type App, type Menu } from 'obsidian'
 
 import FitKitPlugin from '../src/main'
 import { DEFAULT_SETTINGS, type FitKitSettings } from '../src/settings'
-import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from '../src/ui/workout-editor-view'
+import {
+  VIEW_TYPE_FITKIT_WORKOUT_EDITOR,
+  WorkoutEditorView,
+} from '../src/ui/obsidian/workout-editor-view'
 import { rebuildIndex } from '../src/vault/index'
 import { exerciseHistoryFromVault } from '../src/vault/exercise-history-vault'
-import { renderExerciseChartBlock } from '../src/ui/exercise-chart-block'
+import { renderExerciseChartBlock } from '../src/ui/obsidian/exercise-chart-block'
 import { createTestRoot, harnessDocument, harnessWindow } from './harness/obsidian-dom'
 import { buildMockVaultFolderTree, type MockVaultFolder } from './fixtures/mock-vault-folder-tree'
 

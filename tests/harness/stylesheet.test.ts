@@ -26,8 +26,8 @@ vi.mock('obsidian', () => {
 })
 
 import type { ChartSeries } from '../../src/domain/exercise-chart'
-import { renderExerciseChartSvg } from '../../src/ui/exercise-chart-svg'
-import { PlanStepModal } from '../../src/ui/plan-step-modal'
+import { renderExerciseChartSvg } from '../../src/ui/obsidian/exercise-chart-svg'
+import { PlanStepModal } from '../../src/ui/obsidian/plan-step-modal'
 
 beforeAll(() => {
   ensureStylesheetLoaded()

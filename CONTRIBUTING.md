@@ -25,7 +25,7 @@ To see your changes inside Obsidian, symlink `main.js`, `manifest.json`, and `st
 [AGENTS.md](AGENTS.md) is the source of truth for conventions in this repo: file layout, naming, error handling, and the Obsidian-specific pitfalls reviewers look for. Read it before making non-trivial changes. A few points matter most for a drive-by contribution:
 
 - The codebase is TypeScript, and Prettier formatting is enforced (`npm run format`).
-- `src/` is layered: `src/domain/` holds pure modules with no `obsidian` imports, `src/vault/` holds Obsidian-aware helpers that may depend on `src/domain/` but not `src/ui/`, and `src/ui/` holds the views and modals that may depend on anything. Keep new code in the right tier.
+- `src/` is layered: `src/domain/` holds pure modules with no `obsidian` imports, `src/vault/` holds Obsidian-aware helpers that may depend on `src/domain/` but not `src/ui/`, and `src/ui/` holds the views and modals. `src/ui/` is split into `components/` (Preact, no `obsidian`), `model/` (pure data) and `obsidian/` (the shells, unrestricted); lint enforces each folder's imports. Keep new code in the right tier.
 - Vault access goes through Obsidian's Vault API (`vault.process`, the `Editor` API, `fileManager.trashFile`, and so on), never the filesystem directly.
 
 ## Tests and the local gate

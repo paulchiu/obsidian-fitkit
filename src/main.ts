@@ -19,10 +19,13 @@ import {
   type FitKitSettings,
 } from './settings'
 import { dashboardPath, exercisesFolder, workoutFilename, workoutsFolder } from './settings-paths'
-import { renderExerciseChartBlock } from './ui/exercise-chart-block'
-import { ParseDiagnosticsModal } from './ui/parse-diagnostics-modal'
-import { renderWorkoutReadingModeSection } from './ui/workout-reading-mode'
-import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from './ui/workout-editor-view'
+import { renderExerciseChartBlock } from './ui/obsidian/exercise-chart-block'
+import { ParseDiagnosticsModal } from './ui/obsidian/parse-diagnostics-modal'
+import { renderWorkoutReadingModeSection } from './ui/obsidian/workout-reading-mode'
+import {
+  VIEW_TYPE_FITKIT_WORKOUT_EDITOR,
+  WorkoutEditorView,
+} from './ui/obsidian/workout-editor-view'
 import { regenerateDashboard } from './vault/dashboard'
 import {
   applyRegistryBackfillPlan,

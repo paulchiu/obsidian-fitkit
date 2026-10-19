@@ -1,0 +1,405 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const noticeMessages = vi.hoisted(() => [] as string[])
+
+vi.mock('obsidian', async () => {
+  const { mixinFileView } = await import('../../fixtures/obsidian-file-view')
+
+  class ItemView {
+    app: unknown
+    leaf: unknown
+    contentEl: HTMLElement
+    constructor(leaf: unknown) {
+      this.leaf = leaf
+      this.app =
+        leaf && typeof leaf === 'object' && 'app' in leaf
+          ? (leaf as { app?: unknown }).app
+          : undefined
+      this.contentEl = harness.createRoot()
+    }
+    registerDomEvent(): void {}
+    registerEvent(): void {}
+    getState(): Record<string, unknown> {
+      return {}
+    }
+    async setState(_state: unknown, _result: unknown): Promise<void> {}
+  }
+
+  class Plugin {}
+
+  class Menu {
+    addItem(): this {
+      return this
+    }
+    addSeparator(): this {
+      return this
+    }
+    showAtPosition(): void {}
+  }
+
+  class Modal {}
+  class SuggestModal extends Modal {}
+  class PluginSettingTab {}
+  class Setting {}
+  class MarkdownView {}
+
+  class Notice {
+    constructor(readonly message: string) {
+      noticeMessages.push(message)
+    }
+  }
+
+  class TFile {
+    path = ''
+    extension = 'md'
+    basename = ''
+    stat = { mtime: 1000 }
+  }
+
+  const FileView = mixinFileView(ItemView, (value): value is TFile => value instanceof TFile)
+
+  return {
+    FileView,
+    ItemView,
+    MarkdownView,
+    Menu,
+    Modal,
+    Notice,
+    Platform: { isMobile: false },
+    Plugin,
+    PluginSettingTab,
+    Setting,
+    SuggestModal,
+    TFile,
+    normalizePath: (path: string) => path.replace(/\/+/g, '/'),
+    setIcon: () => {},
+  }
+})
+
+const harness = vi.hoisted(() => ({ createRoot: (): HTMLElement => undefined as never }))
+
+import { FileView, TFile } from 'obsidian'
+import type { App, WorkspaceLeaf } from 'obsidian'
+
+import FitKitPlugin from '../../../src/main'
+import { DEFAULT_SETTINGS } from '../../../src/settings'
+import { WorkoutEditorView } from '../../../src/ui/obsidian/workout-editor-view'
+import { buildMockVaultFolderTree } from '../../fixtures/mock-vault-folder-tree'
+import { createTestRoot, harnessDocument, harnessWindow } from '../../harness/obsidian-dom'
+
+harness.createRoot = createTestRoot
+
+const WORKOUT_PATH = 'Fitness/Workouts/2026-08-15.md'
+const OTHER_WORKOUT_PATH = 'Fitness/Workouts/2026-08-17.md'
+
+const workoutSource = [
+  '---',
+  'type: workout',
+  'date: 2026-08-15',
+  'name: Push day',
+  '---',
+  '',
+  '## [[Squat]]',
+  '',
+  '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+].join('\n')
+
+const createWorkoutFile = (path: string): TFile =>
+  Object.assign(new TFile(), {
+    path,
+    basename: path.split('/').pop()?.replace(/\.md$/, '') ?? '',
+  })
+
+/** A real WorkoutEditorView over an in-memory vault holding one workout note. */
+const createView = (
+  persistenceFailure?: () => Error | null,
+): {
+  view: WorkoutEditorView
+  contents: Map<string, string>
+  vault: { read: (target: TFile) => Promise<string> }
+} => {
+  const files = new Map([WORKOUT_PATH, OTHER_WORKOUT_PATH].map((p) => [p, createWorkoutFile(p)]))
+  const contents = new Map<string, string>([
+    [WORKOUT_PATH, workoutSource],
+    [OTHER_WORKOUT_PATH, workoutSource],
+  ])
+  const vault = {
+    getFolderByPath: buildMockVaultFolderTree([...files.values()]).getFolderByPath,
+    read: async (target: TFile): Promise<string> => contents.get(target.path) ?? '',
+    process: async (target: TFile, callback: (text: string) => string): Promise<void> => {
+      const failure = persistenceFailure?.()
+      if (failure) throw failure
+      contents.set(target.path, callback(contents.get(target.path) ?? ''))
+    },
+    getAbstractFileByPath: (path: string): TFile | null => files.get(path) ?? null,
+  }
+  const app = {
+    vault,
+    metadataCache: { getFileCache: () => null, on: () => ({}) },
+  }
+  const plugin = Object.create(FitKitPlugin.prototype) as FitKitPlugin
+  plugin.app = app as unknown as App
+  plugin.settings = { ...DEFAULT_SETTINGS }
+  const view = new WorkoutEditorView({ app } as unknown as WorkspaceLeaf, plugin)
+  return { view, contents, vault }
+}
+
+describe('WorkoutEditorView workspace state', () => {
+  beforeEach(() => {
+    vi.stubGlobal('HTMLElement', harnessWindow.HTMLElement)
+    vi.stubGlobal('activeWindow', harnessWindow)
+    /** Resolve the minimum-skeleton delay at once so a load does not wait on the clock. */
+    vi.stubGlobal('window', {
+      setTimeout: (callback: () => void): number => {
+        callback()
+        return 0
+      },
+      clearTimeout: (): void => {},
+    })
+    vi.stubGlobal('activeDocument', harnessDocument)
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(): void {}
+        disconnect(): void {}
+      },
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('renders the workout named in restored state instead of the empty hint', async () => {
+    const { view } = createView()
+    await view.onOpen()
+
+    await view.setState({ file: WORKOUT_PATH }, { history: false })
+
+    expect(view.contentEl.querySelector('.fitkit-empty')).toBeNull()
+    expect(view.contentEl.textContent).toContain('Squat')
+  })
+
+  it('saves a pending edit to the previous workout before switching to another', async () => {
+    const { view, contents } = createView()
+    await view.onOpen()
+    await view.setState({ file: WORKOUT_PATH }, { history: false })
+    /** Hold the autosave debounce so the edit is still pending at the switch. */
+    vi.stubGlobal('window', { setTimeout: (): number => 1, clearTimeout: (): void => {} })
+    const reps = view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')
+    if (!reps) {
+      throw new Error('reps input not rendered')
+    }
+    reps.value = '7'
+    reps.dispatchEvent(new harnessWindow.Event('input'))
+
+    await view.setState({ file: OTHER_WORKOUT_PATH }, { history: false })
+
+    expect(contents.get(WORKOUT_PATH)).toContain('[reps:: 7]')
+  })
+
+  it('keeps the empty hint when the restored workout no longer exists', async () => {
+    const { view } = createView()
+    await view.onOpen()
+
+    await view.setState({ file: 'Fitness/Workouts/2026-01-01.md' }, { history: false })
+
+    expect(view.contentEl.querySelector('.fitkit-empty')?.textContent).toBe(
+      'Open a workout note to edit.',
+    )
+  })
+
+  it('keeps the on-screen workout when state names the workout already loaded', async () => {
+    const { view, contents } = createView()
+    await view.onOpen()
+    await view.setState({ file: WORKOUT_PATH }, { history: false })
+    contents.set(WORKOUT_PATH, workoutSource.replaceAll('Squat', 'Deadlift'))
+
+    await view.setState({ file: WORKOUT_PATH }, { history: false })
+
+    expect(view.contentEl.textContent).toContain('Squat')
+    expect(view.contentEl.textContent).not.toContain('Deadlift')
+  })
+
+  it('reports the loaded workout as its file so Obsidian can reveal it', async () => {
+    const { view } = createView()
+    await view.onOpen()
+
+    await view.setState({ file: WORKOUT_PATH }, { history: false })
+
+    expect(view instanceof FileView).toBe(true)
+    expect(view.file?.path).toBe(WORKOUT_PATH)
+  })
+
+  it('reports the newly opened workout as its file after switching workouts', async () => {
+    const { view } = createView()
+    await view.onOpen()
+    await view.setState({ file: WORKOUT_PATH }, { history: false })
+
+    await view.setState({ file: OTHER_WORKOUT_PATH }, { history: false })
+
+    expect(view.file?.path).toBe(OTHER_WORKOUT_PATH)
+  })
+})
+
+describe('WorkoutEditorView autosave wiring', () => {
+  /** Holds the debounce so an edit stays pending until the test closes or switches the view. */
+  const holdDebounce = (): void => {
+    vi.stubGlobal('window', { setTimeout: (): number => 1, clearTimeout: (): void => {} })
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('HTMLElement', harnessWindow.HTMLElement)
+    vi.stubGlobal('activeWindow', harnessWindow)
+    vi.stubGlobal('activeDocument', harnessDocument)
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(): void {}
+        disconnect(): void {}
+      },
+    )
+    vi.stubGlobal('window', {
+      setTimeout: (cb: () => void): number => (cb(), 0),
+      clearTimeout: () => {},
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const editReps = async (view: WorkoutEditorView, value: string): Promise<void> => {
+    await view.onOpen()
+    await view.setState({ file: WORKOUT_PATH }, { history: false })
+    holdDebounce()
+    const reps = view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')
+    if (!reps) {
+      throw new Error('reps input not rendered')
+    }
+    reps.value = value
+    reps.dispatchEvent(new harnessWindow.Event('input'))
+  }
+
+  const metaText = (view: WorkoutEditorView): string | undefined =>
+    view.contentEl.querySelector('.fitkit-meta-line')?.textContent ?? undefined
+
+  it.each(['background', 'unload'] as const)(
+    'keeps edited fields visibly unsaved after a failed %s save and recovers on another edit',
+    async (savePath) => {
+      const failure = new Error('disk full')
+      let unavailable = true
+      const { view, contents } = createView(() => {
+        if (!unavailable) return null
+        unavailable = false
+        return failure
+      })
+      await editReps(view, '7')
+      noticeMessages.length = 0
+      vi.useFakeTimers()
+      // eslint-disable-next-line obsidianmd/no-global-this -- The test realm supplies the fake timers used by the scheduled save.
+      vi.stubGlobal('window', globalThis)
+      const reps = view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')
+      if (!reps) throw new Error('reps input not rendered')
+      try {
+        if (savePath === 'background') {
+          reps.dispatchEvent(new harnessWindow.Event('input'))
+          await vi.advanceTimersByTimeAsync(DEFAULT_SETTINGS.autosaveDebounceMs)
+        } else {
+          await expect(view.onUnloadFile()).rejects.toBe(failure)
+        }
+        expect(noticeMessages).toEqual([
+          'Could not save workout. Edits are unsaved. Edit again to retry before leaving.',
+        ])
+        expect(metaText(view)).toContain('unsaved')
+        expect(
+          view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')?.value,
+        ).toBe('7')
+        expect(view.contentEl.querySelector('.fitkit-conflict')).toBeNull()
+        expect(contents.get(WORKOUT_PATH)).toContain('[reps:: 5]')
+
+        reps.value = '9'
+        reps.dispatchEvent(new harnessWindow.Event('input'))
+        await vi.advanceTimersByTimeAsync(DEFAULT_SETTINGS.autosaveDebounceMs)
+
+        expect(contents.get(WORKOUT_PATH)).toContain('[reps:: 9]')
+        expect(metaText(view)).not.toContain('unsaved')
+        expect(
+          view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')?.value,
+        ).toBe('9')
+        expect(noticeMessages).toHaveLength(1)
+      } finally {
+        vi.useRealTimers()
+      }
+    },
+  )
+
+  it('marks the meta line unsaved after an edit and clears it once the close writes it', async () => {
+    const { view, contents } = createView()
+    await editReps(view, '7')
+
+    expect(metaText(view)).toContain('unsaved')
+
+    await view.onUnloadFile()
+
+    expect(contents.get(WORKOUT_PATH)).toContain('[reps:: 7]')
+    expect(metaText(view)).not.toContain('unsaved')
+  })
+
+  it('writes a pending edit when the view is closed', async () => {
+    const { view, contents } = createView()
+    await editReps(view, '9')
+
+    await view.onClose()
+
+    expect(contents.get(WORKOUT_PATH)).toContain('[reps:: 9]')
+  })
+
+  it('shows the reload banner and keeps the disk copy when a pending edit meets an external change', async () => {
+    const { view, contents } = createView()
+    await editReps(view, '7')
+    contents.set(WORKOUT_PATH, workoutSource.replaceAll('Squat', 'Deadlift'))
+
+    await view.onUnloadFile()
+
+    expect(view.contentEl.querySelector('.fitkit-conflict')?.textContent).toContain(
+      'File changed on disk',
+    )
+    expect(contents.get(WORKOUT_PATH)).toContain('Deadlift')
+    expect(contents.get(WORKOUT_PATH)).not.toContain('[reps:: 7]')
+  })
+
+  it('keeps autosave blocked while a reload from the conflict banner is reading the disk', async () => {
+    const { view, contents, vault } = createView()
+    await view.onOpen()
+    await view.setState({ file: WORKOUT_PATH }, { history: false })
+    contents.set(WORKOUT_PATH, workoutSource.replaceAll('Squat', 'Deadlift'))
+    const typeReps = async (value: string): Promise<void> => {
+      const reps = view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Reps"]')
+      if (!reps) {
+        throw new Error('reps input not rendered')
+      }
+      reps.value = value
+      reps.dispatchEvent(new harnessWindow.Event('input'))
+      await Promise.resolve()
+    }
+    await typeReps('7')
+    expect(view.contentEl.querySelector('.fitkit-conflict')).not.toBeNull()
+
+    const pending: Array<() => void> = []
+    const read = vault.read
+    vault.read = (target) =>
+      new Promise((resolve) => pending.push(() => void read(target).then(resolve)))
+    const reloading = view.reloadFromDisk()
+    await typeReps('9')
+    vault.read = read
+    for (const release of pending) {
+      release()
+    }
+    await reloading
+    await new Promise((resolve) => window.setTimeout(resolve, 0))
+
+    expect(contents.get(WORKOUT_PATH)).toContain('Deadlift')
+    expect(contents.get(WORKOUT_PATH)).not.toContain('[reps:: 9]')
+  })
+})

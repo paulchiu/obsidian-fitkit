@@ -18,10 +18,10 @@ import {
 } from './domain/interval-presets'
 import { parseWeightUnit } from './domain/weight-unit'
 import type FitKitPlugin from './main'
-import { DeleteRegistryEntryModal } from './ui/delete-registry-entry-modal'
-import { ExerciseRegistryEntryModal } from './ui/exercise-registry-entry-modal'
-import { ExerciseRenameModal } from './ui/exercise-rename-modal'
-import { ImportExercisesModal } from './ui/import-exercises-modal'
+import { DeleteRegistryEntryModal } from './ui/obsidian/delete-registry-entry-modal'
+import { ExerciseRegistryEntryModal } from './ui/obsidian/exercise-registry-entry-modal'
+import { ExerciseRenameModal } from './ui/obsidian/exercise-rename-modal'
+import { ImportExercisesModal } from './ui/obsidian/import-exercises-modal'
 import { dashboardPath, exercisesFolder, workoutsFolder } from './settings-paths'
 import {
   buildRegistryTableRows,

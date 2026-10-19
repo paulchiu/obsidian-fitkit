@@ -13,7 +13,7 @@
  *
  * DOM polyfill:
  * - Covers only what the current renderer uses.
- * - Inspect src/ui/exercise-chart-svg.ts before extending the renderer.
+ * - Inspect src/ui/obsidian/exercise-chart-svg.ts before extending the renderer.
  * - If the renderer touches a new Obsidian element extension, extend this polyfill to match it.
  */
 
@@ -28,7 +28,7 @@ const { buildExerciseChartSeries } = await jiti.import('../src/domain/exercise-c
 const { createRegistry } = await jiti.import('../src/domain/exercise-registry.ts')
 const { pickBestSet, pickHeaviestSet } = await jiti.import('../src/domain/epley.ts')
 const { parseWorkoutNote } = await jiti.import('../src/domain/workout-note-model.ts')
-const { renderExerciseChartSvg } = await jiti.import('../src/ui/exercise-chart-svg.ts')
+const { renderExerciseChartSvg } = await jiti.import('../src/ui/obsidian/exercise-chart-svg.ts')
 const { extractChartCss } = await jiti.import('../src/domain/chart-css.ts')
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..')

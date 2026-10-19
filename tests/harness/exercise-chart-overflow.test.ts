@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ChartSeries } from '../../src/domain/exercise-chart'
-import { renderExerciseChartSvg, type RenderChartOptions } from '../../src/ui/exercise-chart-svg'
+import {
+  renderExerciseChartSvg,
+  type RenderChartOptions,
+} from '../../src/ui/obsidian/exercise-chart-svg'
 import { createTestRoot } from './obsidian-dom'
 import { measureSvgOverflow, serializeSvg, type SvgOverflow } from './svg-layout'
 
