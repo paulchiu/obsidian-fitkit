@@ -239,6 +239,7 @@ export class WorkoutEditorView extends FileView {
   private autosaverInstance?: Autosaver
   private screensInstance?: TabScreens<EditorScreen>
   private lastRestSeconds: number | null = null
+  private unmountScreen?: () => void
   /**
    * One store per view, so its ladder overlay spans the session. Lazily
    * created because prototype-built views never run field initializers.
@@ -383,7 +384,7 @@ export class WorkoutEditorView extends FileView {
     if (this.dragSession) {
       this.endDrag(false)
     }
-    this.contentEl.empty()
+    this.clearContent()
     this.session = null
     this.model = null
     this.exerciseHistory = null
@@ -477,15 +478,22 @@ export class WorkoutEditorView extends FileView {
     new Notice('Reloaded from disk.')
   }
 
-  private renderEmpty(message: string): void {
+  /** Empties the pane, unmounting a Preact screen first so its effects clean up. */
+  private clearContent(): void {
+    this.unmountScreen?.()
+    this.unmountScreen = undefined
     this.contentEl.empty()
+  }
+
+  private renderEmpty(message: string): void {
+    this.clearContent()
     this.setListRefits = []
     const wrap = this.contentEl.createDiv({ cls: 'fitkit-empty' })
     wrap.setText(message)
   }
 
   private renderSkeleton(): void {
-    this.contentEl.empty()
+    this.clearContent()
     this.setListRefits = []
     const wrap = this.contentEl.createDiv({ cls: 'fitkit-skeleton' })
     for (let i = 0; i < 3; i++) {
@@ -504,7 +512,7 @@ export class WorkoutEditorView extends FileView {
       this.renderEmpty('No file loaded.')
       return
     }
-    this.contentEl.empty()
+    this.clearContent()
     this.setListRefits = []
     const container = this.contentEl.createDiv({ cls: 'fitkit-container' })
     const screen = this.screens.current()
@@ -517,9 +525,11 @@ export class WorkoutEditorView extends FileView {
       return
     }
     if (screen?.kind === 'rest') {
-      screen.clockEl = renderRestTimer(container, this.liveRestSeconds(screen), {
+      const mounted = renderRestTimer(container, this.liveRestSeconds(screen), {
         stop: () => this.stopRestTimer(),
       })
+      screen.clockEl = mounted.clock
+      this.unmountScreen = mounted.unmount
       return
     }
 
@@ -1537,7 +1547,7 @@ export class WorkoutEditorView extends FileView {
     const { card, entry, stopwatch } = screen
     const entries = card.durationEntries
     const index = entries.indexOf(entry)
-    screen.clockEl = renderSetTimer(
+    const mounted = renderSetTimer(
       container,
       {
         exerciseName: card.name,
@@ -1567,6 +1577,8 @@ export class WorkoutEditorView extends FileView {
         },
       },
     )
+    screen.clockEl = mounted.clock
+    this.unmountScreen = mounted.unmount
   }
 
   /** The beep-free wake lock the set and rest timers hold. */

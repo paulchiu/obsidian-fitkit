@@ -1,0 +1,129 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`WorkoutEditorView timer screen structure > draws the rest timer 1`] = `
+"div.fitkit-runner.is-rest
+  div.fitkit-runner-top
+    span.fitkit-runner-phase
+      "Rest"
+  div.fitkit-runner-center
+    div.fitkit-runner-clock
+      "0:00"
+  button.fitkit-btn.fitkit-runner-primary[aria-label=Stop rest timer][type=button]
+    "Stop rest""
+`;
+
+exports[`WorkoutEditorView timer screen structure > draws the set timer running a set after another 1`] = `
+"div.fitkit-runner.is-work
+  div.fitkit-runner-top
+    span.fitkit-runner-phase
+      "Set 2"
+    span.fitkit-runner-name
+      "Rowing"
+  div.fitkit-runner-center
+    div.fitkit-runner-clock
+      "0:00"
+    div.fitkit-runner-stats
+      "Last set 1m55s"
+  button.fitkit-btn.fitkit-runner-primary.fitkit-btn-primary[aria-label=Stop timer][type=button]
+    "Stop"
+  div.fitkit-runner-controls.is-three
+    button.fitkit-btn[aria-label=Next set][type=button]
+      span.fitkit-runner-icon[data-icon=skip-forward]
+      span
+        "Next set"
+    button.fitkit-btn[aria-label=Reset set][type=button]
+      span.fitkit-runner-icon[data-icon=rotate-ccw]
+      span
+        "Reset"
+    button.fitkit-btn[aria-label=Close timer][type=button]
+      span.fitkit-runner-icon[data-icon=check]
+      span
+        "Done""
+`;
+
+exports[`WorkoutEditorView timer screen structure > draws the set timer running the first set 1`] = `
+"div.fitkit-runner.is-work
+  div.fitkit-runner-top
+    span.fitkit-runner-phase
+      "Set 1"
+    span.fitkit-runner-name
+      "Rowing"
+  div.fitkit-runner-center
+    div.fitkit-runner-clock
+      "1:30"
+  button.fitkit-btn.fitkit-runner-primary.fitkit-btn-primary[aria-label=Stop timer][type=button]
+    "Stop"
+  div.fitkit-runner-controls.is-three
+    button.fitkit-btn[aria-label=Next set][type=button]
+      span.fitkit-runner-icon[data-icon=skip-forward]
+      span
+        "Next set"
+    button.fitkit-btn[aria-label=Reset set][type=button]
+      span.fitkit-runner-icon[data-icon=rotate-ccw]
+      span
+        "Reset"
+    button.fitkit-btn[aria-label=Close timer][type=button]
+      span.fitkit-runner-icon[data-icon=check]
+      span
+        "Done""
+`;
+
+exports[`WorkoutEditorView timer screen structure > draws the set timer stopped on a set after another 1`] = `
+"div.fitkit-runner.is-work.is-paused
+  div.fitkit-runner-top
+    span.fitkit-runner-phase
+      "Set 2"
+    span.fitkit-runner-name
+      "Rowing"
+  div.fitkit-runner-center
+    div.fitkit-runner-clock
+      "0:25"
+    div.fitkit-runner-stats
+      "Last set 1m55s"
+    div.fitkit-runner-note
+      "Stopped"
+  button.fitkit-btn.fitkit-runner-primary.fitkit-btn-primary[aria-label=Next set][type=button]
+    "Next set"
+  div.fitkit-runner-controls.is-three
+    button.fitkit-btn[aria-label=Resume timer][type=button]
+      span.fitkit-runner-icon[data-icon=play]
+      span
+        "Resume"
+    button.fitkit-btn[aria-label=Reset set][type=button]
+      span.fitkit-runner-icon[data-icon=rotate-ccw]
+      span
+        "Reset"
+    button.fitkit-btn[aria-label=Close timer][type=button]
+      span.fitkit-runner-icon[data-icon=check]
+      span
+        "Done""
+`;
+
+exports[`WorkoutEditorView timer screen structure > draws the set timer stopped on the first set 1`] = `
+"div.fitkit-runner.is-work.is-paused
+  div.fitkit-runner-top
+    span.fitkit-runner-phase
+      "Set 1"
+    span.fitkit-runner-name
+      "Rowing"
+  div.fitkit-runner-center
+    div.fitkit-runner-clock
+      "1:55"
+    div.fitkit-runner-note
+      "Stopped"
+  button.fitkit-btn.fitkit-runner-primary.fitkit-btn-primary[aria-label=Next set][type=button]
+    "Next set"
+  div.fitkit-runner-controls.is-three
+    button.fitkit-btn[aria-label=Resume timer][type=button]
+      span.fitkit-runner-icon[data-icon=play]
+      span
+        "Resume"
+    button.fitkit-btn[aria-label=Reset set][type=button]
+      span.fitkit-runner-icon[data-icon=rotate-ccw]
+      span
+        "Reset"
+    button.fitkit-btn[aria-label=Close timer][type=button]
+      span.fitkit-runner-icon[data-icon=check]
+      span
+        "Done""
+`;

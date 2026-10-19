@@ -68,7 +68,8 @@ vi.mock('obsidian', async () => {
     SuggestModal,
     TFile,
     normalizePath: (path: string) => path.replace(/\/+/g, '/'),
-    setIcon: () => {},
+    /** Marks where an icon lands, so structure snapshots pin it. */
+    setIcon: (el: HTMLElement, name: string) => el.setAttribute('data-icon', name),
   }
 })
 
@@ -76,12 +77,15 @@ const harness = vi.hoisted(() => ({ createRoot: (): HTMLElement => undefined as 
 
 import { TFile } from 'obsidian'
 import type { App, WorkspaceLeaf } from 'obsidian'
+import { options } from 'preact'
 
 import FitKitPlugin from '../../src/main'
 import { DEFAULT_SETTINGS } from '../../src/settings'
 import { WorkoutEditorView } from '../../src/ui/workout-editor-view'
 import { buildMockVaultFolderTree } from '../fixtures/mock-vault-folder-tree'
 import { createTestRoot, harnessDocument, harnessWindow } from '../harness/obsidian-dom'
+import { outline } from '../harness/outline'
+import { findUnstyledClasses } from '../harness/stylesheet'
 
 harness.createRoot = createTestRoot
 
@@ -507,6 +511,170 @@ describe('WorkoutEditorView rest timer screen', () => {
     expect(view.contentEl.querySelector('.fitkit-runner')).toBeNull()
     expect(text(view, 'fitkit-rest-timer-last')).toBe('Last rest 1m12s')
     expect(contents.get(WORKOUT_PATH)).toBe(before)
+  })
+})
+
+describe('WorkoutEditorView timer screen structure', () => {
+  beforeEach(() => {
+    vi.stubEnv('TZ', 'Australia/Brisbane')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-30T07:15:03+10:00'))
+    vi.stubGlobal('HTMLElement', harnessWindow.HTMLElement)
+    vi.stubGlobal('activeWindow', harnessWindow)
+    intervals.clear()
+    let nextId = 1
+    vi.stubGlobal('window', {
+      setTimeout: (callback: () => void): number => {
+        callback()
+        return 0
+      },
+      clearTimeout: (): void => {},
+      setInterval: (callback: () => void): number => {
+        const id = nextId++
+        intervals.set(id, callback)
+        return id
+      },
+      clearInterval: (id: number): void => {
+        intervals.delete(id)
+      },
+    })
+    vi.stubGlobal('activeDocument', harnessDocument)
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(): void {}
+        disconnect(): void {}
+      },
+    )
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
+  })
+
+  const runner = (view: WorkoutEditorView): Element => {
+    const el = view.contentEl.querySelector('.fitkit-runner')
+    if (!el) {
+      throw new Error('No timer screen rendered')
+    }
+    return el
+  }
+
+  const SET_STATES: ReadonlyArray<{ state: string; clicks: string[] }> = [
+    { state: 'running the first set', clicks: ['Start timer'] },
+    { state: 'stopped on the first set', clicks: ['Start timer', 'Stop timer'] },
+    { state: 'running a set after another', clicks: ['Start timer', 'Next set'] },
+    { state: 'stopped on a set after another', clicks: ['Start timer', 'Next set', 'Stop timer'] },
+  ]
+
+  it.each(SET_STATES)('draws the set timer $state', async ({ clicks }) => {
+    const { view } = await openView(
+      workoutSource('- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90]'),
+    )
+    for (const label of clicks) {
+      vi.setSystemTime(Date.now() + 25_000)
+      clickButton(view, label)
+    }
+
+    expect(outline(runner(view))).toMatchSnapshot()
+    expect(findUnstyledClasses(view.contentEl)).toEqual([])
+  })
+
+  it('draws the rest timer', async () => {
+    const { view } = await openView(
+      workoutSource('- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90]'),
+    )
+
+    clickButton(view, 'Start rest timer')
+
+    expect(outline(runner(view))).toMatchSnapshot()
+    expect(findUnstyledClasses(view.contentEl)).toEqual([])
+  })
+
+  it.each([
+    { screen: 'set timer', open: 'Start timer', clock: '1:42' },
+    { screen: 'rest timer', open: 'Start rest timer', clock: '0:12' },
+  ])('ticks the $screen clock without redrawing the screen', async ({ open, clock }) => {
+    const { view } = await openView(
+      workoutSource('- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90]'),
+    )
+    clickButton(view, open)
+    const before = runner(view)
+    const clockEl = before.querySelector('.fitkit-runner-clock')
+
+    vi.setSystemTime(new Date('2026-09-30T07:15:15+10:00'))
+    tick()
+
+    expect(runner(view)).toBe(before)
+    expect(before.querySelector('.fitkit-runner-clock')).toBe(clockEl)
+    expect(clockEl?.textContent).toBe(clock)
+  })
+
+  it('draws a fresh set timer when the timer is opened again after Done', async () => {
+    const { view } = await openView(
+      workoutSource('- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90]'),
+    )
+    clickButton(view, 'Start timer')
+    const first = runner(view)
+    clickButton(view, 'Close timer')
+
+    clickButton(view, 'Start timer')
+
+    expect(runner(view)).not.toBe(first)
+    expect(first.isConnected).toBe(false)
+  })
+
+  it.each([
+    {
+      leaving: 'Done',
+      open: 'Start timer',
+      leave: async (v: WorkoutEditorView) => clickButton(v, 'Close timer'),
+    },
+    {
+      leaving: 'Stop rest',
+      open: 'Start rest timer',
+      leave: async (v: WorkoutEditorView) => clickButton(v, 'Stop rest timer'),
+    },
+    {
+      leaving: 'closing the tab',
+      open: 'Start timer',
+      leave: (v: WorkoutEditorView) => v.onClose(),
+    },
+  ])('unmounts the timer screen on $leaving', async ({ open, leave }) => {
+    const { view } = await openView(
+      workoutSource('- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90]'),
+    )
+    clickButton(view, open)
+    const unmounted: string[] = []
+    const previous = { ...options }
+    options.unmount = (vnode) => {
+      const cls = (vnode.props as { class?: unknown }).class
+      if (typeof cls === 'string') {
+        unmounted.push(cls)
+      }
+      previous.unmount?.(vnode)
+    }
+
+    try {
+      await leave(view)
+    } finally {
+      Object.assign(options, previous)
+    }
+
+    expect(unmounted.some((cls) => cls.split(' ').includes('fitkit-runner'))).toBe(true)
+  })
+
+  it('leaves the tab empty when it closes on a timer screen', async () => {
+    const { view } = await openView(
+      workoutSource('- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90]'),
+    )
+    clickButton(view, 'Start timer')
+
+    await view.onClose()
+
+    expect(view.contentEl.childNodes).toHaveLength(0)
   })
 })
 

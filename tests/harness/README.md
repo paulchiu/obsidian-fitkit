@@ -26,6 +26,10 @@ is all zeros), so element overflow is out of scope by design.
   (`findUnstyledClasses()`). A class passes when a selector names it or it is
   recognised (`is-*`/`has-*` state hooks, plus the Obsidian classes in
   `OBSIDIAN_CLASSES`).
+- `outline.ts` prints a subtree as indented `tag.class[attr=value]` lines, with
+  adjacent text joined, so a snapshot pins the structure `styles.css` and the
+  focus code depend on rather than how the DOM was built. Use it to pin a
+  surface before porting it to Preact.
 - `svg-layout.ts` measures an SVG against its own viewBox
   (`measureSvgOverflow()`). Every measurement first proves text shapes with a
   pinned DejaVu Sans file and fails loudly otherwise, so a missing font can
