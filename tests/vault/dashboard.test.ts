@@ -342,6 +342,38 @@ describe('dashboard composer', () => {
     expect(markdown).toContain('duration + "s" as Duration')
   })
 
+  it('counts an interval session logged with a plan as a duration session', () => {
+    const intervalIndex: FitKitIndex = {
+      ...mixedIndex,
+      entries: [
+        {
+          path: 'Fitness/Workouts/2026-04-24.md',
+          mtime: 1,
+          date: '2026-04-24',
+          name: 'Workout',
+          exercises: [
+            {
+              exerciseName: 'Bike',
+              kind: 'duration',
+              plan: '3 x 1m @ 300W, 30s rest',
+              totalSets: 3,
+              totalDurationSeconds: 180,
+            },
+          ],
+        },
+      ],
+    }
+
+    const markdown = composeDashboard(
+      intervalIndex,
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+    )
+
+    expect(markdown).toContain('total 180s across 1 session')
+  })
+
   it('defaults strength PB ranking and display to e1rm', () => {
     const markdown = composeDashboard(
       {

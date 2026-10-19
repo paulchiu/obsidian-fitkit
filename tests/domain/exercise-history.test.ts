@@ -358,6 +358,49 @@ describe('exercise history aggregation', () => {
     ])
   })
 
+  it('counts sessions logged with an interval plan toward the duration PB and Last', () => {
+    const history = buildExerciseHistoryMap(
+      fitKitIndex([
+        entry('Fitness/Workouts/2026-04-20.md', '2026-04-20', [
+          {
+            exerciseName: 'Bike',
+            kind: 'duration',
+            plan: '3 x 1m @ 300W, 30s rest',
+            totalDurationSeconds: 180,
+          },
+        ]),
+      ]),
+      { sourcePath: 'Fitness/Workouts/2026-04-24.md', date: '2026-04-24' },
+    )
+
+    expect(formatExerciseHistoryBadges(history.get('Bike'), 'duration', 'kg')).toEqual([
+      { text: 'PB 3m', title: 'Longest session total duration: 3m' },
+      { text: 'last 3m', title: 'Latest prior session total duration: 3m (2026-04-20)' },
+    ])
+  })
+
+  it('ranks interval sessions by the time of their targeted steps when the plan has others', () => {
+    const history = buildExerciseHistoryMap(
+      fitKitIndex([
+        entry('Fitness/Workouts/2026-10-14.md', '2026-10-14', [
+          {
+            exerciseName: 'Bike',
+            kind: 'duration',
+            plan: '(warmup 10m) (x 2 (hard 1m 300W) (rest 1m))',
+            totalDurationSeconds: 720,
+            targetedDurationSeconds: 120,
+          },
+        ]),
+      ]),
+      { sourcePath: 'Fitness/Workouts/2026-10-16.md', date: '2026-10-16' },
+    )
+
+    expect(formatExerciseHistoryBadges(history.get('Bike'), 'duration', 'kg')).toEqual([
+      { text: 'PB 2m', title: 'Longest session total duration: 2m' },
+      { text: 'last 2m', title: 'Latest prior session total duration: 2m (2026-10-14)' },
+    ])
+  })
+
   it('carries the most recent next-time plan forward', () => {
     const history = buildExerciseHistoryMap(
       fitKitIndex([
@@ -466,6 +509,24 @@ describe('exercise history aggregation', () => {
     })
   })
 
+  it('shows only the direction for a duration exercise, saying same target for keep', () => {
+    const lastTime = {
+      nextPlan: { value: { direction: 'up' as const, step: 10 }, date: '2026-10-12' },
+    }
+
+    expect([
+      formatNextPlanBadge(lastTime, 'duration', 'kg'),
+      formatNextPlanBadge(lastTime, 'duration', 'kg', { plan: { direction: 'stay' } }),
+    ]).toEqual([
+      { text: 'Next: up', title: 'Planned on 2026-10-12: up', icon: 'arrow-up' },
+      {
+        text: 'Next: same target',
+        title: 'Planned for next time: same target',
+        icon: 'minus',
+      },
+    ])
+  })
+
   it('falls back to the direction when the plan carries no step', () => {
     const badge = formatNextPlanBadge(
       {
@@ -538,13 +599,8 @@ describe('exercise history aggregation', () => {
     })
   })
 
-  it('has no plan badge for duration exercises or absent plans', () => {
-    expect(
-      formatNextPlanBadge(
-        { nextPlan: { value: { direction: 'up' }, date: '2026-08-10' } },
-        'duration',
-      ),
-    ).toBeNull()
+  it('has no plan badge when no plan was recorded', () => {
+    expect(formatNextPlanBadge({}, 'duration')).toBeNull()
     expect(formatNextPlanBadge({}, 'strength')).toBeNull()
     expect(formatNextPlanBadge(undefined, 'strength')).toBeNull()
   })
@@ -578,5 +634,44 @@ describe('exercise history aggregation', () => {
         today: '2026-04-27',
       }),
     ).toBe('2026-04-27')
+  })
+})
+
+describe('interval plan history', () => {
+  const anchor = { sourcePath: 'Fitness/Workouts/2026-10-14.md', date: '2026-10-14' }
+
+  it('carries the plan of the latest prior duration session', () => {
+    const history = buildExerciseHistoryMap(
+      fitKitIndex([
+        entry('Fitness/Workouts/2026-10-06.md', '2026-10-06', [
+          { exerciseName: 'Indoor Bike Push', kind: 'duration', plan: '8 x 30s @ 300W, 90s rest' },
+        ]),
+        entry('Fitness/Workouts/2026-10-13.md', '2026-10-13', [
+          { exerciseName: 'Indoor Bike Push', kind: 'duration', plan: '10 x 4m @ 300W, 1m rest' },
+        ]),
+      ]),
+      anchor,
+    )
+
+    expect(history.get('Indoor Bike Push')?.intervalPlan).toEqual({
+      value: '10 x 4m @ 300W, 1m rest',
+      date: '2026-10-13',
+    })
+  })
+
+  it('drops the plan once a later duration session was logged without one', () => {
+    const history = buildExerciseHistoryMap(
+      fitKitIndex([
+        entry('Fitness/Workouts/2026-10-06.md', '2026-10-06', [
+          { exerciseName: 'Indoor Bike Push', kind: 'duration', plan: '8 x 30s @ 300W, 90s rest' },
+        ]),
+        entry('Fitness/Workouts/2026-10-13.md', '2026-10-13', [
+          { exerciseName: 'Indoor Bike Push', kind: 'duration', totalDurationSeconds: 1200 },
+        ]),
+      ]),
+      anchor,
+    )
+
+    expect(history.get('Indoor Bike Push')?.intervalPlan).toBeUndefined()
   })
 })

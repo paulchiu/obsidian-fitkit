@@ -11,6 +11,7 @@ import {
   renameEntry,
   resolve,
   sanitizeEntryDraft,
+  typeForName,
   unitForName,
   upsertEntry,
   validateEntryDraft,
@@ -455,5 +456,36 @@ describe('renameEntry', () => {
       'Wall push-up',
       'Knee push-up',
     ])
+  })
+})
+
+describe('interval exercises', () => {
+  const bikeIntervals: ExerciseRegistryEntry = {
+    name: 'Bike Intervals',
+    kind: 'duration',
+    interval: true,
+    aliases: ['bike'],
+  }
+
+  it('reports interval as the type of a duration entry with the interval marker', () => {
+    const registry = createRegistry([bikeIntervals, plank, squat])
+
+    expect(typeForName(registry, 'bike')).toBe('interval')
+    expect(kindForName(registry, 'bike')).toBe('duration')
+    expect(typeForName(registry, 'Plank')).toBe('duration')
+    expect(typeForName(registry, 'Squat')).toBe('strength')
+    expect(typeForName(registry, 'Rowing')).toBeNull()
+  })
+
+  it('keeps the interval marker through upsert and rename', () => {
+    const registry = upsertEntry(createRegistry([squat]), bikeIntervals)
+    const renamed = renameEntry(
+      registry,
+      'Bike Intervals',
+      sanitizeEntryDraft({ ...bikeIntervals, name: 'Bike Sprints' }),
+    )
+
+    expect(typeForName(registry, 'Bike Intervals')).toBe('interval')
+    expect(typeForName(renamed, 'Bike Sprints')).toBe('interval')
   })
 })

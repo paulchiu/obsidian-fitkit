@@ -5,6 +5,7 @@ const registeredCommandIds = vi.hoisted(() => [] as string[])
 
 vi.mock('obsidian', async () => {
   const { mixinFileView } = await import('./fixtures/obsidian-file-view')
+  const { createTestRoot } = await import('./harness/obsidian-dom')
 
   class App {}
   class Plugin {
@@ -28,26 +29,18 @@ vi.mock('obsidian', async () => {
 
   class ItemView {
     app: unknown
-    contentEl: {
-      addClass: () => void
-      empty: () => void
-      createDiv: () => { setText: () => void }
-      classList: { toggle: () => void }
-      clientWidth: number
-    }
+    contentEl: HTMLElement
+    leaf: unknown
     constructor(leaf: unknown) {
+      this.leaf = leaf
       this.app =
         leaf && typeof leaf === 'object' && 'app' in leaf
           ? (leaf as { app?: unknown }).app
           : undefined
-      this.contentEl = {
-        addClass: () => {},
-        empty: () => {},
-        createDiv: () => ({ setText: () => {} }),
-        classList: { toggle: () => {} },
-        clientWidth: 0,
-      }
+      this.contentEl = createTestRoot()
     }
+    registerDomEvent(): void {}
+    registerEvent(): void {}
     getState(): Record<string, unknown> {
       return {}
     }
@@ -137,6 +130,7 @@ vi.mock('obsidian', async () => {
     Menu,
     Modal,
     Notice,
+    Platform: { isMobile: false },
     Plugin,
     PluginSettingTab,
     Setting,
@@ -153,6 +147,9 @@ import FitKitPlugin from '../src/main'
 import { DEFAULT_SETTINGS, type FitKitSettings } from '../src/settings'
 import { VIEW_TYPE_FITKIT_WORKOUT_EDITOR, WorkoutEditorView } from '../src/ui/workout-editor-view'
 import { rebuildIndex } from '../src/vault/index'
+import { exerciseHistoryFromVault } from '../src/vault/exercise-history-vault'
+import { renderExerciseChartBlock } from '../src/ui/exercise-chart-block'
+import { createTestRoot, harnessDocument, harnessWindow } from './harness/obsidian-dom'
 import { buildMockVaultFolderTree, type MockVaultFolder } from './fixtures/mock-vault-folder-tree'
 
 interface SetViewStateArg {
@@ -183,6 +180,7 @@ interface MockWorkspace {
 }
 
 interface MockVault {
+  on: (event: string, cb: (...args: unknown[]) => void) => unknown
   getFolderByPath: (path: string) => MockVaultFolder | null
   read: (file: TFile) => Promise<string>
   process: (file: TFile, callback: (live: string) => string) => Promise<void>
@@ -316,6 +314,7 @@ const makeApp = (
     ...overrides,
   },
   vault: {
+    on: vi.fn(),
     getFolderByPath: vi.fn(() => null),
     read: vi.fn(async () => ''),
     process: vi.fn(async () => undefined),
@@ -1238,5 +1237,362 @@ describe('FitKitPlugin tab menu view switch', () => {
     events.handlers.get('file-menu')?.(menu.menu, file, 'more-options', makeEditorLeaf(file))
 
     expect(menu.titles()).not.toContain('Open in workout editor')
+  })
+})
+
+const freshnessSource = (weight: number): string =>
+  `---\ntype: workout\ndate: 2026-08-15\nname: Push\n---\n\n- [exercise:: [[Squat]]] [set:: 1] [weight:: ${weight}] [reps:: 5]\n`
+
+const makeFreshnessVault = async (): Promise<{
+  plugin: FitKitPlugin
+  files: Array<{ path: string; extension: string; basename: string; stat: { mtime: number } }>
+  contents: Map<string, string>
+  emit: (
+    event: string,
+    file: { path: string; extension?: string; children?: unknown[] },
+    oldPath?: string,
+  ) => void
+  app: MockApp
+}> => {
+  const files = [
+    Object.assign(new TFile(), {
+      path: 'Fitness/Workouts/2026-08-15.md',
+      extension: 'md',
+      basename: '2026-08-15',
+      stat: { mtime: 1 },
+    }),
+  ]
+  const contents = new Map([[files[0]!.path, freshnessSource(50)]])
+  const handlers = new Map<string, (...args: unknown[]) => void>()
+  const app = makeApp(
+    {},
+    {
+      on: (event, cb) => {
+        handlers.set(event, cb)
+        return {}
+      },
+      getFolderByPath: (path) => buildMockVaultFolderTree(files).getFolderByPath(path),
+      read: async (file) => contents.get(file.path) ?? '',
+    },
+  )
+  Object.assign(app.vault, {
+    getAbstractFileByPath: (path: string) => files.find((file) => file.path === path) ?? null,
+  })
+  const plugin = new (FitKitPlugin as unknown as { new (app: MockApp): FitKitPlugin })(app)
+  await plugin.onload()
+  return {
+    plugin,
+    files,
+    contents,
+    app,
+    emit: (event, file, oldPath) => handlers.get(event)?.(file, oldPath),
+  }
+}
+
+type FreshnessVault = Awaited<ReturnType<typeof makeFreshnessVault>>
+type IndexChange = 'modify' | 'settings' | 'manual rebuild' | 'cache reset'
+
+const holdNextWorkoutRead = (
+  fixture: FreshnessVault,
+): {
+  started: Promise<void>
+  release: (source: string) => void
+} => {
+  let release!: (source: string) => void
+  let started!: () => void
+  const reading = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  const pendingRead = new Promise<string>((resolve) => {
+    release = resolve
+  })
+  let first = true
+  fixture.app.vault.read = async (file) => {
+    if (first) {
+      first = false
+      started()
+      return pendingRead
+    }
+    return fixture.contents.get(file.path) ?? ''
+  }
+  return { started: reading, release }
+}
+
+const applyIndexChange = async (
+  change: IndexChange,
+  fixture: FreshnessVault,
+  weight: number,
+): Promise<void> => {
+  const { plugin, files, contents, emit } = fixture
+  contents.set(files[0]!.path, freshnessSource(weight))
+  if (change === 'settings') {
+    files[0]!.path = 'Training/Workouts/2026-08-15.md'
+    contents.set(files[0]!.path, freshnessSource(weight))
+    plugin.settings.fitnessRoot = 'Training'
+    await plugin.saveSettings()
+  } else if (change === 'cache reset') {
+    plugin.cachedIndex = null
+  } else if (change === 'manual rebuild') {
+    await plugin.rebuildWorkoutIndex()
+  } else {
+    emit('modify', files[0]!)
+  }
+}
+
+describe('Workout index freshness', () => {
+  it('keeps an open dirty workout draft unsaved while history and charts read external changes', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', { setTimeout, clearTimeout, setInterval, clearInterval })
+    vi.stubGlobal('HTMLElement', harnessWindow.HTMLElement)
+    vi.stubGlobal('HTMLInputElement', harnessWindow.HTMLInputElement)
+    vi.stubGlobal('activeWindow', harnessWindow)
+    vi.stubGlobal('activeDocument', harnessDocument)
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(): void {}
+        disconnect(): void {}
+      },
+    )
+    try {
+      const { plugin, files, contents, emit, app } = await makeFreshnessVault()
+      Object.assign(app.metadataCache, { on: () => ({}) })
+      app.vault.process = async (file, callback) => {
+        contents.set(file.path, callback(contents.get(file.path) ?? ''))
+      }
+      const leaf = { app, view: null as WorkoutEditorView | null }
+      const view = new WorkoutEditorView(
+        leaf as unknown as import('obsidian').WorkspaceLeaf,
+        plugin,
+      )
+      leaf.view = view
+      app.workspace.getLeavesOfType = (type) =>
+        type === VIEW_TYPE_FITKIT_WORKOUT_EDITOR ? [leaf as unknown as MockLeaf] : []
+      await view.onOpen()
+      const loading = view.setState({ file: files[0]!.path }, { history: false })
+      await vi.advanceTimersByTimeAsync(500)
+      await loading
+      const input = view.contentEl.querySelector<HTMLInputElement>(
+        'input[aria-label="Workout name"]',
+      )!
+      input.value = 'My unsaved draft'
+      input.dispatchEvent(new harnessWindow.Event('input'))
+      expect(view.contentEl.querySelector('.fitkit-meta-line')?.textContent).toContain('unsaved')
+      const externalSource = freshnessSource(80)
+      contents.set(files[0]!.path, externalSource)
+      emit('modify', files[0]!)
+      const history = await exerciseHistoryFromVault(plugin, {
+        sourcePath: 'Fitness/Workouts/2026-08-16.md',
+        date: '2026-08-16',
+      })
+      expect(history.get('Squat')?.strength?.personalBest?.weight).toBe(80)
+      const chart = createTestRoot()
+      await renderExerciseChartBlock(
+        plugin,
+        'exercise: Squat\nkind: strength\nmetric: weight',
+        chart,
+        { sourcePath: 'Journal/chart.md' } as Parameters<typeof renderExerciseChartBlock>[3],
+      )
+      expect(chart.querySelector('.fitkit-chart-dot title')?.textContent).toContain('80kg')
+      expect(
+        view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Workout name"]')?.value,
+      ).toBe('My unsaved draft')
+      expect(view.contentEl.querySelector('.fitkit-meta-line')?.textContent).toContain('unsaved')
+      const file = files[0]
+      if (!(file instanceof TFile)) {
+        throw new Error('Expected the open workout file')
+      }
+      expect(await app.vault.read(file)).toBe(externalSource)
+    } finally {
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    }
+  })
+
+  it('preserves the available index when an empty workout subfolder is created', async () => {
+    const { plugin, emit, app } = await makeFreshnessVault()
+    const index = await plugin.getIndex()
+    app.vault.read = async () => freshnessSource(95)
+    emit('create', { path: 'Fitness/Workouts/Empty', children: [] })
+    expect((await plugin.getIndex()).entries[0]?.exercises[0]?.maxWeightSet?.weight).toBe(50)
+    expect(await plugin.getIndex()).toBe(index)
+  })
+
+  it('renders a fresh chart after an external edit without writing the vault', async () => {
+    const { plugin, files, contents, emit, app } = await makeFreshnessVault()
+    await plugin.rebuildWorkoutIndex()
+    contents.set(files[0]!.path, freshnessSource(80))
+    app.vault.process = async () => {
+      throw new Error('Rendering must not save workout drafts')
+    }
+    emit('modify', files[0]!)
+    const el = createTestRoot()
+    await renderExerciseChartBlock(plugin, 'exercise: Squat\nkind: strength\nmetric: weight', el, {
+      sourcePath: 'Journal/chart.md',
+    } as Parameters<typeof renderExerciseChartBlock>[3])
+    expect(el.querySelector('.fitkit-chart-dot title')?.textContent).toContain('80kg')
+  })
+
+  it.each(['modify', 'settings', 'manual rebuild', 'cache reset'] as const)(
+    'keeps a pending incremental refresh from replacing newer data after %s',
+    async (change) => {
+      const fixture = await makeFreshnessVault()
+      const { plugin, files } = fixture
+      await plugin.getIndex()
+      const read = holdNextWorkoutRead(fixture)
+      const refreshing = plugin.refreshIndexEntry(files[0]!.path)
+      await read.started
+      await applyIndexChange(change, fixture, 90)
+      expect((await plugin.getIndex()).entries[0]?.exercises[0]?.maxWeightSet?.weight).toBe(90)
+      read.release(freshnessSource(60))
+      await refreshing
+      expect((await plugin.getIndex()).entries[0]?.exercises[0]?.maxWeightSet?.weight).toBe(90)
+    },
+  )
+
+  it.each(['modify', 'settings', 'manual rebuild', 'cache reset'] as const)(
+    'returns fresh data to a reader whose full build overlaps %s',
+    async (change) => {
+      const fixture = await makeFreshnessVault()
+      const { plugin } = fixture
+      const read = holdNextWorkoutRead(fixture)
+      const waiting = plugin.getIndex()
+      await read.started
+      await applyIndexChange(change, fixture, 80)
+      read.release(freshnessSource(50))
+      expect((await waiting).entries[0]?.exercises[0]?.maxWeightSet?.weight).toBe(80)
+      expect((await plugin.getIndex()).entries[0]?.exercises[0]?.maxWeightSet?.weight).toBe(80)
+    },
+  )
+
+  it('uses the saved fitness root on the next index read and persists it', async () => {
+    const { plugin, files, contents } = await makeFreshnessVault()
+    await plugin.getIndex()
+    const imported = { ...files[0]!, path: 'Training/Workouts/2026-08-14.md' }
+    files.push(imported)
+    contents.set(imported.path, freshnessSource(90))
+    let saved: unknown
+    vi.spyOn(plugin, 'saveData').mockImplementation(async (data: unknown) => {
+      saved = structuredClone(data)
+    })
+    plugin.settings.fitnessRoot = 'Training'
+    await plugin.saveSettings()
+    vi.spyOn(plugin, 'loadData').mockImplementation(async () => saved)
+    await plugin.loadSettings()
+    expect(plugin.settings.fitnessRoot).toBe('Training')
+    expect((await plugin.getIndex()).entries.map((entry) => entry.path)).toEqual([
+      'Training/Workouts/2026-08-14.md',
+    ])
+  })
+
+  it('preserves the index when saving unrelated settings or an equivalent root', async () => {
+    const { plugin, app } = await makeFreshnessVault()
+    const index = await plugin.getIndex()
+    app.vault.read = async () => {
+      throw new Error('Unrelated setting must not read workouts')
+    }
+    app.vault.getFolderByPath = () => {
+      throw new Error('Unrelated setting must not enumerate folders')
+    }
+    plugin.settings.chartSessionsWindow = 10
+    plugin.settings.fitnessRoot = '/Fitness/'
+    await plugin.saveSettings()
+    expect(await plugin.getIndex()).toBe(index)
+  })
+
+  it.each([
+    ['delete', 'Fitness/Workouts/2026-08-15.md', null, 'md'],
+    ['rename', 'Fitness/Workouts/2026-08-15.md', 'Fitness/Workouts/renamed.md', 'md'],
+    ['rename', 'Fitness/Workouts/2026-08-15.md', 'Archive/2026-08-15.md', 'md'],
+    ['rename', 'Archive/2026-08-15.md', 'Fitness/Workouts/2026-08-15.md', 'md'],
+    ['rename', 'Fitness/Workouts/2026-08-15.md', 'Fitness/Workouts/2026-08-15.txt', 'txt'],
+    ['delete', 'Fitness/Workouts', null, undefined],
+    ['delete', 'Fitness', null, undefined],
+    ['rename', 'Fitness', 'Archive', undefined],
+    ['rename', 'Fitness/Workouts', 'Fitness/Archive', undefined],
+    ['rename', 'Archive', 'Fitness/Workouts/Imported', undefined],
+    ['delete', 'Fitness/Workouts/Imported', null, undefined],
+  ] as const)('reflects %s from %s to %s', async (event, oldPath, newPath, extension) => {
+    const { plugin, files, contents, emit } = await makeFreshnessVault()
+    const oldFilePath =
+      extension === undefined
+        ? `${oldPath}${oldPath === 'Fitness' ? '/Workouts' : ''}/2026-08-15.md`
+        : oldPath
+    files[0]!.path = oldFilePath
+    contents.set(oldFilePath, freshnessSource(50))
+    await plugin.getIndex()
+    const newFilePath =
+      newPath === null
+        ? null
+        : extension === undefined
+          ? `${newPath}${oldFilePath.slice(oldPath.length)}`
+          : newPath
+    if (newFilePath === null) {
+      files.splice(0)
+    } else {
+      files[0]!.path = newFilePath
+      files[0]!.extension = extension ?? 'md'
+      contents.set(newFilePath, freshnessSource(80))
+    }
+    emit(
+      event,
+      { path: newPath ?? oldPath, ...(extension === undefined ? {} : { extension }) },
+      oldPath,
+    )
+    expect((await plugin.getIndex()).entries.map((entry) => entry.path)).toEqual(
+      newFilePath?.startsWith('Fitness/Workouts/') && newFilePath.endsWith('.md')
+        ? [newFilePath]
+        : [],
+    )
+  })
+
+  it('preserves the available index for unrelated paths and attachments without reading workouts', async () => {
+    const { plugin, emit, app } = await makeFreshnessVault()
+    const index = await plugin.getIndex()
+    app.vault.read = async () => {
+      throw new Error('Unrelated event must not read workouts')
+    }
+    app.vault.getFolderByPath = () => {
+      throw new Error('Unrelated event must not enumerate folders')
+    }
+    for (const event of ['modify', 'create', 'delete', 'rename']) {
+      emit(event, { path: 'Journal/today.md', extension: 'md' }, 'Notes/yesterday.md')
+      emit(
+        event,
+        { path: 'Fitness/Workouts/photo.png', extension: 'png' },
+        'Fitness/Workouts/old.png',
+      )
+      emit(event, { path: 'Fitness/Workouts-old' }, 'Fitness/Workouts-new')
+    }
+    const available = await plugin.getIndex()
+    expect(available.entries[0]?.exercises[0]?.maxWeightSet?.weight).toBe(50)
+    expect(available).toBe(index)
+  })
+
+  it('includes externally created workouts on the next read', async () => {
+    const { plugin, files, contents, emit } = await makeFreshnessVault()
+    await plugin.getIndex()
+    const file = { ...files[0]!, path: 'Fitness/Workouts/2026-08-14.md' }
+    files.push(file)
+    contents.set(file.path, freshnessSource(90))
+    emit('create', file)
+    expect((await plugin.getIndex()).entries.map((entry) => entry.path)).toEqual([
+      'Fitness/Workouts/2026-08-14.md',
+      'Fitness/Workouts/2026-08-15.md',
+    ])
+  })
+
+  it('reads externally modified history without rendering an editor', async () => {
+    const { plugin, files, contents, emit } = await makeFreshnessVault()
+    await plugin.rebuildWorkoutIndex()
+    contents.set(files[0]!.path, freshnessSource(80))
+    emit('modify', files[0]!)
+
+    const history = await exerciseHistoryFromVault(plugin, {
+      sourcePath: 'Fitness/Workouts/2026-08-16.md',
+      date: '2026-08-16',
+    })
+
+    expect(history.get('Squat')?.strength?.personalBest?.weight).toBe(80)
   })
 })

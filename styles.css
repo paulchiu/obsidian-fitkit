@@ -380,6 +380,29 @@ body.is-mobile .fitkit-editor-root {
   gap: 4px;
 }
 
+.fitkit-set-rows {
+  display: grid;
+  gap: 6px;
+}
+
+/** A long set list stops at its measured cap and fades out; clip keeps focus from scrolling hidden rows in. */
+.fitkit-set-rows.is-capped {
+  max-height: var(--fitkit-set-cap, 50vh);
+  overflow: hidden;
+  overflow: clip;
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 48px), transparent);
+  mask-image: linear-gradient(to bottom, black calc(100% - 48px), transparent);
+}
+
+.fitkit-set-toggle {
+  justify-self: start;
+}
+
+/** Obsidian's button display outranks the hidden attribute, so a short list's toggle needs this to hide. */
+.fitkit-set-toggle[hidden] {
+  display: none;
+}
+
 /** The row being logged right now gets a larger target than the finished rows above it. */
 .fitkit-row--live .fitkit-input {
   min-height: 36px;
@@ -412,6 +435,127 @@ body.is-mobile .fitkit-editor-root {
 
 .fitkit-duration-row {
   grid-template-columns: 20px minmax(0, 1fr);
+}
+
+.fitkit-duration-row.has-intensity,
+.fitkit-duration-row.has-rest {
+  grid-template-columns: 20px repeat(2, minmax(0, 1fr));
+}
+
+.fitkit-duration-row.has-intensity.has-rest {
+  grid-template-columns: 20px repeat(3, minmax(0, 1fr));
+}
+
+/** The card's plan: profile, progress strip, legend and totals; tapping it opens the plan form. */
+.fitkit-plan-line {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.fitkit-plan-profile {
+  display: block;
+  width: 100%;
+  height: 40px;
+}
+
+.fitkit-plan-strip {
+  display: block;
+  width: 100%;
+  height: 6px;
+}
+
+.fitkit-plan-bar.is-key-0,
+.fitkit-plan-swatch.is-key-0 {
+  fill: var(--background-modifier-border);
+  background: var(--background-modifier-border);
+}
+
+.fitkit-plan-bar.is-key-1,
+.fitkit-plan-swatch.is-key-1 {
+  fill: var(--color-purple, var(--interactive-accent));
+  background: var(--color-purple, var(--interactive-accent));
+}
+
+.fitkit-plan-bar.is-key-2,
+.fitkit-plan-swatch.is-key-2 {
+  fill: var(--color-cyan, var(--text-accent));
+  background: var(--color-cyan, var(--text-accent));
+}
+
+.fitkit-plan-bar.is-key-3,
+.fitkit-plan-swatch.is-key-3 {
+  fill: var(--color-blue, var(--text-accent));
+  background: var(--color-blue, var(--text-accent));
+}
+
+.fitkit-plan-bar.is-key-4,
+.fitkit-plan-swatch.is-key-4 {
+  fill: var(--color-pink, var(--text-accent));
+  background: var(--color-pink, var(--text-accent));
+}
+
+.fitkit-plan-bar.is-key-5,
+.fitkit-plan-swatch.is-key-5 {
+  fill: var(--color-yellow, var(--text-accent));
+  background: var(--color-yellow, var(--text-accent));
+}
+
+/** The same hit and miss colours as the runner's rep dots. */
+.fitkit-plan-progress.is-todo {
+  fill: var(--background-modifier-border);
+}
+
+.fitkit-plan-progress.is-done {
+  fill: var(--text-faint);
+}
+
+.fitkit-plan-progress.is-hit {
+  fill: var(--color-green, var(--text-success));
+}
+
+.fitkit-plan-progress.is-miss {
+  fill: var(--color-orange, var(--text-warning));
+}
+
+.fitkit-plan-marker {
+  fill: var(--text-normal);
+}
+
+.fitkit-plan-legend {
+  font-size: var(--font-ui-small);
+  line-height: 1.5;
+}
+
+.fitkit-plan-step {
+  white-space: nowrap;
+}
+
+.fitkit-plan-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 4px;
+  border-radius: 2px;
+}
+
+.fitkit-plan-count {
+  font-weight: var(--font-semibold);
+  color: var(--text-accent);
+}
+
+.fitkit-plan-muted {
+  color: var(--text-muted);
+}
+
+.fitkit-plan-totals {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
 }
 
 .fitkit-cell {
@@ -485,10 +629,6 @@ body.is-mobile .fitkit-editor-root {
   white-space: nowrap;
 }
 
-.fitkit-row--timing {
-  background: var(--background-modifier-active-hover);
-}
-
 .fitkit-note-line {
   width: 100%;
   font-size: var(--font-ui-smaller);
@@ -502,6 +642,17 @@ body.is-mobile .fitkit-editor-root {
 .fitkit-note-line:focus-visible {
   color: var(--text-normal);
   outline: none;
+}
+
+/** Explains the asterisk on caught-up reps; read-only, unlike a note line. */
+.fitkit-set-legend,
+.fitkit-set-legend:hover {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.fitkit-set-mark {
+  color: var(--text-accent);
 }
 
 /** Exercise-level notes keep the same inset as the set-level note they vary from. */
@@ -527,7 +678,22 @@ body.is-mobile .fitkit-editor-root {
   max-height: inherit;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+/* The button bar holds the bottom spacing, so the form has none for scrolled content to show through below it, Obsidian's phone padding included. */
+.fitkit-set-note-modal-shell .fitkit-set-note-modal {
+  padding-bottom: 0;
+}
+
+/* While the phone keyboard is up, the sheet ends at it and the button bar rests on it, the keyboard covering the home indicator's safe area. */
+.modal.fitkit-set-note-modal-shell.fitkit-keyboard-up {
+  align-self: flex-start;
+  margin-top: var(--fitkit-keyboard-top);
+  max-height: var(--fitkit-keyboard-room);
+}
+
+.fitkit-keyboard-up .fitkit-set-note-actions {
+  padding-bottom: var(--size-4-3);
 }
 
 .fitkit-set-note-modal h2 {
@@ -540,6 +706,268 @@ body.is-mobile .fitkit-editor-root {
   min-height: 0;
 }
 
+.fitkit-plan-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.fitkit-plan-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fitkit-plan-info {
+  display: inline-flex;
+  padding: 2px;
+  background: none;
+  box-shadow: none;
+  color: var(--interactive-accent);
+  cursor: pointer;
+}
+
+.fitkit-plan-info svg {
+  width: 16px;
+  height: 16px;
+}
+
+.fitkit-plan-text {
+  width: 100%;
+  min-height: 72px;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
+  resize: vertical;
+}
+
+.fitkit-plan-modes {
+  display: inline-flex;
+  margin-left: auto;
+}
+
+.fitkit-plan-modes .fitkit-btn {
+  padding: 2px 10px;
+  font-size: var(--font-ui-small);
+}
+
+.fitkit-plan-modes .fitkit-btn:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.fitkit-plan-modes .fitkit-btn:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.fitkit-plan-modes .fitkit-btn[aria-pressed='true'] {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.fitkit-plan-info[hidden],
+.fitkit-plan-builder[hidden],
+.fitkit-plan-text[hidden],
+.fitkit-plan-note[hidden] {
+  display: none;
+}
+
+.fitkit-plan-list {
+  display: grid;
+  gap: 6px;
+}
+
+.fitkit-plan-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/** Tighter than Obsidian's phone input padding, which clips short values like 300W. */
+.fitkit-plan-builder .fitkit-plan-row > input.fitkit-input {
+  min-width: 0;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.fitkit-plan-grow {
+  flex: 1 1 auto;
+}
+
+.fitkit-plan-count {
+  flex: 0 0 3em;
+  text-align: center;
+}
+
+.fitkit-plan-time {
+  flex: 0 0 4.5em;
+}
+
+.fitkit-plan-target {
+  flex: 0 1 7em;
+}
+
+.fitkit-plan-word {
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/** A flat icon button, scoped to beat button:not(.clickable-icon) and its .mobile-tap tint. */
+.fitkit-plan-row > .fitkit-plan-options {
+  display: inline-flex;
+  flex: 0 0 auto;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.fitkit-plan-row > .fitkit-plan-options.mobile-tap {
+  background: var(--background-modifier-hover);
+  box-shadow: none;
+}
+
+.fitkit-plan-options svg {
+  width: 16px;
+  height: 16px;
+}
+
+/** The bottom margin clears the + that hangs below the bracket. */
+.fitkit-plan-repeat {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.fitkit-plan-repeat-body {
+  position: relative;
+  margin-left: 12px;
+  padding-left: 10px;
+  padding-bottom: 16px;
+  border-left: 2px solid var(--background-modifier-border);
+}
+
+.fitkit-plan-builder {
+  display: grid;
+  gap: 8px;
+}
+
+/** The plan's one Add, a dashed bar after the last row; scoped to beat button:not(.clickable-icon). */
+.fitkit-plan-builder > .fitkit-plan-add-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: 6px;
+  border: 1.5px dashed var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  cursor: pointer;
+}
+
+.fitkit-plan-builder > .fitkit-plan-add-bar.mobile-tap {
+  background: var(--background-modifier-hover);
+  box-shadow: none;
+}
+
+.fitkit-plan-add-bar svg {
+  width: 14px;
+  height: 14px;
+}
+
+/** A small round + centred on the foot of the repeat's bracket, with a larger invisible touch area. */
+.fitkit-plan-repeat-body > .fitkit-plan-add-foot {
+  position: absolute;
+  left: -12px;
+  bottom: -11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1.5px solid var(--interactive-accent);
+  border-radius: 50%;
+  background: var(--background-primary);
+  box-shadow: none;
+  color: var(--interactive-accent);
+  cursor: pointer;
+}
+
+.fitkit-plan-repeat-body > .fitkit-plan-add-foot.mobile-tap {
+  background: var(--background-modifier-hover);
+  box-shadow: none;
+}
+
+.fitkit-plan-add-foot::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+}
+
+.fitkit-plan-add-foot svg {
+  width: 14px;
+  height: 14px;
+}
+
+.fitkit-plan-note {
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+}
+
+.fitkit-plan-examples {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  font-size: var(--font-ui-small);
+}
+
+.fitkit-plan-examples[hidden] {
+  display: none;
+}
+
+.fitkit-plan-example {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: center;
+}
+
+.fitkit-plan-example code {
+  overflow-wrap: anywhere;
+}
+
+.fitkit-plan-example-about {
+  grid-column: 1;
+  color: var(--text-muted);
+}
+
+.fitkit-plan-example .fitkit-btn {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.fitkit-plan-preview {
+  min-height: 1.6em;
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+}
+
+.fitkit-plan-error {
+  color: var(--text-warning);
+}
+
 .fitkit-set-note-textarea {
   min-height: 100px;
 }
@@ -549,8 +977,17 @@ body.is-mobile .fitkit-editor-root {
   bottom: 0;
   z-index: 1;
   margin-top: 4px;
-  padding: 10px 0 max(8px, env(safe-area-inset-bottom));
+  padding: 10px 0 0;
+  padding-bottom: max(var(--size-4-3), env(safe-area-inset-bottom));
   background: var(--modal-background, var(--background-primary));
+}
+
+/* Runs the bar across the phone sheet's side padding so nothing scrolls past beside it. */
+.is-phone .fitkit-set-note-actions {
+  margin-left: calc(-1 * var(--size-4-3));
+  margin-right: calc(-1 * var(--size-4-3));
+  padding-left: var(--size-4-3);
+  padding-right: var(--size-4-3);
 }
 
 .fitkit-footer {
@@ -1233,4 +1670,177 @@ body.is-mobile .fitkit-editor-root {
 
 .is-compact .fitkit-bodyweight-stepper > .fitkit-bodyweight-level-label {
   padding: var(--size-4-1) var(--size-4-1);
+}
+
+/* Interval runner: takes over the editor tab while a plan runs; the set and rest timers reuse it. */
+.fitkit-runner {
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 16px;
+  min-height: min(640px, 80vh);
+  padding: 16px;
+  border-radius: var(--radius-l, 12px);
+  background: var(--background-secondary);
+  border: 2px solid var(--background-modifier-border);
+}
+
+.fitkit-runner.is-work {
+  border-color: var(--interactive-accent);
+}
+
+.fitkit-runner.is-rest {
+  border-color: var(--color-green, var(--text-success));
+}
+
+.fitkit-runner.is-paused .fitkit-runner-clock {
+  opacity: 0.5;
+}
+
+.fitkit-runner-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+}
+
+.fitkit-runner-phase {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.fitkit-runner-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fitkit-runner-center {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.fitkit-runner-clock,
+.fitkit-runner-hits {
+  font-size: clamp(64px, 22vw, 120px);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.fitkit-runner-target,
+.fitkit-runner-stats,
+.fitkit-runner-rounds,
+.fitkit-runner-note {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.fitkit-runner-target {
+  font-size: var(--font-ui-large);
+}
+
+.fitkit-runner-step {
+  font-size: clamp(28px, 9vw, 44px);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--interactive-accent);
+}
+
+.fitkit-runner-next {
+  padding: 6px 12px;
+  border-radius: var(--radius-m);
+  background: var(--background-secondary);
+  font-size: var(--font-ui-medium);
+}
+
+.fitkit-runner-dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.fitkit-runner-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--background-modifier-border);
+}
+
+.fitkit-runner-dot.is-hit {
+  background: var(--color-green, var(--text-success));
+  border-color: var(--color-green, var(--text-success));
+}
+
+.fitkit-runner-dot.is-miss {
+  background: var(--color-orange, var(--text-warning));
+  border-color: var(--color-orange, var(--text-warning));
+}
+
+.fitkit-runner-dot.is-done {
+  background: var(--background-modifier-border);
+}
+
+.fitkit-runner-dot.is-current {
+  border-color: var(--interactive-accent);
+}
+
+.fitkit-runner-stepper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fitkit-runner-stepper .fitkit-btn {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: var(--font-ui-large);
+}
+
+.fitkit-runner-stepper-value {
+  min-width: 9em;
+  font-variant-numeric: tabular-nums;
+}
+
+.fitkit-runner-primary {
+  min-height: 88px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.fitkit-runner-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.fitkit-runner-controls.is-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.fitkit-runner-controls .fitkit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+}
+
+.fitkit-runner-banner {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: var(--radius-m, 8px);
+  border: 1px solid var(--text-warning);
+}
+
+.fitkit-run-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }

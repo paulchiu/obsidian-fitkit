@@ -21,6 +21,7 @@
  * than silently leaving (or wrongly "fixing") a reference.
  */
 
+import { exerciseTypeOf } from './exercise-type'
 import { normalize, type ExerciseKind, type ExerciseRegistryEntry } from './exercise-registry'
 import { escapeRegExp } from './regex-utils'
 import type { WeightUnit } from './weight-unit'
@@ -100,6 +101,8 @@ export interface ExerciseRenamePlan {
   resultUnit?: WeightUnit
   /** Ladder surviving the rename, when either folded-in entry owned one. */
   resultLevels?: string[]
+  /** Set when the entry or note that decides `resultKind` is an interval exercise. */
+  resultInterval?: true
   workoutNotes: ExerciseRenameWorkoutNotePlan[]
   totalHeadingOccurrences: number
   totalFieldOccurrences: number
@@ -209,12 +212,14 @@ export function buildExerciseRenamePlan(input: ExerciseRenamePlanInput): Exercis
     isMerge && sourceNote !== null ? notesSectionHasProse(input.sourceNoteText ?? '') : false
 
   const aliasesToKeep = foldAliases(sourceEntry, distinctTargetEntry, oldName, resultName)
-  const resultKind =
-    distinctTargetEntry?.kind ??
-    sourceEntry?.kind ??
-    targetNote?.kind ??
-    sourceNote?.kind ??
-    DEFAULT_RESULT_KIND
+  const kindSource = distinctTargetEntry ?? sourceEntry ?? targetNote ?? sourceNote
+  const resultKind = kindSource?.kind ?? DEFAULT_RESULT_KIND
+  /** The surviving note wins on read, so its marker beats a saved entry an older FitKit may have stripped. */
+  const markerSource = targetNote ?? sourceNote ?? kindSource
+  const resultInterval =
+    resultKind === 'duration' &&
+    markerSource !== null &&
+    exerciseTypeOf(markerSource) === 'interval'
   const resultUnit = distinctTargetEntry?.unit ?? sourceEntry?.unit
   const survivingLevels = distinctTargetEntry?.levels ?? sourceEntry?.levels
   const resultLevels = survivingLevels ? [...survivingLevels] : undefined
@@ -255,6 +260,7 @@ export function buildExerciseRenamePlan(input: ExerciseRenamePlanInput): Exercis
     resultKind,
     resultUnit,
     resultLevels,
+    ...(resultInterval ? { resultInterval: true as const } : {}),
     workoutNotes,
     totalHeadingOccurrences,
     totalFieldOccurrences,

@@ -1,7 +1,7 @@
 import type { App, CachedMetadata, TFile } from 'obsidian'
 
 import { parseExerciseKind } from '../domain/exercise-kind'
-import { normalize, type ExerciseKind } from '../domain/exercise-registry'
+import { intervalMarker, normalize, type ExerciseKind } from '../domain/exercise-registry'
 import { parseWeightUnit, type WeightUnit } from '../domain/weight-unit'
 import type { FitKitSettings } from '../settings'
 import { exercisesFolder } from '../settings-paths'
@@ -15,6 +15,8 @@ export interface ExerciseCatalogEntry {
   unit?: WeightUnit
   /** Present only when a bodyweight note declares a usable levels ladder. */
   levels?: string[]
+  /** Present only when a duration note sets `interval: true`. */
+  interval?: true
 }
 
 export interface ExerciseCatalogDiagnostic {
@@ -90,6 +92,7 @@ export function readExerciseCatalog(app: App, settings: FitKitSettings): Exercis
       kind,
       unit: unitFromFrontmatter(frontmatter, kind),
       levels: ladder.levels,
+      ...intervalMarker({ kind, interval: readFrontmatterField(frontmatter, 'interval') === true }),
     })
     if (ladder.warning) {
       diagnostics.push({ path: file.path, warnings: [ladder.warning] })

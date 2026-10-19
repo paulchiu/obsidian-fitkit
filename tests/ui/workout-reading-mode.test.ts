@@ -119,6 +119,26 @@ describe('workout reading mode rendering', () => {
     expect(root.textContent).toContain('1m35s')
   })
 
+  it('labels a duration exercise logged with a plan as interval and shows the plan', () => {
+    const section = [
+      '## [[Bike]]',
+      '',
+      '- [exercise:: [[Bike]]] [plan:: 3 x 1m @ 300W, 30s rest]',
+      '- [exercise:: [[Bike]]] [set:: 1] [duration:: 60]',
+    ].join('\n')
+    const root = createRenderedSection([
+      '[exercise:: [[Bike]]] [plan:: 3 x 1m @ 300W, 30s rest]',
+      '[exercise:: [[Bike]]] [set:: 1] [duration:: 60]',
+    ])
+
+    renderWorkoutReadingModeSection(createPlugin(), root, createContext(section))
+
+    expect([
+      root.querySelector('.fitkit-reading-kind')?.textContent,
+      root.querySelector('.fitkit-reading-plan')?.textContent,
+    ]).toEqual(['Interval', 'Plan: 3 x 1m @ 300W, 30s rest'])
+  })
+
   it('shows the next-time plan recorded on the exercise', () => {
     const section = [
       '## [[Squat]]',
@@ -136,6 +156,21 @@ describe('workout reading mode rendering', () => {
     expect(root.querySelector('.fitkit-reading-plan')?.textContent).toContain(
       'Next time: up 2.5 kg',
     )
+  })
+
+  it('shows the next-time direction on an interval exercise, without a step', () => {
+    const lines = [
+      '[exercise:: [[Exercise Bike]]] [next:: stay 5] [plan:: (x 3 (over 1m 300W))]',
+      '[exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 60] [watts:: 305]',
+    ]
+    const section = ['## [[Exercise Bike]]', '', ...lines.map((line) => `- ${line}`)].join('\n')
+    const root = createRenderedSection(lines)
+
+    renderWorkoutReadingModeSection(createPlugin(), root, createContext(section))
+
+    expect(
+      [...root.querySelectorAll('.fitkit-reading-plan')].map((line) => line.textContent),
+    ).toEqual(['Plan: (x 3 (over 1m 300W))', 'Next time: same target'])
   })
 
   it('states the plan step in the same unit as the set table beneath it', () => {

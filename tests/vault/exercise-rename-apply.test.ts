@@ -295,6 +295,20 @@ describe('applyExerciseRenamePlan: plain rename', () => {
     expect('unit' in (config.exerciseRegistry[0] ?? {})).toBe(true)
     expect(JSON.stringify(config.exerciseRegistry[0])).not.toContain('kg')
   })
+
+  it('keeps the interval marker on the renamed registry entry', async () => {
+    const config = settings({
+      exerciseRegistry: [{ name: 'Bike', kind: 'duration', interval: true, aliases: [] }],
+    })
+    const { app } = buildMockApp([])
+
+    const plan = await buildExerciseRenamePlanFromVault(app, config, 'Bike', 'Air bike')
+    await applyExerciseRenamePlan(app, config, plan)
+
+    expect(config.exerciseRegistry).toEqual([
+      { name: 'Air bike', kind: 'duration', interval: true, aliases: ['Bike'] },
+    ])
+  })
 })
 
 describe('applyExerciseRenamePlan: merge', () => {

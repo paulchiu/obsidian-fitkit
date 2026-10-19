@@ -1,6 +1,11 @@
 import type { App } from 'obsidian'
 
-import { normalize, overlayKnownKeys, type ExerciseKind } from '../domain/exercise-registry'
+import {
+  intervalMarker,
+  normalize,
+  overlayKnownKeys,
+  type ExerciseKind,
+} from '../domain/exercise-registry'
 import type { WeightUnit } from '../domain/weight-unit'
 import type { FitKitSettings } from '../settings'
 import { collectHistoryOnlyCandidates } from './exercise-registry-history'
@@ -13,6 +18,7 @@ export interface RegistryTableRow {
   kind: ExerciseKind
   unit?: WeightUnit
   levels?: string[]
+  interval?: true
   aliases: string[]
   /**
    * 'note': backed by an exercise note, which wins on read; editing name or
@@ -53,6 +59,7 @@ export async function buildRegistryTableRows(
       kind: entry.kind,
       unit: entry.unit,
       levels: entry.levels ? [...entry.levels] : undefined,
+      ...intervalMarker(entry),
       aliases: entry.aliases,
       provenance: notePath ? 'note' : 'overlay',
       notePath,

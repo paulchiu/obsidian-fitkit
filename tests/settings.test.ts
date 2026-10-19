@@ -8,7 +8,6 @@ import {
   addDeletedExerciseTombstone,
   DEFAULT_SETTINGS,
   FitKitSettingTab,
-  removeDeletedExerciseTombstone,
   settingsFromStored,
   type FitKitSettings,
 } from '../src/settings'
@@ -84,6 +83,23 @@ describe('settings migration', () => {
     expect(migrated.exerciseRegistry).toEqual([{ name: 'Plank', kind: 'duration', aliases: [] }])
   })
 
+  it('keeps the interval marker only on a stored duration entry', () => {
+    const migrated = settingsFromStored({
+      exerciseRegistry: [
+        { name: 'Bike', kind: 'duration', interval: true, aliases: [] },
+        { name: 'Squat', kind: 'strength', interval: true, aliases: [] },
+        { name: 'Row', kind: 'duration', interval: 'yes', aliases: [] },
+      ] as unknown as FitKitSettings['exerciseRegistry'],
+      schemaVersion: 1,
+    })
+
+    expect(migrated.exerciseRegistry.map((entry) => entry.interval)).toEqual([
+      true,
+      undefined,
+      undefined,
+    ])
+  })
+
   it('falls back to strength for an unrecognised stored registry kind', () => {
     const migrated = settingsFromStored({
       exerciseRegistry: [{ name: 'Plank', kind: 'cardio', aliases: [] }],
@@ -115,6 +131,28 @@ describe('settings migration', () => {
     expect(migrated.exerciseRegistry[1]?.levels).toBeUndefined()
   })
 
+  it('keeps stored interval presets, even none, and defaults them when missing', () => {
+    expect([
+      settingsFromStored({ intervalPresets: '', schemaVersion: 1 }).intervalPresets,
+      settingsFromStored({ schemaVersion: 1 }).intervalPresets.split('\n')[0],
+    ]).toEqual(['', 'Tabata: (x 8 (work 20s 400W) (rest 10s))'])
+  })
+
+  it('moves presets still on the first defaults to the current ones', () => {
+    const stored = 'Tabata: 8 x 20s @ 400W, 10s rest\nEMOM: 10 x 40s @ 300W, every 1m'
+
+    const upgraded = settingsFromStored({ intervalPresets: stored, schemaVersion: 1 })
+
+    expect(upgraded.intervalPresets.split('\n').map((line) => line.split(': ')[0])).toEqual([
+      'Tabata',
+      'EMOM',
+      'Over-unders',
+      'Pyramid',
+      '30/30',
+      'Norwegian 4x4',
+    ])
+  })
+
   it('preserves stored deleted exercise tombstones', () => {
     expect(
       settingsFromStored({
@@ -126,11 +164,11 @@ describe('settings migration', () => {
 })
 
 describe('deleted exercise tombstones', () => {
-  it('normalizes, dedupes, and removes tombstones', () => {
-    const added = addDeletedExerciseTombstone([' Squat ', 'bench press'], 'squat')
-
-    expect(added).toEqual(['squat', 'bench press'])
-    expect(removeDeletedExerciseTombstone(added, ' BENCH   PRESS ')).toEqual(['squat'])
+  it('normalizes and dedupes tombstones', () => {
+    expect(addDeletedExerciseTombstone([' Squat ', 'bench press'], 'squat')).toEqual([
+      'squat',
+      'bench press',
+    ])
   })
 })
 

@@ -85,14 +85,20 @@ describe('ExerciseRegistryEntryModal kind select', () => {
     obsidianMock.notices = []
   })
 
-  it('lists strength, duration then bodyweight with their current labels', () => {
+  it('lists strength, duration, interval then bodyweight with their current labels', () => {
     const select = kindSelectIn(openModalWithKind('strength').modal)
     const options = [...select.querySelectorAll('option')]
 
-    expect(options.map((option) => option.value)).toEqual(['strength', 'duration', 'bodyweight'])
+    expect(options.map((option) => option.value)).toEqual([
+      'strength',
+      'duration',
+      'interval',
+      'bodyweight',
+    ])
     expect(options.map((option) => option.textContent)).toEqual([
       'Strength',
       'Duration',
+      'Interval',
       'Bodyweight',
     ])
   })
@@ -207,5 +213,42 @@ describe('ExerciseRegistryEntryModal unit preservation', () => {
     await modalPrivate.handleSave()
 
     expect(plugin.settings.exerciseRegistry[0]?.levels).toEqual(['Wall push-up', 'Knee push-up'])
+  })
+})
+
+describe('ExerciseRegistryEntryModal interval type', () => {
+  it('saves Interval as duration with the interval marker', () => {
+    const { modal, plugin } = openModalWithKind('duration')
+    const select = kindSelectIn(modal)
+
+    select.value = 'interval'
+    select.dispatchEvent(new harnessWindow.Event('change'))
+    saveIn(modal)
+
+    expect(plugin.settings.exerciseRegistry[0]).toMatchObject({
+      name: 'Plank',
+      kind: 'duration',
+      interval: true,
+    })
+  })
+
+  it('shows an interval entry as Interval and keeps it through an alias edit', async () => {
+    const original: ExerciseRegistryEntry = {
+      name: 'Bike',
+      kind: 'duration',
+      interval: true,
+      aliases: [],
+    }
+    const plugin = createPluginStub([original])
+    const modal = new ExerciseRegistryEntryModal(plugin, { kind: 'edit', original }, vi.fn())
+    modal.onOpen()
+    const shown = kindSelectIn(modal).value
+
+    const modalPrivate = modal as unknown as ModalPrivate
+    modalPrivate.aliasesText = 'Air bike'
+    await modalPrivate.handleSave()
+
+    expect(shown).toBe('interval')
+    expect(plugin.settings.exerciseRegistry[0]).toMatchObject({ kind: 'duration', interval: true })
   })
 })

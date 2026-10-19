@@ -1,4 +1,12 @@
-import { MarkdownView, Notice, Plugin, TFile, type WorkspaceLeaf, normalizePath } from 'obsidian'
+import {
+  MarkdownView,
+  Notice,
+  Plugin,
+  TFile,
+  type TAbstractFile,
+  type WorkspaceLeaf,
+  normalizePath,
+} from 'obsidian'
 
 import { formatErrorMessage } from './domain/error'
 import { createRegistry } from './domain/exercise-registry'
@@ -22,7 +30,7 @@ import {
 } from './vault/exercise-registry-backfill'
 import { buildExerciseRegistrySnapshot } from './vault/exercise-registry-vault'
 import { markdownFilesInFolder } from './vault/folder-scan'
-import { rebuildIndex, updateIndexEntry } from './vault/index'
+import { createWorkoutIndex, type WorkoutIndex } from './vault/workout-index'
 
 function formatTodayIsoDate(): string {
   const d = new Date()
@@ -44,15 +52,29 @@ function delay(ms: number): Promise<void> {
 
 export default class FitKitPlugin extends Plugin {
   settings!: FitKitSettings
-  cachedIndex: FitKitIndex | null = null
-  lastDiagnostics: IndexDiagnostic[] = []
+  private indexWorkoutsFolder?: string
+  private workoutIndexStore?: WorkoutIndex
 
-  /**
-   * Chains overlapping calls to refreshIndexEntry, which read-modify-writes
-   * cachedIndex across an await, ensuring each runs in order with fresh data.
-   * Settled links never reject, so a failed refresh cannot stall later ones.
-   */
-  private indexRefreshQueue: Promise<void> | null = null
+  private get workoutIndex(): WorkoutIndex {
+    this.workoutIndexStore ??= createWorkoutIndex(this.app, () => this.settings)
+    return this.workoutIndexStore
+  }
+
+  get cachedIndex(): FitKitIndex | null {
+    return this.workoutIndex.cachedIndex
+  }
+
+  set cachedIndex(index: FitKitIndex | null) {
+    this.workoutIndex.cachedIndex = index
+  }
+
+  get lastDiagnostics(): IndexDiagnostic[] {
+    return this.workoutIndex.lastDiagnostics
+  }
+
+  set lastDiagnostics(diagnostics: IndexDiagnostic[]) {
+    this.workoutIndex.lastDiagnostics = diagnostics
+  }
 
   /** The workout each tab was switched to markdown for, which file-open routing leaves alone. */
   private markdownChoiceStore?: WeakMap<WorkspaceLeaf, TFile>
@@ -63,7 +85,22 @@ export default class FitKitPlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings()
+    this.indexWorkoutsFolder = normalizePath(workoutsFolder(this.settings))
     this.addSettingTab(new FitKitSettingTab(this.app, this))
+
+    this.registerEvent(
+      this.app.vault.on('create', (file) => {
+        if ('children' in file && Array.isArray(file.children) && file.children.length === 0) {
+          return
+        }
+        this.invalidateForVaultChange(file)
+      }),
+    )
+    this.registerEvent(this.app.vault.on('modify', (file) => this.invalidateForVaultChange(file)))
+    this.registerEvent(this.app.vault.on('delete', (file) => this.invalidateForVaultChange(file)))
+    this.registerEvent(
+      this.app.vault.on('rename', (file, oldPath) => this.invalidateForVaultChange(file, oldPath)),
+    )
 
     this.registerMarkdownCodeBlockProcessor('fitkit-chart', (source, el, ctx) =>
       renderExerciseChartBlock(this, source, el, ctx),
@@ -146,43 +183,41 @@ export default class FitKitPlugin extends Plugin {
     }
   }
 
+  private invalidateForVaultChange(file: TAbstractFile, oldPath?: string): void {
+    const folder = normalizePath(workoutsFolder(this.settings))
+    const relevantPath = (path: string): boolean => {
+      if ('extension' in file) {
+        return path.startsWith(`${folder}/`) && path.toLowerCase().endsWith('.md')
+      }
+      return path === folder || path.startsWith(`${folder}/`) || folder.startsWith(`${path}/`)
+    }
+    if (relevantPath(file.path) || (oldPath !== undefined && relevantPath(oldPath))) {
+      this.workoutIndex.invalidate()
+    }
+  }
+
+  getIndex(): Promise<FitKitIndex> {
+    return this.workoutIndex.getIndex()
+  }
+
   async rebuildWorkoutIndex(): Promise<void> {
-    this.cachedIndex = await rebuildIndex(this.app, this.settings)
-    this.lastDiagnostics = this.cachedIndex.diagnostics
+    this.workoutIndex.invalidate()
+    const index = await this.getIndex()
     new Notice(
-      `Indexed ${this.cachedIndex.entries.length} workout(s)${
+      `Indexed ${index.entries.length} workout(s)${
         this.lastDiagnostics.length ? `, ${this.lastDiagnostics.length} diagnostic(s)` : ''
       }.`,
     )
   }
 
-  /**
-   * History badges and charts read the cached index, so a note saved without
-   * refreshing it serves stale data until the next manual rebuild. Chained onto
-   * indexRefreshQueue so overlapping calls apply in order instead of racing.
-   */
-  async refreshIndexEntry(path: string): Promise<void> {
-    const previous = this.indexRefreshQueue ?? Promise.resolve()
-    const run = previous.then(() => this.applyIndexRefresh(path))
-    this.indexRefreshQueue = run.then(
-      () => undefined,
-      () => undefined,
-    )
-    return run
-  }
-
-  private async applyIndexRefresh(path: string): Promise<void> {
-    if (this.cachedIndex === null) {
-      return
-    }
-    this.cachedIndex = await updateIndexEntry(this.app, this.settings, this.cachedIndex, path)
-    this.lastDiagnostics = this.cachedIndex.diagnostics
+  refreshIndexEntry(path: string): Promise<void> {
+    return this.workoutIndex.refreshEntry(path)
   }
 
   async rebuildDashboard(): Promise<void> {
-    this.cachedIndex = await rebuildIndex(this.app, this.settings)
-    this.lastDiagnostics = this.cachedIndex.diagnostics
-    const result = await regenerateDashboard(this.app, this.settings, this.cachedIndex)
+    this.workoutIndex.invalidate()
+    const index = await this.getIndex()
+    const result = await regenerateDashboard(this.app, this.settings, index)
     new Notice(`Dashboard rebuilt: ${result.sectionCount} section(s) at ${result.path}.`)
   }
 
@@ -192,9 +227,9 @@ export default class FitKitPlugin extends Plugin {
       delete this.settings.hiddenDashboardSectionsByPath[path]
       await this.saveSettings()
     }
-    this.cachedIndex = await rebuildIndex(this.app, this.settings)
-    this.lastDiagnostics = this.cachedIndex.diagnostics
-    const result = await regenerateDashboard(this.app, this.settings, this.cachedIndex)
+    this.workoutIndex.invalidate()
+    const index = await this.getIndex()
+    const result = await regenerateDashboard(this.app, this.settings, index)
     new Notice(`Restored hidden sections; ${result.sectionCount} section(s) now in dashboard.`)
   }
 
@@ -470,6 +505,11 @@ export default class FitKitPlugin extends Plugin {
   }
 
   async saveSettings(): Promise<void> {
+    const folder = normalizePath(workoutsFolder(this.settings))
+    if (this.indexWorkoutsFolder !== folder) {
+      this.workoutIndex.invalidate()
+      this.indexWorkoutsFolder = folder
+    }
     await this.saveData(this.settings)
   }
 }

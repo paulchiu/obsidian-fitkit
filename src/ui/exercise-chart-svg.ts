@@ -246,8 +246,8 @@ function thinTicksToBudget(ordered: number[]): number[] {
   }
   const stride = Math.max(1, Math.ceil((ordered.length - 1) / (MAX_LEVEL_TICKS - 1)))
   const thinned = ordered.filter((_level, index) => index % stride === 0)
-  const last = ordered[ordered.length - 1] as number
-  if (thinned[thinned.length - 1] !== last) {
+  const last = ordered.at(-1)
+  if (last !== undefined && thinned.at(-1) !== last) {
     thinned.push(last)
   }
   return thinned

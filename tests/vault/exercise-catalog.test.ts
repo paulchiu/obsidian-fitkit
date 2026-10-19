@@ -343,4 +343,33 @@ describe('findExerciseNotePath', () => {
 
     expect(findExerciseNotePath(app, settings(), 'Push-up')).toBeNull()
   })
+
+  it('reads the interval marker from a duration note only', () => {
+    const snapshot = readExerciseCatalog(
+      mockApp([
+        {
+          path: 'Fitness/Exercises/Bike.md',
+          basename: 'Bike',
+          frontmatter: { type: 'exercise', kind: 'duration', interval: true },
+        },
+        {
+          path: 'Fitness/Exercises/Plank.md',
+          basename: 'Plank',
+          frontmatter: { type: 'exercise', kind: 'duration', interval: false },
+        },
+        {
+          path: 'Fitness/Exercises/Squat.md',
+          basename: 'Squat',
+          frontmatter: { type: 'exercise', kind: 'strength', interval: true },
+        },
+      ]),
+      settings(),
+    )
+
+    expect(snapshot.entries.map((entry) => [entry.name, entry.interval])).toEqual([
+      ['Bike', true],
+      ['Plank', undefined],
+      ['Squat', undefined],
+    ])
+  })
 })

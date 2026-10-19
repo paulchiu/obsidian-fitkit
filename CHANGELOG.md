@@ -9,9 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Interval training. `Switch to interval`, under `Change type...` in the card menu beside the other exercise types, gives the card a plan such as `[plan:: (x 8 (work 30s 300W) (rest 90s))]`, with watts, load or level targets, open work, and `every` for EMOM. The card then shows each rep's intensity and rest, and `Add set` and `Repeat` carry both forward. Adding the exercise to a later workout starts it with the plan it last ran. A new [Interval training](docs/interval-training.md) page covers planning a session, common sessions to start from, and running a plan.
+- `Start` on a planned card takes over the editor tab with a big clock and one big button, which reads `Rest` while you work (ending the rep with the time you actually did) and `Skip` while you rest. Each rep is written to the note as it finishes, with a stepper during rest to correct the intensity you just held. Pause, End run, rep dots and a finished screen with the reps on target round it out.
+- A run survives Obsidian being closed or killed. The note holds one start stamp, so reopening it catches up reps that finished meanwhile (filled with the target and flagged `logged while Obsidian was closed`), or offers to resume or end a run whose plan has long since ended. Closing the tab pauses the run.
+- Interval is a saved exercise type. Choosing `Update registry too` when switching a card to interval records the exercise as interval, so it starts as interval next time, with its last plan, or with the plan form open when it has none. It is stored as `kind: duration` plus `interval: true` in the exercise note, so older FitKit versions read it as an ordinary duration exercise with its history, charts and PBs intact. The registry form, the registry table, import and reading mode show Interval too.
+- Plans can nest, mix intensities and name their steps, written as bracketed lists such as `(warmup 10m 150W) (x 3 (over 1m 300W) (under 2m 220W)) (cooldown 5m 120W)`. The runner heads the clock with the step name and its target, shows the set and round and what comes next, runs steps with no rest between them straight on, and writes each step's name on its row. Steps without a target, such as a warm-up, are timed but count towards neither hits nor the duration PB. The one-line form keeps working.
+- The plan form edits a plan as rows of steps, rests and nested repeats, or as text, with a live preview of the reps and total time, an info button with worked examples to use as they are, and starter plans for Tabata, EMOM, over-unders, a pyramid, 30/30 and Norwegian 4x4.
+- An interval card shows its plan as a profile of the steps in time, coloured by step, with a strip marking each logged rep on target or short and a line that spells the plan out in the same colours.
+- An interval card's menu records a next-time direction (`Plan: increase`, `Plan: keep` or `Plan: decrease`, written as `[next:: up]`), shown as the `Next` badge on the card and again the next time the exercise comes up.
+- A card whose sets run past half the screen shows only that much, fading out above `Show all N sets`, which opens the whole list until `Show fewer sets`. `Add set` and `Repeat` open it so the new row shows. When several reps were logged while Obsidian was closed, each gets an asterisk by its set number and one line under the sets explains it, in place of a note on every rep.
+- `Interval beeps` in settings beeps the last three seconds of each interval and the change between work and rest, and vibrates where the device can. The runner also keeps the screen awake where the platform allows.
+
 ### Changed
 
+- The card menu is shorter. The three `Switch to ...` items sit behind one `Change type...` item, and `Open exercise file`, `Move up` and `Move down` are gone, since tapping the name opens the file and the drag handle reorders cards.
+- The duration timer and the rest timer take over the tab like the interval runner, as a big clock that keeps the screen awake. The duration timer stays open after `Stop`, with `Next set`, `Resume`, `Reset` and `Done`, so a run of stretches is timed set after set without going back to the card.
+- Renaming a card to an exercise the registry already types now switches it the way `Change type...` does for this workout: an interval name opens the plan form, a plain duration name drops the plan, and a bodyweight name offers the level 1 relabel without writing a ladder.
+
 ### Fixed
+
+- Charts and workout history use current workout files after external edits, moves, deletions or a saved fitness folder change, without requiring an editor render or manual index rebuild.
+
+- Failed workout saves show a notice and keep edits marked unsaved so another edit can retry.
+
+- Closing or switching workout notes waits for edits made during the final save to persist.
+- Workout saves preserve external edits that arrive just before the atomic write, and stay blocked until the note is reloaded.
+- An edit made while the workout editor was still saving the previous one could be dropped, and closing the tab during a save could lose the last edit.
+- `Add set` and `Repeat` after deleting a set could give the new set the same number as an existing one. New sets now number after the highest.
 
 ### Removed
 

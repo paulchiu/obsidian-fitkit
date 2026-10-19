@@ -25,9 +25,9 @@ Leave `Create exercise note` ticked for anything you want to chart and revisit; 
 
 Each exercise gets a card. The header holds the name and the card menu, plus a drag handle on the left that appears when you hover the card or reach it with the keyboard. On a touch device or a narrow pane the handle is always visible.
 
-The card menu covers `Open exercise file`, `Rename exercise`, `Add exercise note` / `Edit exercise note`, the plan items described under [Planning your next session](#planning-your-next-session), `Switch to ...` for the other two kinds, `Move up`, `Move down`, and `Remove exercise`.
+Tap the name to open the exercise file, and drag the handle to reorder cards. The card menu covers `Rename exercise`, `Add exercise note` / `Edit exercise note`, `Edit levels` on a bodyweight card or `Edit interval plan` on an interval card, the plan items described under [Planning your next session](#planning-your-next-session), `Change type...`, which opens a second menu with `Switch to ...` for each other type, and `Remove exercise`.
 
-`Rename exercise` is scoped to this workout: it points the card at a different exercise. It suggests names already in your exercises folder or workout history, and if the name you pick is a different kind it asks before switching the card over. To rename an exercise everywhere, use the registry instead, see [Exercise registry](exercise-registry.md#renaming-an-exercise).
+`Rename exercise` is scoped to this workout: it points the card at a different exercise. It suggests names already in your exercises folder or workout history. When the name you pick is recorded as a different type, the card switches the way `Change type...` does with `Just this workout`: it asks first if the kind changes, a name recorded as interval opens the plan form, and a plain duration name drops the card's plan. To rename an exercise everywhere, use the registry instead, see [Exercise registry](exercise-registry.md#renaming-an-exercise).
 
 Under the header sit the history badges:
 
@@ -47,7 +47,7 @@ The last row of a strength card is the one you are logging, so its fields are dr
 
 The first set of a new card prefills its weight from the plan you recorded for that exercise last session, applied to that session's top set. A proposed weight is drawn dashed until you type over it. Reps are never prefilled: weight is what you choose before a set, reps are what you count after it. A row holding a weight and no reps counts for nothing until you record them, so it cannot become a personal best or move your history while the set is still in progress.
 
-Duration cards work the same way, swapping weight and reps for a single `Duration` field, with `Add set`, `Repeat` (which copies the last duration, stopping a running timer first) and a play button beside it that fills the entry live and writes it on stop. Their set numbers are figures too, resequenced from the same `Renumber sets` item. The field accepts three shapes:
+Duration cards work the same way, swapping weight and reps for a single `Duration` field, with `Add set`, `Repeat` (which copies the last duration) and `Start timer` beside them. Their set numbers are figures too, resequenced from the same `Renumber sets` item. The field accepts three shapes:
 
 - Bare seconds, `90`.
 - Unit form, `1m30s` or `2h`.
@@ -55,7 +55,14 @@ Duration cards work the same way, swapping weight and reps for a single `Duratio
 
 Whatever you type is normalised to the unit form on blur, and stored in the note as seconds.
 
-While the timer runs, the row also records when it started (`[started:: ...]`), so a timer cut off by the phone closing Obsidian in the background picks up where it left off the next time the workout opens. Stopping the timer, or closing the tab yourself, adds the elapsed time to the duration and removes the start time.
+`Start timer` takes over the tab with a big clock that counts the last set up from whatever time it already holds (or adds a set when the card has none), and keeps the screen awake where the platform allows. Everything a stretch session needs is on that screen, so you never have to go back to the card between sets:
+
+- `Stop` writes the time into the set and leaves the screen open, marked `Stopped`.
+- `Next set` adds a set and starts timing it at once, whether the clock is running or stopped. The time of the set before shows beneath the clock.
+- `Resume` carries on adding to a stopped set, and `Reset` clears the set's time and times it again from zero.
+- `Done` stops the clock, writes the time, and returns to the workout where you left it.
+
+While the timer runs, the row also records when it started (`[started:: ...]`), so a timer cut off by the phone closing Obsidian in the background picks up where it left off, timer screen and all, the next time the workout opens. Stopping the timer, or closing the tab yourself, adds the elapsed time to the duration and removes the start time.
 
 Bodyweight cards show `Set`, `Level` and `Reps` per set, with a `Load` cell that appears only while some row in that exercise carries a load. The kebab on each row adds load to that row or removes it again.
 
@@ -65,15 +72,21 @@ The card menu holds `Edit levels`, which edits the ladder one rung per line. An 
 
 A rung name too long for its cell shortens to a compact form (`L2`), and grows back into the full name when the cell has room again.
 
+A card whose sets run past half the screen shows only that much, fading out above `Show all N sets`, so one long card does not take over the workout. `Show all N sets` opens the whole list until `Show fewer sets`, and `Add set` and `Repeat` open it so the new row shows.
+
+## Interval training
+
+`Switch to interval`, under `Change type...` in the card menu, turns a card into an interval card and opens the plan form, where you build a plan from steps, rests and repeats or start from a preset such as Tabata. The card then shows the plan as a profile of its steps, and `Start` runs it as a full-screen clock, writing each rep to the note as it finishes. See [Interval training](interval-training.md) for how to plan a session, common sessions to start from, and what the runner does.
+
 ## Planning your next session
 
-The card menu records how you want to load the exercise next session: `Plan: increase`, `Plan: keep`, or `Plan: decrease`. Choosing the direction that is already set clears it. With increase or decrease chosen, `Set plan step...` takes the step; it stays greyed out until there is a direction to attach a step to.
+The card menu records how you want to load the exercise next session: `Plan: increase`, `Plan: keep`, or `Plan: decrease`. Choosing the direction that is already set clears it. With increase or decrease chosen, `Set plan step...` takes the step; it stays greyed out until there is a direction to attach a step to. An interval card offers the three directions without a step, since each step of its plan has its own target; keep reads `Same target` (see [Interval training](interval-training.md#planning-the-next-session)).
 
 This is a note to yourself, not an instruction the plugin acts on. It is written as `[next:: up 2.5]`, surfaces as the `Next` badge on the card straight away and again the next time that exercise comes up, and is listed under `Next session plans` on the dashboard. The step is a weight change for a strength exercise and a rung count for a bodyweight one. A `[next:: ...]` value that does not start with `up`, `down`, or `stay` is ignored rather than reported, and is dropped the next time the note is saved.
 
 ## Rest timer
 
-The footer holds a rest timer that counts up from zero and shows `Last rest 90s` once you stop it. You start and stop it yourself; it never starts on its own, since only you know whether the set is over. It is a live aid only; rest is not written into the note. Turn it off under `Rest timer` in settings if you time rests elsewhere.
+The footer holds a rest timer. `Start rest` takes over the tab with a big clock counting up from zero, kept awake like the interval runner, and `Stop rest` returns to the workout where you left it, with `Last rest 90s` beside the button. You start and stop it yourself; it never starts on its own, since only you know whether the set is over. It is a live aid only; rest is not written into the note. Turn it off under `Rest timer` in settings if you time rests elsewhere.
 
 The timer on a duration card is a separate thing, and that one does write into the duration field.
 

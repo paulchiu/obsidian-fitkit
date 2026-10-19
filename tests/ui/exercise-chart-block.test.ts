@@ -82,6 +82,9 @@ function createPlugin(
     },
     settings,
     cachedIndex: emptyIndex,
+    getIndex(this: { cachedIndex: FitKitIndex }): Promise<FitKitIndex> {
+      return Promise.resolve(this.cachedIndex)
+    },
     lastDiagnostics: [],
   } as unknown as ChartBlockPlugin
 }
@@ -165,6 +168,18 @@ describe('exercise chart block rendering', () => {
     await renderExerciseChartBlock(plugin, '', createTestRoot(), createContext(file.path))
 
     expect(renderedNotes()).toEqual([])
+  })
+
+  it('charts an interval exercise note as duration without a kind note', async () => {
+    const file = new TFile('Fitness/Exercises/Bike.md')
+    const plugin = createPlugin(
+      [file],
+      new Map([[file.path, { type: 'exercise', kind: 'duration', interval: true }]]),
+    )
+
+    await renderExerciseChartBlock(plugin, '', createTestRoot(), createContext(file.path))
+
+    expect([renderedSeries().kind, renderedNotes()]).toEqual(['duration', []])
   })
 
   it('uses exercise note unit frontmatter for strength charts', async () => {

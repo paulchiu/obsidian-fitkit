@@ -124,6 +124,45 @@ describe('exercise registry vault merge', () => {
     expect(merged).toEqual([{ name: 'Squat', kind: 'strength', unit: 'lbs', aliases: [] }])
   })
 
+  it('takes the interval marker from the note, even when the saved entry lost it', () => {
+    const app = mockApp([
+      {
+        path: 'Fitness/Exercises/Bike.md',
+        basename: 'Bike',
+        frontmatter: { type: 'exercise', kind: 'duration', interval: true },
+      },
+      {
+        path: 'Fitness/Exercises/Plank.md',
+        basename: 'Plank',
+        frontmatter: { type: 'exercise', kind: 'duration' },
+      },
+    ])
+    const snapshot = buildExerciseRegistrySnapshot(
+      app,
+      settingsWithRegistry([
+        { name: 'Bike', kind: 'duration', aliases: [] },
+        { name: 'Plank', kind: 'duration', interval: true, aliases: [] },
+      ]),
+    )
+
+    expect(snapshot.entries).toEqual([
+      { name: 'Bike', kind: 'duration', interval: true, aliases: [] },
+      { name: 'Plank', kind: 'duration', aliases: [] },
+    ])
+    expect(snapshot.diagnostics).toEqual([])
+  })
+
+  it('keeps the interval marker on a no-note registry entry', () => {
+    const snapshot = buildExerciseRegistrySnapshot(
+      mockApp([]),
+      settingsWithRegistry([{ name: 'Air bike', kind: 'duration', interval: true, aliases: [] }]),
+    )
+
+    expect(snapshot.entries).toEqual([
+      { name: 'Air bike', kind: 'duration', interval: true, aliases: [] },
+    ])
+  })
+
   it('keeps no-note registry entries', () => {
     const snapshot = buildExerciseRegistrySnapshot(
       mockApp([]),

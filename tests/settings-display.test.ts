@@ -8,7 +8,14 @@ import { createTestRoot } from './harness/obsidian-dom'
  */
 
 const rendered = vi.hoisted(
-  () => [] as { name: string; desc: string; heading: boolean; buttonText?: string }[],
+  () =>
+    [] as {
+      name: string
+      desc: string
+      heading: boolean
+      buttonText?: string
+      input?: string
+    }[],
 )
 
 vi.mock('obsidian', () => {
@@ -46,7 +53,18 @@ vi.mock('obsidian', () => {
       cb(toggle)
       return this
     }
+    addTextArea(cb: (area: unknown) => void): this {
+      this.record.input = 'textarea'
+      const area = {
+        inputEl: createTestRoot().createEl('textarea'),
+        setValue: () => area,
+        onChange: () => area,
+      }
+      cb(area)
+      return this
+    }
     addText(cb: (text: unknown) => void): this {
+      this.record.input = 'text'
       const text = {
         inputEl: createTestRoot().createEl('input'),
         setValue: () => text,
@@ -151,5 +169,11 @@ describe('display fallback', () => {
       .map((entry) => entry.buttonText)
 
     expect(buttons).toEqual(['Rebuild', 'Rebuild', 'Restore', 'Show', 'Show', 'Sync', 'Rebuild'])
+  })
+
+  it('edits the interval presets in a multi-line box', () => {
+    displayTab()
+
+    expect(rendered.find((row) => row.name === 'Interval presets')?.input).toBe('textarea')
   })
 })

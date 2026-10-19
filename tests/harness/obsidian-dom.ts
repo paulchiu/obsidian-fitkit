@@ -40,11 +40,19 @@ export function installObsidianDomExtensions(): void {
     hasClass,
     setText,
     setAttr,
+    setCssProps,
     instanceOf,
     detach,
   }
   Object.assign(harnessWindow.HTMLElement.prototype, extensions)
   Object.assign(harnessWindow.SVGElement.prototype, extensions)
+  /** Obsidian's `el.win`: the window an element lives in, a popout's own included. */
+  Object.defineProperty(harnessWindow.Node.prototype, 'win', {
+    configurable: true,
+    get(): Window {
+      return harnessWindow as unknown as Window
+    },
+  })
 }
 
 /** Fresh detached root for a test to render into. Detached roots keep
@@ -121,8 +129,13 @@ function applySvgOptions(child: Element, options?: SvgElementInfo | string): voi
     return
   }
   const resolved: SvgElementInfo = typeof options === 'string' ? { cls: options } : options
+  /** Obsidian adds a string `cls` as one token, so a space in it throws there and must here. */
   if (resolved.cls !== undefined) {
-    child.classList.add(...splitClasses(resolved.cls))
+    if (Array.isArray(resolved.cls)) {
+      child.classList.add(...resolved.cls)
+    } else {
+      child.classList.add(resolved.cls)
+    }
   }
   if (resolved.attr !== undefined) {
     for (const [name, value] of Object.entries(resolved.attr)) {
@@ -233,6 +246,15 @@ function removeClass(this: Element, ...classes: string[]): void {
 
 function hasClass(this: Element, cls: string): boolean {
   return this.classList.contains(cls)
+}
+
+function setCssProps(this: Element, props: Record<string, string>): void {
+  if (!this.instanceOf(harnessWindow.HTMLElement)) {
+    return
+  }
+  for (const [name, value] of Object.entries(props)) {
+    this.style.setProperty(name, value)
+  }
 }
 
 function setText(this: Element, value: string): void {

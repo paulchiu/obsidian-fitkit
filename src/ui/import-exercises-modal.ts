@@ -1,7 +1,7 @@
 import { Modal, Notice } from 'obsidian'
 
 import { formatErrorMessage } from '../domain/error'
-import { EXERCISE_KINDS, EXERCISE_KIND_LABELS, parseExerciseKind } from '../domain/exercise-kind'
+import { EXERCISE_TYPES, EXERCISE_TYPE_LABELS, parseExerciseType } from '../domain/exercise-type'
 import type FitKitPlugin from '../main'
 import {
   ExerciseImportApplyError,
@@ -117,20 +117,20 @@ export class ImportExercisesModal extends Modal {
   private renderKindCell(tr: HTMLElement, row: ExerciseImportPlanRow): void {
     const kindCell = this.createLabeledCell(tr, 'Kind')
     if (row.status === 'known' && !row.createNoNoteEntry) {
-      kindCell.createSpan({ text: row.kind })
+      kindCell.createSpan({ text: row.type })
       return
     }
     const select = kindCell.createEl('select', { cls: 'fitkit-import-select' })
     select.setAttr('aria-label', `Kind for ${row.name}`)
-    for (const kind of EXERCISE_KINDS) {
+    for (const type of EXERCISE_TYPES) {
       select.createEl('option', {
-        value: kind,
-        text: EXERCISE_KIND_LABELS[kind],
+        value: type,
+        text: EXERCISE_TYPE_LABELS[type],
       })
     }
-    select.value = row.kind
+    select.value = row.type
     select.addEventListener('change', () => {
-      row.kind = parseExerciseKind(select.value) ?? row.kind
+      row.type = parseExerciseType(select.value) ?? row.type
     })
   }
 

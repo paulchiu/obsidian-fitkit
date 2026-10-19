@@ -1,5 +1,5 @@
 import type { App, WorkspaceLeaf } from 'obsidian'
-import { FileView, Menu, Modal, Notice, TFile, normalizePath, setIcon } from 'obsidian'
+import { FileView, Menu, Modal, Notice, TFile, setIcon } from 'obsidian'
 
 import { reorderArray } from '../domain/array-utils'
 import {
@@ -17,7 +17,27 @@ import {
   ZERO_DURATION_DISPLAY,
 } from '../domain/duration-input'
 import { formatErrorMessage } from '../domain/error'
-import { assertUnreachableKind, EXERCISE_KINDS } from '../domain/exercise-kind'
+import {
+  CAUGHT_UP_NOTE,
+  isCaughtUp,
+  loggedReps,
+  marksCaughtUpReps,
+  restsAfter,
+  type RunRow,
+} from '../domain/interval-run'
+import {
+  resumeSession,
+  startSession,
+  stepSession,
+  type RunEvent,
+  type RunSession,
+  type RunTransition,
+} from '../domain/interval-session'
+import { summarisePlan } from '../domain/plan-summary'
+import { INTENSITY_KINDS, type IntensityKind } from '../domain/interval-plan'
+import { parseIntervalProgram, type IntervalProgram } from '../domain/interval-program'
+import { parseIntervalPresets } from '../domain/interval-presets'
+import { assertUnreachableKind } from '../domain/exercise-kind'
 import {
   formatExerciseHistoryBadges,
   formatNextPlanBadge,
@@ -26,22 +46,21 @@ import {
   type ExerciseHistorySummary,
 } from '../domain/exercise-history'
 import {
-  createRegistry,
-  kindForName,
+  typeForName,
   levelsForName,
   normalize,
   unitForName,
-  upsertEntry,
   type ExerciseRegistry,
-  type ExerciseRegistryEntry,
 } from '../domain/exercise-registry'
 import { formatLocalTimestamp } from '../domain/local-timestamp'
 import { DEFAULT_WEIGHT_UNIT } from '../domain/weight-unit'
-import type {
-  ExerciseNoteKindUpdateResult,
-  ExerciseNoteLevelsUpdateResult,
-} from '../domain/exercise-note-migrate'
-import { setExerciseNoteKind, setExerciseNoteLevels } from '../domain/exercise-note-migrate'
+import {
+  EXERCISE_TYPES,
+  kindOfType,
+  loggedTypeOf,
+  type ExerciseType,
+} from '../domain/exercise-type'
+import { planTypeSwitch, type TypeSwitchPlan } from '../domain/exercise-type-switch'
 import { filterSuggestableNames } from '../domain/exercise-suggestions'
 import {
   formatNumber as formatPlanNumber,
@@ -68,25 +87,34 @@ import {
 } from '../domain/workout-note-model'
 import type FitKitPlugin from '../main'
 import { exercisesFolder, isInFolder, workoutsFolder } from '../settings-paths'
-import { findExerciseNotePath } from '../vault/exercise-catalog'
+import { createAutosaver, type Autosaver } from '../vault/autosaver'
 import { composeExerciseNote } from '../vault/exercise-note'
 import { planExerciseFileOpen } from '../vault/exercise-file-plan'
 import { exerciseHistoryFromVault } from '../vault/exercise-history-vault'
+import { exerciseRegistryWithVaultNotes } from '../vault/exercise-registry-vault'
 import {
-  applyLadderOverrides,
-  bodyweightLevelsFor,
-  exerciseRegistryWithVaultNotes,
-  sameLevels,
-} from '../vault/exercise-registry-vault'
+  createExerciseStore,
+  type EnsureKnownResult,
+  type ExerciseStore,
+  type LadderRecordResult,
+  type TypeRecordResult,
+} from '../vault/exercise-store'
 import { FileSession } from '../vault/file-session'
 import { markdownFilesInFolder } from '../vault/folder-scan'
 import { ensureParentFolder } from '../vault/vault-utils'
 import { ConfirmModal } from './confirm-modal'
 import { EditLevelsModal } from './edit-levels-modal'
+import { createCuePlayer, type CuePlayer } from './interval-cues'
+import { clockSeconds, formatClock, renderRunner } from './interval-runner'
+import { renderRestTimer, renderSetTimer } from './timer-screen'
+import { createTabScreens, type ScreenStop, type TabScreens, type WakeHold } from './tab-screens'
+import { IntervalPlanModal } from './interval-plan-modal'
 import { ExerciseSuggestModal } from './exercise-suggest-modal'
 import { KindSwitchChoiceModal, type KindSwitchChoice } from './kind-switch-choice-modal'
 import { menuAnchorForTrigger } from './menu-anchor'
+import { renderPlanSummary } from './plan-summary-view'
 import { SetNoteModal } from './set-note-modal'
+import { capSetList } from './set-list-cap'
 import { PlanStepModal } from './plan-step-modal'
 
 interface DragSession {
@@ -100,20 +128,40 @@ interface DragSession {
   indicator: HTMLElement
 }
 
-interface ActiveTimer {
-  card: ExerciseCard
-  entry: EditableDurationEntry
+interface Stopwatch {
   startedAtMs: number
+  /** Seconds the set already had when this stretch of timing started. */
   accumulator: number
-  intervalId: number
-  inputEl: HTMLInputElement | null
 }
 
-interface ActiveRestTimer {
-  startedAtMs: number
-  intervalId: number
-  labelEl: HTMLElement | null
+/** A duration card's timer shown full-tab; it stays open after Stop so the next set starts from it. */
+interface SetTimerScreen {
+  kind: 'set'
+  card: ExerciseCard
+  /** The set on the clock, kept after Stop so Resume and Reset act on it. */
+  entry: EditableDurationEntry
+  /** Null while the set is stopped. */
+  stopwatch: Stopwatch | null
+  clockEl: HTMLElement | null
 }
+
+interface RunScreen {
+  kind: 'run'
+  card: ExerciseCard
+  session: RunSession
+  clockEl: HTMLElement | null
+  /** Also the screen's wake lock. */
+  cues: CuePlayer
+}
+
+interface RestScreen {
+  kind: 'rest'
+  startedAtMs: number
+  clockEl: HTMLElement | null
+}
+
+/** A screen that takes over the whole tab in place of the card list. */
+type EditorScreen = SetTimerScreen | RunScreen | RestScreen
 
 export const VIEW_TYPE_FITKIT_WORKOUT_EDITOR = 'fitkit-workout-editor'
 
@@ -124,12 +172,7 @@ interface EditableStrengthSet {
   note?: string
 }
 
-interface EditableDurationEntry {
-  set?: number
-  durationSeconds?: number
-  startedAt?: string
-  note?: string
-}
+type EditableDurationEntry = RunRow
 
 interface EditableBodyweightSet {
   set?: number
@@ -144,6 +187,8 @@ interface ExerciseCard {
   kind: ExerciseKind
   exerciseNotes?: string
   next?: NextPlan
+  /** Raw `[plan::]` text; only a duration card writes it back. */
+  plan?: string
   strengthSets: EditableStrengthSet[]
   durationEntries: EditableDurationEntry[]
   bodyweightSets: EditableBodyweightSet[]
@@ -185,27 +230,52 @@ export class WorkoutEditorView extends FileView {
   private session: FileSession | null = null
   private model: EditorWorkoutModel | null = null
   private exerciseHistory: ExerciseHistoryByName | null = null
-  private dirty = false
-  private conflictDetected = false
   private resizeObserver: ResizeObserver | null = null
-  private autoSaveTimer: number | null = null
-  private autoSaveInflight = false
-  private autoSaveRequeued = false
   private dragSession: DragSession | null = null
-  private activeTimer: ActiveTimer | null = null
-  private activeRestTimer: ActiveRestTimer | null = null
   private seededWeightsStore?: WeakSet<EditableStrengthSet>
-  private ladderOverridesStore?: Map<string, string[]>
+  private expandedSetListsStore?: WeakSet<ExerciseCard>
+  private setListRefits?: Array<() => void>
+  private exerciseStoreInstance?: ExerciseStore
+  private autosaverInstance?: Autosaver
+  private screensInstance?: TabScreens<EditorScreen>
   private lastRestSeconds: number | null = null
   /**
-   * Ladders this session wrote that the metadata cache may not report yet.
-   * Renders overlay them until the snapshot catches up, so a card never
-   * shows the rungs from before its own write. Lazily created because
-   * prototype-built views never run field initializers.
+   * One store per view, so its ladder overlay spans the session. Lazily
+   * created because prototype-built views never run field initializers.
    */
-  private get ladderOverrides(): Map<string, string[]> {
-    this.ladderOverridesStore ??= new Map<string, string[]>()
-    return this.ladderOverridesStore
+  private get exerciseStore(): ExerciseStore {
+    this.exerciseStoreInstance ??= createExerciseStore(this.app, this.plugin)
+    return this.exerciseStoreInstance
+  }
+
+  /** Lazily created for the same reason as exerciseStore. */
+  private get autosaver(): Autosaver {
+    this.autosaverInstance ??= createAutosaver({
+      session: () => this.session,
+      serialize: () =>
+        this.model?.isFitKitWorkout ? serializeWorkoutNote(toWorkoutNoteModel(this.model)) : null,
+      debounceMs: () => this.plugin.settings.autosaveDebounceMs,
+      refreshIndex: (path) => this.plugin.refreshIndexEntry(path),
+      onChange: () => this.updateMetaText(),
+      onSaveError: () => {
+        new Notice('Could not save workout. Edits are unsaved. Edit again to retry before leaving.')
+      },
+      onConflict: () => {
+        new Notice('File changed on disk. Reload before further edits.')
+        this.render()
+      },
+    })
+    return this.autosaverInstance
+  }
+
+  /** Lazily created for the same reason as exerciseStore. */
+  private get screens(): TabScreens<EditorScreen> {
+    this.screensInstance ??= createTabScreens<EditorScreen>({
+      scroller: () => this.contentEl,
+      render: () => this.render(),
+      stop: (screen, how) => this.stopScreen(screen, how),
+    })
+    return this.screensInstance
   }
 
   constructor(
@@ -258,11 +328,20 @@ export class WorkoutEditorView extends FileView {
 
   async onOpen(): Promise<void> {
     this.contentEl.addClass('fitkit-editor-root')
-    this.resizeObserver = new ResizeObserver(() => this.updateNarrowState())
+    this.resizeObserver = new ResizeObserver(() => {
+      this.updateNarrowState()
+      this.setListRefits?.forEach((refit) => refit())
+    })
     this.resizeObserver.observe(this.contentEl)
     this.updateNarrowState()
     this.registerDragLifetimeListeners()
     this.registerEvent(this.app.metadataCache.on('changed', (file) => this.onMetadataChanged(file)))
+    /** The OS drops a wake lock whenever the app is hidden, so take it again on return. */
+    this.registerDomEvent(activeDocument, 'visibilitychange', () => {
+      if (activeDocument.visibilityState === 'visible') {
+        this.screens.wakeAgain()
+      }
+    })
     this.renderEmpty('Open a workout note to edit.')
   }
 
@@ -296,13 +375,9 @@ export class WorkoutEditorView extends FileView {
   }
 
   async onClose(): Promise<void> {
-    this.stopTimer({ write: true })
-    this.clearRestTimerState()
-    if (this.autoSaveTimer !== null) {
-      window.clearTimeout(this.autoSaveTimer)
-      this.autoSaveTimer = null
-    }
-    await this.flushAutoSave()
+    this.screens.teardown('bank')
+    this.lastRestSeconds = null
+    await this.autosaver.settle()
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
     if (this.dragSession) {
@@ -354,15 +429,9 @@ export class WorkoutEditorView extends FileView {
   }
 
   async onUnloadFile(): Promise<void> {
-    this.stopTimer({ write: true })
-    this.clearRestTimerState()
-    if (this.autoSaveTimer !== null) {
-      window.clearTimeout(this.autoSaveTimer)
-      this.autoSaveTimer = null
-    }
-    if (this.session && this.dirty && !this.conflictDetected) {
-      await this.flushAutoSave()
-    }
+    this.screens.teardown('bank')
+    this.lastRestSeconds = null
+    await this.autosaver.settle()
   }
 
   async onLoadFile(file: TFile): Promise<void> {
@@ -376,8 +445,7 @@ export class WorkoutEditorView extends FileView {
     const { model, isWorkout, warnings } = await this.session.load()
     this.model = toEditorWorkoutModel(model, isWorkout, file.path)
     this.exerciseHistory = await this.loadExerciseHistory()
-    this.dirty = false
-    this.conflictDetected = false
+    this.autosaver.reset()
     this.resumeSavedTimer()
     if (skeletonShownAt !== null) {
       const elapsed = Date.now() - skeletonShownAt
@@ -396,19 +464,14 @@ export class WorkoutEditorView extends FileView {
     if (!this.session) {
       return
     }
-    this.abortTimer()
-    this.clearRestTimer()
-    if (this.autoSaveTimer !== null) {
-      window.clearTimeout(this.autoSaveTimer)
-      this.autoSaveTimer = null
-    }
+    this.screens.teardown('discard')
+    /** Autosave stays blocked by the conflict until the disk copy is in, so an edit made during the read cannot write the stale model. */
     const { model, isWorkout } = await this.session.load()
     this.model = toEditorWorkoutModel(model, isWorkout, this.session.file.path)
     if (!this.model.isFitKitWorkout) {
       this.exerciseHistory = null
     }
-    this.dirty = false
-    this.conflictDetected = false
+    this.autosaver.reset()
     this.resumeSavedTimer()
     this.render()
     new Notice('Reloaded from disk.')
@@ -416,12 +479,14 @@ export class WorkoutEditorView extends FileView {
 
   private renderEmpty(message: string): void {
     this.contentEl.empty()
+    this.setListRefits = []
     const wrap = this.contentEl.createDiv({ cls: 'fitkit-empty' })
     wrap.setText(message)
   }
 
   private renderSkeleton(): void {
     this.contentEl.empty()
+    this.setListRefits = []
     const wrap = this.contentEl.createDiv({ cls: 'fitkit-skeleton' })
     for (let i = 0; i < 3; i++) {
       const card = wrap.createDiv({ cls: 'fitkit-skeleton-card' })
@@ -440,7 +505,23 @@ export class WorkoutEditorView extends FileView {
       return
     }
     this.contentEl.empty()
+    this.setListRefits = []
     const container = this.contentEl.createDiv({ cls: 'fitkit-container' })
+    const screen = this.screens.current()
+    if (screen?.kind === 'run') {
+      this.renderRun(container, screen)
+      return
+    }
+    if (screen?.kind === 'set') {
+      this.renderSetTimerScreen(container, screen)
+      return
+    }
+    if (screen?.kind === 'rest') {
+      screen.clockEl = renderRestTimer(container, this.liveRestSeconds(screen), {
+        stop: () => this.stopRestTimer(),
+      })
+      return
+    }
 
     this.renderHeader(container)
 
@@ -452,7 +533,7 @@ export class WorkoutEditorView extends FileView {
       return
     }
 
-    if (this.conflictDetected) {
+    if (this.autosaver.state().conflict) {
       const banner = container.createDiv({ cls: 'fitkit-conflict' })
       banner.createSpan({
         text: 'File changed on disk. Reload to pick up external edits before continuing.',
@@ -466,7 +547,7 @@ export class WorkoutEditorView extends FileView {
 
     const list = container.createDiv({ cls: 'fitkit-exercise-list' })
     /** One merged snapshot per render: every card reads its ladder from this instead of rebuilding it. */
-    const registry = this.registryForRender()
+    const registry = this.exerciseStore.registry()
     for (let i = 0; i < this.model.exercises.length; i++) {
       this.renderExerciseCard(list, i, registry)
     }
@@ -481,32 +562,16 @@ export class WorkoutEditorView extends FileView {
     if (!this.isRestTimerEnabled()) {
       return
     }
-    const timer = this.activeRestTimer
     const control = footer.createDiv({ cls: 'fitkit-rest-timer-control' })
     const button = control.createEl('button', {
       cls: 'fitkit-btn fitkit-btn-muted fitkit-rest-timer-button',
-      attr: {
-        type: 'button',
-        'aria-label': timer ? 'Stop rest timer' : 'Start rest timer',
-      },
+      attr: { type: 'button', 'aria-label': 'Start rest timer' },
     })
-    setIcon(button, timer ? 'square' : 'timer')
-    const label = button.createSpan({
-      cls: 'fitkit-rest-timer-label',
-      text: timer ? `Stop ${formatDurationInput(this.liveRestSeconds(timer))}` : 'Start rest',
-    })
-    if (timer) {
-      timer.labelEl = label
-    }
-    button.addEventListener('click', () => {
-      if (this.activeRestTimer) {
-        this.stopRestTimer()
-      } else {
-        this.startRestTimer()
-      }
-    })
+    setIcon(button, 'timer')
+    button.createSpan({ cls: 'fitkit-rest-timer-label', text: 'Start rest' })
+    button.addEventListener('click', () => this.startRestTimer())
 
-    if (!timer && this.lastRestSeconds !== null) {
+    if (this.lastRestSeconds !== null) {
       control.createSpan({
         cls: 'fitkit-rest-timer-last',
         text: `Last rest ${formatDurationInput(this.lastRestSeconds)}`,
@@ -550,7 +615,7 @@ export class WorkoutEditorView extends FileView {
       return
     }
     /** Direct card renders (and tests) build their own snapshot; full renders share one. */
-    const snapshot = registry ?? this.registryForRender()
+    const snapshot = registry ?? this.exerciseStore.registry()
 
     const card = list.createDiv({ cls: 'fitkit-card' })
     card.dataset.exerciseIndex = String(index)
@@ -620,6 +685,31 @@ export class WorkoutEditorView extends FileView {
     }
   }
 
+  /** Renders a card's set rows into their own box, capped when the list runs long. */
+  private renderSetRows(
+    wrap: HTMLElement,
+    ex: ExerciseCard,
+    count: number,
+    renderRow: (rows: HTMLElement, i: number) => void,
+  ): void {
+    const rows = wrap.createDiv({ cls: 'fitkit-set-rows' })
+    for (let i = 0; i < count; i++) {
+      renderRow(rows, i)
+    }
+    const expanded = this.expandedSetLists
+    const refit = capSetList(wrap, rows, {
+      expanded: () => expanded.has(ex),
+      setExpanded: (next) => {
+        if (next) {
+          expanded.add(ex)
+        } else {
+          expanded.delete(ex)
+        }
+      },
+    })
+    ;(this.setListRefits ??= []).push(refit)
+  }
+
   private renderStrengthTable(card: HTMLElement, ex: ExerciseCard, exerciseIndex: number): void {
     const wrap = card.createDiv({ cls: 'fitkit-set-area' })
 
@@ -629,19 +719,20 @@ export class WorkoutEditorView extends FileView {
     header.createSpan({ cls: 'fitkit-set-label', text: 'Weight' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Reps' })
 
-    for (let i = 0; i < ex.strengthSets.length; i++) {
-      this.renderStrengthRow(wrap, ex, i)
-    }
+    this.renderSetRows(wrap, ex, ex.strengthSets.length, (rows, i) =>
+      this.renderStrengthRow(rows, ex, i),
+    )
 
     const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
     const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
     addBtn.addEventListener('click', () => {
       const last = ex.strengthSets[ex.strengthSets.length - 1]
-      const next: EditableStrengthSet = { set: ex.strengthSets.length + 1 }
+      const next: EditableStrengthSet = { set: nextSetNumber(ex.strengthSets) }
       if (last?.weight !== undefined) {
         next.weight = last.weight
       }
       ex.strengthSets.push(next)
+      this.expandedSetLists.add(ex)
       this.markDirty()
       this.render()
       this.focusRowCell(exerciseIndex, ex.strengthSets.length - 1, 'Weight')
@@ -651,10 +742,11 @@ export class WorkoutEditorView extends FileView {
     repeatBtn.addEventListener('click', () => {
       const last = ex.strengthSets[ex.strengthSets.length - 1]
       ex.strengthSets.push({
-        set: ex.strengthSets.length + 1,
+        set: nextSetNumber(ex.strengthSets),
         weight: last?.weight,
         reps: last?.reps,
       })
+      this.expandedSetLists.add(ex)
       this.markDirty()
       this.render()
     })
@@ -743,15 +835,16 @@ export class WorkoutEditorView extends FileView {
     }
     header.createSpan({ cls: 'fitkit-bodyweight-head-spacer', attr: { 'aria-hidden': 'true' } })
 
-    for (let i = 0; i < ex.bodyweightSets.length; i++) {
-      this.renderBodyweightRow(wrap, ex, i, levels, showLoad)
-    }
+    this.renderSetRows(wrap, ex, ex.bodyweightSets.length, (rows, i) =>
+      this.renderBodyweightRow(rows, ex, i, levels, showLoad),
+    )
 
     const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
     const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
     addBtn.addEventListener('click', () => {
       const last = ex.bodyweightSets[ex.bodyweightSets.length - 1]
-      ex.bodyweightSets.push({ set: ex.bodyweightSets.length + 1, level: last?.level ?? 1 })
+      ex.bodyweightSets.push({ set: nextSetNumber(ex.bodyweightSets), level: last?.level ?? 1 })
+      this.expandedSetLists.add(ex)
       this.markDirty()
       this.render()
       this.focusRowCell(exerciseIndex, ex.bodyweightSets.length - 1, 'Reps')
@@ -761,11 +854,12 @@ export class WorkoutEditorView extends FileView {
     repeatBtn.addEventListener('click', () => {
       const last = ex.bodyweightSets[ex.bodyweightSets.length - 1]
       ex.bodyweightSets.push({
-        set: ex.bodyweightSets.length + 1,
+        set: nextSetNumber(ex.bodyweightSets),
         level: last?.level,
         reps: last?.reps,
         load: last?.load,
       })
+      this.expandedSetLists.add(ex)
       this.markDirty()
       this.render()
     })
@@ -959,56 +1053,90 @@ export class WorkoutEditorView extends FileView {
   }
 
   private renderDurationTable(card: HTMLElement, ex: ExerciseCard, exerciseIndex: number): void {
+    const columns = intervalColumns(ex)
+    if (ex.plan !== undefined) {
+      const line = card.createDiv({
+        cls: 'fitkit-plan-line',
+        attr: { role: 'button', tabindex: '0', 'aria-label': 'Edit interval plan' },
+      })
+      if (columns.plan) {
+        renderPlanSummary(line, summarisePlan(ex.plan, columns.plan, ex.durationEntries), ex.plan)
+      } else {
+        line.createDiv({ cls: 'fitkit-plan-legend', text: ex.plan })
+      }
+      line.addEventListener('click', () => this.openIntervalPlanModal(ex))
+    }
     const wrap = card.createDiv({ cls: 'fitkit-set-area' })
 
-    const header = wrap.createDiv({ cls: 'fitkit-set-row fitkit-duration-row fitkit-set-head' })
+    const header = wrap.createDiv({
+      cls: durationRowClasses(columns, 'fitkit-set-row fitkit-duration-row fitkit-set-head'),
+    })
     // The set column is a figure now, too narrow for a label; the rows still name it.
     header.createSpan({ cls: 'fitkit-set-label fitkit-set-figure' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Duration' })
+    if (columns.intensity) {
+      header.createSpan({ cls: 'fitkit-set-label', text: INTENSITY_LABELS[columns.intensity] })
+    }
+    if (columns.rest) {
+      header.createSpan({ cls: 'fitkit-set-label', text: 'Rest' })
+    }
 
-    for (let i = 0; i < ex.durationEntries.length; i++) {
-      this.renderDurationRow(wrap, ex, i, exerciseIndex)
+    const markCaughtUp = marksCaughtUpReps(ex.durationEntries)
+    this.renderSetRows(wrap, ex, ex.durationEntries.length, (rows, i) =>
+      this.renderDurationRow(rows, ex, i, exerciseIndex, columns, markCaughtUp),
+    )
+    if (markCaughtUp) {
+      wrap.createDiv({ cls: 'fitkit-note-line fitkit-set-legend', text: `* ${CAUGHT_UP_NOTE}` })
     }
 
     const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
     const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
     addBtn.addEventListener('click', () => {
-      if (this.activeTimer && this.activeTimer.card === ex) {
+      if (this.runningSetTimer()?.card === ex) {
         this.stopTimer({ write: true })
       }
-      ex.durationEntries.push({})
+      ex.durationEntries.push(carriedIntervalFields(ex.durationEntries.at(-1)))
+      this.expandedSetLists.add(ex)
       this.markDirty()
       this.render()
     })
     const repeatBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Repeat' })
     repeatBtn.disabled = ex.durationEntries.length === 0
     repeatBtn.addEventListener('click', () => {
-      if (this.activeTimer && this.activeTimer.card === ex) {
+      if (this.runningSetTimer()?.card === ex) {
         this.stopTimer({ write: true })
       }
       const last = ex.durationEntries[ex.durationEntries.length - 1]
       ex.durationEntries.push({
-        set: ex.durationEntries.length + 1,
+        set: nextSetNumber(ex.durationEntries),
         durationSeconds: last?.durationSeconds,
+        ...carriedIntervalFields(last),
       })
+      this.expandedSetLists.add(ex)
       this.markDirty()
       this.render()
     })
 
-    const isRunningHere = this.activeTimer?.card === ex
+    if (columns.plan) {
+      const done = loggedReps(ex.durationEntries)
+      const runBtn = actions.createEl('button', {
+        cls: 'fitkit-btn fitkit-btn-primary fitkit-run-button',
+        text: done > 0 ? `Start from rep ${done + 1}` : 'Start',
+        attr: { 'aria-label': 'Start interval plan' },
+      })
+      runBtn.disabled = done >= columns.plan.steps.length
+      const program = columns.plan
+      runBtn.addEventListener('click', () => this.startIntervalRun(ex, program))
+      return
+    }
+
     const timerBtn = actions.createEl('button', {
       cls: 'fitkit-btn fitkit-timer-button',
-      text: isRunningHere ? 'Stop timer' : 'Start timer',
-      attr: { 'aria-label': isRunningHere ? 'Stop timer' : 'Start timer' },
+      text: 'Start timer',
+      attr: { 'aria-label': 'Start timer' },
     })
-    setIcon(timerBtn, isRunningHere ? 'square' : 'play')
-    timerBtn.addEventListener('click', () => {
-      if (this.activeTimer && this.activeTimer.card === ex) {
-        this.stopTimer({ write: true })
-      } else {
-        this.startCardTimer(ex)
-      }
-    })
+    setIcon(timerBtn, 'play')
+    timerBtn.addEventListener('click', () => this.openSetTimer(ex))
   }
 
   private renderDurationRow(
@@ -1016,40 +1144,56 @@ export class WorkoutEditorView extends FileView {
     ex: ExerciseCard,
     i: number,
     exerciseIndex: number,
+    columns: IntervalColumns = intervalColumns(ex),
+    markCaughtUp = false,
   ): void {
     const durationEntry = ex.durationEntries[i]
     if (!durationEntry) {
       return
     }
-    const isTiming = this.activeTimer?.entry === durationEntry
-    const container = wrap.createDiv({
-      cls: isTiming ? 'fitkit-row fitkit-row--timing' : 'fitkit-row',
-    })
+    const container = wrap.createDiv({ cls: 'fitkit-row' })
     container.dataset.fitkitTimerRow = `${exerciseIndex}:${i}`
     const body = container.createDiv({ cls: 'fitkit-row-body' })
-    const row = body.createDiv({ cls: 'fitkit-set-row fitkit-duration-row' })
+    const row = body.createDiv({
+      cls: durationRowClasses(columns, 'fitkit-set-row fitkit-duration-row'),
+    })
 
     const setCell = this.createCell(row, 'Set', 'fitkit-set-figure')
     setCell.setText(String(durationEntry.set ?? i + 1))
-
-    const durationCell = this.createCell(row, 'Duration')
-    if (isTiming && this.activeTimer) {
-      const durationInput = durationCell.createEl('input', {
-        cls: 'fitkit-input fitkit-duration-input',
-        attr: { type: 'text', 'aria-label': 'Duration' },
+    const marked = markCaughtUp && isCaughtUp(durationEntry)
+    if (marked) {
+      setCell.createSpan({
+        cls: 'fitkit-set-mark',
+        text: '*',
+        attr: { 'aria-label': CAUGHT_UP_NOTE },
       })
-      durationInput.value = formatDurationInput(this.liveSeconds(this.activeTimer))
-      durationInput.toggleAttribute('disabled', true)
-      this.activeTimer.inputEl = durationInput
-    } else {
-      this.renderDurationInput(durationCell, durationEntry)
+    }
+
+    this.renderDurationInput(this.createCell(row, 'Duration'), durationEntry)
+    const intensity = columns.intensity
+    if (intensity) {
+      const label = INTENSITY_LABELS[intensity]
+      const input = this.createInputCell(row, label, {
+        type: 'number',
+        step: '0.1',
+        inputmode: 'decimal',
+      })
+      input.value = durationEntry[intensity] === undefined ? '' : String(durationEntry[intensity])
+      input.addEventListener('input', () => {
+        durationEntry[intensity] = parseNumberInput(input.value)
+        this.markDirty()
+      })
+    }
+    if (columns.rest) {
+      this.renderRestInput(this.createCell(row, 'Rest'), durationEntry)
     }
 
     this.renderRowActions(container, body, {
       label: `duration entry ${i + 1}`,
       currentNote: durationEntry.note,
+      hideNoteLine: marked,
       onDelete: () => {
-        if (this.activeTimer?.entry === durationEntry) {
+        if (this.runningSetTimer()?.entry === durationEntry) {
           this.abortTimer()
         }
         ex.durationEntries.splice(i, 1)
@@ -1110,6 +1254,26 @@ export class WorkoutEditorView extends FileView {
     })
   }
 
+  private renderRestInput(cell: HTMLElement, durationEntry: EditableDurationEntry): void {
+    const input = cell.createEl('input', {
+      cls: 'fitkit-input fitkit-duration-input',
+      attr: { type: 'text', 'aria-label': 'Rest', placeholder: ZERO_DURATION_DISPLAY },
+    })
+    input.value = formatDurationInput(durationEntry.restSeconds)
+    input.addEventListener('input', () => {
+      const parsed = parseDurationInput(input.value)
+      setAriaInvalid(input, parsed === null)
+      if (parsed !== null) {
+        durationEntry.restSeconds = parsed.seconds
+        this.markDirty()
+      }
+    })
+    input.addEventListener('blur', () => {
+      setAriaInvalid(input, false)
+      input.value = formatDurationInput(durationEntry.restSeconds)
+    })
+  }
+
   private openExerciseNoteModal(ex: ExerciseCard): void {
     new SetNoteModal(this.app, {
       title: `Note for ${ex.name}`,
@@ -1122,10 +1286,29 @@ export class WorkoutEditorView extends FileView {
     }).open()
   }
 
+  /** The plan this exercise's latest prior session ran, which a new or newly interval card starts from. */
+  private lastIntervalPlan(name: string): string | undefined {
+    return this.exerciseHistory?.get(name)?.intervalPlan?.value
+  }
+
+  private openIntervalPlanModal(ex: ExerciseCard): void {
+    new IntervalPlanModal(this.app, {
+      exerciseName: ex.name,
+      initial: ex.plan,
+      suggested: this.lastIntervalPlan(ex.name),
+      presets: parseIntervalPresets(this.plugin.settings.intervalPresets).presets,
+      onSave: (plan) => {
+        ex.plan = plan
+        this.markDirty()
+        this.render()
+      },
+    }).open()
+  }
+
   private openEditLevelsModal(ex: ExerciseCard): void {
     new EditLevelsModal(this.app, {
       exerciseName: ex.name,
-      initial: this.currentBodyweightLevels(ex.name) ?? defaultBodyweightLevels(ex.name),
+      initial: this.exerciseStore.levelsFor(ex.name) ?? defaultBodyweightLevels(ex.name),
       onSave: (levels) => {
         void this.confirmLadderEdit(ex, levels)
       },
@@ -1138,7 +1321,7 @@ export class WorkoutEditorView extends FileView {
    * proceeds on confirmation. Logged sets keep their numbers throughout.
    */
   private async confirmLadderEdit(ex: ExerciseCard, levels: string[]): Promise<void> {
-    const previous = this.currentBodyweightLevels(ex.name) ?? []
+    const previous = this.exerciseStore.levelsFor(ex.name) ?? []
     const changes = describeBodyweightLadderChanges(previous, levels, [
       ...(await this.occupiedBodyweightLevels(ex)),
     ])
@@ -1203,76 +1386,15 @@ export class WorkoutEditorView extends FileView {
     return occupied
   }
 
-  /**
-   * Snapshot for rendering, with ladders this session wrote overlaid.
-   * Vault writes land on disk before the metadata cache reports them, so
-   * the render straight after a ladder write would otherwise show stale rungs.
-   */
-  private registryForRender(): ExerciseRegistry {
-    const snapshot = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
-    this.pruneLadderOverrides(snapshot)
-    return createRegistry(applyLadderOverrides(snapshot.entries, this.ladderOverrides))
-  }
-
-  /**
-   * Freshest ladder for decisions and menus: a value this session wrote
-   * wins until the snapshot reports it, so later reads never shadow it.
-   */
-  private currentBodyweightLevels(name: string): string[] | undefined {
-    const override = this.ladderOverrides.get(normalize(name))
-    if (override !== undefined) {
-      return [...override]
-    }
-    return bodyweightLevelsFor(this.app, this.plugin.settings, name)
-  }
-
-  /**
-   * Drops overrides the snapshot has caught up with. Without this a later
-   * outside edit to the same ladder would stay hidden behind the override.
-   */
-  private pruneLadderOverrides(snapshot: ExerciseRegistry): void {
-    for (const [key, levels] of this.ladderOverrides) {
-      if (sameLevels(levelsForName(snapshot, key) ?? [], levels)) {
-        this.ladderOverrides.delete(key)
-      }
-    }
-  }
-
-  /**
-   * Writes an edited ladder to whichever store wins on read: the exercise
-   * note when one exists, else the registry entry (created when missing).
-   */
   private async persistLadder(name: string, levels: string[]): Promise<void> {
-    const trimmed = name.trim()
-    if (!trimmed) {
+    const result = await this.exerciseStore.recordLadder(name, levels)
+    if (!result) {
       return
     }
-    const notePath = findExerciseNotePath(this.app, this.plugin.settings, trimmed)
-    const noteFile = notePath ? this.app.vault.getAbstractFileByPath(notePath) : null
-    if (noteFile instanceof TFile) {
-      let result: ExerciseNoteLevelsUpdateResult | undefined
-      await this.app.vault.process(noteFile, (text) => {
-        result = setExerciseNoteLevels(text, levels)
-        return result.markdown
-      })
-      if (result?.changed) {
-        this.ladderOverrides.set(normalize(trimmed), [...levels])
-        new Notice(`Exercise note now records levels for ${trimmed}.`)
-      }
-      this.render()
-      return
+    const notice = ladderRecordNotice(result)
+    if (notice) {
+      new Notice(notice)
     }
-    const settings = this.plugin.settings
-    const current = createRegistry(settings.exerciseRegistry)
-    const key = normalize(trimmed)
-    const existing = current.entries.find((entry) => normalize(entry.name) === key)
-    const nextEntry: ExerciseRegistryEntry = existing
-      ? { ...existing, aliases: [...existing.aliases], levels: [...levels] }
-      : { name: trimmed, kind: 'bodyweight', aliases: [], levels: [...levels] }
-    settings.exerciseRegistry = upsertEntry(current, nextEntry).entries
-    await this.plugin.saveSettings()
-    this.ladderOverrides.set(key, [...levels])
-    new Notice(`Registry now records levels for ${trimmed}.`)
     this.render()
   }
 
@@ -1282,6 +1404,8 @@ export class WorkoutEditorView extends FileView {
     opts: {
       label: string
       currentNote: string | undefined
+      /** The note stays editable from the menu; the row shows it some other way. */
+      hideNoteLine?: boolean
       onDelete: () => void
       onNoteSave: (next: string | undefined) => void
       onRenumber?: () => void
@@ -1308,7 +1432,7 @@ export class WorkoutEditorView extends FileView {
       opts.loadMenu,
     )
 
-    if (opts.currentNote && opts.currentNote.length > 0) {
+    if (opts.currentNote && opts.currentNote.length > 0 && !opts.hideNoteLine) {
       const line = container.createDiv({
         cls: 'fitkit-note-line',
         attr: { role: 'button', tabindex: '0' },
@@ -1383,63 +1507,136 @@ export class WorkoutEditorView extends FileView {
     }
   }
 
-  private startCardTimer(card: ExerciseCard): void {
-    this.clearRestTimer()
-    if (this.activeTimer && this.activeTimer.card !== card) {
-      this.stopTimer({ write: true })
-    }
+  /** Takes over the tab with the card's timer, timing its last set (or a new one when it has none). */
+  private openSetTimer(card: ExerciseCard): void {
     if (card.durationEntries.length === 0) {
       card.durationEntries.push({})
     }
-    const entry = card.durationEntries[card.durationEntries.length - 1]
+    const entry = card.durationEntries.at(-1)
     if (!entry) {
       return
     }
-    if (this.activeTimer && this.activeTimer.entry === entry) {
+    const screen: SetTimerScreen = { kind: 'set', card, entry, stopwatch: null, clockEl: null }
+    this.screens.enter(screen, { wake: this.screenWake() })
+    this.timeSet(screen)
+  }
+
+  /** Starts the clock on the screen's set, adding to any time it already has. */
+  private timeSet(screen: SetTimerScreen): void {
+    if (screen.stopwatch) {
       return
     }
     const startedAtMs = Date.now()
-    entry.startedAt = formatLocalTimestamp(new Date(startedAtMs))
-    this.runTimer(card, entry, startedAtMs)
+    screen.entry.startedAt = formatLocalTimestamp(new Date(startedAtMs))
+    this.runStopwatch(screen, startedAtMs)
     this.markDirty()
     this.render()
+  }
+
+  private renderSetTimerScreen(container: HTMLElement, screen: SetTimerScreen): void {
+    const { card, entry, stopwatch } = screen
+    const entries = card.durationEntries
+    const index = entries.indexOf(entry)
+    screen.clockEl = renderSetTimer(
+      container,
+      {
+        exerciseName: card.name,
+        set: entry.set ?? index + 1,
+        seconds: stopwatch ? this.liveSeconds(stopwatch) : (entry.durationSeconds ?? 0),
+        running: stopwatch !== null,
+        previousSeconds: entries[index - 1]?.durationSeconds,
+      },
+      {
+        stop: () => this.stopTimer({ write: true }),
+        resume: () => this.timeSet(screen),
+        reset: () => {
+          this.stopTimer({ write: false, render: false })
+          delete entry.durationSeconds
+          this.timeSet(screen)
+        },
+        next: () => {
+          this.stopTimer({ write: true, render: false })
+          const next = { set: nextSetNumber(entries), ...carriedIntervalFields(entries.at(-1)) }
+          entries.push(next)
+          screen.entry = next
+          this.timeSet(screen)
+        },
+        done: () => {
+          this.stopTimer({ write: true, render: false })
+          this.screens.leave()
+        },
+      },
+    )
+  }
+
+  /** The beep-free wake lock the set and rest timers hold. */
+  private screenWake(): WakeHold {
+    return createCuePlayer(activeWindow, false)
+  }
+
+  /** What ending each screen from outside keeps: a banked stop saves the set or run so far. */
+  private stopScreen(screen: EditorScreen, how: ScreenStop): void {
+    if (screen.kind === 'set') {
+      this.stopTimer({ write: how === 'bank', render: false })
+    } else if (screen.kind === 'run' && how === 'bank') {
+      this.bankRun(screen)
+    }
+  }
+
+  /** The set timer screen while its set is being timed. */
+  private runningSetTimer(): SetTimerScreen | null {
+    const screen = this.screens.current()
+    return screen?.kind === 'set' && screen.stopwatch ? screen : null
   }
 
   /** Picks up a timer the note records as running, such as one cut off when the app was killed. */
   private resumeSavedTimer(): void {
     for (const card of this.model?.exercises ?? []) {
+      const plan = intervalColumns(card).plan
+      const now = Date.now()
+      const resumed = plan && resumeSession(card.durationEntries, plan, now)
+      if (resumed) {
+        this.applyRun(this.enterRun(card, resumed.session, { keepScroll: true }), resumed, now)
+        return
+      }
+    }
+    for (const card of this.model?.exercises ?? []) {
+      if (intervalColumns(card).plan) {
+        continue
+      }
       const entry = card.durationEntries.find((candidate) => candidate.startedAt !== undefined)
       const startedAtMs = Date.parse(entry?.startedAt ?? '')
       if (entry && !Number.isNaN(startedAtMs)) {
-        this.runTimer(card, entry, startedAtMs)
+        const screen: SetTimerScreen = { kind: 'set', card, entry, stopwatch: null, clockEl: null }
+        this.screens.enter(screen, {
+          wake: this.screenWake(),
+          returnScrollTop: 0,
+          keepScroll: true,
+        })
+        this.runStopwatch(screen, startedAtMs)
         return
       }
     }
   }
 
-  private runTimer(card: ExerciseCard, entry: EditableDurationEntry, startedAtMs: number): void {
-    this.activeTimer = {
-      card,
-      entry,
-      startedAtMs,
-      accumulator: entry.durationSeconds ?? 0,
-      intervalId: window.setInterval(() => this.tickTimer(), 1000),
-      inputEl: null,
-    }
+  private runStopwatch(screen: SetTimerScreen, startedAtMs: number): void {
+    screen.stopwatch = { startedAtMs, accumulator: screen.entry.durationSeconds ?? 0 }
+    this.screens.startClock(() => this.tickTimer(), 1000)
   }
 
   private stopTimer(opts: { write: boolean; render?: boolean }): void {
-    const timer = this.activeTimer
-    if (!timer) {
+    const screen = this.runningSetTimer()
+    const stopwatch = screen?.stopwatch
+    if (!screen || !stopwatch) {
       return
     }
-    window.clearInterval(timer.intervalId)
-    delete timer.entry.startedAt
+    this.screens.stopClock()
+    delete screen.entry.startedAt
     if (opts.write) {
-      timer.entry.durationSeconds = this.liveSeconds(timer)
+      screen.entry.durationSeconds = this.liveSeconds(stopwatch)
       this.markDirty()
     }
-    this.activeTimer = null
+    screen.stopwatch = null
     if (opts.render !== false) {
       this.render()
     }
@@ -1450,104 +1647,207 @@ export class WorkoutEditorView extends FileView {
   }
 
   private tickTimer(): void {
-    const timer = this.activeTimer
-    if (!timer || !timer.inputEl) {
+    const screen = this.runningSetTimer()
+    if (!screen?.stopwatch || !screen.clockEl) {
       return
     }
-    timer.inputEl.value = formatDurationInput(this.liveSeconds(timer))
+    screen.clockEl.setText(formatClock(this.liveSeconds(screen.stopwatch)))
   }
 
-  private liveSeconds(timer: ActiveTimer): number {
-    return timer.accumulator + Math.max(0, Math.floor((Date.now() - timer.startedAtMs) / 1000))
+  private liveSeconds(stopwatch: Stopwatch): number {
+    return (
+      stopwatch.accumulator + Math.max(0, Math.floor((Date.now() - stopwatch.startedAtMs) / 1000))
+    )
+  }
+
+  private startIntervalRun(card: ExerciseCard, program: IntervalProgram): void {
+    /** Bank what holds the tab before reading the rows the run starts from. */
+    this.screens.teardown('bank')
+    const now = Date.now()
+    const started = startSession(card.durationEntries, program, now)
+    const run = this.enterRun(card, started.session)
+    run.cues.prime()
+    this.applyRun(run, started, now)
+  }
+
+  private enterRun(
+    card: ExerciseCard,
+    session: RunSession,
+    { keepScroll = false }: { keepScroll?: boolean } = {},
+  ): RunScreen {
+    const cues = createCuePlayer(activeWindow, this.plugin.settings.intervalBeepsEnabled !== false)
+    const run: RunScreen = { kind: 'run', card, session, clockEl: null, cues }
+    this.screens.enter(run, { wake: cues, keepScroll })
+    this.screens.startClock(() => this.sendRun({ kind: 'tick' }), 500)
+    return run
+  }
+
+  private renderRun(container: HTMLElement, run: RunScreen): void {
+    const { session } = run
+    const primed = (event: RunEvent) => (): void => {
+      run.cues.prime()
+      this.sendRun(event)
+    }
+    run.clockEl = renderRunner(
+      container,
+      {
+        exerciseName: run.card.name,
+        program: session.program,
+        rows: session.rows,
+        now: Date.now(),
+        screen: session.screen,
+      },
+      {
+        primary: primed({ kind: 'press' }),
+        togglePause: primed({ kind: 'toggle-pause' }),
+        end: () => this.sendRun({ kind: 'end' }),
+        adjust: (delta) => this.sendRun({ kind: 'adjust', delta }),
+        resumeCut: primed({ kind: 'resume-cut' }),
+        endCut: () => this.sendRun({ kind: 'end-cut' }),
+        back: () => this.sendRun({ kind: 'back' }),
+      },
+    )
+  }
+
+  private sendRun(event: RunEvent): void {
+    const run = this.screens.current()
+    if (run?.kind === 'run') {
+      const now = Date.now()
+      this.applyRun(run, stepSession(run.session, event, now), now)
+    }
+  }
+
+  /** Carries out what a run transition asks of the view. */
+  private applyRun(run: RunScreen, { session, effects }: RunTransition, now: number): void {
+    run.session = session
+    if (effects.rows) {
+      run.card.durationEntries = effects.rows
+      this.markDirty()
+    }
+    if (effects.notice !== undefined) {
+      new Notice(effects.notice)
+    }
+    if (effects.leave) {
+      /** The rows already hold everything, so the card list is all that is left to show. */
+      this.screens.leave()
+      return
+    }
+    if (effects.redraw === 'full') {
+      this.render()
+    }
+    if (effects.cue) {
+      run.cues.play(effects.cue)
+    }
+    if (effects.redraw === 'clock' && run.clockEl) {
+      const clock = { exerciseName: run.card.name, program: session.program, rows: session.rows }
+      run.clockEl.setText(formatClock(clockSeconds({ ...clock, now })))
+    }
+  }
+
+  /** Pauses a run with the time so far kept in its rows, the way the set timer banks a set. */
+  private bankRun(run: RunScreen): void {
+    const { rows } = stepSession(run.session, { kind: 'close' }, Date.now()).effects
+    if (rows) {
+      run.card.durationEntries = rows
+      this.markDirty()
+    }
   }
 
   private startRestTimer(): void {
     if (!this.isRestTimerEnabled()) {
       return
     }
-    if (this.activeRestTimer) {
+    if (this.screens.current()?.kind === 'rest') {
       return
     }
     this.lastRestSeconds = null
-    if (this.activeTimer) {
-      this.stopTimer({ write: true, render: false })
-    }
-    const intervalId = window.setInterval(() => this.tickRestTimer(), 1000)
-    this.activeRestTimer = {
-      startedAtMs: Date.now(),
-      intervalId,
-      labelEl: null,
-    }
+    const rest: RestScreen = { kind: 'rest', startedAtMs: Date.now(), clockEl: null }
+    this.screens.enter(rest, { wake: this.screenWake() })
+    this.screens.startClock(() => this.tickRestTimer(), 1000)
     this.render()
   }
 
   private stopRestTimer(): void {
-    const timer = this.activeRestTimer
-    if (!timer) {
+    const rest = this.screens.current()
+    if (rest?.kind !== 'rest') {
       return
     }
-    const restSeconds = this.liveRestSeconds(timer)
-    this.clearRestTimer()
-    this.lastRestSeconds = restSeconds
-    this.render()
-  }
-
-  private clearRestTimer(): void {
-    const timer = this.activeRestTimer
-    if (!timer) {
-      return
-    }
-    window.clearInterval(timer.intervalId)
-    this.activeRestTimer = null
+    this.lastRestSeconds = this.liveRestSeconds(rest)
+    this.screens.leave()
   }
 
   private clearRestTimerState(): void {
-    this.clearRestTimer()
+    if (this.screens.current()?.kind === 'rest') {
+      this.screens.teardown('discard')
+    }
     this.lastRestSeconds = null
   }
 
   private tickRestTimer(): void {
-    const timer = this.activeRestTimer
-    if (!timer?.labelEl) {
+    const rest = this.screens.current()
+    if (rest?.kind !== 'rest' || !rest.clockEl) {
       return
     }
-    timer.labelEl.setText(`Stop ${formatDurationInput(this.liveRestSeconds(timer))}`)
+    rest.clockEl.setText(formatClock(this.liveRestSeconds(rest)))
   }
 
-  private liveRestSeconds(timer: ActiveRestTimer): number {
-    return Math.max(0, Math.floor((Date.now() - timer.startedAtMs) / 1000))
+  private liveRestSeconds(rest: RestScreen): number {
+    return Math.max(0, Math.floor((Date.now() - rest.startedAtMs) / 1000))
   }
 
   private isRestTimerEnabled(): boolean {
     return this.plugin.settings.strengthRestTimerEnabled !== false
   }
 
-  private async switchKind(index: number, nextKind: ExerciseKind): Promise<void> {
-    if (!this.model) {
+  /** The scope question is skipped when there is nothing to choose. */
+  private async switchCardType(index: number, target: ExerciseType): Promise<void> {
+    const ex = this.model?.exercises[index]
+    const current = ex ? loggedTypeOf(ex) : null
+    if (!ex || current === null || current === target) {
       return
     }
-    const ex = this.model.exercises[index]
-    if (!ex || ex.kind === nextKind) {
-      return
-    }
-    const hadRows = hasRows(ex)
-    const registry = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
-    const registryKind = kindForName(registry, ex.name)
-    const choice = await this.chooseKindSwitch(ex, nextKind, registryKind)
+    const nextKind = kindOfType(target)
+    const clearsRows = ex.kind !== nextKind && hasRows(ex)
+    const registry = this.exerciseStore.registry()
+    const registryType = typeForName(registry, ex.name)
+    const choice =
+      registryType === target && ex.kind === nextKind
+        ? 'workout'
+        : await this.chooseTypeSwitch(ex, current, target, registryType, clearsRows)
     if (choice === 'cancel') {
       return
     }
-    /** Captured before the switch clears the card; the relabel offer below marks these as level 1. */
-    const relabelSource = nextKind === 'bodyweight' ? toWorkoutExercise(ex) : null
-    this.applyKindSwitch(index, nextKind, hadRows)
-    if (choice === 'workout-and-registry') {
-      await this.persistKindChange(ex.name, nextKind)
+    await this.runTypeSwitch(
+      index,
+      planTypeSwitch({ loggedType: current, target, registryType, scope: choice }),
+    )
+  }
+
+  /** Carries out a type switch plan on the card at `index`, the one path both the card menu and rename take. */
+  private async runTypeSwitch(index: number, plan: TypeSwitchPlan): Promise<void> {
+    const ex = this.model?.exercises[index]
+    if (!ex) {
+      return
     }
-    if (nextKind === 'bodyweight' && relabelSource) {
-      /** Workout-only leaves durable stores alone: a ladder seeded into a note whose kind was not switched would be unreadable, and a registry entry would leak past the chosen scope. */
-      if (choice === 'workout-and-registry') {
-        await this.seedBodyweightLadder(ex)
-      }
+    /** Captured before the switch clears the card; the relabel offer below marks these as level 1. */
+    const relabelSource = plan.offersRelabel ? toWorkoutExercise(ex) : null
+    if (plan.changesKind) {
+      this.applyKindSwitch(index, kindOfType(plan.target), hasRows(ex), plan.announcedAs)
+    } else if (plan.dropsPlan) {
+      ex.plan = undefined
+      this.markDirty()
+      this.render()
+    }
+    if (plan.recordsType) {
+      await this.persistTypeChange(ex.name, plan.target)
+    }
+    if (plan.opensPlanForm) {
+      this.openIntervalPlanModal(ex)
+    }
+    if (plan.seedsLadder) {
+      await this.seedBodyweightLadder(ex)
+    }
+    if (relabelSource) {
       await this.offerFirstLevelRelabel(index, relabelSource)
     }
   }
@@ -1558,7 +1858,7 @@ export class WorkoutEditorView extends FileView {
    * menu is usable immediately. An existing ladder is left alone.
    */
   private async seedBodyweightLadder(ex: ExerciseCard): Promise<void> {
-    if ((this.currentBodyweightLevels(ex.name) ?? []).length > 0) {
+    if ((this.exerciseStore.levelsFor(ex.name) ?? []).length > 0) {
       return
     }
     await this.persistLadder(ex.name, defaultBodyweightLevels(ex.name))
@@ -1608,87 +1908,27 @@ export class WorkoutEditorView extends FileView {
     })
   }
 
-  /**
-   * Writes the kind switch to the exercise note when one exists, and to the
-   * registry either way. An exercise note always beats the registry overlay
-   * (see buildExerciseRegistrySnapshot), so the note decides behaviour; the
-   * registry copy keeps the settings table and its readers truthful.
-   */
-  private async persistKindChange(name: string, nextKind: ExerciseKind): Promise<void> {
-    const trimmed = name.trim()
-    if (!trimmed) {
-      return
+  private async persistTypeChange(name: string, nextType: ExerciseType): Promise<void> {
+    const result = await this.exerciseStore.recordType(name, nextType)
+    for (const notice of result ? typeRecordNotices(result, nextType) : []) {
+      new Notice(notice)
     }
-    const notePath = findExerciseNotePath(this.app, this.plugin.settings, trimmed)
-    const noteFile = notePath ? this.app.vault.getAbstractFileByPath(notePath) : null
-    if (noteFile instanceof TFile) {
-      let result: ExerciseNoteKindUpdateResult | undefined
-      await this.app.vault.process(noteFile, (text) => {
-        result = setExerciseNoteKind(text, nextKind, {
-          name: noteFile.basename,
-          fitnessRoot: this.plugin.settings.fitnessRoot,
-        })
-        return result.markdown
-      })
-      if (result?.warnings.some((warning) => warning.kind === 'custom-recent-sessions')) {
-        new Notice(
-          `The Recent sessions query in the note for ${trimmed} looks customised, so it was left as it is and still reads the old kind's fields.`,
-        )
-      }
-      if (result?.changed) {
-        new Notice(`Exercise note now records ${trimmed} as ${nextKind}.`)
-        /**
-         * The registry is read on its own by the settings table, so leaving
-         * it behind would mislead the next reader and raise a conflict
-         * against the note that just won. The note still wins on read.
-         */
-        await this.persistRegistryKind(trimmed, nextKind)
-      } else {
-        new Notice(
-          `Could not update the exercise note for ${trimmed}; its frontmatter was left unchanged.`,
-        )
-      }
-      return
-    }
-    await this.persistRegistryKind(trimmed, nextKind)
   }
 
-  private chooseKindSwitch(
+  private chooseTypeSwitch(
     card: ExerciseCard,
-    nextKind: ExerciseKind,
-    registryKind: ExerciseKind | null,
+    currentType: ExerciseType,
+    nextType: ExerciseType,
+    registryType: ExerciseType | null,
+    clearsRows: boolean,
   ): Promise<KindSwitchChoice> {
     return new Promise((resolve) => {
       new KindSwitchChoiceModal(
         this.app,
-        {
-          exerciseName: card.name,
-          currentKind: card.kind,
-          nextKind,
-          hasRows: hasRows(card),
-          registryKind,
-        },
+        { exerciseName: card.name, currentType, nextType, clearsRows, registryType },
         resolve,
       ).open()
     })
-  }
-
-  private async persistRegistryKind(name: string, nextKind: ExerciseKind): Promise<void> {
-    const settings = this.plugin.settings
-    const trimmed = name.trim()
-    if (!trimmed) {
-      return
-    }
-    const current = createRegistry(settings.exerciseRegistry)
-    const trimmedKey = normalize(trimmed)
-    const existing = current.entries.find((entry) => normalize(entry.name) === trimmedKey)
-    const nextEntry: ExerciseRegistryEntry = existing
-      ? { ...existing, aliases: [...existing.aliases], kind: nextKind }
-      : { name: trimmed, kind: nextKind, aliases: [] }
-    const updated = upsertEntry(current, nextEntry)
-    settings.exerciseRegistry = updated.entries
-    await this.plugin.saveSettings()
-    new Notice(`Registry now records ${trimmed} as ${nextKind}.`)
   }
 
   private async confirmKindSwitch(card: ExerciseCard, nextKind: ExerciseKind): Promise<boolean> {
@@ -1709,7 +1949,12 @@ export class WorkoutEditorView extends FileView {
     })
   }
 
-  private applyKindSwitch(index: number, nextKind: ExerciseKind, clearedRows: boolean): void {
+  private applyKindSwitch(
+    index: number,
+    nextKind: ExerciseKind,
+    clearedRows: boolean,
+    targetLabel: string = nextKind,
+  ): void {
     if (!this.model) {
       return
     }
@@ -1717,11 +1962,12 @@ export class WorkoutEditorView extends FileView {
     if (!ex || ex.kind === nextKind) {
       return
     }
-    if (this.activeTimer?.card === ex) {
+    if (this.runningSetTimer()?.card === ex) {
       this.abortTimer()
     }
     const previousKind = ex.kind
     ex.kind = nextKind
+    ex.plan = undefined
     ex.strengthSets = []
     ex.durationEntries = []
     ex.bodyweightSets = []
@@ -1729,8 +1975,14 @@ export class WorkoutEditorView extends FileView {
     this.markDirty()
     this.render()
     if (clearedRows) {
-      new Notice(`Switched to ${nextKind}. Previous ${previousKind} rows were cleared.`)
+      new Notice(`Switched to ${targetLabel}. Previous ${previousKind} rows were cleared.`)
     }
+  }
+
+  /** Cards whose long set list is shown in full; adding a set opens it so the new row shows. */
+  private get expandedSetLists(): WeakSet<ExerciseCard> {
+    this.expandedSetListsStore ??= new WeakSet<ExerciseCard>()
+    return this.expandedSetListsStore
   }
 
   /** Rows whose weight came from the plan and has not been typed over yet. View state only; never written to the note. */
@@ -1768,7 +2020,7 @@ export class WorkoutEditorView extends FileView {
     if (!card?.instanceOf(HTMLElement)) {
       return
     }
-    const rows = card.querySelectorAll('.fitkit-set-area > .fitkit-row')
+    const rows = card.querySelectorAll('.fitkit-set-rows > .fitkit-row')
     const row = rows.item(rowIndex)
     if (!row?.instanceOf(HTMLElement)) {
       return
@@ -1782,32 +2034,12 @@ export class WorkoutEditorView extends FileView {
     }
   }
 
-  private moveExercise(index: number, delta: number): void {
-    if (!this.model) {
-      return
-    }
-    const target = index + delta
-    if (target < 0 || target >= this.model.exercises.length) {
-      return
-    }
-    const arr = this.model.exercises
-    const a = arr[index]
-    const b = arr[target]
-    if (!a || !b) {
-      return
-    }
-    arr[index] = b
-    arr[target] = a
-    this.markDirty()
-    this.render()
-  }
-
   private removeExercise(index: number): void {
     if (!this.model) {
       return
     }
     const ex = this.model.exercises[index]
-    if (ex && this.activeTimer?.card === ex) {
+    if (ex && this.runningSetTimer()?.card === ex) {
       this.abortTimer()
     }
     this.model.exercises.splice(index, 1)
@@ -1817,7 +2049,8 @@ export class WorkoutEditorView extends FileView {
 
   /**
    * The plan the user records for next session. Choosing the active direction
-   * again clears it, matching the segmented control this replaced.
+   * again clears it, matching the segmented control this replaced. An interval
+   * card records the direction alone, so it has no step to set.
    */
   private addNextPlanMenuItems(menu: Menu, ex: ExerciseCard): void {
     for (const option of NEXT_PLAN_OPTIONS) {
@@ -1835,6 +2068,9 @@ export class WorkoutEditorView extends FileView {
       )
     }
 
+    if (ex.kind === 'duration') {
+      return
+    }
     const canSetStep = ex.next !== undefined && ex.next.direction !== 'stay'
     menu.addItem((item) =>
       item
@@ -1868,15 +2104,7 @@ export class WorkoutEditorView extends FileView {
     if (!ex) {
       return
     }
-    const lastIndex = this.model.exercises.length - 1
-
     const menu = new Menu()
-    menu.addItem((item) =>
-      item
-        .setTitle('Open exercise file')
-        .setIcon('file-text')
-        .onClick(() => void this.openOrCreateExerciseFile(ex)),
-    )
     menu.addItem((item) =>
       item
         .setTitle('Rename exercise')
@@ -1898,36 +2126,27 @@ export class WorkoutEditorView extends FileView {
           .onClick(() => this.openEditLevelsModal(ex)),
       )
     }
-    if (ex.kind === 'strength' || ex.kind === 'bodyweight') {
+    const shownType = loggedTypeOf(ex)
+    if (shownType === 'interval') {
+      menu.addItem((item) =>
+        item
+          .setTitle('Edit interval plan')
+          .setIcon('timer')
+          .onClick(() => this.openIntervalPlanModal(ex)),
+      )
+    }
+    if (ex.kind === 'strength' || ex.kind === 'bodyweight' || shownType === 'interval') {
       menu.addSeparator()
       this.addNextPlanMenuItems(menu, ex)
     }
     menu.addSeparator()
-    for (const nextKind of EXERCISE_KINDS) {
-      if (nextKind === ex.kind) {
-        continue
-      }
-      menu.addItem((item) =>
-        item
-          .setTitle(`Switch to ${nextKind}`)
-          .setIcon('repeat')
-          .onClick(() => void this.switchKind(index, nextKind)),
-      )
-    }
-    menu.addSeparator()
+    const show = showCardMenuAt(evt)
     menu.addItem((item) =>
       item
-        .setTitle('Move up')
-        .setIcon('chevron-up')
-        .setDisabled(index === 0)
-        .onClick(() => this.moveExercise(index, -1)),
-    )
-    menu.addItem((item) =>
-      item
-        .setTitle('Move down')
-        .setIcon('chevron-down')
-        .setDisabled(index === lastIndex)
-        .onClick(() => this.moveExercise(index, 1)),
+        .setTitle('Change type...')
+        .setIcon('repeat')
+        /** Obsidian has no public submenu, so the types open as a second menu once this one closes. */
+        .onClick(() => window.setTimeout(() => show(this.typeMenu(index, shownType)), 0)),
     )
     menu.addSeparator()
     menu.addItem((item) =>
@@ -1937,14 +2156,24 @@ export class WorkoutEditorView extends FileView {
         .setWarning(true)
         .onClick(() => void this.confirmAndRemoveExercise(index)),
     )
+    show(menu)
+  }
 
-    const target = evt.currentTarget
-    if (target instanceof HTMLElement) {
-      const rect = target.getBoundingClientRect()
-      menu.showAtPosition(menuAnchorForTrigger(rect))
-    } else {
-      menu.showAtMouseEvent(evt)
+  /** The types a card can switch to, leaving out the one it shows. */
+  private typeMenu(index: number, shownType: ExerciseType): Menu {
+    const menu = new Menu()
+    for (const target of EXERCISE_TYPES) {
+      if (target === shownType) {
+        continue
+      }
+      menu.addItem((item) =>
+        item
+          .setTitle(`Switch to ${target}`)
+          .setIcon('repeat')
+          .onClick(() => void this.switchCardType(index, target)),
+      )
     }
+    return menu
   }
 
   private renderExerciseHistoryBadges(
@@ -2030,11 +2259,6 @@ export class WorkoutEditorView extends FileView {
       return
     }
 
-    const deletedKey = normalize(plan.name)
-    const previousDeleted = this.plugin.settings.deletedExercises ?? []
-    const hadTombstone = previousDeleted.some(
-      (deletedName) => normalize(deletedName) === deletedKey,
-    )
     let shouldClearTombstone = false
 
     if (plan.kind === 'create') {
@@ -2042,7 +2266,7 @@ export class WorkoutEditorView extends FileView {
         await ensureParentFolder(this.app, plan.path)
         await this.app.vault.create(
           plan.path,
-          composeExerciseNote(plan.name, plan.exerciseKind, plan.workoutsFolderPath, plan.unit),
+          composeExerciseNote(plan.name, plan.exerciseType, plan.workoutsFolderPath, plan.unit),
         )
         new Notice(`Created exercise note for '${plan.name}'.`)
         shouldClearTombstone = true
@@ -2062,11 +2286,8 @@ export class WorkoutEditorView extends FileView {
       new Notice(`Could not open exercise file: ${formatError(error)}`)
     }
 
-    if (hadTombstone && shouldClearTombstone) {
-      this.plugin.settings.deletedExercises = previousDeleted.filter(
-        (deletedName) => normalize(deletedName) !== deletedKey,
-      )
-      await this.plugin.saveSettings()
+    if (shouldClearTombstone) {
+      await this.exerciseStore.undelete(plan.name)
     }
   }
 
@@ -2200,23 +2421,20 @@ export class WorkoutEditorView extends FileView {
       return
     }
     const names = await this.collectExerciseSuggestions()
-    const registry = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
+    const registry = this.exerciseStore.registry()
     new ExerciseSuggestModal(this.app, names, (name) => {
       void this.addExerciseFromSuggestion(name, registry)
     }).open()
   }
 
-  private async addExerciseFromSuggestion(
-    name: string,
-    registry: ReturnType<typeof createRegistry>,
-  ): Promise<void> {
+  private async addExerciseFromSuggestion(name: string, registry: ExerciseRegistry): Promise<void> {
     const trimmed = name.trim()
     if (!trimmed || !this.model) {
       return
     }
     const exerciseIndex = this.model.exercises.length
-    const registryKind = kindForName(registry, trimmed)
-    const kind: ExerciseKind = registryKind ?? 'strength'
+    const registryType = typeForName(registry, trimmed)
+    const kind = kindOfType(registryType ?? 'strength')
     const card: ExerciseCard = {
       name: trimmed,
       kind,
@@ -2224,14 +2442,20 @@ export class WorkoutEditorView extends FileView {
       durationEntries: [],
       bodyweightSets: [],
     }
+    if (kind === 'duration') {
+      card.plan = this.lastIntervalPlan(trimmed)
+    }
     this.markSeededWeight(seedEmptyRow(card, this.exerciseHistory?.get(trimmed)))
     this.model.exercises.push(card)
     this.markDirty()
     this.render()
     const focusLabel = FOCUS_COLUMN_LABELS[kind]
     this.focusRowCell(exerciseIndex, 0, focusLabel)
+    if (registryType === 'interval' && card.plan === undefined) {
+      this.openIntervalPlanModal(card)
+    }
 
-    if (registryKind === null) {
+    if (registryType === null) {
       const wasDeleted = (this.plugin.settings.deletedExercises ?? []).some(
         (deletedName) => normalize(deletedName) === normalize(trimmed),
       )
@@ -2256,70 +2480,10 @@ export class WorkoutEditorView extends FileView {
     kind: ExerciseKind,
     createNote: boolean,
   ): Promise<void> {
-    let settingsChanged = false
-    const deletedKey = normalize(name)
-    const previousDeleted = this.plugin.settings.deletedExercises ?? []
-    const hadTombstone = previousDeleted.some(
-      (deletedName) => normalize(deletedName) === deletedKey,
-    )
-
-    if (createNote) {
-      const path = normalizePath(`${exercisesFolder(this.plugin.settings)}/${name}.md`)
-      if (!this.app.vault.getAbstractFileByPath(path)) {
-        try {
-          await ensureParentFolder(this.app, path)
-          await this.app.vault.create(
-            path,
-            composeExerciseNote(name, kind, workoutsFolder(this.plugin.settings)),
-          )
-        } catch (error) {
-          new Notice(`Could not create exercise note for '${name}': ${formatErrorMessage(error)}.`)
-          return
-        }
-        /**
-         * A note-backed exercise still needs a registry entry so it shows up in
-         * the settings Registry table, which lists settings.exerciseRegistry
-         * directly rather than the note-merged snapshot.
-         */
-        const registry = createRegistry(this.plugin.settings.exerciseRegistry)
-        if (kindForName(registry, name) === null) {
-          this.plugin.settings.exerciseRegistry = upsertEntry(registry, {
-            name,
-            kind,
-            aliases: [],
-          }).entries
-          settingsChanged = true
-        }
-        new Notice(`Created exercise note for '${name}'.`)
-      } else {
-        new Notice(
-          hadTombstone
-            ? `Restored '${name}' using the existing exercise note.`
-            : `Using existing exercise note for '${name}'.`,
-        )
-      }
-    } else {
-      const registry = createRegistry(this.plugin.settings.exerciseRegistry)
-      if (kindForName(registry, name) === null) {
-        this.plugin.settings.exerciseRegistry = upsertEntry(registry, {
-          name,
-          kind,
-          aliases: [],
-        }).entries
-        settingsChanged = true
-        new Notice(`Added '${name}' as a no-note registry entry.`)
-      }
-    }
-
-    if (hadTombstone) {
-      this.plugin.settings.deletedExercises = previousDeleted.filter(
-        (deletedName) => normalize(deletedName) !== deletedKey,
-      )
-      settingsChanged = true
-    }
-
-    if (settingsChanged) {
-      await this.plugin.saveSettings()
+    const result = await this.exerciseStore.ensureKnown(name, kind, { createNote })
+    const notice = ensureKnownNotice(name, result)
+    if (notice) {
+      new Notice(notice)
     }
   }
 
@@ -2332,7 +2496,7 @@ export class WorkoutEditorView extends FileView {
       return
     }
     const names = await this.collectExerciseSuggestions()
-    const registry = createRegistry(exerciseRegistryWithVaultNotes(this.app, this.plugin.settings))
+    const registry = this.exerciseStore.registry()
     const modal = new ExerciseSuggestModal(this.app, names, (name) => {
       const trimmed = name.trim()
       if (!trimmed || !this.model) {
@@ -2348,7 +2512,7 @@ export class WorkoutEditorView extends FileView {
   private async applyRename(
     index: number,
     trimmed: string,
-    registry: ReturnType<typeof createRegistry>,
+    registry: ExerciseRegistry,
   ): Promise<void> {
     if (!this.model) {
       return
@@ -2360,29 +2524,22 @@ export class WorkoutEditorView extends FileView {
     if (target.name === trimmed) {
       return
     }
-    const nextKind = kindForName(registry, trimmed)
-    if (nextKind && nextKind !== target.kind) {
-      const hadRows = hasRows(target)
-      const confirmed = await this.confirmKindSwitch(target, nextKind)
-      if (!confirmed) {
-        return
-      }
-      /** Captured before the switch clears the card, mirroring the card menu path. */
-      const relabelSource = nextKind === 'bodyweight' ? toWorkoutExercise(target) : null
-      target.name = trimmed
-      this.applyKindSwitch(index, nextKind, hadRows)
-      if (nextKind === 'bodyweight' && relabelSource) {
-        const switched = this.model.exercises[index]
-        if (switched) {
-          await this.seedBodyweightLadder(switched)
-        }
-        await this.offerFirstLevelRelabel(index, relabelSource)
-      }
+    const registryType = typeForName(registry, trimmed)
+    const loggedType = loggedTypeOf(target)
+    /** The registry already holds the new name's type, so the switch is the card menu's this-workout one. */
+    const plan =
+      registryType && registryType !== loggedType
+        ? planTypeSwitch({ loggedType, target: registryType, registryType, scope: 'workout' })
+        : null
+    if (plan?.changesKind && !(await this.confirmKindSwitch(target, kindOfType(plan.target)))) {
       return
     }
     target.name = trimmed
     this.markDirty()
     this.render()
+    if (plan) {
+      await this.runTypeSwitch(index, plan)
+    }
   }
 
   private async collectExerciseSuggestions(): Promise<string[]> {
@@ -2421,9 +2578,7 @@ export class WorkoutEditorView extends FileView {
   }
 
   private markDirty(): void {
-    this.dirty = true
-    this.updateMetaText()
-    this.scheduleAutoSave()
+    this.autosaver.markDirty()
   }
 
   /**
@@ -2446,7 +2601,7 @@ export class WorkoutEditorView extends FileView {
     if (identity.length > 0) {
       parts.push(identity.join(', '))
     }
-    if (this.dirty) {
+    if (this.autosaver.state().dirty) {
       parts.push('unsaved')
     }
     return parts.join(' | ')
@@ -2456,66 +2611,6 @@ export class WorkoutEditorView extends FileView {
     const line = this.contentEl.querySelector('.fitkit-meta-line')
     if (line instanceof HTMLElement) {
       line.setText(this.metaLineText())
-    }
-  }
-
-  private scheduleAutoSave(): void {
-    if (this.conflictDetected) {
-      return
-    }
-    if (this.autoSaveTimer !== null) {
-      window.clearTimeout(this.autoSaveTimer)
-    }
-    this.autoSaveTimer = window.setTimeout(() => {
-      this.autoSaveTimer = null
-      void this.flushAutoSave()
-    }, this.plugin.settings.autosaveDebounceMs)
-  }
-
-  private async flushAutoSave(): Promise<void> {
-    if (!this.session || !this.model) {
-      return
-    }
-    if (!this.dirty || !this.model.isFitKitWorkout) {
-      return
-    }
-    if (this.conflictDetected) {
-      return
-    }
-    if (this.autoSaveInflight) {
-      this.autoSaveRequeued = true
-      return
-    }
-    this.autoSaveInflight = true
-    /**
-     * Captured before the write so a concurrent onClose/loadFile on this view
-     * (which can null out or reassign this.session while we await below)
-     * cannot make the refresh below crash or target the wrong file.
-     */
-    const session = this.session
-    const path = session.file.path
-    try {
-      const nextText = serializeWorkoutNote(toWorkoutNoteModel(this.model))
-      const result = await session.saveIfUnchanged(nextText)
-      if (!result.ok) {
-        this.conflictDetected = true
-        new Notice('File changed on disk. Reload before further edits.')
-        this.render()
-        return
-      }
-      this.dirty = false
-      this.updateMetaText()
-      /** A refresh failure is a cache-staleness problem, not a save failure; never let it surface as an unhandled rejection or block the finally below. */
-      await this.plugin.refreshIndexEntry(path).catch(() => undefined)
-    } finally {
-      this.autoSaveInflight = false
-      if (this.autoSaveRequeued) {
-        this.autoSaveRequeued = false
-        /** Only reschedule if the view is still live; onClose may have torn down session/model while this save was in flight. */
-        if (this.session) {
-          this.scheduleAutoSave()
-        }
-      }
     }
   }
 }
@@ -2612,6 +2707,19 @@ function setAriaInvalid(element: HTMLElement, invalid: boolean): void {
   } else {
     element.toggleAttribute('aria-invalid', false)
   }
+}
+
+/**
+ * Shows a menu under the button `evt` came from, or at the pointer. The position is read now,
+ * since `currentTarget` is gone once the event has been handled.
+ */
+function showCardMenuAt(evt: MouseEvent): (menu: Menu) => void {
+  const target = evt.currentTarget
+  if (target instanceof HTMLElement) {
+    const position = menuAnchorForTrigger(target.getBoundingClientRect())
+    return (menu) => menu.showAtPosition(position)
+  }
+  return (menu) => menu.showAtMouseEvent(evt)
 }
 
 function hasRows(card: ExerciseCard): boolean {
@@ -2717,6 +2825,9 @@ export function toEditorExercise(exercise: ExerciseEntry): ExerciseCard {
         durationEntries: exercise.durationEntries.map(toEditorDurationEntry),
         bodyweightSets: [],
       }
+      if (exercise.plan !== undefined) {
+        card.plan = exercise.plan
+      }
       break
     default:
       return assertUnreachableKind(exercise)
@@ -2768,19 +2879,7 @@ function toEditorBodyweightSet(set: BodyweightSet): EditableBodyweightSet {
 }
 
 function toEditorDurationEntry(entry: DurationEntry): EditableDurationEntry {
-  const editable: EditableDurationEntry = {
-    durationSeconds: entry.durationSeconds,
-  }
-  if (entry.set !== undefined) {
-    editable.set = entry.set
-  }
-  if (entry.startedAt !== undefined) {
-    editable.startedAt = entry.startedAt
-  }
-  if (entry.note !== undefined) {
-    editable.note = entry.note
-  }
-  return editable
+  return { ...entry }
 }
 
 function toWorkoutNoteModel(model: EditorWorkoutModel): WorkoutNoteModel {
@@ -2815,6 +2914,61 @@ export function formatLadderChangesWarning(
   }
 }
 
+/** Notices for a recorded type change, in the order they are shown. */
+export function typeRecordNotices(result: TypeRecordResult, type: ExerciseType): string[] {
+  const { name } = result
+  const warning = result.customRecentSessions
+    ? [
+        `The Recent sessions query in the note for ${name} looks customised, so it was left as it is and still reads the old kind's fields.`,
+      ]
+    : []
+  switch (result.wrote) {
+    case 'note':
+      return [
+        ...warning,
+        `Exercise note now records ${name} as ${type}.`,
+        `Registry now records ${name} as ${type}.`,
+      ]
+    case 'registry':
+      return [...warning, `Registry now records ${name} as ${type}.`]
+    case 'note-unchanged':
+      return [
+        ...warning,
+        `Could not update the exercise note for ${name}; its frontmatter was left unchanged.`,
+      ]
+  }
+}
+
+/** Notice for a recorded ladder; null when an unchanged note leaves nothing to report. */
+export function ladderRecordNotice(result: LadderRecordResult): string | null {
+  switch (result.wrote) {
+    case 'note':
+      return `Exercise note now records levels for ${result.name}.`
+    case 'registry':
+      return `Registry now records levels for ${result.name}.`
+    case 'note-unchanged':
+      return null
+  }
+}
+
+/** Notice for adding an unknown exercise; null when it was already known. */
+export function ensureKnownNotice(name: string, result: EnsureKnownResult): string | null {
+  switch (result.outcome) {
+    case 'note-created':
+      return `Created exercise note for '${name}'.`
+    case 'note-reused':
+      return result.restored
+        ? `Restored '${name}' using the existing exercise note.`
+        : `Using existing exercise note for '${name}'.`
+    case 'registry-added':
+      return `Added '${name}' as a no-note registry entry.`
+    case 'already-known':
+      return null
+    case 'note-failed':
+      return `Could not create exercise note for '${name}': ${result.message}.`
+  }
+}
+
 export function toWorkoutExercise(card: ExerciseCard): ExerciseEntry {
   const note = card.exerciseNotes
   const next = card.next
@@ -2832,6 +2986,9 @@ export function toWorkoutExercise(card: ExerciseCard): ExerciseEntry {
         exerciseName: card.name,
         kind: card.kind,
         durationEntries: card.durationEntries.map(toDurationEntry),
+      }
+      if (card.plan !== undefined) {
+        entry.plan = card.plan
       }
       return withNoteAndNext(entry, note, next)
     }
@@ -2883,19 +3040,7 @@ function toBodyweightSet(set: EditableBodyweightSet): BodyweightSet {
 }
 
 function toDurationEntry(entry: EditableDurationEntry): DurationEntry {
-  const durationEntry: DurationEntry = {
-    durationSeconds: entry.durationSeconds ?? 0,
-  }
-  if (entry.set !== undefined) {
-    durationEntry.set = entry.set
-  }
-  if (entry.startedAt !== undefined) {
-    durationEntry.startedAt = entry.startedAt
-  }
-  if (entry.note !== undefined) {
-    durationEntry.note = entry.note
-  }
-  return durationEntry
+  return { ...entry, durationSeconds: entry.durationSeconds ?? 0 }
 }
 
 function readCardIndex(card: HTMLElement): number | null {
@@ -2909,4 +3054,57 @@ function readCardIndex(card: HTMLElement): number | null {
 
 function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+const INTENSITY_LABELS: Record<IntensityKind, string> = {
+  watts: 'Watts',
+  load: 'Load',
+  level: 'Level',
+}
+
+interface IntervalColumns {
+  plan: IntervalProgram | null
+  intensity: IntensityKind | null
+  rest: boolean
+}
+
+/** Which interval columns a duration card shows: the plan's intensity, or whichever its rows already log. */
+function intervalColumns(card: ExerciseCard): IntervalColumns {
+  const parsed = card.plan === undefined ? null : parseIntervalProgram(card.plan)
+  const plan = parsed?.ok ? parsed.program : null
+  const logged = INTENSITY_KINDS.find((kind) =>
+    card.durationEntries.some((entry) => entry[kind] !== undefined),
+  )
+  return {
+    plan,
+    intensity: plan?.intensity ?? logged ?? null,
+    rest:
+      plan?.steps.some(restsAfter) === true ||
+      card.durationEntries.some((entry) => entry.restSeconds !== undefined),
+  }
+}
+
+function durationRowClasses(columns: IntervalColumns, base: string): string {
+  return [base, columns.intensity ? 'has-intensity' : '', columns.rest ? 'has-rest' : '']
+    .filter(Boolean)
+    .join(' ')
+}
+
+/** One past the highest set number, so a set added after a deletion never repeats one. */
+function nextSetNumber(entries: readonly { set?: number }[]): number {
+  return entries.reduce((high, entry, index) => Math.max(high, entry.set ?? index + 1), 0) + 1
+}
+
+/** Intensity and rest a new row starts from, copied from the row before it. */
+function carriedIntervalFields(last: EditableDurationEntry | undefined): EditableDurationEntry {
+  const carried: EditableDurationEntry = {}
+  for (const kind of INTENSITY_KINDS) {
+    if (last?.[kind] !== undefined) {
+      carried[kind] = last[kind]
+    }
+  }
+  if (last?.restSeconds !== undefined) {
+    carried.restSeconds = last.restSeconds
+  }
+  return carried
 }

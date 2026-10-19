@@ -508,6 +508,49 @@ TABLE WITHOUT ID file.link
     )
     expect(plan.resultLevels).toEqual(['Wall push-up', 'Knee push-up'])
   })
+
+  it('keeps an interval exercise interval through a rename', () => {
+    const plan = buildExerciseRenamePlan(
+      baseInput({
+        oldName: 'Bike',
+        newName: 'Air bike',
+        registry: [{ name: 'Bike', kind: 'duration', interval: true, aliases: [] }],
+      }),
+    )
+    expect([plan.resultKind, plan.resultInterval]).toEqual(['duration', true])
+  })
+
+  it('takes the interval marker from the note when a saved entry lost it', () => {
+    const plan = buildExerciseRenamePlan(
+      baseInput({
+        oldName: 'Bike',
+        newName: 'Air bike',
+        registry: [{ name: 'Bike', kind: 'duration', aliases: [] }],
+        catalog: [
+          { name: 'Bike', path: 'Fitness/Exercises/Bike.md', kind: 'duration', interval: true },
+        ],
+      }),
+    )
+    expect(plan.resultInterval).toBe(true)
+  })
+
+  it('takes the interval marker from the surviving entry on a merge', () => {
+    const plan = buildExerciseRenamePlan(
+      baseInput({
+        oldName: 'Bike',
+        newName: 'Row',
+        registry: [
+          { name: 'Bike', kind: 'duration', interval: true, aliases: [] },
+          { name: 'Row', kind: 'duration', aliases: [] },
+        ],
+      }),
+    )
+    expect([plan.operation, plan.resultKind, plan.resultInterval]).toEqual([
+      'merge',
+      'duration',
+      undefined,
+    ])
+  })
 })
 
 describe('rewriteWorkoutNoteOccurrences', () => {
