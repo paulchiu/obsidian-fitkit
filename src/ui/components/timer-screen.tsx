@@ -158,7 +158,8 @@ function Clock({
   return <div class="fitkit-runner-clock" ref={clock} />
 }
 
-function Control({
+/** A labelled icon button; the icon is drawn through the host. */
+export function Control({
   icon,
   text,
   label,

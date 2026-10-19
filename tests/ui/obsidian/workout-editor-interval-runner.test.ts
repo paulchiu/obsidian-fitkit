@@ -147,8 +147,8 @@ vi.mock('obsidian', async () => {
 
 import { TFile } from 'obsidian'
 import type { App, WorkspaceLeaf } from 'obsidian'
+import { options } from 'preact'
 
-import type { IndexEntry } from '../../../src/domain/types'
 import FitKitPlugin from '../../../src/main'
 import { DEFAULT_SETTINGS } from '../../../src/settings'
 import { WorkoutEditorView } from '../../../src/ui/obsidian/workout-editor-view'
@@ -192,24 +192,16 @@ const runTo = (time: string): void => {
 const openView = async (
   source: string,
   settings: Partial<typeof DEFAULT_SETTINGS> = {},
-  history: IndexEntry[] = [],
-  otherNotes: Record<string, string> = {},
 ): Promise<{ view: WorkoutEditorView; contents: Map<string, string>; plugin: FitKitPlugin }> => {
-  const files = [WORKOUT_PATH, ...Object.keys(otherNotes)].map((path) =>
-    Object.assign(new TFile(), {
-      path,
-      basename: path.slice(path.lastIndexOf('/') + 1).replace(/\.md$/, ''),
-    }),
-  )
-  const contents = new Map([[WORKOUT_PATH, source], ...Object.entries(otherNotes)])
+  const file = Object.assign(new TFile(), { path: WORKOUT_PATH, basename: '2026-10-12' })
+  const contents = new Map([[WORKOUT_PATH, source]])
   const vault = {
-    getFolderByPath: buildMockVaultFolderTree(files).getFolderByPath,
+    getFolderByPath: buildMockVaultFolderTree([file]).getFolderByPath,
     read: async (target: TFile): Promise<string> => contents.get(target.path) ?? '',
     process: async (target: TFile, callback: (text: string) => string): Promise<void> => {
       contents.set(target.path, callback(contents.get(target.path) ?? ''))
     },
-    getAbstractFileByPath: (path: string): TFile | null =>
-      files.find((candidate) => candidate.path === path) ?? null,
+    getAbstractFileByPath: (path: string): TFile | null => (path === WORKOUT_PATH ? file : null),
   }
   const app = {
     vault,
@@ -220,7 +212,7 @@ const openView = async (
   plugin.settings = { ...DEFAULT_SETTINGS, ...settings }
   plugin.refreshIndexEntry = async (): Promise<void> => {}
   plugin.saveData = async (): Promise<void> => {}
-  plugin.cachedIndex = { schemaVersion: 1, builtAt: 0, entries: history, diagnostics: [] }
+  plugin.cachedIndex = { schemaVersion: 1, builtAt: 0, entries: [], diagnostics: [] }
   const view = new WorkoutEditorView({ app } as unknown as WorkspaceLeaf, plugin)
   await view.onOpen()
   await view.setState({ file: WORKOUT_PATH }, { history: false })
@@ -588,6 +580,42 @@ describe('WorkoutEditorView interval runner', () => {
   })
 
   describe('leaving', () => {
+    const LEAVE: ReadonlyArray<{
+      leaving: string
+      leave: (view: WorkoutEditorView) => Promise<void> | void
+    }> = [
+      { leaving: 'End run', leave: (view) => button(view, 'End run').click() },
+      {
+        leaving: 'finishing',
+        leave: (view) => {
+          runTo('07:20:00')
+          runnerButton(view, 'Back to workout').click()
+        },
+      },
+      { leaving: 'closing the tab', leave: (view) => view.onClose() },
+    ]
+
+    it.each(LEAVE)('unmounts the runner on $leaving', async ({ leave }) => {
+      const view = await start(...BIKE)
+      const unmounted: string[] = []
+      const previous = { ...options }
+      options.unmount = (vnode) => {
+        const cls = (vnode.props as { class?: unknown }).class
+        if (typeof cls === 'string') {
+          unmounted.push(cls)
+        }
+        previous.unmount?.(vnode)
+      }
+
+      try {
+        await leave(view)
+      } finally {
+        Object.assign(options, previous)
+      }
+
+      expect(unmounted.some((cls) => cls.split(' ').includes('fitkit-runner'))).toBe(true)
+    })
+
     it('leaves the tab empty when it closes on the runner', async () => {
       const view = await start(...BIKE)
 

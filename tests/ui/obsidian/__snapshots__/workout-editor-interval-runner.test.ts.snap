@@ -96,10 +96,12 @@ exports[`WorkoutEditorView interval runner > draws the runner resting while paus
   button.fitkit-btn.fitkit-runner-primary[disabled=][type=button]
     "Skip"
   div.fitkit-runner-controls
-    button.fitkit-btn[aria-label=Resume run][data-icon=play][type=button]
+    button.fitkit-btn[aria-label=Resume run][type=button]
+      span.fitkit-runner-icon[data-icon=play]
       span
         "Resume"
-    button.fitkit-btn[aria-label=End run][data-icon=square][type=button]
+    button.fitkit-btn[aria-label=End run][type=button]
+      span.fitkit-runner-icon[data-icon=square]
       span
         "End run""
 `;
@@ -134,10 +136,12 @@ exports[`WorkoutEditorView interval runner > draws the runner resting with the s
   button.fitkit-btn.fitkit-runner-primary[type=button]
     "Skip"
   div.fitkit-runner-controls
-    button.fitkit-btn[aria-label=Pause run][data-icon=pause][type=button]
+    button.fitkit-btn[aria-label=Pause run][type=button]
+      span.fitkit-runner-icon[data-icon=pause]
       span
         "Pause"
-    button.fitkit-btn[aria-label=End run][data-icon=square][type=button]
+    button.fitkit-btn[aria-label=End run][type=button]
+      span.fitkit-runner-icon[data-icon=square]
       span
         "End run""
 `;
@@ -168,10 +172,12 @@ exports[`WorkoutEditorView interval runner > draws the runner working a named st
   button.fitkit-btn.fitkit-runner-primary.fitkit-btn-primary[type=button]
     "Next"
   div.fitkit-runner-controls
-    button.fitkit-btn[aria-label=Pause run][data-icon=pause][type=button]
+    button.fitkit-btn[aria-label=Pause run][type=button]
+      span.fitkit-runner-icon[data-icon=pause]
       span
         "Pause"
-    button.fitkit-btn[aria-label=End run][data-icon=square][type=button]
+    button.fitkit-btn[aria-label=End run][type=button]
+      span.fitkit-runner-icon[data-icon=square]
       span
         "End run""
 `;
@@ -208,10 +214,12 @@ exports[`WorkoutEditorView interval runner > draws the runner working a step in 
   button.fitkit-btn.fitkit-runner-primary.fitkit-btn-primary[type=button]
     "Next"
   div.fitkit-runner-controls
-    button.fitkit-btn[aria-label=Pause run][data-icon=pause][type=button]
+    button.fitkit-btn[aria-label=Pause run][type=button]
+      span.fitkit-runner-icon[data-icon=pause]
       span
         "Pause"
-    button.fitkit-btn[aria-label=End run][data-icon=square][type=button]
+    button.fitkit-btn[aria-label=End run][type=button]
+      span.fitkit-runner-icon[data-icon=square]
       span
         "End run""
 `;
@@ -233,10 +241,12 @@ exports[`WorkoutEditorView interval runner > draws the runner working the last s
   button.fitkit-btn.fitkit-runner-primary.fitkit-btn-primary[type=button]
     "Finish"
   div.fitkit-runner-controls
-    button.fitkit-btn[aria-label=Pause run][data-icon=pause][type=button]
+    button.fitkit-btn[aria-label=Pause run][type=button]
+      span.fitkit-runner-icon[data-icon=pause]
       span
         "Pause"
-    button.fitkit-btn[aria-label=End run][data-icon=square][type=button]
+    button.fitkit-btn[aria-label=End run][type=button]
+      span.fitkit-runner-icon[data-icon=square]
       span
         "End run""
 `;
@@ -264,10 +274,12 @@ exports[`WorkoutEditorView interval runner > draws the runner working while paus
   button.fitkit-btn.fitkit-runner-primary.fitkit-btn-primary[disabled=][type=button]
     "Rest"
   div.fitkit-runner-controls
-    button.fitkit-btn[aria-label=Resume run][data-icon=play][type=button]
+    button.fitkit-btn[aria-label=Resume run][type=button]
+      span.fitkit-runner-icon[data-icon=play]
       span
         "Resume"
-    button.fitkit-btn[aria-label=End run][data-icon=square][type=button]
+    button.fitkit-btn[aria-label=End run][type=button]
+      span.fitkit-runner-icon[data-icon=square]
       span
         "End run""
 `;
@@ -293,10 +305,12 @@ exports[`WorkoutEditorView interval runner > draws the runner working, no step n
   button.fitkit-btn.fitkit-runner-primary.fitkit-btn-primary[type=button]
     "Rest"
   div.fitkit-runner-controls
-    button.fitkit-btn[aria-label=Pause run][data-icon=pause][type=button]
+    button.fitkit-btn[aria-label=Pause run][type=button]
+      span.fitkit-runner-icon[data-icon=pause]
       span
         "Pause"
-    button.fitkit-btn[aria-label=End run][data-icon=square][type=button]
+    button.fitkit-btn[aria-label=End run][type=button]
+      span.fitkit-runner-icon[data-icon=square]
       span
         "End run""
 `;
