@@ -123,7 +123,7 @@ function renderExercisePreview(
   plugin: FitKitPlugin,
   ctx: MarkdownPostProcessorContext,
 ): void {
-  /** One snapshot per preview: the plan line, the set table and the ladder must all agree. */
+  // One snapshot per preview, so the plan line, the set table and the ladder agree.
   const registry = createRegistry(exerciseRegistryWithVaultNotes(plugin.app, plugin.settings))
   const unit = unitForName(registry, exercise.exerciseName) ?? DEFAULT_WEIGHT_UNIT
   const preview = buildReadingPreview(
@@ -132,7 +132,6 @@ function renderExercisePreview(
     levelsForName(registry, exercise.exerciseName),
   )
 
-  /** Preact adopts or removes a container's existing children, so it gets an element of its own. */
   const wrap = el.createDiv({ cls: 'fitkit-reading-preview' })
   const child = preactRenderChild(wrap)
   child.register(() => wrap.remove())

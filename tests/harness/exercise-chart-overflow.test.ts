@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import type { ChartSeries } from '../../src/domain/exercise-chart'
-import { renderChart } from './render-chart'
+import {
+  renderExerciseChart,
+  type ExerciseChartProps,
+} from '../../src/ui/components/exercise-chart'
 import { createTestRoot } from './obsidian-dom'
 import { measureSvgOverflow, serializeSvg, type SvgOverflow } from './svg-layout'
 
@@ -40,10 +43,10 @@ function bodyweightSeries(): ChartSeries {
 /** Render a series through the real chart renderer, failing when no SVG is drawn. */
 function renderedChart(
   series: ChartSeries,
-  options: Parameters<typeof renderChart>[2] = {},
+  options: Omit<ExerciseChartProps, 'series'> = {},
 ): Element {
   const root = createTestRoot()
-  renderChart(root, series, options)
+  renderExerciseChart(root, { series, ...options })
   const svg = root.querySelector('svg')
   expect(svg).not.toBeNull()
   return svg as Element

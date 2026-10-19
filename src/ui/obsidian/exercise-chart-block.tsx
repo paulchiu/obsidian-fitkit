@@ -6,8 +6,6 @@ import {
   type MarkdownPostProcessorContext,
 } from 'obsidian'
 
-import { render } from 'preact'
-
 import {
   parseExerciseChartBlock,
   resolveExerciseChartMetric,
@@ -31,7 +29,7 @@ import { exerciseRegistryWithVaultNotes } from '../../vault/exercise-registry-va
 import { DEFAULT_WEIGHT_UNIT, parseWeightUnit, type WeightUnit } from '../../domain/weight-unit'
 import type { BodyweightLadder } from '../../domain/bodyweight-levels'
 import type { ChartSeries } from '../../domain/exercise-chart'
-import { ChartMessage, ExerciseChart } from '../components/exercise-chart'
+import { renderChartMessage, renderExerciseChart } from '../components/exercise-chart'
 import { preactRenderChild } from './preact-render-child'
 
 type KindFrontmatterResult =
@@ -41,8 +39,8 @@ type KindFrontmatterResult =
 
 /** What a chart block shows: a message, or the exercise's chart. */
 type ChartView =
-  | { message: string }
-  | { series: ChartSeries; notes: string[]; ladder: BodyweightLadder | undefined }
+  | { kind: 'message'; text: string }
+  | { kind: 'chart'; series: ChartSeries; notes: string[]; ladder: BodyweightLadder | undefined }
 
 export async function renderExerciseChartBlock(
   plugin: FitKitPlugin,
@@ -51,24 +49,23 @@ export async function renderExerciseChartBlock(
   ctx: MarkdownPostProcessorContext,
 ): Promise<void> {
   ctx.addChild(preactRenderChild(el))
-  el.addClass('fitkit-chart')
   try {
     drawChartView(el, await buildChartView(plugin, source, ctx))
   } catch {
     new Notice('Failed to render chart block.')
-    drawChartView(el, { message: 'fitkit-chart: failed to render.' })
+    renderChartMessage(el, 'fitkit-chart: failed to render.')
   }
 }
 
 function drawChartView(el: HTMLElement, view: ChartView): void {
-  render(
-    'message' in view ? (
-      <ChartMessage text={view.message} />
-    ) : (
-      <ExerciseChart series={view.series} notes={view.notes} ladder={view.ladder} />
-    ),
-    el,
-  )
+  switch (view.kind) {
+    case 'message':
+      renderChartMessage(el, view.text)
+      break
+    case 'chart':
+      renderExerciseChart(el, view)
+      break
+  }
 }
 
 async function buildChartView(
@@ -86,7 +83,8 @@ async function buildChartView(
     parsed.exerciseName ?? (sourceIsExerciseNote && sourceFile ? sourceFile.basename : null)
   if (!exerciseName) {
     return {
-      message: "fitkit-chart: set 'exercise: <name>' or place this block inside an exercise note.",
+      kind: 'message',
+      text: "fitkit-chart: set 'exercise: <name>' or place this block inside an exercise note.",
     }
   }
 
@@ -169,7 +167,7 @@ async function buildChartView(
     metric,
     weightUnit,
   )
-  return { series, notes, ladder: levelsForName(registry, exerciseName) }
+  return { kind: 'chart', series, notes, ladder: levelsForName(registry, exerciseName) }
 }
 
 function resolveSourceFile(plugin: FitKitPlugin, ctx: MarkdownPostProcessorContext): TFile | null {

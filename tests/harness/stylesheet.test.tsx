@@ -30,7 +30,7 @@ import { render } from 'preact'
 
 import { ReadingPreviewBody } from '../../src/ui/components/reading-preview'
 import { buildReadingPreview } from '../../src/ui/model/reading-preview'
-import { renderChart } from './render-chart'
+import { renderChartMessage, renderExerciseChart } from '../../src/ui/components/exercise-chart'
 import { PlanStepModal } from '../../src/ui/obsidian/plan-step-modal'
 
 beforeAll(() => {
@@ -153,7 +153,7 @@ describe('unstyled render', () => {
   it('finds no unstyled class in a rendered chart', () => {
     const root = createTestRoot()
     harnessDocument.body.appendChild(root)
-    renderChart(root, chartSeries(), { notes: ['note one'] })
+    renderExerciseChart(root, { series: chartSeries(), notes: ['note one'] })
 
     expect(findUnstyledClasses(root)).toEqual([])
   })
@@ -161,7 +161,7 @@ describe('unstyled render', () => {
   it('finds no unstyled class in a rendered empty chart', () => {
     const root = createTestRoot()
     harnessDocument.body.appendChild(root)
-    renderChart(root, { ...chartSeries(), points: [] })
+    renderExerciseChart(root, { series: { ...chartSeries(), points: [] } })
 
     expect(findUnstyledClasses(root)).toEqual([])
   })
@@ -179,6 +179,14 @@ describe('unstyled render', () => {
     render(<ReadingPreviewBody preview={buildReadingPreview(exercise, 'kg', undefined)} />, root)
 
     expect(root.querySelector('table')).not.toBeNull()
+    expect(findUnstyledClasses(root)).toEqual([])
+  })
+
+  it('finds no unstyled class in a rendered chart message', () => {
+    const root = createTestRoot()
+    harnessDocument.body.appendChild(root)
+    renderChartMessage(root, 'fitkit-chart: failed to render.')
+
     expect(findUnstyledClasses(root)).toEqual([])
   })
 

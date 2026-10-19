@@ -6,14 +6,8 @@ import {
   niceRange,
   pickXTickIndices,
 } from '../../src/domain/exercise-chart'
-import type { ChartSeries } from '../../src/domain/exercise-chart'
 import { createRegistry } from '../../src/domain/exercise-registry'
 import type { ExerciseIndexRow, FitKitIndex, IndexEntry } from '../../src/domain/types'
-import {
-  chartYAxisTitle,
-  formatChartTooltip,
-  formatChartValue,
-} from '../../src/ui/model/exercise-chart-layout'
 
 function fitKitIndex(entries: IndexEntry[]): FitKitIndex {
   return {
@@ -480,7 +474,7 @@ describe('buildExerciseChartSeries', () => {
     expect(series.points[0]?.value).toBeCloseTo(133.3333333333)
   })
 
-  it('formats e1rm chart axis values and tooltips with the active unit', () => {
+  it('derives the e1rm point from the best set', () => {
     const series = buildExerciseChartSeries(
       fitKitIndex([
         entry('w/2026-04-01.md', '2026-04-01', [
@@ -497,14 +491,10 @@ describe('buildExerciseChartSeries', () => {
       30,
       'e1rm',
     )
-    const point = series.points[0]
-    if (!point) {
-      throw new Error('Expected chart point')
-    }
 
-    expect(chartYAxisTitle(series)).toBe('e1rm (kg)')
-    expect(formatChartValue(point.value, series)).toBe('114.0kg')
-    expect(formatChartTooltip(point.date, point.value, series)).toBe('2026-04-01: e1rm 114.0kg')
+    expect(series.points).toEqual([
+      { date: '2026-04-01', value: 114, workoutPath: 'w/2026-04-01.md' },
+    ])
   })
 
   it('uses the registry weight unit for weight and e1rm series', () => {
@@ -530,67 +520,7 @@ describe('buildExerciseChartSeries', () => {
     )
 
     expect(series.unit).toBe('lbs')
-    expect(formatChartValue(series.points[0]?.value ?? 0, series)).toBe('233.3lbs')
-  })
-
-  it('formats weight and e1rm chart values with kg and lbs suffixes', () => {
-    const baseSeries = {
-      exerciseName: 'Bench Press',
-      kind: 'strength',
-      points: [],
-      windowRequested: 30,
-      totalDates: 0,
-    } satisfies Omit<ChartSeries, 'metric' | 'unit'>
-
-    expect(formatChartValue(80, { ...baseSeries, metric: 'weight', unit: 'kg' })).toBe('80kg')
-    expect(formatChartValue(200, { ...baseSeries, metric: 'weight', unit: 'lbs' })).toBe('200lbs')
-    expect(formatChartValue(114.5, { ...baseSeries, metric: 'e1rm', unit: 'kg' })).toBe('114.5kg')
-    expect(formatChartValue(233.3, { ...baseSeries, metric: 'e1rm', unit: 'lbs' })).toBe('233.3lbs')
-  })
-
-  it('names the rung in a level tooltip instead of a duration', () => {
-    const baseSeries = {
-      exerciseName: 'Push-up',
-      kind: 'bodyweight',
-      points: [],
-      windowRequested: 30,
-      totalDates: 0,
-    } satisfies Omit<ChartSeries, 'metric' | 'unit'>
-    const series: ChartSeries = { ...baseSeries, metric: 'level', unit: 'level' }
-
-    expect(formatChartTooltip('2026-04-01', 2, series, ['Wall push-up', 'Knee push-up'])).toBe(
-      '2026-04-01: Knee push-up',
-    )
-  })
-
-  it('reads a reps tooltip as a rep count', () => {
-    const baseSeries = {
-      exerciseName: 'Push-up',
-      kind: 'bodyweight',
-      points: [],
-      windowRequested: 30,
-      totalDates: 0,
-    } satisfies Omit<ChartSeries, 'metric' | 'unit'>
-    const series: ChartSeries = { ...baseSeries, metric: 'reps', unit: 'reps' }
-
-    expect(formatChartTooltip('2026-04-01', 8, series)).toBe('2026-04-01: 8 reps')
-  })
-
-  it('labels weight chart axes with the active unit', () => {
-    const series = buildExerciseChartSeries(
-      fitKitIndex([
-        entry('w/2026-04-01.md', '2026-04-01', [
-          { exerciseName: 'Bench Press', kind: 'strength', maxWeightSet: { weight: 200, reps: 5 } },
-        ]),
-      ]),
-      createRegistry([{ name: 'Bench Press', kind: 'strength', unit: 'lbs', aliases: [] }]),
-      'Bench Press',
-      'strength',
-      30,
-      'weight',
-    )
-
-    expect(chartYAxisTitle(series)).toBe('weight (lbs)')
+    expect(series.points[0]?.value).toBeCloseTo(233.3, 1)
   })
 
   it('breaks same-date same-value ties on lexicographic workoutPath', () => {
@@ -764,23 +694,6 @@ describe('buildExerciseChartSeries', () => {
       { date: '2026-04-02', value: 8, workoutPath: 'w/2026-04-02.md' },
       { date: '2026-04-03', value: 12, workoutPath: 'w/2026-04-03.md' },
     ])
-    expect(chartYAxisTitle(series)).toBe('reps')
-    expect(formatChartValue(12, series)).toBe('12 reps')
-    expect(formatChartTooltip('2026-04-03', 12, series)).toBe('2026-04-03: 12 reps')
-  })
-
-  it('labels a level series axis so it is not the only kind without a title', () => {
-    const series: ChartSeries = {
-      exerciseName: 'Push-Up',
-      kind: 'bodyweight',
-      metric: 'level',
-      unit: 'level',
-      points: [],
-      windowRequested: 30,
-      totalDates: 0,
-    }
-
-    expect(chartYAxisTitle(series)).toBe('level')
   })
 
   it('skips strength rows where weight is NaN or non-finite', () => {

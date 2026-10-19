@@ -1,3 +1,5 @@
+import { render } from 'preact'
+
 import type { BodyweightLadder } from '../../domain/bodyweight-levels'
 import type { ChartSeries } from '../../domain/exercise-chart'
 import {
@@ -14,8 +16,20 @@ export interface ExerciseChartProps {
 }
 
 /** A one-line message in the chart's empty-state style. */
-export function ChartMessage({ text }: { text: string }) {
+function ChartMessage({ text }: { text: string }) {
   return <div class="fitkit-chart-empty">{text}</div>
+}
+
+/** Draws the chart into `el`, which carries `fitkit-chart` for its margin and sizing. */
+export function renderExerciseChart(el: HTMLElement, props: ExerciseChartProps): void {
+  el.classList.add('fitkit-chart')
+  render(<ExerciseChart {...props} />, el)
+}
+
+/** Draws a one-line message into `el` in place of a chart. */
+export function renderChartMessage(el: HTMLElement, text: string): void {
+  el.classList.add('fitkit-chart')
+  render(<ChartMessage text={text} />, el)
 }
 
 /** The exercise chart's notes, title and plot, or its empty state when the series has no sessions. */

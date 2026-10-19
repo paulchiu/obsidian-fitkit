@@ -5,8 +5,8 @@ export function ReadingPreviewBody({ preview }: { preview: ReadingPreview }) {
   return (
     <>
       <div class="fitkit-reading-summary">
-        <span class="fitkit-reading-kind">{preview.kind}</span>
-        <span class="fitkit-reading-count">{preview.count}</span>
+        <span class="fitkit-reading-kind">{preview.typeLabel}</span>
+        <span class="fitkit-reading-count">{preview.rowCountLabel}</span>
       </div>
       {preview.note !== undefined && <div class="fitkit-reading-note">{preview.note}</div>}
       {preview.plans.map((plan) => (

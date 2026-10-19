@@ -11,23 +11,23 @@ export type ReadingTable = { headings: string[]; rows: string[][] } | { emptyMes
 
 /** What the reading-mode preview of one exercise shows. */
 export interface ReadingPreview {
-  kind: string
-  count: string
+  typeLabel: string
+  rowCountLabel: string
   note?: string
   /** Plan lines in display order. */
   plans: string[]
   table: ReadingTable
 }
 
-export function formatWeight(value: number | undefined, unit: WeightUnit): string {
+function formatWeight(value: number | undefined, unit: WeightUnit): string {
   return value === undefined || !Number.isFinite(value) ? '-' : `${value} ${unit}`
 }
 
-export function formatReps(value: number | undefined): string {
+function formatReps(value: number | undefined): string {
   return value === undefined || !Number.isFinite(value) ? '-' : String(value)
 }
 
-export function formatDurationSeconds(value: number | undefined): string {
+function formatDurationSeconds(value: number | undefined): string {
   return formatDurationInput(value) || '-'
 }
 
@@ -35,7 +35,7 @@ function formatSet(value: number): string {
   return Number.isFinite(value) && value > 0 ? String(value) : '-'
 }
 
-function rowCount(count: number): string {
+function rowCountLabel(count: number): string {
   return count === 1 ? '1 row' : `${count} rows`
 }
 
@@ -56,8 +56,8 @@ export function buildReadingPreview(
   }
   const { count, table } = countAndTable(exercise, unit, levels)
   return {
-    kind: EXERCISE_TYPE_LABELS[loggedTypeOf(exercise)],
-    count: rowCount(count),
+    typeLabel: EXERCISE_TYPE_LABELS[loggedTypeOf(exercise)],
+    rowCountLabel: rowCountLabel(count),
     ...(exercise.note ? { note: exercise.note } : {}),
     plans,
     table,

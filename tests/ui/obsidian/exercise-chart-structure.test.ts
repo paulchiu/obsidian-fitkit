@@ -3,9 +3,13 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { createTestRoot, harnessWindow } from '../../harness/obsidian-dom'
 
+const notices = vi.hoisted((): string[] => [])
+
 vi.mock('obsidian', () => {
   class Notice {
-    constructor(readonly message: string) {}
+    constructor(message: string) {
+      notices.push(message)
+    }
   }
 
   class MarkdownRenderChild {
@@ -64,14 +68,12 @@ const strengthIndex = (values: number[]): FitKitIndex =>
     maxWeightSet: { weight: value, reps: 5 },
   }))
 
-const durationIndex = (values: number[]): FitKkitIndexAlias =>
+const durationIndex = (values: number[]): FitKitIndex =>
   indexOf('Plank', values, (value) => ({
     exerciseName: '',
     kind: 'duration',
     totalDurationSeconds: value,
   }))
-
-type FitKkitIndexAlias = FitKitIndex
 
 const bodyweightIndex = (values: number[]): FitKitIndex =>
   indexOf('Push-Up', values, (level) => ({
@@ -182,7 +184,32 @@ describe('exercise chart block structure', () => {
     const plugin = withIndex(strengthIndex([]))
     plugin.getIndex = (): Promise<FitKitIndex> => Promise.reject(new Error('index unavailable'))
 
+    notices.length = 0
+
     expect(await draw(plugin, 'exercise: Bench Press')).toMatchSnapshot()
+    expect(notices).toEqual(['Failed to render chart block.'])
+  })
+
+  it('leaves the element unstyled until the chart is drawn', async () => {
+    const plugin = withIndex(strengthIndex([80, 85]))
+    let release: () => void = () => {}
+    plugin.getIndex = (): Promise<FitKitIndex> =>
+      new Promise((resolve) => {
+        release = () => resolve(strengthIndex([80, 85]))
+      })
+    const el = createTestRoot()
+
+    const drawing = renderExerciseChartBlock(
+      plugin,
+      'exercise: Bench Press\nkind: strength',
+      el,
+      createContext('Fitness/Dashboard.md'),
+    )
+    const classWhileLoading = el.className
+    release()
+    await drawing
+
+    expect([classWhileLoading, el.className]).toEqual(['', 'fitkit-chart'])
   })
 
   it('unmounts the chart when Obsidian unloads the block', async () => {

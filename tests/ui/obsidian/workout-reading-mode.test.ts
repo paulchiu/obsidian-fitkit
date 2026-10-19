@@ -33,7 +33,6 @@ vi.mock('obsidian', () => {
 import type { MarkdownPostProcessorContext } from 'obsidian'
 
 import type FitKitPlugin from '../../../src/main'
-import { formatDurationSeconds } from '../../../src/ui/model/reading-preview'
 import { renderWorkoutReadingModeSection } from '../../../src/ui/obsidian/workout-reading-mode'
 
 const strengthSection = [
@@ -355,6 +354,21 @@ describe('workout reading mode rendering', () => {
     expect(root.querySelectorAll('.fitkit-reading-hidden-source-row')).toHaveLength(0)
   })
 
+  it('draws one preview when the post-processor runs twice on the same section', () => {
+    const root = createRenderedSection([
+      '[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '[exercise:: [[Squat]]] [set:: 2] [weight:: 105] [reps:: 3] [notes:: smooth]',
+    ])
+    const plugin = createPlugin()
+    const ctx = createContext(strengthSection)
+
+    renderWorkoutReadingModeSection(plugin, root, ctx)
+    renderWorkoutReadingModeSection(plugin, root, ctx)
+
+    expect(root.querySelectorAll('.fitkit-reading-preview')).toHaveLength(1)
+    expect(ctx.children).toHaveLength(1)
+  })
+
   it('skips non-workout notes', () => {
     const root = createRenderedSection([
       '[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
@@ -369,16 +383,6 @@ describe('workout reading mode rendering', () => {
 
     expect(root.querySelector('.fitkit-reading-preview')).toBeNull()
     expect(root.querySelectorAll('.fitkit-reading-hidden-source-row')).toHaveLength(0)
-  })
-
-  it('formats durations across minute and hour boundaries', () => {
-    expect(formatDurationSeconds(undefined)).toBe('-')
-    expect(formatDurationSeconds(1)).toBe('1s')
-    expect(formatDurationSeconds(45)).toBe('45s')
-    expect(formatDurationSeconds(60)).toBe('1m')
-    expect(formatDurationSeconds(65)).toBe('1m5s')
-    expect(formatDurationSeconds(3600)).toBe('1h')
-    expect(formatDurationSeconds(3660)).toBe('1h1m')
   })
 })
 
@@ -445,6 +449,19 @@ describe('workout reading mode structure', () => {
     expect(
       preview('Squat', ['[exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]']),
     ).toMatchSnapshot()
+  })
+
+  it('draws only the note when an exercise has a note and no plans', () => {
+    expect(
+      preview('Plank', [
+        '[exercise:: [[Plank]]] [notes:: steady]',
+        '[exercise:: [[Plank]]] [set:: 1] [duration:: 60]',
+      ]),
+    ).toMatchSnapshot()
+  })
+
+  it('draws neither note nor plan lines for a bare duration exercise', () => {
+    expect(preview('Plank', ['[exercise:: [[Plank]]] [set:: 1] [duration:: 60]'])).toMatchSnapshot()
   })
 
   it.each([

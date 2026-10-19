@@ -151,6 +151,36 @@ exports[`workout reading mode structure > draws a strength table with a note and
             "smooth""
 `;
 
+exports[`workout reading mode structure > draws neither note nor plan lines for a bare duration exercise 1`] = `
+"div
+  ul
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Plank]]] [set:: 1] [duration:: 60]"
+  div.fitkit-reading-preview
+    div.fitkit-reading-summary
+      span.fitkit-reading-kind
+        "Duration"
+      span.fitkit-reading-count
+        "1 row"
+    table.fitkit-reading-table
+      thead
+        tr
+          th
+            "Set"
+          th
+            "Duration"
+          th
+            "Notes"
+      tbody
+        tr
+          td
+            "1"
+          td
+            "1m"
+          td
+            "-""
+`;
+
 exports[`workout reading mode structure > draws one row as a singular count 1`] = `
 "div
   ul
@@ -181,6 +211,40 @@ exports[`workout reading mode structure > draws one row as a singular count 1`] 
             "100 kg"
           td
             "5"
+          td
+            "-""
+`;
+
+exports[`workout reading mode structure > draws only the note when an exercise has a note and no plans 1`] = `
+"div
+  ul
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Plank]]] [notes:: steady]"
+    li.fitkit-reading-hidden-source-row
+      "[exercise:: [[Plank]]] [set:: 1] [duration:: 60]"
+  div.fitkit-reading-preview
+    div.fitkit-reading-summary
+      span.fitkit-reading-kind
+        "Duration"
+      span.fitkit-reading-count
+        "1 row"
+    div.fitkit-reading-note
+      "steady"
+    table.fitkit-reading-table
+      thead
+        tr
+          th
+            "Set"
+          th
+            "Duration"
+          th
+            "Notes"
+      tbody
+        tr
+          td
+            "1"
+          td
+            "1m"
           td
             "-""
 `;
