@@ -8,6 +8,7 @@ import {
 } from '../../harness/obsidian-dom'
 import { outline } from '../../harness/outline'
 import { findUnstyledClasses } from '../../harness/stylesheet'
+import { watchUnmounts } from '../../harness/unmount'
 
 vi.mock('obsidian', () => {
   class Modal {
@@ -157,5 +158,17 @@ describe('set note modal', () => {
     save?.click()
 
     expect(onSave).toHaveBeenCalledTimes(1)
+  })
+
+  it('unmounts its component when it closes', () => {
+    const modal = openModal({ title: 'Note', initial: 'x', onSave: vi.fn() })
+    const unmounts = watchUnmounts()
+    try {
+      modal.close()
+    } finally {
+      unmounts.stop()
+    }
+
+    expect(unmounts.names).toContain('TextAreaForm')
   })
 })

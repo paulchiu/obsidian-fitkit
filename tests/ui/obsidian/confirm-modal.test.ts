@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { outline } from '../../harness/outline'
 import { createTestRoot, findButtons, harnessDocument } from '../../harness/obsidian-dom'
 import { findUnstyledClasses } from '../../harness/stylesheet'
+import { watchUnmounts } from '../../harness/unmount'
 
 vi.mock('obsidian', () => {
   class Modal {
@@ -88,5 +89,17 @@ describe('confirm modal', () => {
 
     expect(resolve).toHaveBeenCalledExactlyOnceWith(false)
     expect(contentEl.children).toHaveLength(0)
+  })
+
+  it('unmounts its component when it closes', () => {
+    const { modal } = openModal()
+    const unmounts = watchUnmounts()
+    try {
+      modal.close()
+    } finally {
+      unmounts.stop()
+    }
+
+    expect(unmounts.names).toContain('ConfirmBody')
   })
 })

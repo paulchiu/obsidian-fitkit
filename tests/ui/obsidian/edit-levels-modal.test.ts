@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTestRoot, findButtons, harnessDocument } from '../../harness/obsidian-dom'
 import { outline } from '../../harness/outline'
 import { findUnstyledClasses } from '../../harness/stylesheet'
+import { watchUnmounts } from '../../harness/unmount'
 
 const notices: string[] = []
 
@@ -137,5 +138,17 @@ describe('edit levels modal', () => {
     save?.click()
 
     expect(onSave).toHaveBeenCalledTimes(1)
+  })
+
+  it('unmounts its component when it closes', () => {
+    const { modal } = openModal()
+    const unmounts = watchUnmounts()
+    try {
+      modal.close()
+    } finally {
+      unmounts.stop()
+    }
+
+    expect(unmounts.names).toContain('TextAreaForm')
   })
 })

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { outline } from '../../harness/outline'
 import { createTestRoot, findButtons, harnessDocument } from '../../harness/obsidian-dom'
 import { findUnstyledClasses } from '../../harness/stylesheet'
+import { watchUnmounts } from '../../harness/unmount'
 import type { KindSwitchChoiceModalOptions } from '../../../src/ui/obsidian/kind-switch-choice-modal'
 
 vi.mock('obsidian', () => {
@@ -90,5 +91,17 @@ describe('kind switch choice modal', () => {
 
     expect(resolve).toHaveBeenCalledExactlyOnceWith('cancel')
     expect(contentEl.children).toHaveLength(0)
+  })
+
+  it('unmounts its component when it closes', () => {
+    const { modal } = openModal()
+    const unmounts = watchUnmounts()
+    try {
+      modal.close()
+    } finally {
+      unmounts.stop()
+    }
+
+    expect(unmounts.names).toContain('KindSwitchChoiceBody')
   })
 })

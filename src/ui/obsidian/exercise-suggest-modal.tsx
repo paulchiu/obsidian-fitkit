@@ -1,11 +1,13 @@
 import { SuggestModal, type App } from 'obsidian'
+import { render } from 'preact'
 
-export type ExerciseChoice = {
-  type: 'existing' | 'new'
-  name: string
-}
+import { ExerciseSuggestion, type ExerciseChoice } from '../components/exercise-suggestion'
+
+export type { ExerciseChoice }
 
 export class ExerciseSuggestModal extends SuggestModal<ExerciseChoice> {
+  private rows = new Set<HTMLElement>()
+
   private handleEnterKeydown = (event: KeyboardEvent): void => {
     if (event.key !== 'Enter') {
       return
@@ -38,6 +40,8 @@ export class ExerciseSuggestModal extends SuggestModal<ExerciseChoice> {
 
   onClose(): void {
     this.inputEl.removeEventListener('keydown', this.handleEnterKeydown, true)
+    this.rows.forEach((row) => render(null, row))
+    this.rows.clear()
     super.onClose()
   }
 
@@ -60,17 +64,10 @@ export class ExerciseSuggestModal extends SuggestModal<ExerciseChoice> {
   }
 
   renderSuggestion(item: ExerciseChoice, el: HTMLElement): void {
+    render(null, el)
     el.empty()
-    el.createDiv({
-      cls: item.type === 'new' ? 'fitkit-suggest-title is-new' : 'fitkit-suggest-title',
-      text: item.type === 'new' ? `Add "${item.name}"` : item.name,
-    })
-    if (item.type === 'new') {
-      el.createDiv({
-        cls: 'fitkit-suggest-note',
-        text: 'You will choose whether to create an exercise note.',
-      })
-    }
+    this.rows.add(el)
+    render(<ExerciseSuggestion item={item} />, el)
   }
 
   onChooseSuggestion(item: ExerciseChoice): void {

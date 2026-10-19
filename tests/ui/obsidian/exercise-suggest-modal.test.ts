@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { outline } from '../../harness/outline'
 import { createTestRoot, harnessDocument } from '../../harness/obsidian-dom'
 import { findUnstyledClasses } from '../../harness/stylesheet'
+import { watchUnmounts } from '../../harness/unmount'
 
 vi.mock('obsidian', () => {
   class SuggestModal {
@@ -57,5 +58,22 @@ describe('exercise suggest modal rows', () => {
     expect(el.textContent).toBe(
       'Add "Bear crawl"You will choose whether to create an exercise note.',
     )
+  })
+
+  it('unmounts every row it drew when it closes', () => {
+    const modal = new ExerciseSuggestModal({} as never, ['Plank'], vi.fn())
+    const rows = [harnessDocument.body.createDiv(), harnessDocument.body.createDiv()]
+    modal.renderSuggestion({ type: 'existing', name: 'Plank' }, rows[0]!)
+    modal.renderSuggestion({ type: 'new', name: 'Bear crawl' }, rows[1]!)
+
+    const unmounts = watchUnmounts()
+    try {
+      modal.onClose()
+    } finally {
+      unmounts.stop()
+    }
+
+    expect(unmounts.names.filter((name) => name === 'ExerciseSuggestion')).toHaveLength(2)
+    expect(rows.map((row) => row.children.length)).toEqual([0, 0])
   })
 })

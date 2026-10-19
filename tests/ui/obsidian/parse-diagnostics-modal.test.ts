@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { outline } from '../../harness/outline'
 import { createTestRoot, harnessDocument } from '../../harness/obsidian-dom'
 import { findUnstyledClasses } from '../../harness/stylesheet'
+import { watchUnmounts } from '../../harness/unmount'
 
 vi.mock('obsidian', () => {
   class Modal {
@@ -53,5 +54,27 @@ describe('parse diagnostics modal', () => {
     modal.onOpen()
 
     expect(modal.titleEl.textContent).toBe('Exercise registry diagnostics')
+  })
+
+  it('unmounts its component when it closes', () => {
+    const modal = new ParseDiagnosticsModal({} as never, [{ path: 'a.md', warnings: ['x'] }])
+    modal.onOpen()
+    const unmounts = watchUnmounts()
+    try {
+      modal.close()
+    } finally {
+      unmounts.stop()
+    }
+
+    expect(unmounts.names).toContain('ParseDiagnosticsBody')
+  })
+
+  it('leaves nothing drawn once closed', () => {
+    const modal = new ParseDiagnosticsModal({} as never, [{ path: 'a.md', warnings: ['x'] }])
+    modal.onOpen()
+
+    modal.close()
+
+    expect(modal.contentEl.children).toHaveLength(0)
   })
 })

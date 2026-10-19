@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { outline } from '../../harness/outline'
 import { createTestRoot, findButtons, harnessDocument } from '../../harness/obsidian-dom'
 import { findUnstyledClasses } from '../../harness/stylesheet'
+import { watchUnmounts } from '../../harness/unmount'
 
 vi.mock('obsidian', () => {
   class Modal {
@@ -99,5 +100,17 @@ describe('delete registry entry modal', () => {
 
     expect(resolve).toHaveBeenCalledExactlyOnceWith({ confirmed: false, alsoDeleteFile: false })
     expect(contentEl.children).toHaveLength(0)
+  })
+
+  it('unmounts its component when it closes', () => {
+    const { modal } = openModal('Exercises/Plank.md')
+    const unmounts = watchUnmounts()
+    try {
+      modal.close()
+    } finally {
+      unmounts.stop()
+    }
+
+    expect(unmounts.names).toContain('DeleteRegistryEntryBody')
   })
 })
