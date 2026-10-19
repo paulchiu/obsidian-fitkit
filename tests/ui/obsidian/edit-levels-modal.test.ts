@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createTestRoot, findButtons, harnessDocument } from '../../harness/obsidian-dom'
+import { outline } from '../../harness/outline'
+import { findUnstyledClasses } from '../../harness/stylesheet'
+import { watchUnmounts } from '../../harness/unmount'
 
 const notices: string[] = []
 
@@ -35,6 +38,10 @@ vi.mock('obsidian', () => {
 
 import { EditLevelsModal } from '../../../src/ui/obsidian/edit-levels-modal'
 
+/** The stubbed `window.setTimeout` queues here so a test can see what waits for the next tick. */
+const timers: (() => void)[] = []
+const flushTimers = (): void => timers.splice(0).forEach((run) => run())
+
 function openModal(options?: { initial?: string[]; onSave?: (levels: string[]) => void }): {
   modal: EditLevelsModal
   contentEl: HTMLElement
@@ -54,11 +61,9 @@ function openModal(options?: { initial?: string[]; onSave?: (levels: string[]) =
 describe('edit levels modal', () => {
   beforeEach(() => {
     notices.length = 0
+    timers.length = 0
     vi.stubGlobal('window', {
-      setTimeout: (callback: () => void): number => {
-        callback()
-        return 1
-      },
+      setTimeout: (callback: () => void): number => timers.push(callback),
     })
   })
 
@@ -67,12 +72,21 @@ describe('edit levels modal', () => {
     vi.unstubAllGlobals()
   })
 
-  it('prefills one rung per line and focuses the end of the text', () => {
+  it('prefills one rung per line, then on the next tick focuses the end of the text', () => {
     const { contentEl } = openModal()
 
     const textarea = contentEl.querySelector('textarea')
-    expect(textarea?.value).toBe('Wall push-up\nKnee push-up')
+    if (!textarea) {
+      throw new Error('Expected a textarea.')
+    }
+    textarea.setSelectionRange(0, 0)
+    expect(textarea.value).toBe('Wall push-up\nKnee push-up')
+    expect(harnessDocument.activeElement).not.toBe(textarea)
+
+    flushTimers()
+
     expect(harnessDocument.activeElement).toBe(textarea)
+    expect([textarea.selectionStart, textarea.selectionEnd]).toEqual([25, 25])
   })
 
   it('saves trimmed rungs with blanks dropped', () => {
@@ -106,5 +120,47 @@ describe('edit levels modal', () => {
     expect(onSave).not.toHaveBeenCalled()
     expect(close).not.toHaveBeenCalled()
     expect(notices).toEqual(['Enter at least one level.'])
+  })
+
+  it('draws the labelled text box and action row under the exercise title', () => {
+    const { modal, contentEl } = openModal()
+
+    expect(modal.titleEl.textContent).toBe('Edit levels for Push-up')
+    expect(modal.modalEl.classList.contains('fitkit-set-note-modal-shell')).toBe(true)
+    expect(outline(contentEl)).toMatchSnapshot()
+    expect(findUnstyledClasses(contentEl)).toEqual([])
+  })
+
+  it('closes without saving from Cancel and clears the shell class', () => {
+    const { modal, contentEl, onSave } = openModal()
+
+    findButtons(contentEl, 'Cancel')[0]?.click()
+
+    expect(onSave).not.toHaveBeenCalled()
+    expect(modal.modalEl.classList.contains('fitkit-set-note-modal-shell')).toBe(false)
+    expect(contentEl.children).toHaveLength(0)
+  })
+
+  it('saves once when Save is pressed again while the close is still under way', () => {
+    const { modal, contentEl, onSave } = openModal()
+    vi.spyOn(modal, 'close').mockImplementation(() => {})
+
+    const [save] = findButtons(contentEl, 'Save')
+    save?.click()
+    save?.click()
+
+    expect(onSave).toHaveBeenCalledTimes(1)
+  })
+
+  it('unmounts its component when it closes', () => {
+    const { modal } = openModal()
+    const unmounts = watchUnmounts()
+    try {
+      modal.close()
+    } finally {
+      unmounts.stop()
+    }
+
+    expect(unmounts.names).toContain('TextAreaForm')
   })
 })

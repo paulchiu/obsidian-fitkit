@@ -30,6 +30,9 @@ is all zeros), so element overflow is out of scope by design.
   adjacent text joined, so a snapshot pins the structure `styles.css` and the
   focus code depend on rather than how the DOM was built. Use it to pin a
   surface before porting it to Preact.
+- `unmount.ts` records the components Preact unmounts (`watchUnmounts()`), so a
+  test can prove a surface took its component down on close rather than just
+  emptying its element.
 - `svg-layout.ts` measures an SVG against its own viewBox
   (`measureSvgOverflow()`). Every measurement first proves text shapes with a
   pinned DejaVu Sans file and fails loudly otherwise, so a missing font can

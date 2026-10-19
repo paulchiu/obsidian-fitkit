@@ -1,0 +1,12 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`confirm modal > draws the message and the two labelled buttons under the given title 1`] = `
+"div.fitkit-kind-confirm-modal
+  p
+    "This cannot be undone."
+  div.fitkit-confirm-actions
+    button.fitkit-btn
+      "Keep"
+    button.fitkit-btn.fitkit-destructive-button
+      "Delete""
+`;

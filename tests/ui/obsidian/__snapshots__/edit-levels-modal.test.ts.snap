@@ -1,0 +1,14 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`edit levels modal > draws the labelled text box and action row under the exercise title 1`] = `
+"div.fitkit-set-note-modal
+  div.fitkit-set-note-field
+    label.fitkit-label[for=fitkit-edit-levels-textarea]
+      "Levels, one per line"
+    textarea.fitkit-textarea.fitkit-set-note-textarea[id=fitkit-edit-levels-textarea][rows=6]
+  div.fitkit-confirm-actions.fitkit-set-note-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Save""
+`;

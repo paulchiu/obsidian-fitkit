@@ -1,0 +1,15 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`exercise suggest modal rows > draws a new exercise 1`] = `
+"div
+  div.fitkit-suggest-title.is-new
+    "Add "Bear crawl""
+  div.fitkit-suggest-note
+    "You will choose whether to create an exercise note.""
+`;
+
+exports[`exercise suggest modal rows > draws an existing exercise 1`] = `
+"div
+  div.fitkit-suggest-title
+    "Plank""
+`;

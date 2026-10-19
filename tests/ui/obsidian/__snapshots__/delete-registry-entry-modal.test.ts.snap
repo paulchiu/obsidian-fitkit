@@ -1,0 +1,31 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`delete registry entry modal > draws the warning and actions for an exercise note 1`] = `
+"div.fitkit-kind-confirm-modal
+  p
+    "Remove the registry overlay for 'Plank'? Existing workout history is not rewritten."
+  p.fitkit-import-muted
+    "The exercise note will stay in your vault unless you choose to delete it too."
+  div.fitkit-import-checkbox-row
+    input[id=fitkit-delete-also-file][type=checkbox]
+    label[for=fitkit-delete-also-file]
+      "Also delete the exercise note 'Exercises/Plank.md' and ignore this exercise until restored."
+  div.fitkit-confirm-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-destructive-button
+      "Delete""
+`;
+
+exports[`delete registry entry modal > draws the warning and actions for no exercise note 1`] = `
+"div.fitkit-kind-confirm-modal
+  p
+    "Remove the registry overlay for 'Plank'? Existing workout history is not rewritten."
+  p.fitkit-import-muted
+    "No matching exercise note exists in your exercises folder. This exercise will be removed from the registry."
+  div.fitkit-confirm-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-destructive-button
+      "Delete""
+`;
