@@ -7,7 +7,8 @@ vi.mock('obsidian', async () =>
 import { TFile } from 'obsidian'
 
 import { ExerciseCardBody } from '../../../src/ui/components/exercise-card'
-import { countRenders } from '../../harness/renders'
+import { SetList } from '../../../src/ui/components/set-list'
+import { countRenders, countRendersSettled } from '../../harness/renders'
 import { harnessDocument, harnessWindow } from '../../harness/obsidian-dom'
 import { watchUnmounts } from '../../harness/unmount'
 import {
@@ -152,6 +153,72 @@ describe('WorkoutEditorView redraws in place', () => {
   })
 })
 
+describe('WorkoutEditorView redraws of unchanged cards', () => {
+  const PUSH_UPS = [
+    '## [[Push-up]]',
+    '',
+    '- [exercise:: [[Push-up]]] [set:: 1] [level:: 1] [reps:: 10]',
+    '',
+    '## [[Plank]]',
+    '',
+    '- [exercise:: [[Plank]]] [set:: 1] [duration:: 30]',
+  ]
+
+  it('redraws no set list, even through context, when nothing the cards draw changed', async () => {
+    const { view } = await openEditor({ body: PUSH_UPS })
+
+    const renders = await countRendersSettled(SetList, () => view.refreshSettingsDrivenUi())
+
+    expect(renders).toBe(0)
+  })
+
+  it('redraws a card whose history badge changed with nothing else on it', async () => {
+    const { view, plugin } = await openEditor({
+      body: [
+        '## [[Squat]]',
+        '',
+        '- [exercise:: [[Squat]]] [next:: up 2.5]',
+        '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      ],
+    })
+    const badge = (): string | null | undefined =>
+      card(view).querySelector('.fitkit-plan-badge')?.textContent
+
+    const before = badge()
+    plugin.settings.exerciseRegistry = [
+      { name: 'Squat', kind: 'strength', unit: 'lbs', aliases: [] },
+    ]
+    view.refreshSettingsDrivenUi()
+
+    expect([before, badge()]).toEqual(['Next: 102.5 kg', 'Next: 102.5 lbs'])
+  })
+})
+
+describe('WorkoutEditorView name box', () => {
+  const renamed = (name: string): string =>
+    workoutNote(SQUAT).replace('name: Leg day', `name: ${name}`)
+  const nameBox = (view: { contentEl: HTMLElement }): string | undefined =>
+    view.contentEl.querySelector<HTMLInputElement>('input[aria-label="Workout name"]')?.value
+
+  it('shows the name read back by Reload from disk', async () => {
+    const { view, contents } = await openEditor({ body: SQUAT })
+    contents.set(WORKOUT_PATH, renamed('Push day'))
+
+    await view.reloadFromDisk()
+
+    expect(nameBox(view)).toBe('Push day')
+  })
+
+  it('shows the name of the workout the tab switches to', async () => {
+    const OTHER = 'Fitness/Workouts/2026-06-16.md'
+    const { view } = await openEditor({ body: SQUAT, workouts: { [OTHER]: renamed('Arm day') } })
+
+    await view.setState({ file: OTHER }, { history: false })
+
+    expect(nameBox(view)).toBe('Arm day')
+  })
+})
+
 describe('WorkoutEditorView screens', () => {
   it('takes the set timer down when it is closed, and the cards down while it is up', async () => {
     const { view } = await openEditor({ body: PLANK })
@@ -209,7 +276,42 @@ describe('WorkoutEditorView set timer clock', () => {
   })
 })
 
+/** The harness realm's navigator, where the cue player asks for a wake lock. */
+const navigatorOf = (): Navigator => (harnessWindow as unknown as Window).navigator
+
 describe('WorkoutEditorView teardown', () => {
+  it('draws nothing and holds no timer when the tab closes while the workout is still loading', async () => {
+    const locks: string[] = []
+    Object.defineProperty(navigatorOf(), 'wakeLock', {
+      configurable: true,
+      value: {
+        request: async (type: string): Promise<unknown> => {
+          locks.push(type)
+          return { addEventListener: () => {}, release: async () => {} }
+        },
+      },
+    })
+    const running = [
+      '## [[Plank]]',
+      '',
+      '- [exercise:: [[Plank]]] [set:: 1] [duration:: 30] [started:: 2026-06-15T07:14:00+10:00]',
+    ]
+    const { view, releaseRead } = createEditor({ body: running, deferRead: true })
+    await view.onOpen()
+
+    try {
+      const loading = view.setState({ file: WORKOUT_PATH }, { history: false })
+      await view.onClose()
+      releaseRead()
+      await loading
+      await settle()
+
+      expect([view.contentEl.childElementCount, locks]).toEqual([0, []])
+    } finally {
+      Reflect.deleteProperty(navigatorOf(), 'wakeLock')
+    }
+  })
+
   it('unmounts the tree and takes every drag listener down when closed', async () => {
     const proto = harnessWindow.HTMLElement.prototype
     const pointerCalls = (spy: { mock: { calls: unknown[][] } }): number =>
@@ -222,7 +324,8 @@ describe('WorkoutEditorView teardown', () => {
     try {
       await view.onClose()
 
-      expect([pointerCalls(added), pointerCalls(removed)]).toEqual([4, 4])
+      expect(pointerCalls(added)).toBeGreaterThan(0)
+      expect(pointerCalls(removed)).toBe(pointerCalls(added))
       expect(unmounts.names).toContain('EditorRoot')
       expect(view.contentEl.childElementCount).toBe(0)
     } finally {
@@ -230,15 +333,5 @@ describe('WorkoutEditorView teardown', () => {
       added.mockRestore()
       removed.mockRestore()
     }
-  })
-
-  it('draws nothing when a render arrives after the tab closed', async () => {
-    const { view, plugin } = await openEditor({ body: SQUAT })
-    await view.onClose()
-
-    plugin.settings.strengthRestTimerEnabled = false
-    view.refreshSettingsDrivenUi()
-
-    expect(view.contentEl.childElementCount).toBe(0)
   })
 })

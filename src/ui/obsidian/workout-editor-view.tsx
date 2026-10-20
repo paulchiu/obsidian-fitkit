@@ -1,6 +1,6 @@
 import type { WorkspaceLeaf } from 'obsidian'
 import { FileView, Menu, Notice, TFile } from 'obsidian'
-import { createRef, render as draw, type RefObject } from 'preact'
+import { createRef, render as renderTree, type RefObject } from 'preact'
 
 import { reorderArray } from '../../domain/array-utils'
 import {
@@ -93,7 +93,7 @@ import { EditLevelsModal } from './edit-levels-modal'
 import { createCuePlayer, type CuePlayer } from './interval-cues'
 import { clockSeconds } from '../model/interval-runner'
 import { EditorRoot, type EditorPage, type EditorScene } from '../components/editor-root'
-import type { CardHandlers, CardProps } from '../components/exercise-card'
+import type { CardHandlers, CardProps, LoadMenu } from '../components/exercise-card'
 import { HostContext } from '../components/host'
 import { LayoutContext, type Layout } from '../components/layout'
 import type { RowControls } from '../components/set-rows'
@@ -202,7 +202,11 @@ export class WorkoutEditorView extends FileView {
   /** Whether the tree is drawn, so a settle or timer that fires after close draws nothing. */
   private mounted = false
   private resizeListenersStore?: Set<() => void>
+  private layoutStore?: Layout
   private cardHandlersStore?: CardHandlers
+  private metaLineStore?: RefObject<HTMLSpanElement>
+  /** The latest draw asked for while a drag was in progress, made once the drag ends. */
+  private sceneAfterDrag?: EditorScene
   private dragSession: DragSession | null = null
   private seededWeightsStore?: WeakSet<EditableStrengthSet>
   private expandedSetListsStore?: WeakSet<ExerciseCard>
@@ -360,7 +364,7 @@ export class WorkoutEditorView extends FileView {
       if (this.dragSession) {
         this.endDrag(false)
       }
-      draw(null, this.contentEl)
+      renderTree(null, this.contentEl)
       this.session = null
       this.model = null
       this.exerciseHistory = null
@@ -377,14 +381,21 @@ export class WorkoutEditorView extends FileView {
     return this.resizeListenersStore
   }
 
-  /** What the drawn tree can ask of the pane's size. */
+  /** What the drawn tree can ask of the pane's size; one object, so the context never changes. */
   private get layout(): Layout {
-    return {
+    this.layoutStore ??= {
       onResize: (refit) => {
         this.resizeListeners.add(refit)
         return () => this.resizeListeners.delete(refit)
       },
     }
+    return this.layoutStore
+  }
+
+  /** The header's meta line, which autosave rewrites between draws. */
+  private get metaLine(): RefObject<HTMLSpanElement> {
+    this.metaLineStore ??= createRef()
+    return this.metaLineStore
   }
 
   /** Narrow state through the Obsidian class helpers so the test realm can observe it. */
@@ -414,10 +425,19 @@ export class WorkoutEditorView extends FileView {
       this.renderSkeleton()
       skeletonShownAt = Date.now()
     }
-    this.session = new FileSession(this.app, file)
-    const { model, isWorkout, warnings } = await this.session.load()
+    const session = new FileSession(this.app, file)
+    this.session = session
+    const { model, isWorkout, warnings } = await session.load()
+    /** Closing the tab or opening another note meanwhile leaves this load nothing to show. */
+    if (this.session !== session) {
+      return
+    }
     this.model = toEditorWorkoutModel(model, isWorkout, file.path)
-    this.exerciseHistory = await this.loadExerciseHistory()
+    const history = await this.loadExerciseHistory()
+    if (this.session !== session) {
+      return
+    }
+    this.exerciseHistory = history
     this.autosaver.reset()
     this.resumeSavedTimer()
     if (skeletonShownAt !== null) {
@@ -434,13 +454,17 @@ export class WorkoutEditorView extends FileView {
   }
 
   async reloadFromDisk(): Promise<void> {
-    if (!this.session) {
+    const session = this.session
+    if (!session) {
       return
     }
     this.screens.teardown('discard')
     /** Autosave stays blocked by the conflict until the disk copy is in, so an edit made during the read cannot write the stale model. */
-    const { model, isWorkout } = await this.session.load()
-    this.model = toEditorWorkoutModel(model, isWorkout, this.session.file.path)
+    const { model, isWorkout } = await session.load()
+    if (this.session !== session) {
+      return
+    }
+    this.model = toEditorWorkoutModel(model, isWorkout, session.file.path)
     if (!this.model.isFitKitWorkout) {
       this.exerciseHistory = null
     }
@@ -459,17 +483,18 @@ export class WorkoutEditorView extends FileView {
   }
 
   /**
-   * Draws `scene` into the pane, updating what is already there in place. A drag in progress ends
-   * first, since its indicator sits among the cards the draw is about to reconcile.
+   * Draws `scene` into the pane, updating what is already there in place. A draw asked for mid-drag
+   * waits for the drag to end, since its indicator sits among the cards the draw would reconcile.
    */
   private draw(scene: EditorScene): void {
     if (!this.mounted) {
       return
     }
     if (this.dragSession) {
-      this.endDrag(false)
+      this.sceneAfterDrag = scene
+      return
     }
-    draw(
+    renderTree(
       <HostContext.Provider value={obsidianHost}>
         <LayoutContext.Provider value={this.layout}>
           <EditorRoot scene={scene} />
@@ -505,10 +530,11 @@ export class WorkoutEditorView extends FileView {
     /** One merged snapshot per render: every card reads its ladder from this instead of rebuilding it. */
     const registry = model.isFitKitWorkout ? this.exerciseStore.registry() : null
     return {
-      workout: model,
+      workoutKey: model,
       name: model.name,
       isWorkout: model.isFitKitWorkout,
       metaLine: this.metaLineText(),
+      metaLineRef: this.metaLine,
       conflict: this.autosaver.state().conflict,
       cards: registry
         ? model.exercises.map((ex, index) => this.cardProps(ex, index, registry))
@@ -848,7 +874,7 @@ export class WorkoutEditorView extends FileView {
     row: T,
     index: number,
     label: string,
-    loadMenu?: { hasLoad: boolean; onAddLoad: () => void; onRemoveLoad: () => void },
+    loadMenu?: LoadMenu,
   ): RowControls {
     const changed = (): void => {
       this.markDirty()
@@ -1735,17 +1761,17 @@ export class WorkoutEditorView extends FileView {
       session.handle.releasePointerCapture(session.pointerId)
     }
     session.indicator.remove()
-    if (!commit || !this.model) {
-      return
-    }
+    const deferred = this.sceneAfterDrag
+    this.sceneAfterDrag = undefined
     const { fromIndex, toIndex } = session
     const targetIndex = toIndex > fromIndex ? toIndex - 1 : toIndex
-    if (fromIndex === targetIndex) {
-      return
+    if (commit && this.model && fromIndex !== targetIndex) {
+      this.model.exercises = reorderArray(this.model.exercises, fromIndex, targetIndex)
+      this.markDirty()
+      this.render()
+    } else if (deferred) {
+      this.draw(deferred)
     }
-    this.model.exercises = reorderArray(this.model.exercises, fromIndex, targetIndex)
-    this.markDirty()
-    this.render()
   }
 
   private async confirmAndRemoveExercise(index: number): Promise<void> {
@@ -1966,8 +1992,8 @@ export class WorkoutEditorView extends FileView {
   }
 
   private updateMetaText(): void {
-    const line = this.contentEl.querySelector('.fitkit-meta-line')
-    if (line instanceof HTMLElement) {
+    const line = this.metaLine.current
+    if (line) {
       line.textContent = this.metaLineText()
     }
   }

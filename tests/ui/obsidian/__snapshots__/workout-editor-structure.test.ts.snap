@@ -154,7 +154,7 @@ exports[`WorkoutEditorView structure > draws a duration card 1`] = `
       button.fitkit-btn
         "Repeat"
       button.fitkit-btn.fitkit-timer-button[aria-label=Start timer]
-        span[data-icon=play]"
+        span.fitkit-timer-button-icon[data-icon=play]"
 `;
 
 exports[`WorkoutEditorView structure > draws a strength card 1`] = `
@@ -425,7 +425,7 @@ exports[`WorkoutEditorView structure > draws the footer with the last rest besid
     "Add exercise"
   div.fitkit-rest-timer-control
     button.fitkit-btn.fitkit-btn-muted.fitkit-rest-timer-button[aria-label=Start rest timer][type=button]
-      span[data-icon=timer]
+      span.fitkit-rest-timer-icon[data-icon=timer]
       span.fitkit-rest-timer-label
         "Start rest"
     span.fitkit-rest-timer-last

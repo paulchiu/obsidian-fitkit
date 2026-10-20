@@ -1,5 +1,5 @@
 import type { JSX } from 'preact'
-import { useContext } from 'preact/hooks'
+import { useCallback } from 'preact/hooks'
 
 import type { BodyweightLadder } from '../../domain/bodyweight-levels'
 import type { ExerciseHistoryBadge, NextPlanBadge } from '../../domain/exercise-history'
@@ -16,7 +16,7 @@ import {
   type EditableStrengthSet,
 } from '../model/set-rows'
 import { useDomEffect } from './dom-effect'
-import { HostContext, useIcon } from './host'
+import { useIcon } from './host'
 import { memo } from './memo'
 import { PlanSummary } from './plan-summary'
 import { SetList } from './set-list'
@@ -28,6 +28,13 @@ import {
   type RowControls,
   type RowEdit,
 } from './set-rows'
+
+/** A bodyweight row's load entries in its options menu. */
+export interface LoadMenu {
+  hasLoad: boolean
+  onAddLoad: () => void
+  onRemoveLoad: () => void
+}
 
 /** What the view does for a card; created once, each reading the view's state when called. */
 export interface CardHandlers {
@@ -48,7 +55,7 @@ export interface CardHandlers {
     row: T,
     index: number,
     label: string,
-    loadMenu?: { hasLoad: boolean; onAddLoad: () => void; onRemoveLoad: () => void },
+    loadMenu?: LoadMenu,
   ) => RowControls
   addLoad: (ex: ExerciseCard, index: number) => void
   removeLoad: (ex: ExerciseCard, index: number) => void
@@ -109,12 +116,13 @@ export const ExerciseCardView = memo(
   (a, b) => a.ex === b.ex && a.index === b.index && a.signature === b.signature,
 )
 
-/** The handle's icon and drag wiring share one effect, since the icon replaces nothing here. */
+/** The handle carries its icon and the view's drag wiring, so one element feeds both refs. */
 function DragHandle({ attach }: { attach: CardHandlers['attachDrag'] }): JSX.Element {
-  const host = useContext(HostContext)
-  const ref = useDomEffect<HTMLButtonElement>((handle) => {
-    host.icon(handle, 'grip-vertical')
-    return attach(handle)
+  const icon = useIcon<HTMLButtonElement>('grip-vertical')
+  const drag = useDomEffect<HTMLButtonElement>((handle) => attach(handle), [attach])
+  const ref = useCallback((el: HTMLButtonElement | null) => {
+    icon.current = el
+    drag.current = el
   }, [])
   return (
     <button

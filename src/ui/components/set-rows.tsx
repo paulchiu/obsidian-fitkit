@@ -195,6 +195,7 @@ function BodyweightRow({
             position={index + 1}
             levels={levels}
             level={set.level ?? 1}
+            showLoad={showLoad}
             setLevel={setLevel}
             openMenu={openLevelMenu}
           />
@@ -233,12 +234,15 @@ function LevelStepper({
   position,
   levels,
   level,
+  showLoad,
   setLevel,
   openMenu,
 }: {
   position: number
   levels: BodyweightLadder | undefined
   level: number
+  /** Whether the row also draws a load cell, which leaves the level cell less room. */
+  showLoad: boolean
   setLevel: (level: number) => void
   openMenu: (trigger: HTMLElement) => void
 }): JSX.Element {
@@ -247,13 +251,16 @@ function LevelStepper({
   const minus = useIcon<HTMLButtonElement>('minus')
   const plus = useIcon<HTMLButtonElement>('plus')
   const chevron = useIcon<HTMLSpanElement>('chevron-down')
-  /** The label's classes are set here, not drawn, so the fit's `is-label-short` survives a render. */
+  /**
+   * The label's classes are set here, not drawn, so the fit's `is-label-short` survives a render.
+   * It refits when the name or the cell's width can change: a load column narrows the cell.
+   */
   const label = useDomEffect<HTMLButtonElement>(
     (el) => {
       el.classList.add('fitkit-bodyweight-level-label')
       fitLevelLabel(el)
     },
-    [name],
+    [name, showLoad],
   )
   useResize(() => {
     if (label.current) {
@@ -472,12 +479,12 @@ export function SetBar({ repeatDisabled, onAdd, onRepeat, end }: SetBarProps): J
   )
 }
 
-/** Icon only, named by its label, as Obsidian's `setIcon` left it before the port. */
+/** Icon only, named by its label; the icon sits in a span of its own since `setIcon` replaces children. */
 function TimerButton({ onClick }: { onClick: () => void }): JSX.Element {
   const icon = useIcon<HTMLSpanElement>('play')
   return (
     <button class="fitkit-btn fitkit-timer-button" aria-label="Start timer" onClick={onClick}>
-      <span ref={icon} />
+      <span ref={icon} class="fitkit-timer-button-icon" />
     </button>
   )
 }

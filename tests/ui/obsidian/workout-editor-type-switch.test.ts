@@ -7,6 +7,8 @@ vi.mock('obsidian', async () =>
 import type { IndexEntry } from '../../../src/domain/types'
 import { obsidianRecord } from '../../fixtures/obsidian-editor-mock'
 import { harnessDocument } from '../../harness/obsidian-dom'
+import { outline } from '../../harness/outline'
+import { findUnstyledClasses } from '../../harness/stylesheet'
 import {
   button,
   card,
@@ -61,6 +63,22 @@ describe('WorkoutEditorView unknown exercise choices', () => {
     picker.inputEl.value = 'Squat'
     pressKey(picker.inputEl, 'Enter')
   }
+
+  it.each([
+    { known: 'never seen', settings: {} },
+    { known: 'deleted before', settings: { deletedExercises: ['squat'] } },
+  ])('asks about an exercise $known with a note box ticked by default', async ({ settings }) => {
+    const { view } = await openEditor({ body: [], settings })
+
+    await addUnknown(view.contentEl)
+    const modal = await openedModal('Add exercise')
+
+    expect(outline(modal.contentEl)).toMatchSnapshot()
+    expect(modal.contentEl.querySelector<HTMLInputElement>('input[type=checkbox]')?.checked).toBe(
+      true,
+    )
+    expect(findUnstyledClasses(modal.contentEl)).toEqual([])
+  })
 
   it('adds the card but records nothing when the question is skipped', async () => {
     const { view, plugin, saved, created } = await openEditor({ body: [] })
@@ -246,6 +264,24 @@ describe('WorkoutEditorView set seeding', () => {
     button(card(view), 'Add set').click()
 
     expect([seeded, typed, unconfirmed()]).toEqual([true, false, false])
+  })
+
+  it('confirms a seeded weight typed over with the same number', async () => {
+    const { view } = await seedStrength(
+      lastSquat({
+        maxWeightSet: { weight: 100, reps: 5 },
+        next: { direction: 'up', step: 2.5 },
+      }),
+    )
+    const weight = (): HTMLInputElement | null => cellInput(firstRow(view), 'Weight')
+    const seeded = weight()?.classList.contains('fitkit-input--unconfirmed')
+
+    typeInto(weight() as HTMLInputElement, '102.5')
+
+    expect([seeded, weight()?.classList.contains('fitkit-input--unconfirmed')]).toEqual([
+      true,
+      false,
+    ])
   })
 
   it('seeds a bodyweight row shaped like the rows Add set appends', async () => {

@@ -1,5 +1,5 @@
 import type { JSX, RefObject } from 'preact'
-import { useLayoutEffect, useRef } from 'preact/hooks'
+import { useLayoutEffect } from 'preact/hooks'
 
 import { formatDurationInput } from '../../domain/duration-input'
 import { useDomEffect } from './dom-effect'
@@ -17,12 +17,14 @@ export interface EditorHandlers {
 }
 
 export interface EditorPage {
-  /** Changes when a different workout is loaded, which is when the name box takes its text again. */
-  workout: object
+  /** Identity of the loaded workout; a new one is when the name box takes its text again. */
+  workoutKey: object
   name: string
   /** A note without `type: workout` shows the warning and no cards. */
   isWorkout: boolean
   metaLine: string
+  /** The view rewrites the meta line through this as autosave settles. */
+  metaLineRef: RefObject<HTMLSpanElement>
   conflict: boolean
   cards: Array<Omit<CardProps, 'handlers'>>
   cardHandlers: CardHandlers
@@ -134,10 +136,10 @@ function Header({ page }: { page: EditorPage }): JSX.Element {
     (input) => {
       input.value = page.name
     },
-    [page.workout],
+    [page.workoutKey],
   )
-  /** The view patches this line as autosave settles, so it is written, never drawn as a child. */
-  const meta = useRef<HTMLSpanElement>(null)
+  /** The view also writes this line as autosave settles, so it is never drawn as a child. */
+  const meta = page.metaLineRef
   useLayoutEffect(() => {
     if (meta.current) meta.current.textContent = page.metaLine
   })
@@ -197,7 +199,7 @@ function RestControl({ last, start }: { last: number | null; start: () => void }
         aria-label="Start rest timer"
         onClick={start}
       >
-        <span ref={icon} />
+        <span ref={icon} class="fitkit-rest-timer-icon" />
         <span class="fitkit-rest-timer-label">Start rest</span>
       </button>
       {last !== null && (
