@@ -603,6 +603,12 @@ body.is-mobile .fitkit-editor-root {
   gap: 6px;
 }
 
+/* The icon's own span, laid out like the bare svg it wraps. */
+.fitkit-timer-button-icon,
+.fitkit-rest-timer-icon {
+  display: inline-flex;
+}
+
 .fitkit-rest-timer-button {
   display: inline-flex;
   align-items: center;

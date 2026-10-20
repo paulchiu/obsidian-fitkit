@@ -17,8 +17,7 @@ import {
   type DotState,
   type RunnerTimeline,
 } from '../model/interval-runner'
-import { HostContext, type Host } from './host'
-import { Clock, Control, mountScreen, type ScreenMount } from './screen-parts'
+import { Clock, Control } from './screen-parts'
 
 export interface RunnerModel extends RunnerTimeline {
   exerciseName: string
@@ -35,21 +34,8 @@ export interface RunnerHandlers {
   back: () => void
 }
 
-/** Draws the run screen that takes over the editor tab; only the running screen has a clock. */
-export function renderRunner(
-  parent: HTMLElement,
-  model: RunnerModel,
-  handlers: RunnerHandlers,
-  host: Host,
-): ScreenMount {
-  return mountScreen(parent, (clock) => (
-    <HostContext.Provider value={host}>
-      <Runner model={model} handlers={handlers} clock={clock} />
-    </HostContext.Provider>
-  ))
-}
-
-function Runner({
+/** The run screen that takes over the editor tab; only the running screen has a clock. */
+export function Runner({
   model,
   handlers,
   clock,

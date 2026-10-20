@@ -154,7 +154,7 @@ exports[`WorkoutEditorView structure > draws a duration card 1`] = `
       button.fitkit-btn
         "Repeat"
       button.fitkit-btn.fitkit-timer-button[aria-label=Start timer]
-        span[data-icon=play]"
+        span.fitkit-timer-button-icon[data-icon=play]"
 `;
 
 exports[`WorkoutEditorView structure > draws a strength card 1`] = `
@@ -424,7 +424,8 @@ exports[`WorkoutEditorView structure > draws the footer with the last rest besid
   button.fitkit-btn
     "Add exercise"
   div.fitkit-rest-timer-control
-    button.fitkit-btn.fitkit-btn-muted.fitkit-rest-timer-button[aria-label=Start rest timer][data-icon=timer][type=button]
+    button.fitkit-btn.fitkit-btn-muted.fitkit-rest-timer-button[aria-label=Start rest timer][type=button]
+      span.fitkit-rest-timer-icon[data-icon=timer]
       span.fitkit-rest-timer-label
         "Start rest"
     span.fitkit-rest-timer-last
@@ -463,4 +464,14 @@ exports[`WorkoutEditorView structure > draws the loading skeleton while the work
     div.fitkit-skeleton-line.is-short
     div.fitkit-skeleton-line
     div.fitkit-skeleton-line.is-medium"
+`;
+
+exports[`WorkoutEditorView structure > draws the warning in place of the cards when the note is not a workout 1`] = `
+"div.fitkit-container
+  div.fitkit-header
+    div.fitkit-meta
+      span.fitkit-meta-line
+        "2026-06-15"
+  div.fitkit-warn
+    "This note has no \`type: workout\` frontmatter. The editor will not save changes here.""
 `;

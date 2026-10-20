@@ -367,6 +367,17 @@ describe('WorkoutEditorView bodyweight level labels', () => {
     expect(shortened(view)).toEqual([true, true])
   })
 
+  it('refits the rung labels when adding a load narrows the level cell without a resize', async () => {
+    widths = FITS
+    const { view } = await openEditor(TWO_ROWS)
+
+    widths = OVERRUNS
+    openRowMenu(rows(card(view))[1] as Element)
+    chooseMenuItem('Add load')
+
+    expect(shortened(view)).toEqual([true, true])
+  })
+
   it('leaves a fitting rung name alone', async () => {
     widths = FITS
 

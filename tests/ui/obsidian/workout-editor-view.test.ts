@@ -12,21 +12,12 @@ import {
   ensureKnownNotice,
   formatLadderChangesWarning,
   ladderRecordNotice,
-  shouldShortenLevelLabel,
   toEditorExercise,
   toWorkoutExercise,
   typeRecordNotices,
 } from '../../../src/ui/obsidian/workout-editor-view'
 
 /** The editor's pure helpers; everything it draws is driven through a real view in the sibling files. */
-describe('WorkoutEditorView level label fit', () => {
-  it('shortens a rung name only when its own width overruns the cell', () => {
-    expect(shouldShortenLevelLabel(120, 100)).toBe(true)
-    expect(shouldShortenLevelLabel(100, 100)).toBe(false)
-    expect(shouldShortenLevelLabel(120, 200)).toBe(false)
-  })
-})
-
 describe('WorkoutEditorView ladder history warning', () => {
   it('names each affected level with its old and new meaning', () => {
     expect(

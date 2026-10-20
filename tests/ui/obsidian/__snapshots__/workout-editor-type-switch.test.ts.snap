@@ -1,0 +1,31 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`WorkoutEditorView unknown exercise choices > asks about an exercise deleted before with a note box ticked by default 1`] = `
+"div
+  p.fitkit-import-muted
+    ""Squat" was previously deleted and ignored. Add it again?"
+  label.fitkit-import-checkbox-row
+    input[type=checkbox]
+    span
+      "Create exercise note"
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Skip"
+    button.fitkit-btn.fitkit-btn-primary
+      "Add exercise""
+`;
+
+exports[`WorkoutEditorView unknown exercise choices > asks about an exercise never seen with a note box ticked by default 1`] = `
+"div
+  p.fitkit-import-muted
+    ""Squat" is not in your exercise registry yet."
+  label.fitkit-import-checkbox-row
+    input[type=checkbox]
+    span
+      "Create exercise note"
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Skip"
+    button.fitkit-btn.fitkit-btn-primary
+      "Add exercise""
+`;

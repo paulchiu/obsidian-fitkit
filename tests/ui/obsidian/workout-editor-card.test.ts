@@ -731,3 +731,147 @@ describe('WorkoutEditorView menu placement', () => {
     expectWithin(box, 360)
   })
 })
+
+describe('WorkoutEditorView drag to reorder', () => {
+  const THREE = [
+    '## [[Squat]]',
+    '',
+    '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+    '',
+    '## [[Deadlift]]',
+    '',
+    '- [exercise:: [[Deadlift]]] [set:: 1] [weight:: 140] [reps:: 3]',
+    '',
+    '## [[Press]]',
+    '',
+    '- [exercise:: [[Press]]] [set:: 1] [weight:: 50] [reps:: 8]',
+  ]
+
+  const names = (view: WorkoutEditorView): string[] =>
+    [...view.contentEl.querySelectorAll('.fitkit-name-button-text')].map(
+      (el) => el.textContent ?? '',
+    )
+
+  /** jsdom has no layout, so each card stands 100px tall from the top and the handle lacks pointer capture. */
+  const layOut = (view: WorkoutEditorView): HTMLElement => {
+    const cards = view.contentEl.querySelectorAll<HTMLElement>(
+      '.fitkit-exercise-list > .fitkit-card',
+    )
+    cards.forEach((el, i) => {
+      el.getBoundingClientRect = () => ({ top: i * 100, height: 100 }) as DOMRect
+    })
+    const handle = card(view, 0).querySelector<HTMLElement>('.fitkit-drag-handle')
+    if (!handle) throw new Error('no drag handle drawn')
+    Object.assign(handle, {
+      setPointerCapture: () => {},
+      hasPointerCapture: () => false,
+      releasePointerCapture: () => {},
+    })
+    return handle
+  }
+
+  const fireOnWindow = (evt: Event): void => {
+    ;(harnessWindow as unknown as EventTarget).dispatchEvent(evt)
+  }
+
+  const pointer = (type: string, clientY: number): Event => {
+    const evt = new harnessWindow.MouseEvent(type, { clientY, bubbles: true })
+    Object.defineProperty(evt, 'pointerId', { value: 1 })
+    return evt
+  }
+
+  it('commits the new order once when the handle is released between two other cards', async () => {
+    const { view, contents } = await openEditor({ body: THREE })
+    const handle = layOut(view)
+
+    handle.dispatchEvent(pointer('pointerdown', 50))
+    handle.dispatchEvent(pointer('pointermove', 180))
+    const dragging = card(view, 0).classList.contains('is-dragging')
+    fireOnWindow(pointer('pointerup', 180))
+    fireOnWindow(pointer('lostpointercapture', 180))
+
+    expect([dragging, names(view)]).toEqual([true, ['Deadlift', 'Squat', 'Press']])
+    expect(view.contentEl.querySelector('.fitkit-drop-indicator')).toBeNull()
+    await savedBody(contents, [
+      '## [[Deadlift]]',
+      '',
+      '- [exercise:: [[Deadlift]]] [set:: 1] [weight:: 140] [reps:: 3]',
+      '',
+      '## [[Squat]]',
+      '',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '',
+      '## [[Press]]',
+      '',
+      '- [exercise:: [[Press]]] [set:: 1] [weight:: 50] [reps:: 8]',
+    ])
+  })
+
+  it('keeps a drag alive across a redraw and commits it once on release', async () => {
+    const { view, contents } = await openEditor({ body: THREE })
+    const handle = layOut(view)
+
+    handle.dispatchEvent(pointer('pointerdown', 50))
+    handle.dispatchEvent(pointer('pointermove', 180))
+    view.refreshSettingsDrivenUi()
+    fireOnWindow(pointer('pointerup', 180))
+    fireOnWindow(pointer('lostpointercapture', 180))
+
+    expect(names(view)).toEqual(['Deadlift', 'Squat', 'Press'])
+    await savedBody(contents, [
+      '## [[Deadlift]]',
+      '',
+      '- [exercise:: [[Deadlift]]] [set:: 1] [weight:: 140] [reps:: 3]',
+      '',
+      '## [[Squat]]',
+      '',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '',
+      '## [[Press]]',
+      '',
+      '- [exercise:: [[Press]]] [set:: 1] [weight:: 50] [reps:: 8]',
+    ])
+  })
+
+  it('numbers the cards in their new order after each reorder', async () => {
+    const { view } = await openEditor({ body: THREE })
+    const indices = (): Array<string | undefined> =>
+      [...view.contentEl.querySelectorAll<HTMLElement>('.fitkit-exercise-list > .fitkit-card')].map(
+        (el) => el.dataset.exerciseIndex,
+      )
+    const dragFirstBetweenTheOthers = (): void => {
+      const handle = layOut(view)
+      handle.dispatchEvent(pointer('pointerdown', 50))
+      handle.dispatchEvent(pointer('pointermove', 180))
+      fireOnWindow(pointer('pointerup', 180))
+    }
+
+    dragFirstBetweenTheOthers()
+    const once = [names(view), indices()]
+    dragFirstBetweenTheOthers()
+
+    expect([once, [names(view), indices()]]).toEqual([
+      [
+        ['Deadlift', 'Squat', 'Press'],
+        ['0', '1', '2'],
+      ],
+      [
+        ['Squat', 'Deadlift', 'Press'],
+        ['0', '1', '2'],
+      ],
+    ])
+  })
+
+  it('leaves the order alone when the drag is cancelled', async () => {
+    const { view } = await openEditor({ body: THREE })
+    const handle = layOut(view)
+
+    handle.dispatchEvent(pointer('pointerdown', 50))
+    handle.dispatchEvent(pointer('pointermove', 180))
+    fireOnWindow(pointer('pointercancel', 180))
+
+    expect(names(view)).toEqual(['Squat', 'Deadlift', 'Press'])
+    expect(view.contentEl.querySelector('.fitkit-drop-indicator')).toBeNull()
+    expect(card(view, 0).classList.contains('is-dragging')).toBe(false)
+  })
+})

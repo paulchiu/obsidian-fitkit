@@ -40,6 +40,8 @@ export const obsidianRecord = {
   menus: [] as MockMenu[],
   modals: [] as MockModal[],
   notices: [] as string[],
+  /** Removes each listener a view registered through `registerDomEvent`. */
+  domListeners: [] as Array<() => void>,
   platform: { isMobile: false },
 }
 
@@ -47,6 +49,9 @@ export function resetObsidianRecord(): void {
   obsidianRecord.menus.length = 0
   obsidianRecord.modals.length = 0
   obsidianRecord.notices.length = 0
+  for (const remove of obsidianRecord.domListeners.splice(0)) {
+    remove()
+  }
   obsidianRecord.platform.isMobile = false
 }
 
@@ -67,7 +72,16 @@ export function createObsidianMock(): Record<string, unknown> {
           : undefined
       this.contentEl = createTestRoot()
     }
-    registerDomEvent(): void {}
+    registerDomEvent(
+      target: { addEventListener: (type: string, callback: never) => void },
+      type: string,
+      callback: unknown,
+    ): void {
+      target.addEventListener(type, callback as never)
+      obsidianRecord.domListeners.push(() =>
+        (target as unknown as EventTarget).removeEventListener(type, callback as never),
+      )
+    }
     registerEvent(): void {}
     getState(): Record<string, unknown> {
       return {}

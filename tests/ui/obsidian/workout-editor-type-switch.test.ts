@@ -6,6 +6,9 @@ vi.mock('obsidian', async () =>
 
 import type { IndexEntry } from '../../../src/domain/types'
 import { obsidianRecord } from '../../fixtures/obsidian-editor-mock'
+import { harnessDocument } from '../../harness/obsidian-dom'
+import { outline } from '../../harness/outline'
+import { findUnstyledClasses } from '../../harness/stylesheet'
 import {
   button,
   card,
@@ -14,6 +17,7 @@ import {
   firstRow,
   modalTitles,
   noteBody,
+  openedModal,
   openEditor,
   pickerModal,
   pressKey,
@@ -49,6 +53,60 @@ describe('WorkoutEditorView unknown exercise', () => {
     expect(plugin.settings.deletedExercises).toEqual([])
     expect(saved[0]?.exerciseRegistry).toEqual(plugin.settings.exerciseRegistry)
     expect(obsidianRecord.notices).toEqual(["Created exercise note for 'Squat'."])
+  })
+})
+
+describe('WorkoutEditorView unknown exercise choices', () => {
+  const addUnknown = async (view: Parameters<typeof button>[0]): Promise<void> => {
+    button(view, 'Add exercise').click()
+    const picker = await pickerModal()
+    picker.inputEl.value = 'Squat'
+    pressKey(picker.inputEl, 'Enter')
+  }
+
+  it.each([
+    { known: 'never seen', settings: {} },
+    { known: 'deleted before', settings: { deletedExercises: ['squat'] } },
+  ])('asks about an exercise $known with a note box ticked by default', async ({ settings }) => {
+    const { view } = await openEditor({ body: [], settings })
+
+    await addUnknown(view.contentEl)
+    const modal = await openedModal('Add exercise')
+
+    expect(outline(modal.contentEl)).toMatchSnapshot()
+    expect(modal.contentEl.querySelector<HTMLInputElement>('input[type=checkbox]')?.checked).toBe(
+      true,
+    )
+    expect(findUnstyledClasses(modal.contentEl)).toEqual([])
+  })
+
+  it('adds the card but records nothing when the question is skipped', async () => {
+    const { view, plugin, saved, created } = await openEditor({ body: [] })
+
+    await addUnknown(view.contentEl)
+    await choose('Add exercise', 'Skip')
+    await settle()
+
+    expect([created, saved, plugin.settings.exerciseRegistry]).toEqual([[], [], []])
+    expect(card(view).textContent).toContain('Squat')
+  })
+
+  it('records a registry entry without a note when the note box is unticked', async () => {
+    const { view, plugin, saved, created } = await openEditor({ body: [] })
+
+    await addUnknown(view.contentEl)
+    const modal = await openedModal('Add exercise')
+    /** A detached checkbox toggles without telling anyone. */
+    harnessDocument.body.appendChild(modal.contentEl)
+    modal.contentEl.querySelector<HTMLInputElement>('input[type=checkbox]')?.click()
+    button(modal.contentEl, 'Add exercise').click()
+    modal.contentEl.remove()
+    await vi.waitFor(() => expect(saved).toHaveLength(1))
+
+    expect(created).toEqual([])
+    expect(plugin.settings.exerciseRegistry).toEqual([
+      { name: 'Squat', kind: 'strength', aliases: [] },
+    ])
   })
 })
 
@@ -206,6 +264,24 @@ describe('WorkoutEditorView set seeding', () => {
     button(card(view), 'Add set').click()
 
     expect([seeded, typed, unconfirmed()]).toEqual([true, false, false])
+  })
+
+  it('confirms a seeded weight typed over with the same number', async () => {
+    const { view } = await seedStrength(
+      lastSquat({
+        maxWeightSet: { weight: 100, reps: 5 },
+        next: { direction: 'up', step: 2.5 },
+      }),
+    )
+    const weight = (): HTMLInputElement | null => cellInput(firstRow(view), 'Weight')
+    const seeded = weight()?.classList.contains('fitkit-input--unconfirmed')
+
+    typeInto(weight() as HTMLInputElement, '102.5')
+
+    expect([seeded, weight()?.classList.contains('fitkit-input--unconfirmed')]).toEqual([
+      true,
+      false,
+    ])
   })
 
   it('seeds a bodyweight row shaped like the rows Add set appends', async () => {

@@ -1,8 +1,7 @@
 import type { JSX, RefObject } from 'preact'
 
 import { formatDurationInput } from '../../domain/duration-input'
-import { HostContext, type Host } from './host'
-import { Clock, Control, mountScreen, type ScreenMount } from './screen-parts'
+import { Clock, Control } from './screen-parts'
 
 export interface SetTimerModel {
   exerciseName: string
@@ -21,50 +20,11 @@ export interface SetTimerHandlers {
   done: () => void
 }
 
-/** A drawn timer screen, which always has a clock. */
-export type TimerScreenMount = ScreenMount & { clock: HTMLElement }
-
 /**
  * The runner screen cut down to a stopwatch for one duration set, with every control
  * a stretch session needs so the workout never has to be reopened between sets.
  */
-export function renderSetTimer(
-  parent: HTMLElement,
-  model: SetTimerModel,
-  handlers: SetTimerHandlers,
-  host: Host,
-): TimerScreenMount {
-  return mount(parent, (clock) => (
-    <HostContext.Provider value={host}>
-      <SetTimer model={model} handlers={handlers} clock={clock} />
-    </HostContext.Provider>
-  ))
-}
-
-/** The runner screen as a plain count-up rest clock; stopping it returns to the workout. */
-export function renderRestTimer(
-  parent: HTMLElement,
-  seconds: number,
-  handlers: { stop: () => void },
-): TimerScreenMount {
-  return mount(parent, (clock) => (
-    <RestTimer seconds={seconds} stop={handlers.stop} clock={clock} />
-  ))
-}
-
-/** Both timer screens always draw a clock, so the view can tick it without checking. */
-function mount(
-  parent: HTMLElement,
-  screen: (clock: RefObject<HTMLDivElement>) => JSX.Element,
-): TimerScreenMount {
-  const { clock, unmount } = mountScreen(parent, screen)
-  if (!clock) {
-    throw new Error('Timer screen drew no clock')
-  }
-  return { clock, unmount }
-}
-
-function SetTimer({
+export function SetTimer({
   model,
   handlers,
   clock,
@@ -111,7 +71,8 @@ function SetTimer({
   )
 }
 
-function RestTimer({
+/** The runner screen as a plain count-up rest clock; stopping it returns to the workout. */
+export function RestTimer({
   seconds,
   stop,
   clock,

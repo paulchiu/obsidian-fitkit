@@ -30,6 +30,9 @@ is all zeros), so element overflow is out of scope by design.
   adjacent text joined, so a snapshot pins the structure `styles.css` and the
   focus code depend on rather than how the DOM was built. Use it to pin a
   surface before porting it to Preact.
+- `renders.ts` counts how often a component renders (`countRenders()`, or
+  `countRendersSettled()` to include the re-renders Preact queues), so a test
+  can prove a memoised component skipped a redraw.
 - `unmount.ts` records the components Preact unmounts (`watchUnmounts()`), so a
   test can prove a surface took its component down on close rather than just
   emptying its element.

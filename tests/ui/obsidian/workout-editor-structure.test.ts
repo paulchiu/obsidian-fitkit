@@ -59,6 +59,17 @@ describe('WorkoutEditorView structure', () => {
     expect(findUnstyledClasses(header)).toEqual([])
   })
 
+  it('draws the warning in place of the cards when the note is not a workout', async () => {
+    const { view, contents } = createEditor({ body: [] })
+    contents.set(WORKOUT_PATH, '# Just a note\n')
+    await view.onOpen()
+    await view.setState({ file: WORKOUT_PATH }, { history: false })
+
+    const container = part(view.contentEl, '.fitkit-container')
+    expect(outline(container)).toMatchSnapshot()
+    expect(findUnstyledClasses(container)).toEqual([])
+  })
+
   it('draws the footer with the last rest beside the rest button', async () => {
     const { view } = await openEditor({ body: STRENGTH })
     button(view.contentEl, 'Start rest timer').click()
