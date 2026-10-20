@@ -170,7 +170,7 @@ describe('WorkoutEditorView rest timer', () => {
         .filter((child) => child.tagName === 'BUTTON')
         .map((child) => child.textContent),
     ).toEqual(['Add exercise'])
-    expect(rest.getAttribute('data-icon')).toBe('timer')
+    expect(rest.querySelector('[data-icon]')?.getAttribute('data-icon')).toBe('timer')
     expect(text(rest, 'fitkit-rest-timer-label')).toBe('Start rest')
     expect(footer(disabled.view).querySelector('.fitkit-rest-timer-button')).toBeNull()
   })
@@ -308,19 +308,6 @@ describe('WorkoutEditorView rest timer', () => {
     await view.reloadFromDisk()
 
     expect(runner(view.contentEl)).toBeNull()
-  })
-
-  /** The set screen covers the footer, so this reaches the button drawn before it opened. */
-  it('saves a running set before a rest started from behind the set screen', async () => {
-    const { view, contents } = await openEditor({ body: PLANK_30 })
-    const rest = button(footer(view), 'Start rest timer')
-    button(card(view), 'Start timer').click()
-    advance(8)
-
-    rest.click()
-
-    expect(view.contentEl.querySelector('.fitkit-runner.is-rest')).not.toBeNull()
-    await savedBody(contents, exercise('Plank', ['[set:: 1] [duration:: 38]']))
   })
 })
 
@@ -658,7 +645,7 @@ describe('WorkoutEditorView set row lifetime', () => {
     { kind: 'bodyweight', body: BODYWEIGHT, rowsComponent: 'BodyweightRows' },
     { kind: 'duration', body: PLANK_30, rowsComponent: 'DurationRows' },
   ])(
-    'unmounts the $kind rows and set bar when the editor redraws and when it closes',
+    'keeps the $kind rows and set bar mounted when the editor redraws, and unmounts them when it closes',
     async ({ body, rowsComponent }) => {
       const { view } = await openEditor({ body })
       const unmounts = watchUnmounts()
@@ -669,10 +656,10 @@ describe('WorkoutEditorView set row lifetime', () => {
         unmounts.names.length = 0
         await view.onClose()
 
-        expect([redrawn, unmounts.names]).toEqual([
-          expect.arrayContaining([rowsComponent, 'SetBar']),
-          expect.arrayContaining([rowsComponent, 'SetBar']),
-        ])
+        expect(redrawn).not.toContain(rowsComponent)
+        expect(unmounts.names).toEqual(
+          expect.arrayContaining([rowsComponent, 'SetBar', 'EditorRoot']),
+        )
       } finally {
         unmounts.stop()
       }

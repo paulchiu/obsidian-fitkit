@@ -424,7 +424,8 @@ exports[`WorkoutEditorView structure > draws the footer with the last rest besid
   button.fitkit-btn
     "Add exercise"
   div.fitkit-rest-timer-control
-    button.fitkit-btn.fitkit-btn-muted.fitkit-rest-timer-button[aria-label=Start rest timer][data-icon=timer][type=button]
+    button.fitkit-btn.fitkit-btn-muted.fitkit-rest-timer-button[aria-label=Start rest timer][type=button]
+      span[data-icon=timer]
       span.fitkit-rest-timer-label
         "Start rest"
     span.fitkit-rest-timer-last

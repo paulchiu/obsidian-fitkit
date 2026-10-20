@@ -1,0 +1,17 @@
+import { options } from 'preact'
+
+/** How many times components of `type` render while `run` runs, read from Preact's `diffed` hook. */
+export function countRenders(type: unknown, run: () => void): number {
+  let n = 0
+  const saved = Object.getOwnPropertyDescriptor(options, 'diffed')
+  options.diffed = (vnode) => {
+    if (vnode.type === type) n++
+  }
+  try {
+    run()
+  } finally {
+    delete options.diffed
+    if (saved) Object.defineProperty(options, 'diffed', saved)
+  }
+  return n
+}

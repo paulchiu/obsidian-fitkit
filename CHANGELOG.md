@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The plugin's screens are now drawn with Preact, so nothing should look or behave differently.
+
 ### Fixed
 
 ### Removed

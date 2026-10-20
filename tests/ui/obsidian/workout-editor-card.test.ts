@@ -758,7 +758,7 @@ describe('WorkoutEditorView drag to reorder', () => {
       '.fitkit-exercise-list > .fitkit-card',
     )
     cards.forEach((el, i) => {
-      el.getBoundingClientRect = () => new harnessWindow.DOMRect(0, i * 100, 300, 100)
+      el.getBoundingClientRect = () => ({ top: i * 100, height: 100 }) as DOMRect
     })
     const handle = card(view, 0).querySelector<HTMLElement>('.fitkit-drag-handle')
     if (!handle) throw new Error('no drag handle drawn')
@@ -768,6 +768,10 @@ describe('WorkoutEditorView drag to reorder', () => {
       releasePointerCapture: () => {},
     })
     return handle
+  }
+
+  const fireOnWindow = (evt: Event): void => {
+    ;(harnessWindow as unknown as EventTarget).dispatchEvent(evt)
   }
 
   const pointer = (type: string, clientY: number): Event => {
@@ -783,8 +787,8 @@ describe('WorkoutEditorView drag to reorder', () => {
     handle.dispatchEvent(pointer('pointerdown', 50))
     handle.dispatchEvent(pointer('pointermove', 180))
     const dragging = card(view, 0).classList.contains('is-dragging')
-    harnessWindow.dispatchEvent(pointer('pointerup', 180))
-    harnessWindow.dispatchEvent(pointer('lostpointercapture', 180))
+    fireOnWindow(pointer('pointerup', 180))
+    fireOnWindow(pointer('lostpointercapture', 180))
 
     expect([dragging, names(view)]).toEqual([true, ['Deadlift', 'Squat', 'Press']])
     expect(view.contentEl.querySelector('.fitkit-drop-indicator')).toBeNull()
@@ -809,7 +813,7 @@ describe('WorkoutEditorView drag to reorder', () => {
 
     handle.dispatchEvent(pointer('pointerdown', 50))
     handle.dispatchEvent(pointer('pointermove', 180))
-    harnessWindow.dispatchEvent(pointer('pointercancel', 180))
+    fireOnWindow(pointer('pointercancel', 180))
 
     expect(names(view)).toEqual(['Squat', 'Deadlift', 'Press'])
     expect(view.contentEl.querySelector('.fitkit-drop-indicator')).toBeNull()

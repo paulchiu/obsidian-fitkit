@@ -26,7 +26,7 @@ export function mountScreen(
   return { clock: clock.current, unmount }
 }
 
-/** The clock's text is set outside the render, since the view rewrites it on every tick. */
+/** The clock's text is set outside the render, since the view rewrites it on every tick; each render writes it again. */
 export function Clock({
   seconds,
   clock,
@@ -36,7 +36,7 @@ export function Clock({
 }): JSX.Element {
   useLayoutEffect(() => {
     if (clock.current) clock.current.textContent = formatClock(seconds)
-  }, [seconds])
+  })
   return <div class="fitkit-runner-clock" ref={clock} />
 }
 

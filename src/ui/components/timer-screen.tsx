@@ -64,7 +64,7 @@ function mount(
   return { clock, unmount }
 }
 
-function SetTimer({
+export function SetTimer({
   model,
   handlers,
   clock,
@@ -111,7 +111,7 @@ function SetTimer({
   )
 }
 
-function RestTimer({
+export function RestTimer({
   seconds,
   stop,
   clock,

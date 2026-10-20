@@ -11,6 +11,7 @@ import {
   ZERO_DURATION_DISPLAY,
 } from '../../domain/duration-input'
 import { CAUGHT_UP_NOTE, isCaughtUp } from '../../domain/interval-run'
+import { shouldShortenLevelLabel } from '../model/level-label-fit'
 import {
   INTENSITY_LABELS,
   durationRowClasses,
@@ -21,8 +22,8 @@ import {
   type IntervalColumns,
 } from '../model/set-rows'
 import { useDomEffect } from './dom-effect'
-import { HostContext, useIcon, type Host } from './host'
-import { mountTree } from './screen-parts'
+import { useIcon } from './host'
+import { useResize } from './layout'
 
 /** A row's name for labels, its note, and the dialogs the view opens for it. */
 export interface RowControls {
@@ -54,8 +55,6 @@ export interface BodyweightRowsProps {
   setLevel: (set: EditableBodyweightSet, level: number) => void
   /** Opens the set's level menu under `trigger`. */
   openLevelMenu: (set: EditableBodyweightSet, trigger: HTMLElement) => void
-  /** Shortens `label` when `full` overflows its slot, and unshortens it when it fits. */
-  fitLabel: (label: HTMLElement, full: HTMLElement) => void
 }
 
 export interface DurationRowsProps {
@@ -79,43 +78,7 @@ export interface SetBarProps {
   end?: SetBarEnd
 }
 
-/** Draws a strength card's rows into `parent`, in place if they are already there. */
-export function renderStrengthRows(
-  parent: HTMLElement,
-  props: StrengthRowsProps,
-  host: Host,
-): () => void {
-  return mountTree(parent, withHost(host, <StrengthRows {...props} />))
-}
-
-/** Draws a bodyweight card's rows into `parent`, in place if they are already there. */
-export function renderBodyweightRows(
-  parent: HTMLElement,
-  props: BodyweightRowsProps,
-  host: Host,
-): () => void {
-  return mountTree(parent, withHost(host, <BodyweightRows {...props} />))
-}
-
-/** Draws a duration card's rows into `parent`, in place if they are already there. */
-export function renderDurationRows(
-  parent: HTMLElement,
-  props: DurationRowsProps,
-  host: Host,
-): () => void {
-  return mountTree(parent, withHost(host, <DurationRows {...props} />))
-}
-
-/** Draws the Add set and Repeat bar into `parent`. */
-export function renderSetBar(parent: HTMLElement, props: SetBarProps, host: Host): () => void {
-  return mountTree(parent, withHost(host, <SetBar {...props} />))
-}
-
-const withHost = (host: Host, tree: JSX.Element): JSX.Element => (
-  <HostContext.Provider value={host}>{tree}</HostContext.Provider>
-)
-
-function StrengthRows({ sets, isSeeded, controls, onEdit }: StrengthRowsProps): JSX.Element {
+export function StrengthRows({ sets, isSeeded, controls, onEdit }: StrengthRowsProps): JSX.Element {
   return (
     <>
       {sets.map((set, i) => (
@@ -182,7 +145,7 @@ function StrengthRow({
   )
 }
 
-function BodyweightRows(props: BodyweightRowsProps): JSX.Element {
+export function BodyweightRows(props: BodyweightRowsProps): JSX.Element {
   return (
     <>
       {props.sets.map((set, i) => (
@@ -196,7 +159,6 @@ function BodyweightRows(props: BodyweightRowsProps): JSX.Element {
           onEdit={props.onEdit}
           setLevel={(level) => props.setLevel(set, level)}
           openLevelMenu={(trigger) => props.openLevelMenu(set, trigger)}
-          fitLabel={props.fitLabel}
         />
       ))}
     </>
@@ -212,7 +174,6 @@ function BodyweightRow({
   onEdit,
   setLevel,
   openLevelMenu,
-  fitLabel,
 }: {
   set: EditableBodyweightSet
   index: number
@@ -222,7 +183,6 @@ function BodyweightRow({
   onEdit: RowEdit<EditableBodyweightSet>
   setLevel: (level: number) => void
   openLevelMenu: (trigger: HTMLElement) => void
-  fitLabel: (label: HTMLElement, full: HTMLElement) => void
 }): JSX.Element {
   return (
     <Row cls="fitkit-row" controls={controls}>
@@ -237,7 +197,6 @@ function BodyweightRow({
             level={set.level ?? 1}
             setLevel={setLevel}
             openMenu={openLevelMenu}
-            fitLabel={fitLabel}
           />
         </Cell>
         <Cell label="Reps">
@@ -276,14 +235,12 @@ function LevelStepper({
   level,
   setLevel,
   openMenu,
-  fitLabel,
 }: {
   position: number
   levels: BodyweightLadder | undefined
   level: number
   setLevel: (level: number) => void
   openMenu: (trigger: HTMLElement) => void
-  fitLabel: (label: HTMLElement, full: HTMLElement) => void
 }): JSX.Element {
   const rungCount = levels?.length ?? 0
   const name = formatBodyweightLevelLabel(levels, level)
@@ -294,13 +251,15 @@ function LevelStepper({
   const label = useDomEffect<HTMLButtonElement>(
     (el) => {
       el.classList.add('fitkit-bodyweight-level-label')
-      const full = el.querySelector<HTMLElement>('.fitkit-bodyweight-level-full')
-      if (full) {
-        fitLabel(el, full)
-      }
+      fitLevelLabel(el)
     },
     [name],
   )
+  useResize(() => {
+    if (label.current) {
+      fitLevelLabel(label.current)
+    }
+  })
   return (
     <div class="fitkit-bodyweight-stepper">
       <button
@@ -342,7 +301,22 @@ function LevelStepper({
   )
 }
 
-function DurationRows(props: DurationRowsProps): JSX.Element {
+/**
+ * Shortens a rung name that overflows its own text slot. It unshortens first, since a
+ * shortened label hides the span it measures, so every refit reads live widths and converges.
+ */
+function fitLevelLabel(label: HTMLElement): void {
+  const full = label.querySelector<HTMLElement>('.fitkit-bodyweight-level-full')
+  if (!full) {
+    return
+  }
+  label.classList.remove('is-label-short')
+  if (shouldShortenLevelLabel(full.scrollWidth, full.clientWidth)) {
+    label.classList.add('is-label-short')
+  }
+}
+
+export function DurationRows(props: DurationRowsProps): JSX.Element {
   return (
     <>
       {props.entries.map((entry, i) => (
@@ -474,7 +448,7 @@ function DurationField({
   )
 }
 
-function SetBar({ repeatDisabled, onAdd, onRepeat, end }: SetBarProps): JSX.Element {
+export function SetBar({ repeatDisabled, onAdd, onRepeat, end }: SetBarProps): JSX.Element {
   return (
     <>
       <button class="fitkit-btn" onClick={onAdd}>

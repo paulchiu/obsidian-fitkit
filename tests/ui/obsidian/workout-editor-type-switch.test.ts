@@ -6,6 +6,7 @@ vi.mock('obsidian', async () =>
 
 import type { IndexEntry } from '../../../src/domain/types'
 import { obsidianRecord } from '../../fixtures/obsidian-editor-mock'
+import { harnessDocument } from '../../harness/obsidian-dom'
 import {
   button,
   card,
@@ -14,6 +15,7 @@ import {
   firstRow,
   modalTitles,
   noteBody,
+  openedModal,
   openEditor,
   pickerModal,
   pressKey,
@@ -49,6 +51,44 @@ describe('WorkoutEditorView unknown exercise', () => {
     expect(plugin.settings.deletedExercises).toEqual([])
     expect(saved[0]?.exerciseRegistry).toEqual(plugin.settings.exerciseRegistry)
     expect(obsidianRecord.notices).toEqual(["Created exercise note for 'Squat'."])
+  })
+})
+
+describe('WorkoutEditorView unknown exercise choices', () => {
+  const addUnknown = async (view: Parameters<typeof button>[0]): Promise<void> => {
+    button(view, 'Add exercise').click()
+    const picker = await pickerModal()
+    picker.inputEl.value = 'Squat'
+    pressKey(picker.inputEl, 'Enter')
+  }
+
+  it('adds the card but records nothing when the question is skipped', async () => {
+    const { view, plugin, saved, created } = await openEditor({ body: [] })
+
+    await addUnknown(view.contentEl)
+    await choose('Add exercise', 'Skip')
+    await settle()
+
+    expect([created, saved, plugin.settings.exerciseRegistry]).toEqual([[], [], []])
+    expect(card(view).textContent).toContain('Squat')
+  })
+
+  it('records a registry entry without a note when the note box is unticked', async () => {
+    const { view, plugin, saved, created } = await openEditor({ body: [] })
+
+    await addUnknown(view.contentEl)
+    const modal = await openedModal('Add exercise')
+    /** A detached checkbox toggles without telling anyone. */
+    harnessDocument.body.appendChild(modal.contentEl)
+    modal.contentEl.querySelector<HTMLInputElement>('input[type=checkbox]')?.click()
+    button(modal.contentEl, 'Add exercise').click()
+    modal.contentEl.remove()
+    await vi.waitFor(() => expect(saved).toHaveLength(1))
+
+    expect(created).toEqual([])
+    expect(plugin.settings.exerciseRegistry).toEqual([
+      { name: 'Squat', kind: 'strength', aliases: [] },
+    ])
   })
 })
 
