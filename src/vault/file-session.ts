@@ -1,6 +1,5 @@
 import type { App, TFile } from 'obsidian'
 
-import { fnv1a32 } from '../domain/hash'
 import { parseWorkoutNote, type WorkoutNoteModel } from '../domain/workout-note-model'
 
 export interface LoadResult {
@@ -8,18 +7,17 @@ export interface LoadResult {
   model: WorkoutNoteModel | null
   isWorkout: boolean
   warnings: string[]
-  hash: string
   mtime: number
 }
 
-export type SaveResult = { ok: true; hash: string; mtime: number } | { ok: false; reason: 'hash' }
+export type SaveResult = { ok: true; mtime: number } | { ok: false; reason: 'conflict' }
 
 /**
- * Tracks the last-known text hash and mtime of a TFile. A save is blocked when the text
+ * Tracks the last-known text and mtime of a TFile. A save is blocked when the text
  * changed since it was last read or written, whatever the mtime says.
  */
 export class FileSession {
-  private lastHash: string | null = null
+  private lastText: string | null = null
   private lastMtime: number | null = null
 
   constructor(
@@ -30,44 +28,37 @@ export class FileSession {
   async load(): Promise<LoadResult> {
     const text = await this.app.vault.read(this.file)
     const result = parseWorkoutNote(text, this.file.path)
-    const hash = fnv1a32(text)
     const mtime = this.file.stat.mtime
-    this.lastHash = hash
+    this.lastText = text
     this.lastMtime = mtime
     return {
       text,
       model: result.model,
       isWorkout: result.isWorkout,
       warnings: result.warnings,
-      hash,
       mtime,
     }
   }
 
   async saveIfUnchanged(nextText: string): Promise<SaveResult> {
     const currentText = await this.app.vault.read(this.file)
-    if (this.lastHash !== null && fnv1a32(currentText) !== this.lastHash) {
-      return { ok: false, reason: 'hash' }
+    if (this.lastText !== null && currentText !== this.lastText) {
+      return { ok: false, reason: 'conflict' }
     }
 
     let conflict = false
     await this.app.vault.process(this.file, (text) => {
-      if (this.lastHash !== null && fnv1a32(text) !== this.lastHash) {
+      if (this.lastText !== null && text !== this.lastText) {
         conflict = true
         return text
       }
       return nextText
     })
-    if (conflict) return { ok: false, reason: 'hash' }
-    const newHash = fnv1a32(nextText)
+    if (conflict) return { ok: false, reason: 'conflict' }
     const newMtime = this.file.stat.mtime
-    this.lastHash = newHash
+    this.lastText = nextText
     this.lastMtime = newMtime
-    return { ok: true, hash: newHash, mtime: newMtime }
-  }
-
-  get snapshotHash(): string | null {
-    return this.lastHash
+    return { ok: true, mtime: newMtime }
   }
 
   get snapshotMtime(): number | null {

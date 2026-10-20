@@ -49,14 +49,13 @@ describe('FileSession', () => {
 
       expect(await session.saveIfUnchanged('Attempted replacement')).toEqual({
         ok: false,
-        reason: 'hash',
+        reason: 'conflict',
       })
       expect(await read()).toBe('External workout edit')
-      expect(session.snapshotHash).toBe(loaded.hash)
       expect(session.snapshotMtime).toBe(loaded.mtime)
       expect(await session.saveIfUnchanged('Attempted replacement')).toEqual({
         ok: false,
-        reason: 'hash',
+        reason: 'conflict',
       })
       expect(await read()).toBe('External workout edit')
 
@@ -78,8 +77,21 @@ describe('FileSession', () => {
     edit('First saved workout')
     expect(await session.saveIfUnchanged('Third saved workout')).toEqual({
       ok: false,
-      reason: 'hash',
+      reason: 'conflict',
     })
     expect(await read()).toBe('First saved workout')
+  })
+
+  it('blocks a save after an external edit to non-ASCII text', async () => {
+    const { session, read, edit } = createVault()
+    edit('A\u0001')
+    await session.load()
+    edit('Ł')
+
+    expect(await session.saveIfUnchanged('Attempted replacement')).toEqual({
+      ok: false,
+      reason: 'conflict',
+    })
+    expect(await read()).toBe('Ł')
   })
 })
