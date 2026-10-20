@@ -6,24 +6,17 @@ import {
   defaultBodyweightLevels,
   describeBodyweightLadderChanges,
   formatBodyweightLevelLabel,
-  formatBodyweightLevelShort,
   pickBestBodyweightSet,
   type BodyweightLadder,
   type BodyweightLadderChange,
 } from '../../domain/bodyweight-levels'
-import {
-  formatDurationInput,
-  parseDurationInput,
-  ZERO_DURATION_DISPLAY,
-} from '../../domain/duration-input'
+import { formatDurationInput } from '../../domain/duration-input'
 import { formatErrorMessage } from '../../domain/error'
 import {
   CAUGHT_UP_NOTE,
-  isCaughtUp,
   loggedReps,
   marksCaughtUpReps,
   restsAfter,
-  type RunRow,
 } from '../../domain/interval-run'
 import {
   resumeSession,
@@ -34,7 +27,7 @@ import {
   type RunTransition,
 } from '../../domain/interval-session'
 import { summarisePlan } from '../../domain/plan-summary'
-import { INTENSITY_KINDS, type IntensityKind } from '../../domain/interval-plan'
+import { INTENSITY_KINDS } from '../../domain/interval-plan'
 import { parseIntervalProgram, type IntervalProgram } from '../../domain/interval-program'
 import { parseIntervalPresets } from '../../domain/interval-presets'
 import { assertUnreachableKind } from '../../domain/exercise-kind'
@@ -107,7 +100,23 @@ import { EditLevelsModal } from './edit-levels-modal'
 import { createCuePlayer, type CuePlayer } from './interval-cues'
 import { renderRunner } from '../components/interval-runner'
 import { clockSeconds } from '../model/interval-runner'
+import {
+  renderBodyweightRows,
+  renderDurationRows,
+  renderSetBar,
+  renderStrengthRows,
+  type RowControls,
+  type SetBarProps,
+} from '../components/set-rows'
 import { renderRestTimer, renderSetTimer } from '../components/timer-screen'
+import {
+  INTENSITY_LABELS,
+  durationRowClasses,
+  type EditableBodyweightSet,
+  type EditableDurationEntry,
+  type EditableStrengthSet,
+  type IntervalColumns,
+} from '../model/set-rows'
 import { formatClock } from '../model/clock'
 import { obsidianHost } from './host'
 import { createTabScreens, type ScreenStop, type TabScreens, type WakeHold } from './tab-screens'
@@ -168,23 +177,6 @@ type EditorScreen = SetTimerScreen | RunScreen | RestScreen
 
 export const VIEW_TYPE_FITKIT_WORKOUT_EDITOR = 'fitkit-workout-editor'
 
-interface EditableStrengthSet {
-  set?: number
-  weight?: number
-  reps?: number
-  note?: string
-}
-
-type EditableDurationEntry = RunRow
-
-interface EditableBodyweightSet {
-  set?: number
-  level?: number
-  reps?: number
-  load?: number
-  note?: string
-}
-
 interface ExerciseCard {
   name: string
   kind: ExerciseKind
@@ -243,6 +235,8 @@ export class WorkoutEditorView extends FileView {
   private screensInstance?: TabScreens<EditorScreen>
   private lastRestSeconds: number | null = null
   private unmountScreen?: () => void
+  /** Takes down every card's rows and set bar, which are mounted inside the imperative cards. */
+  private rowUnmounts?: Array<() => void>
   /**
    * One store per view, so its ladder overlay spans the session. Lazily
    * created because prototype-built views never run field initializers.
@@ -412,12 +406,7 @@ export class WorkoutEditorView extends FileView {
     }
   }
 
-  /**
-   * Refit every rung label after a resize. Labels fit themselves on first
-   * render; only a width change afterwards can overflow a new one. Each
-   * label unshortens before measuring, so the measure always reads live
-   * widths and every tick converges instead of oscillating.
-   */
+  /** Refit every rung label after a resize; labels fit themselves when drawn. */
   private refreshLevelLabels(): void {
     for (const label of this.contentEl.querySelectorAll('.fitkit-bodyweight-level-label')) {
       if (!label.instanceOf(HTMLElement)) {
@@ -427,7 +416,6 @@ export class WorkoutEditorView extends FileView {
       if (!full?.instanceOf(HTMLElement)) {
         continue
       }
-      label.removeClass('is-label-short')
       this.fitLevelLabel(label, full)
     }
   }
@@ -485,6 +473,8 @@ export class WorkoutEditorView extends FileView {
   private clearContent(): void {
     this.unmountScreen?.()
     this.unmountScreen = undefined
+    this.rowUnmounts?.forEach((unmount) => unmount())
+    this.rowUnmounts = []
     this.contentEl.empty()
   }
 
@@ -698,17 +688,14 @@ export class WorkoutEditorView extends FileView {
     }
   }
 
-  /** Renders a card's set rows into their own box, capped when the list runs long. */
+  /** Draws a card's set rows into their own box with `draw`, capped when the list runs long. */
   private renderSetRows(
     wrap: HTMLElement,
     ex: ExerciseCard,
-    count: number,
-    renderRow: (rows: HTMLElement, i: number) => void,
+    draw: (rows: HTMLElement) => () => void,
   ): void {
     const rows = wrap.createDiv({ cls: 'fitkit-set-rows' })
-    for (let i = 0; i < count; i++) {
-      renderRow(rows, i)
-    }
+    this.trackMount(draw(rows))
     const expanded = this.expandedSetLists
     const refit = capSetList(wrap, rows, {
       expanded: () => expanded.has(ex),
@@ -723,6 +710,17 @@ export class WorkoutEditorView extends FileView {
     ;(this.setListRefits ??= []).push(refit)
   }
 
+  /** Draws the Add set and Repeat bar into a box of its own under the card's rows. */
+  private renderSetBar(wrap: HTMLElement, props: SetBarProps): void {
+    const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
+    this.trackMount(renderSetBar(actions, props, obsidianHost))
+  }
+
+  /** Remembers a mounted component so the next redraw or close takes it down first. */
+  private trackMount(unmount: () => void): void {
+    ;(this.rowUnmounts ??= []).push(unmount)
+  }
+
   private renderStrengthTable(card: HTMLElement, ex: ExerciseCard, exerciseIndex: number): void {
     const wrap = card.createDiv({ cls: 'fitkit-set-area' })
 
@@ -732,92 +730,50 @@ export class WorkoutEditorView extends FileView {
     header.createSpan({ cls: 'fitkit-set-label', text: 'Weight' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Reps' })
 
-    this.renderSetRows(wrap, ex, ex.strengthSets.length, (rows, i) =>
-      this.renderStrengthRow(rows, ex, i),
-    )
-
-    const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
-    const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
-    addBtn.addEventListener('click', () => {
-      const last = ex.strengthSets[ex.strengthSets.length - 1]
-      const next: EditableStrengthSet = { set: nextSetNumber(ex.strengthSets) }
-      if (last?.weight !== undefined) {
-        next.weight = last.weight
-      }
-      ex.strengthSets.push(next)
-      this.expandedSetLists.add(ex)
-      this.markDirty()
-      this.render()
-      this.focusRowCell(exerciseIndex, ex.strengthSets.length - 1, 'Weight')
-    })
-    const repeatBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Repeat' })
-    repeatBtn.disabled = ex.strengthSets.length === 0
-    repeatBtn.addEventListener('click', () => {
-      const last = ex.strengthSets[ex.strengthSets.length - 1]
-      ex.strengthSets.push({
-        set: nextSetNumber(ex.strengthSets),
-        weight: last?.weight,
-        reps: last?.reps,
-      })
-      this.expandedSetLists.add(ex)
-      this.markDirty()
-      this.render()
-    })
-  }
-
-  private renderStrengthRow(wrap: HTMLElement, ex: ExerciseCard, i: number): void {
-    const set = ex.strengthSets[i]
-    if (!set) {
-      return
-    }
-    // The logging loop only ever touches the bottom row; the ones above it are session history.
-    const isLive = i === ex.strengthSets.length - 1
-    const container = wrap.createDiv({ cls: isLive ? 'fitkit-row fitkit-row--live' : 'fitkit-row' })
-    const body = container.createDiv({ cls: 'fitkit-row-body' })
-    const row = body.createDiv({ cls: 'fitkit-set-row' })
-
-    const setCell = this.createCell(row, 'Set', 'fitkit-set-figure')
-    setCell.setText(String(set.set ?? i + 1))
-
-    const weightInput = this.createInputCell(row, 'Weight', {
-      type: 'number',
-      step: '0.1',
-      inputmode: 'decimal',
-    })
-    weightInput.value = set.weight !== undefined ? String(set.weight) : ''
-    if (this.seededWeights.has(set)) {
-      weightInput.addClass('fitkit-input--unconfirmed')
-    }
-    weightInput.addEventListener('input', () => {
-      this.seededWeights.delete(set)
-      weightInput.removeClass('fitkit-input--unconfirmed')
-      set.weight = parseNumberInput(weightInput.value)
-      this.markDirty()
+    this.renderSetRows(wrap, ex, (rows) => {
+      /** Typing over a seeded weight redraws the rows in place to drop its unconfirmed mark. */
+      const draw = (): (() => void) =>
+        renderStrengthRows(
+          rows,
+          {
+            sets: ex.strengthSets,
+            isSeeded: (set) => this.seededWeights.has(set),
+            controls: (set, i) => this.rowControls(ex.strengthSets, set, i, `set ${i + 1}`),
+            onEdit: (set, patch) => {
+              const confirmed = 'weight' in patch && this.seededWeights.delete(set)
+              this.editRow(set, patch)
+              if (confirmed) {
+                draw()
+              }
+            },
+          },
+          obsidianHost,
+        )
+      return draw()
     })
 
-    const repsInput = this.createInputCell(row, 'Reps', { type: 'number', inputmode: 'numeric' })
-    repsInput.value = set.reps !== undefined ? String(set.reps) : ''
-    repsInput.addEventListener('input', () => {
-      set.reps = parseNumberInput(repsInput.value)
-      this.markDirty()
-    })
-    this.renderRowActions(container, body, {
-      label: `set ${i + 1}`,
-      currentNote: set.note,
-      onDelete: () => {
-        ex.strengthSets.splice(i, 1)
+    this.renderSetBar(wrap, {
+      repeatDisabled: ex.strengthSets.length === 0,
+      onAdd: () => {
+        const last = ex.strengthSets[ex.strengthSets.length - 1]
+        const next: EditableStrengthSet = { set: nextSetNumber(ex.strengthSets) }
+        if (last?.weight !== undefined) {
+          next.weight = last.weight
+        }
+        ex.strengthSets.push(next)
+        this.expandedSetLists.add(ex)
         this.markDirty()
         this.render()
+        this.focusRowCell(exerciseIndex, ex.strengthSets.length - 1, 'Weight')
       },
-      onNoteSave: (next) => {
-        set.note = next
-        this.markDirty()
-        this.render()
-      },
-      onRenumber: () => {
-        ex.strengthSets.forEach((row, index) => {
-          row.set = index + 1
+      onRepeat: () => {
+        const last = ex.strengthSets[ex.strengthSets.length - 1]
+        ex.strengthSets.push({
+          set: nextSetNumber(ex.strengthSets),
+          weight: last?.weight,
+          reps: last?.reps,
         })
+        this.expandedSetLists.add(ex)
         this.markDirty()
         this.render()
       },
@@ -848,220 +804,96 @@ export class WorkoutEditorView extends FileView {
     }
     header.createSpan({ cls: 'fitkit-bodyweight-head-spacer', attr: { 'aria-hidden': 'true' } })
 
-    this.renderSetRows(wrap, ex, ex.bodyweightSets.length, (rows, i) =>
-      this.renderBodyweightRow(rows, ex, i, levels, showLoad),
+    this.renderSetRows(wrap, ex, (rows) =>
+      renderBodyweightRows(
+        rows,
+        {
+          sets: ex.bodyweightSets,
+          levels,
+          showLoad,
+          controls: (set, i) =>
+            this.rowControls(ex.bodyweightSets, set, i, `bodyweight entry ${i + 1}`, {
+              hasLoad: set.load !== undefined,
+              onAddLoad: () => {
+                set.load = ex.bodyweightSets[i - 1]?.load ?? 0
+                this.markDirty()
+                this.render()
+              },
+              onRemoveLoad: () => {
+                set.load = undefined
+                this.markDirty()
+                this.render()
+              },
+            }),
+          onEdit: (set, patch) => this.editRow(set, patch),
+          setLevel: (set, level) => this.setBodyweightLevel(set, level),
+          openLevelMenu: (set, trigger) => this.openLevelMenu(set, levels, trigger),
+          fitLabel: (label, full) => this.fitLevelLabel(label, full),
+        },
+        obsidianHost,
+      ),
     )
 
-    const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
-    const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
-    addBtn.addEventListener('click', () => {
-      const last = ex.bodyweightSets[ex.bodyweightSets.length - 1]
-      ex.bodyweightSets.push({ set: nextSetNumber(ex.bodyweightSets), level: last?.level ?? 1 })
-      this.expandedSetLists.add(ex)
-      this.markDirty()
-      this.render()
-      this.focusRowCell(exerciseIndex, ex.bodyweightSets.length - 1, 'Reps')
-    })
-    const repeatBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Repeat' })
-    repeatBtn.disabled = ex.bodyweightSets.length === 0
-    repeatBtn.addEventListener('click', () => {
-      const last = ex.bodyweightSets[ex.bodyweightSets.length - 1]
-      ex.bodyweightSets.push({
-        set: nextSetNumber(ex.bodyweightSets),
-        level: last?.level,
-        reps: last?.reps,
-        load: last?.load,
-      })
-      this.expandedSetLists.add(ex)
-      this.markDirty()
-      this.render()
+    this.renderSetBar(wrap, {
+      repeatDisabled: ex.bodyweightSets.length === 0,
+      onAdd: () => {
+        const last = ex.bodyweightSets[ex.bodyweightSets.length - 1]
+        ex.bodyweightSets.push({ set: nextSetNumber(ex.bodyweightSets), level: last?.level ?? 1 })
+        this.expandedSetLists.add(ex)
+        this.markDirty()
+        this.render()
+        this.focusRowCell(exerciseIndex, ex.bodyweightSets.length - 1, 'Reps')
+      },
+      onRepeat: () => {
+        const last = ex.bodyweightSets[ex.bodyweightSets.length - 1]
+        ex.bodyweightSets.push({
+          set: nextSetNumber(ex.bodyweightSets),
+          level: last?.level,
+          reps: last?.reps,
+          load: last?.load,
+        })
+        this.expandedSetLists.add(ex)
+        this.markDirty()
+        this.render()
+      },
     })
   }
 
-  private renderBodyweightRow(
-    wrap: HTMLElement,
-    ex: ExerciseCard,
-    i: number,
+  private openLevelMenu(
+    set: EditableBodyweightSet,
     levels: BodyweightLadder | undefined,
-    showLoad: boolean,
+    trigger: HTMLElement,
   ): void {
-    const set = ex.bodyweightSets[i]
-    if (!set) {
-      return
-    }
     const level = set.level ?? 1
-    const container = wrap.createDiv({ cls: 'fitkit-row' })
-    const body = container.createDiv({ cls: 'fitkit-row-body' })
-    const row = body.createDiv({
-      cls: showLoad ? 'fitkit-bodyweight-row has-load' : 'fitkit-bodyweight-row',
-    })
-
-    const setCell = this.createCell(row, 'Set', 'fitkit-set-figure')
-    setCell.setText(String(set.set ?? i + 1))
-
-    this.renderBodyweightLevelCell(row, ex, i, levels, level)
-
-    const repsInput = this.createInputCell(row, 'Reps', { type: 'number', inputmode: 'numeric' })
-    repsInput.value = set.reps !== undefined ? String(set.reps) : ''
-    repsInput.addEventListener('input', () => {
-      set.reps = parseNumberInput(repsInput.value)
-      this.markDirty()
-    })
-
-    if (showLoad) {
-      const loadCell = this.createCell(row, 'Load', 'fitkit-bodyweight-load')
-      if (set.load !== undefined) {
-        const loadInput = loadCell.createEl('input', {
-          cls: 'fitkit-input',
-          attr: { type: 'number', step: '0.1', inputmode: 'decimal' },
-        })
-        loadInput.setAttr('aria-label', 'Load')
-        loadInput.value = String(set.load)
-        loadInput.addEventListener('input', () => {
-          set.load = parseNumberInput(loadInput.value)
-          this.markDirty()
-        })
-      }
+    const menu = new Menu()
+    const top = Math.max(levels?.length ?? 0, level)
+    for (let n = 1; n <= top; n++) {
+      const target = n
+      menu.addItem((item) =>
+        item
+          .setTitle(formatBodyweightLevelLabel(levels, target))
+          .setChecked(target === level)
+          .onClick(() => this.setBodyweightLevel(set, target)),
+      )
     }
-
-    this.renderRowActions(container, body, {
-      label: `bodyweight entry ${i + 1}`,
-      currentNote: set.note,
-      onDelete: () => {
-        ex.bodyweightSets.splice(i, 1)
-        this.markDirty()
-        this.render()
-      },
-      onNoteSave: (next) => {
-        set.note = next
-        this.markDirty()
-        this.render()
-      },
-      onRenumber: () => {
-        ex.bodyweightSets.forEach((entry, index) => {
-          entry.set = index + 1
-        })
-        this.markDirty()
-        this.render()
-      },
-      loadMenu: {
-        hasLoad: set.load !== undefined,
-        onAddLoad: () => {
-          const previous = ex.bodyweightSets[i - 1]
-          set.load = previous?.load ?? 0
-          this.markDirty()
-          this.render()
-        },
-        onRemoveLoad: () => {
-          set.load = undefined
-          this.markDirty()
-          this.render()
-        },
-      },
-    })
+    menu.showAtPosition(menuAnchorForTrigger(trigger.getBoundingClientRect()))
   }
 
-  private renderBodyweightLevelCell(
-    row: HTMLElement,
-    ex: ExerciseCard,
-    rowIndex: number,
-    levels: BodyweightLadder | undefined,
-    level: number,
-  ): void {
-    const rungCount = levels?.length ?? 0
-    const cell = this.createCell(row, 'Level')
-    const stepper = cell.createDiv({ cls: 'fitkit-bodyweight-stepper' })
-
-    const minus = stepper.createEl('button', {
-      cls: 'fitkit-btn fitkit-bodyweight-step',
-      attr: { type: 'button', 'aria-label': `Lower level for set ${rowIndex + 1}` },
-    })
-    setIcon(minus, 'minus')
-    minus.disabled = level <= 1
-    minus.addEventListener('click', () => {
-      if (level > 1) {
-        this.setBodyweightLevel(ex, rowIndex, level - 1)
-      }
-    })
-
-    const label = stepper.createEl('button', {
-      cls: 'fitkit-bodyweight-level-label',
-      attr: {
-        type: 'button',
-        'aria-haspopup': 'menu',
-        'aria-label': `Level for set ${rowIndex + 1}: ${formatBodyweightLevelLabel(levels, level)}`,
-      },
-    })
-    const full = label.createSpan({
-      cls: 'fitkit-bodyweight-level-full',
-      text: formatBodyweightLevelLabel(levels, level),
-    })
-    label.createSpan({
-      cls: 'fitkit-bodyweight-level-short',
-      text: formatBodyweightLevelShort(level),
-    })
-    const chevron = label.createSpan({
-      cls: 'fitkit-bodyweight-level-chevron',
-      attr: { 'aria-hidden': 'true' },
-    })
-    setIcon(chevron, 'chevron-down')
-    label.addEventListener('click', () => {
-      const menu = new Menu()
-      const top = Math.max(rungCount, level)
-      for (let n = 1; n <= top; n++) {
-        const target = n
-        menu.addItem((item) =>
-          item
-            .setTitle(formatBodyweightLevelLabel(levels, target))
-            .setChecked(target === level)
-            .onClick(() => this.setBodyweightLevel(ex, rowIndex, target)),
-        )
-      }
-      const rect = label.getBoundingClientRect()
-      menu.showAtPosition(menuAnchorForTrigger(rect))
-    })
-
-    const plus = stepper.createEl('button', {
-      cls: 'fitkit-btn fitkit-bodyweight-step',
-      attr: { type: 'button', 'aria-label': `Raise level for set ${rowIndex + 1}` },
-    })
-    setIcon(plus, 'plus')
-    plus.disabled = rungCount === 0 || level >= rungCount
-    plus.addEventListener('click', () => {
-      if (rungCount > 0 && level < rungCount) {
-        this.setBodyweightLevel(ex, rowIndex, level + 1)
-      }
-    })
-    this.fitLevelLabel(label, full)
-  }
-
-  private setBodyweightLevel(ex: ExerciseCard, rowIndex: number, level: number): void {
-    const set = ex.bodyweightSets[rowIndex]
-    if (!set) {
-      return
-    }
+  private setBodyweightLevel(set: EditableBodyweightSet, level: number): void {
     set.level = level
     this.markDirty()
     this.render()
   }
 
   /**
-   * Shorten a rung name that overflows its own text slot. A shortened label
-   * hides its measured span, so fitting one directly keeps it short; resize
-   * refits unshorten first so the measure below always reads live widths.
+   * Shortens a rung name that overflows its own text slot. It unshortens first, since a
+   * shortened label hides the span it measures, so every refit reads live widths and converges.
    */
-  private fitLevelLabel(
-    label: HTMLElement,
-    full: HTMLElement,
-    widths: LevelLabelWidths = measureLevelLabelWidths(full),
-  ): void {
-    if (label.hasClass('is-label-short')) {
-      return
-    }
+  private fitLevelLabel(label: HTMLElement, full: HTMLElement): void {
+    label.removeClass('is-label-short')
+    const widths = measureLevelLabelWidths(full)
     if (shouldShortenLevelLabel(widths.content, widths.available)) {
       label.addClass('is-label-short')
-    } else {
-      label.removeClass('is-label-short')
     }
   }
 
@@ -1095,195 +927,54 @@ export class WorkoutEditorView extends FileView {
     }
 
     const markCaughtUp = marksCaughtUpReps(ex.durationEntries)
-    this.renderSetRows(wrap, ex, ex.durationEntries.length, (rows, i) =>
-      this.renderDurationRow(rows, ex, i, exerciseIndex, columns, markCaughtUp),
+    this.renderSetRows(wrap, ex, (rows) =>
+      renderDurationRows(
+        rows,
+        {
+          entries: ex.durationEntries,
+          exerciseIndex,
+          columns,
+          markCaughtUp,
+          controls: (entry, i) =>
+            this.rowControls(ex.durationEntries, entry, i, `duration entry ${i + 1}`),
+          onEdit: (entry, patch) => this.editRow(entry, patch),
+        },
+        obsidianHost,
+      ),
     )
     if (markCaughtUp) {
       wrap.createDiv({ cls: 'fitkit-note-line fitkit-set-legend', text: `* ${CAUGHT_UP_NOTE}` })
     }
 
-    const actions = wrap.createDiv({ cls: 'fitkit-row-actions' })
-    const addBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Add set' })
-    addBtn.addEventListener('click', () => {
-      if (this.runningSetTimer()?.card === ex) {
-        this.stopTimer({ write: true })
-      }
-      ex.durationEntries.push(carriedIntervalFields(ex.durationEntries.at(-1)))
-      this.expandedSetLists.add(ex)
-      this.markDirty()
-      this.render()
-    })
-    const repeatBtn = actions.createEl('button', { cls: 'fitkit-btn', text: 'Repeat' })
-    repeatBtn.disabled = ex.durationEntries.length === 0
-    repeatBtn.addEventListener('click', () => {
-      if (this.runningSetTimer()?.card === ex) {
-        this.stopTimer({ write: true })
-      }
-      const last = ex.durationEntries[ex.durationEntries.length - 1]
-      ex.durationEntries.push({
-        set: nextSetNumber(ex.durationEntries),
-        durationSeconds: last?.durationSeconds,
-        ...carriedIntervalFields(last),
-      })
-      this.expandedSetLists.add(ex)
-      this.markDirty()
-      this.render()
-    })
-
-    if (columns.plan) {
-      const done = loggedReps(ex.durationEntries)
-      const runBtn = actions.createEl('button', {
-        cls: 'fitkit-btn fitkit-btn-primary fitkit-run-button',
-        text: done > 0 ? `Start from rep ${done + 1}` : 'Start',
-        attr: { 'aria-label': 'Start interval plan' },
-      })
-      runBtn.disabled = done >= columns.plan.steps.length
-      const program = columns.plan
-      runBtn.addEventListener('click', () => this.startIntervalRun(ex, program))
-      return
-    }
-
-    const timerBtn = actions.createEl('button', {
-      cls: 'fitkit-btn fitkit-timer-button',
-      text: 'Start timer',
-      attr: { 'aria-label': 'Start timer' },
-    })
-    setIcon(timerBtn, 'play')
-    timerBtn.addEventListener('click', () => this.openSetTimer(ex))
-  }
-
-  private renderDurationRow(
-    wrap: HTMLElement,
-    ex: ExerciseCard,
-    i: number,
-    exerciseIndex: number,
-    columns: IntervalColumns = intervalColumns(ex),
-    markCaughtUp = false,
-  ): void {
-    const durationEntry = ex.durationEntries[i]
-    if (!durationEntry) {
-      return
-    }
-    const container = wrap.createDiv({ cls: 'fitkit-row' })
-    container.dataset.fitkitTimerRow = `${exerciseIndex}:${i}`
-    const body = container.createDiv({ cls: 'fitkit-row-body' })
-    const row = body.createDiv({
-      cls: durationRowClasses(columns, 'fitkit-set-row fitkit-duration-row'),
-    })
-
-    const setCell = this.createCell(row, 'Set', 'fitkit-set-figure')
-    setCell.setText(String(durationEntry.set ?? i + 1))
-    const marked = markCaughtUp && isCaughtUp(durationEntry)
-    if (marked) {
-      setCell.createSpan({
-        cls: 'fitkit-set-mark',
-        text: '*',
-        attr: { 'aria-label': CAUGHT_UP_NOTE },
-      })
-    }
-
-    this.renderDurationInput(this.createCell(row, 'Duration'), durationEntry)
-    const intensity = columns.intensity
-    if (intensity) {
-      const label = INTENSITY_LABELS[intensity]
-      const input = this.createInputCell(row, label, {
-        type: 'number',
-        step: '0.1',
-        inputmode: 'decimal',
-      })
-      input.value = durationEntry[intensity] === undefined ? '' : String(durationEntry[intensity])
-      input.addEventListener('input', () => {
-        durationEntry[intensity] = parseNumberInput(input.value)
-        this.markDirty()
-      })
-    }
-    if (columns.rest) {
-      this.renderRestInput(this.createCell(row, 'Rest'), durationEntry)
-    }
-
-    this.renderRowActions(container, body, {
-      label: `duration entry ${i + 1}`,
-      currentNote: durationEntry.note,
-      hideNoteLine: marked,
-      onDelete: () => {
-        if (this.runningSetTimer()?.entry === durationEntry) {
-          this.abortTimer()
-        }
-        ex.durationEntries.splice(i, 1)
+    const program = columns.plan
+    const done = loggedReps(ex.durationEntries)
+    this.renderSetBar(wrap, {
+      repeatDisabled: ex.durationEntries.length === 0,
+      onAdd: () => {
+        ex.durationEntries.push(carriedIntervalFields(ex.durationEntries.at(-1)))
+        this.expandedSetLists.add(ex)
         this.markDirty()
         this.render()
       },
-      onNoteSave: (next) => {
-        durationEntry.note = next
-        this.markDirty()
-        this.render()
-      },
-      onRenumber: () => {
-        ex.durationEntries.forEach((entry, index) => {
-          entry.set = index + 1
+      onRepeat: () => {
+        const last = ex.durationEntries[ex.durationEntries.length - 1]
+        ex.durationEntries.push({
+          set: nextSetNumber(ex.durationEntries),
+          durationSeconds: last?.durationSeconds,
+          ...carriedIntervalFields(last),
         })
+        this.expandedSetLists.add(ex)
         this.markDirty()
         this.render()
       },
-    })
-  }
-
-  private renderDurationInput(cell: HTMLElement, durationEntry: EditableDurationEntry): void {
-    const input = cell.createEl('input', {
-      cls: 'fitkit-input fitkit-duration-input',
-      attr: {
-        type: 'text',
-        inputmode: 'text',
-        placeholder: ZERO_DURATION_DISPLAY,
-      },
-    })
-    input.setAttr('aria-label', 'Duration')
-    input.setAttr('data-fitkit-default-focus', 'true')
-    input.value = formatDurationInput(durationEntry.durationSeconds)
-
-    const sync = (mark: boolean): boolean => {
-      const parsed = parseDurationInput(input.value)
-      setAriaInvalid(input, parsed === null)
-      if (parsed === null) {
-        return false
-      }
-      durationEntry.durationSeconds = parsed.seconds
-      if (mark) {
-        this.markDirty()
-      }
-      return true
-    }
-
-    input.addEventListener('input', () => void sync(true))
-    input.addEventListener('blur', () => {
-      const parsed = parseDurationInput(input.value)
-      setAriaInvalid(input, false)
-      if (parsed === null) {
-        input.value = formatDurationInput(durationEntry.durationSeconds)
-        return
-      }
-      durationEntry.durationSeconds = parsed.seconds
-      input.value = parsed.display
-    })
-  }
-
-  private renderRestInput(cell: HTMLElement, durationEntry: EditableDurationEntry): void {
-    const input = cell.createEl('input', {
-      cls: 'fitkit-input fitkit-duration-input',
-      attr: { type: 'text', 'aria-label': 'Rest', placeholder: ZERO_DURATION_DISPLAY },
-    })
-    input.value = formatDurationInput(durationEntry.restSeconds)
-    input.addEventListener('input', () => {
-      const parsed = parseDurationInput(input.value)
-      setAriaInvalid(input, parsed === null)
-      if (parsed !== null) {
-        durationEntry.restSeconds = parsed.seconds
-        this.markDirty()
-      }
-    })
-    input.addEventListener('blur', () => {
-      setAriaInvalid(input, false)
-      input.value = formatDurationInput(durationEntry.restSeconds)
+      end: program
+        ? {
+            kind: 'run',
+            text: done > 0 ? `Start from rep ${done + 1}` : 'Start',
+            disabled: done >= program.steps.length,
+            onClick: () => this.startIntervalRun(ex, program),
+          }
+        : { kind: 'timer', onClick: () => this.openSetTimer(ex) },
     })
   }
 
@@ -1411,73 +1102,47 @@ export class WorkoutEditorView extends FileView {
     this.render()
   }
 
-  private renderRowActions(
-    container: HTMLElement,
-    body: HTMLElement,
-    opts: {
-      label: string
-      currentNote: string | undefined
-      /** The note stays editable from the menu; the row shows it some other way. */
-      hideNoteLine?: boolean
-      onDelete: () => void
-      onNoteSave: (next: string | undefined) => void
-      onRenumber?: () => void
-      loadMenu?: { hasLoad: boolean; onAddLoad: () => void; onRemoveLoad: () => void }
-    },
-  ): void {
-    const openNoteModal = (): void => {
-      new SetNoteModal(this.app, {
-        title: `Note for ${opts.label}`,
-        initial: opts.currentNote ?? '',
-        onSave: opts.onNoteSave,
-      }).open()
-    }
-    const triggerDelete = (): void => {
-      void this.confirmAndDeleteRow(opts.label, opts.onDelete)
-    }
-
-    this.renderRowKebab(
-      body,
-      opts.label,
-      openNoteModal,
-      triggerDelete,
-      opts.onRenumber,
-      opts.loadMenu,
-    )
-
-    if (opts.currentNote && opts.currentNote.length > 0 && !opts.hideNoteLine) {
-      const line = container.createDiv({
-        cls: 'fitkit-note-line',
-        attr: { role: 'button', tabindex: '0' },
-      })
-      line.setText(opts.currentNote)
-      line.addEventListener('click', openNoteModal)
-      line.addEventListener('keydown', (evt) => {
-        if (evt.key === 'Enter' || evt.key === ' ') {
-          evt.preventDefault()
-          openNoteModal()
-        }
-      })
-    }
+  /** Writes a typed value into a row; typing never redraws. */
+  private editRow<T extends object>(row: T, patch: Partial<T>): void {
+    Object.assign(row, patch)
+    this.markDirty()
   }
 
-  private renderRowKebab(
-    body: HTMLElement,
+  /** What the note line and options menu of `row`, at `index` in `rows`, do when used. */
+  private rowControls<T extends { set?: number; note?: string }>(
+    rows: T[],
+    row: T,
+    index: number,
     label: string,
-    onNote: () => void,
-    onDelete: () => void,
-    onRenumber?: () => void,
     loadMenu?: { hasLoad: boolean; onAddLoad: () => void; onRemoveLoad: () => void },
-  ): void {
-    const kebab = body.createEl('button', {
-      cls: 'fitkit-btn fitkit-btn-muted fitkit-row-kebab',
-      attr: { type: 'button', 'aria-label': `Options for ${label}` },
-    })
-    setIcon(kebab, 'more-vertical')
-    kebab.addEventListener('click', (evt) => {
-      evt.stopPropagation()
+  ): RowControls {
+    const changed = (): void => {
+      this.markDirty()
+      this.render()
+    }
+    const onRenumber = (): void => {
+      rows.forEach((entry, i) => {
+        entry.set = i + 1
+      })
+      changed()
+    }
+    const onDelete = (): void => {
+      rows.splice(index, 1)
+      changed()
+    }
+    const openNote = (): void => {
+      new SetNoteModal(this.app, {
+        title: `Note for ${label}`,
+        initial: row.note ?? '',
+        onSave: (next) => {
+          row.note = next
+          changed()
+        },
+      }).open()
+    }
+    const openMenu = (trigger: HTMLElement): void => {
       const menu = new Menu()
-      menu.addItem((item) => item.setTitle('Edit note').setIcon('pencil').onClick(onNote))
+      menu.addItem((item) => item.setTitle('Edit note').setIcon('pencil').onClick(openNote))
       if (loadMenu) {
         if (loadMenu.hasLoad) {
           menu.addItem((item) =>
@@ -1489,17 +1154,19 @@ export class WorkoutEditorView extends FileView {
           )
         }
       }
-      if (onRenumber) {
-        menu.addItem((item) =>
-          item.setTitle('Renumber sets').setIcon('list-ordered').onClick(onRenumber),
-        )
-      }
       menu.addItem((item) =>
-        item.setTitle('Delete row').setIcon('trash-2').setWarning(true).onClick(onDelete),
+        item.setTitle('Renumber sets').setIcon('list-ordered').onClick(onRenumber),
       )
-      const rect = kebab.getBoundingClientRect()
-      menu.showAtPosition(menuAnchorForTrigger(rect))
-    })
+      menu.addItem((item) =>
+        item
+          .setTitle('Delete row')
+          .setIcon('trash-2')
+          .setWarning(true)
+          .onClick(() => void this.confirmAndDeleteRow(label, onDelete)),
+      )
+      menu.showAtPosition(menuAnchorForTrigger(trigger.getBoundingClientRect()))
+    }
+    return { label, note: row.note, openNote, openMenu }
   }
 
   private async confirmAndDeleteRow(label: string, onDelete: () => void): Promise<void> {
@@ -2014,23 +1681,6 @@ export class WorkoutEditorView extends FileView {
     if (row) {
       this.seededWeights.add(row)
     }
-  }
-
-  private createCell(row: HTMLElement, label: string, cls?: string): HTMLElement {
-    const cell = row.createDiv({ cls: cls ? `fitkit-cell ${cls}` : 'fitkit-cell' })
-    cell.dataset.label = label
-    return cell
-  }
-
-  private createInputCell(
-    row: HTMLElement,
-    label: string,
-    attr: Record<string, string>,
-  ): HTMLInputElement {
-    const cell = this.createCell(row, label)
-    const input = cell.createEl('input', { cls: 'fitkit-input', attr })
-    input.setAttr('aria-label', label)
-    return input
   }
 
   private focusRowCell(exerciseIndex: number, rowIndex: number, label: string): void {
@@ -2708,26 +2358,6 @@ export function shouldShortenLevelLabel(labelWidth: number, availableWidth: numb
   return labelWidth > availableWidth
 }
 
-function parseNumberInput(raw: string): number | undefined {
-  const trimmed = raw.trim()
-  if (trimmed.length === 0) {
-    return undefined
-  }
-  const n = Number(trimmed)
-  if (Number.isNaN(n)) {
-    return undefined
-  }
-  return n
-}
-
-function setAriaInvalid(element: HTMLElement, invalid: boolean): void {
-  if (invalid) {
-    element.setAttr('aria-invalid', 'true')
-  } else {
-    element.toggleAttribute('aria-invalid', false)
-  }
-}
-
 /**
  * Shows a menu under the button `evt` came from, or at the pointer. The position is read now,
  * since `currentTarget` is gone once the event has been handled.
@@ -3075,18 +2705,6 @@ function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-const INTENSITY_LABELS: Record<IntensityKind, string> = {
-  watts: 'Watts',
-  load: 'Load',
-  level: 'Level',
-}
-
-interface IntervalColumns {
-  plan: IntervalProgram | null
-  intensity: IntensityKind | null
-  rest: boolean
-}
-
 /** Which interval columns a duration card shows: the plan's intensity, or whichever its rows already log. */
 function intervalColumns(card: ExerciseCard): IntervalColumns {
   const parsed = card.plan === undefined ? null : parseIntervalProgram(card.plan)
@@ -3101,12 +2719,6 @@ function intervalColumns(card: ExerciseCard): IntervalColumns {
       plan?.steps.some(restsAfter) === true ||
       card.durationEntries.some((entry) => entry.restSeconds !== undefined),
   }
-}
-
-function durationRowClasses(columns: IntervalColumns, base: string): string {
-  return [base, columns.intensity ? 'has-intensity' : '', columns.rest ? 'has-rest' : '']
-    .filter(Boolean)
-    .join(' ')
 }
 
 /** One past the highest set number, so a set added after a deletion never repeats one. */

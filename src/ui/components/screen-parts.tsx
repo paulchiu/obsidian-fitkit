@@ -10,14 +10,20 @@ export interface ScreenMount {
   unmount: () => void
 }
 
+/** Renders `tree` into `parent`, or again in place if it is already there; the result takes it down. */
+export function mountTree(parent: HTMLElement, tree: JSX.Element): () => void {
+  render(tree, parent)
+  return () => render(null, parent)
+}
+
 /** Renders `screen` into `parent`, handing it the ref its clock (if any) attaches to. */
 export function mountScreen(
   parent: HTMLElement,
   screen: (clock: RefObject<HTMLDivElement>) => JSX.Element,
 ): ScreenMount {
   const clock = createRef<HTMLDivElement>()
-  render(screen(clock), parent)
-  return { clock: clock.current, unmount: () => render(null, parent) }
+  const unmount = mountTree(parent, screen(clock))
+  return { clock: clock.current, unmount }
 }
 
 /** The clock's text is set outside the render, since the view rewrites it on every tick. */

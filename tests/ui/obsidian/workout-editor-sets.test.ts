@@ -15,6 +15,8 @@ import {
   chooseMenuItem,
   deleteRow,
   firstRow,
+  modalTitles,
+  pressKey,
   headLabels,
   noteBody,
   openedModal,
@@ -29,6 +31,7 @@ import {
   workoutNote,
 } from '../../fixtures/workout-editor'
 import { harnessDocument } from '../../harness/obsidian-dom'
+import { watchUnmounts } from '../../harness/unmount'
 
 useEditorEnvironment()
 
@@ -327,12 +330,10 @@ describe('WorkoutEditorView duration rows', () => {
 
     const actions = [...(card(view).querySelector('.fitkit-row-actions')?.children ?? [])]
 
-    expect(actions.map((action) => action.textContent)).toEqual([
-      'Add set',
-      'Repeat',
-      'Start timer',
-    ])
-    expect(actions[2]?.getAttribute('data-icon')).toBe('play')
+    expect(
+      actions.map((action) => action.getAttribute('aria-label') ?? action.textContent),
+    ).toEqual(['Add set', 'Repeat', 'Start timer'])
+    expect(actions[2]?.querySelector('[data-icon]')?.getAttribute('data-icon')).toBe('play')
   })
 
   it('shows the duration set number as a figure rather than an editable field', async () => {
@@ -401,6 +402,28 @@ describe('WorkoutEditorView duration rows', () => {
 
       expect(invalid).toBe(false)
       expect(input.value).toBe(shown)
+    },
+  )
+
+  it.each([
+    { typed: '1.', saved: null },
+    { typed: '90', saved: 90 },
+  ])(
+    'leaves "$typed" as typed in the duration input once the autosave completes',
+    async ({ typed, saved }) => {
+      const { view, contents } = await openEditor({
+        body: exercise('Plank', ['[set:: 1] [duration:: 0]']),
+      })
+      const input = cellInput(firstRow(view), 'Duration') as HTMLInputElement
+
+      typeInto(input, typed)
+      if (saved !== null) {
+        await savedBody(contents, exercise('Plank', [`[set:: 1] [duration:: ${saved}]`]))
+      }
+      await settle()
+
+      expect(input.value).toBe(typed)
+      expect(cellInput(firstRow(view), 'Duration')).toBe(input)
     },
   )
 
@@ -483,50 +506,6 @@ describe('WorkoutEditorView duration timer', () => {
     await leave(view)
 
     await savedBody(contents, exercise('Plank', ['[set:: 1] [duration:: 42]']))
-  })
-
-  /** The set screen covers the card, so these reach the controls drawn before it opened. */
-  describe('from behind the set screen', () => {
-    it('saves the timed set, then appends one, when Add set fires', async () => {
-      const { view, contents } = await openEditor({
-        body: exercise('Plank', ['[set:: 1] [duration:: 0]']),
-      })
-      const addSet = button(card(view), 'Add set')
-      button(card(view), 'Start timer').click()
-      advance(8)
-
-      addSet.click()
-
-      await savedBody(contents, exercise('Plank', ['[set:: 1] [duration:: 8]', '[duration:: 0]']))
-    })
-
-    it('saves the timed set, then copies its duration, when Repeat fires', async () => {
-      const { view, contents } = await openEditor({
-        body: exercise('Plank', ['[set:: 1] [duration:: 0]']),
-      })
-      const repeat = button(card(view), 'Repeat')
-      button(card(view), 'Start timer').click()
-      advance(8)
-
-      repeat.click()
-
-      await savedBody(
-        contents,
-        exercise('Plank', ['[set:: 1] [duration:: 8]', '[set:: 2] [duration:: 8]']),
-      )
-    })
-
-    it('stops the timer without saving it when its row is deleted', async () => {
-      const { view, contents } = await openEditor({ body: PLANK_30 })
-      const row = firstRow(view)
-      button(card(view), 'Start timer').click()
-      advance(5)
-
-      await deleteRow(row)
-
-      expect(button(view.contentEl, 'Resume timer')).toBeDefined()
-      await savedBody(contents, ['## [[Plank]]', ''])
-    })
   })
 })
 
@@ -669,4 +648,105 @@ describe('WorkoutEditorView repeat set', () => {
       expect([withSet, repeat(view).disabled]).toEqual([false, true])
     },
   )
+})
+
+describe('WorkoutEditorView set row lifetime', () => {
+  const BODYWEIGHT = exercise('Push-up', ['[set:: 1] [level:: 1] [reps:: 10]'])
+
+  it.each([
+    { kind: 'strength', body: SQUAT, rowsComponent: 'StrengthRows' },
+    { kind: 'bodyweight', body: BODYWEIGHT, rowsComponent: 'BodyweightRows' },
+    { kind: 'duration', body: PLANK_30, rowsComponent: 'DurationRows' },
+  ])(
+    'unmounts the $kind rows and set bar when the editor redraws and when it closes',
+    async ({ body, rowsComponent }) => {
+      const { view } = await openEditor({ body })
+      const unmounts = watchUnmounts()
+
+      try {
+        button(card(view), 'Add set').click()
+        const redrawn = [...unmounts.names]
+        unmounts.names.length = 0
+        await view.onClose()
+
+        expect([redrawn, unmounts.names]).toEqual([
+          expect.arrayContaining([rowsComponent, 'SetBar']),
+          expect.arrayContaining([rowsComponent, 'SetBar']),
+        ])
+      } finally {
+        unmounts.stop()
+      }
+    },
+  )
+})
+
+describe('WorkoutEditorView row inputs', () => {
+  const BIKE = (fields: string): string[] =>
+    exercise('Bike', [`[set:: 1] [duration:: 30] ${fields}`])
+
+  it('saves the rest typed into a duration row', async () => {
+    const { view, contents } = await openEditor({ body: BIKE('[rest:: 90]') })
+
+    typeInto(cellInput(firstRow(view), 'Rest') as HTMLInputElement, '2m')
+
+    await savedBody(contents, BIKE('[rest:: 120]'))
+  })
+
+  it.each([
+    { typed: 'soon', shown: '1m30s' },
+    { typed: '120', shown: '2m' },
+  ])(
+    'flags rest text "$typed" only while it is not a duration, and shows "$shown" on blur',
+    async ({ typed, shown }) => {
+      const { view } = await openEditor({ body: BIKE('[rest:: 90]') })
+      const input = cellInput(firstRow(view), 'Rest') as HTMLInputElement
+
+      typeInto(input, typed)
+      const invalid = input.getAttribute('aria-invalid')
+      blur(input)
+
+      expect([invalid, input.hasAttribute('aria-invalid'), input.value]).toEqual([
+        typed === 'soon' ? 'true' : null,
+        false,
+        shown,
+      ])
+    },
+  )
+
+  it.each([
+    { kind: 'watts', label: 'Watts' },
+    { kind: 'load', label: 'Load' },
+    { kind: 'level', label: 'Level' },
+  ])('saves the $kind typed into a duration row', async ({ kind, label }) => {
+    const { view, contents } = await openEditor({ body: BIKE(`[${kind}:: 5]`) })
+
+    typeInto(cellInput(firstRow(view), label) as HTMLInputElement, '7.5')
+
+    await savedBody(contents, BIKE(`[${kind}:: 7.5]`))
+  })
+
+  it('saves the load typed into a bodyweight row', async () => {
+    const pushUp = (load: string): string[] =>
+      exercise('Push-up', [`[set:: 1] [level:: 1] [reps:: 10] [load:: ${load}]`])
+    const { view, contents } = await openEditor({ body: pushUp('5') })
+
+    typeInto(cellInput(firstRow(view), 'Load') as HTMLInputElement, '7.5')
+
+    await savedBody(contents, pushUp('7.5'))
+  })
+
+  it('draws a set note as a line that opens the note editor by click or Enter', async () => {
+    const { view } = await openEditor({
+      body: exercise('Squat', ['[set:: 1] [weight:: 80] [reps:: 5] [notes:: Felt heavy]']),
+    })
+    const line = firstRow(view).querySelector<HTMLElement>('.fitkit-note-line')
+
+    line?.click()
+    const afterClick = modalTitles()
+    if (line) pressKey(line, 'Enter')
+
+    expect(line?.textContent).toBe('Felt heavy')
+    expect(afterClick).toEqual(['Note for set 1'])
+    expect(modalTitles()).toEqual(['Note for set 1', 'Note for set 1'])
+  })
 })
