@@ -1,0 +1,204 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ExerciseRegistryEntryModal form > draws an edit form with the entry filled in 1`] = `
+"div.fitkit-registry-entry-modal
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Name"
+    input.fitkit-registry-input[type=text]
+    div.fitkit-registry-field-error
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Kind"
+    select.fitkit-registry-select
+      option[value=strength]
+        "Strength"
+      option[value=duration]
+        "Duration"
+      option[value=interval]
+        "Interval"
+      option[value=bodyweight]
+        "Bodyweight"
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Unit"
+    select.fitkit-registry-select
+      option[value=kg]
+        "kg"
+      option[value=lbs]
+        "lbs"
+    div.fitkit-registry-field-warning
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Aliases (one per line)"
+    textarea.fitkit-registry-textarea[rows=5]
+    div.fitkit-registry-field-error
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Save""
+`;
+
+exports[`ExerciseRegistryEntryModal form > draws an empty create form with Save held back by the missing name 1`] = `
+"div.fitkit-registry-entry-modal
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Name"
+    input.fitkit-registry-input[type=text]
+    div.fitkit-registry-field-error
+      "Name cannot be empty."
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Kind"
+    select.fitkit-registry-select
+      option[value=strength]
+        "Strength"
+      option[value=duration]
+        "Duration"
+      option[value=interval]
+        "Interval"
+      option[value=bodyweight]
+        "Bodyweight"
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Unit"
+    select.fitkit-registry-select
+      option[value=kg]
+        "kg"
+      option[value=lbs]
+        "lbs"
+    div.fitkit-registry-field-warning
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Aliases (one per line)"
+    textarea.fitkit-registry-textarea[rows=5]
+    div.fitkit-registry-field-error
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary[disabled=]
+      "Save""
+`;
+
+exports[`ExerciseRegistryEntryModal form > explains a name that is already taken and holds Save back 1`] = `
+"div.fitkit-registry-entry-modal
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Name"
+    input.fitkit-registry-input[type=text]
+    div.fitkit-registry-field-error
+      "Name 'bench press' conflicts with entry 'Bench Press'."
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Kind"
+    select.fitkit-registry-select
+      option[value=strength]
+        "Strength"
+      option[value=duration]
+        "Duration"
+      option[value=interval]
+        "Interval"
+      option[value=bodyweight]
+        "Bodyweight"
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Unit"
+    select.fitkit-registry-select
+      option[value=kg]
+        "kg"
+      option[value=lbs]
+        "lbs"
+    div.fitkit-registry-field-warning
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Aliases (one per line)"
+    textarea.fitkit-registry-textarea[rows=5]
+    div.fitkit-registry-field-error
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary[disabled=]
+      "Save""
+`;
+
+exports[`ExerciseRegistryEntryModal form > explains an alias that clashes with another entry 1`] = `
+"div.fitkit-registry-entry-modal
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Name"
+    input.fitkit-registry-input[type=text]
+    div.fitkit-registry-field-error
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Kind"
+    select.fitkit-registry-select
+      option[value=strength]
+        "Strength"
+      option[value=duration]
+        "Duration"
+      option[value=interval]
+        "Interval"
+      option[value=bodyweight]
+        "Bodyweight"
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Unit"
+    select.fitkit-registry-select
+      option[value=kg]
+        "kg"
+      option[value=lbs]
+        "lbs"
+    div.fitkit-registry-field-warning
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Aliases (one per line)"
+    textarea.fitkit-registry-textarea[rows=5]
+    div.fitkit-registry-field-error
+      "Alias 'Bench Press' conflicts with entry 'Bench Press'."
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary[disabled=]
+      "Save""
+`;
+
+exports[`ExerciseRegistryEntryModal form > warns that a changed unit reinterprets recorded weights, and drops it when put back 1`] = `
+"div.fitkit-registry-entry-modal
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Name"
+    input.fitkit-registry-input[type=text]
+    div.fitkit-registry-field-error
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Kind"
+    select.fitkit-registry-select
+      option[value=strength]
+        "Strength"
+      option[value=duration]
+        "Duration"
+      option[value=interval]
+        "Interval"
+      option[value=bodyweight]
+        "Bodyweight"
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Unit"
+    select.fitkit-registry-select
+      option[value=kg]
+        "kg"
+      option[value=lbs]
+        "lbs"
+    div.fitkit-registry-field-warning
+  div.fitkit-registry-field
+    label.fitkit-registry-field-label
+      "Aliases (one per line)"
+    textarea.fitkit-registry-textarea[rows=5]
+    div.fitkit-registry-field-error
+  div.fitkit-import-actions
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Save""
+`;

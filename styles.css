@@ -879,6 +879,10 @@ body.is-mobile .fitkit-editor-root {
   box-shadow: none;
 }
 
+.fitkit-plan-icon {
+  display: inline-flex;
+}
+
 .fitkit-plan-add-bar svg {
   width: 14px;
   height: 14px;

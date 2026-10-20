@@ -1,6 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createTestRoot, findButtons } from '../../harness/obsidian-dom'
+import {
+  createTestRoot,
+  findButtons,
+  harnessDocument,
+  harnessWindow,
+} from '../../harness/obsidian-dom'
+import { watchUnmounts } from '../../harness/unmount'
+import { outline } from '../../harness/outline'
+import { findUnstyledClasses } from '../../harness/stylesheet'
 
 const obsidianMock = vi.hoisted((): { notices: string[] } => ({ notices: [] }))
 
@@ -125,11 +133,40 @@ function createPluginStub() {
   }
 }
 
-type ModalPrivate = {
-  contentEl: HTMLElement
-  plan: ExerciseRenamePlan | null
-  computePreview(): Promise<void>
-  handleConfirm(): Promise<void>
+const nameInput = (modal: ExerciseRenameModal): HTMLInputElement => {
+  const input = modal.contentEl.querySelector('input')
+  if (!input) {
+    throw new Error('Expected the name input.')
+  }
+  return input
+}
+
+const typeName = (modal: ExerciseRenameModal, value: string): void => {
+  const input = nameInput(modal)
+  input.value = value
+  input.dispatchEvent(new harnessWindow.Event('input', { bubbles: true }))
+}
+
+/** Lets the awaited vault mocks settle and the modal redraw after the click that started them. */
+const settle = async (): Promise<void> => {
+  for (let turn = 0; turn < 20; turn++) {
+    await Promise.resolve()
+  }
+}
+
+/** Opens the modal, types nothing, and walks the Preview changes button to the preview stage. */
+async function openPreview(
+  plugin: ReturnType<typeof createPluginStub>,
+  options: { oldName?: string; onApplied?: () => void } = {},
+): Promise<ExerciseRenameModal> {
+  const modal = new ExerciseRenameModal(plugin as unknown as FitKitPlugin, {
+    oldName: 'Row',
+    ...options,
+  })
+  modal.onOpen()
+  findButtons(modal.contentEl, 'Preview changes')[0]?.click()
+  await settle()
+  return modal
 }
 
 describe('describeRenameApplyFailures', () => {
@@ -214,29 +251,23 @@ describe('ExerciseRenameModal preview', () => {
         refusal: { reason: 'unchanged', message: 'New name is identical to the current name.' },
       }),
     )
-    const modal = new ExerciseRenameModal(createPluginStub() as unknown as FitKitPlugin, {
-      oldName: 'Row',
-    })
-    const modalPrivate = modal as unknown as ModalPrivate
 
-    await modalPrivate.computePreview()
+    const modal = await openPreview(createPluginStub())
 
-    const text = collectText(modalPrivate.contentEl)
+    const text = collectText(modal.contentEl)
     expect(text).toContain("Can't rename this exercise")
     expect(text).toContain('New name is identical to the current name.')
-    expect(findButtons(modalPrivate.contentEl, 'Confirm rename')).toHaveLength(0)
+    expect(findButtons(modal.contentEl, 'Confirm rename')).toHaveLength(0)
+    expect(outline(modal.contentEl)).toMatchSnapshot()
+    expect(findUnstyledClasses(modal.contentEl)).toEqual([])
   })
 
   it('states the note file rename with both paths, row counts, and the kept alias for a plain rename', async () => {
     vi.mocked(buildExerciseRenamePlanFromVault).mockResolvedValue(basePlan())
-    const modal = new ExerciseRenameModal(createPluginStub() as unknown as FitKitPlugin, {
-      oldName: 'Row',
-    })
-    const modalPrivate = modal as unknown as ModalPrivate
 
-    await modalPrivate.computePreview()
+    const modal = await openPreview(createPluginStub())
 
-    const text = collectText(modalPrivate.contentEl)
+    const text = collectText(modal.contentEl)
     expect(text).toContain(
       "Rename: 'Fitness/Exercises/Row.md' → 'Fitness/Exercises/Barbell Row.md'.",
     )
@@ -246,8 +277,10 @@ describe('ExerciseRenameModal preview', () => {
       "'Row' will be kept as an alias of 'Barbell Row', so existing references still resolve.",
     )
     expect(text).toContain('No references will be left stale.')
-    expect(findButtons(modalPrivate.contentEl, 'Confirm rename')).toHaveLength(1)
-    expect(findButtons(modalPrivate.contentEl, 'Confirm merge')).toHaveLength(0)
+    expect(findButtons(modal.contentEl, 'Confirm rename')).toHaveLength(1)
+    expect(findButtons(modal.contentEl, 'Confirm merge')).toHaveLength(0)
+    expect(outline(modal.contentEl)).toMatchSnapshot()
+    expect(findUnstyledClasses(modal.contentEl)).toEqual([])
   })
 
   it('warns plainly about stale pathed/aliased occurrences instead of silently dropping them', async () => {
@@ -264,16 +297,13 @@ describe('ExerciseRenameModal preview', () => {
         ],
       }),
     )
-    const modal = new ExerciseRenameModal(createPluginStub() as unknown as FitKitPlugin, {
-      oldName: 'Row',
-    })
-    const modalPrivate = modal as unknown as ModalPrivate
 
-    await modalPrivate.computePreview()
+    const modal = await openPreview(createPluginStub())
 
-    const text = collectText(modalPrivate.contentEl).join(' ')
+    const text = collectText(modal.contentEl).join(' ')
     expect(text).toContain('2 reference(s) use a pathed or aliased wikilink')
     expect(text).toContain('will not be rewritten here')
+    expect(outline(modal.contentEl)).toMatchSnapshot()
   })
 
   it('names what happens to the losing note and its prose on a merge', async () => {
@@ -285,14 +315,10 @@ describe('ExerciseRenameModal preview', () => {
         aliasesToKeep: ['Row', 'Rows'],
       }),
     )
-    const modal = new ExerciseRenameModal(createPluginStub() as unknown as FitKitPlugin, {
-      oldName: 'Row',
-    })
-    const modalPrivate = modal as unknown as ModalPrivate
 
-    await modalPrivate.computePreview()
+    const modal = await openPreview(createPluginStub())
 
-    const text = collectText(modalPrivate.contentEl).join(' ')
+    const text = collectText(modal.contentEl).join(' ')
     expect(text).toContain(
       "'Fitness/Exercises/Row.md' will be removed after merging into 'Fitness/Exercises/Barbell Row.md'.",
     )
@@ -300,7 +326,116 @@ describe('ExerciseRenameModal preview', () => {
     expect(text).toContain('Its Notes section has text')
     expect(text).toContain('Merged from Row')
     expect(text).toContain('Other aliases carried over: Rows.')
-    expect(findButtons(modalPrivate.contentEl, 'Confirm merge')).toHaveLength(1)
+    expect(findButtons(modal.contentEl, 'Confirm merge')).toHaveLength(1)
+    expect(outline(modal.contentEl)).toMatchSnapshot()
+  })
+
+  it('shows the rename with no note file and no workout notes', async () => {
+    vi.mocked(buildExerciseRenamePlanFromVault).mockResolvedValue(
+      basePlan({
+        sourceNotePath: null,
+        targetNotePath: null,
+        workoutNotes: [],
+        totalHeadingOccurrences: 0,
+        totalFieldOccurrences: 0,
+        aliasesToKeep: ['Row', 'Rows'],
+      }),
+    )
+
+    const modal = await openPreview(createPluginStub())
+
+    expect(outline(modal.contentEl)).toMatchSnapshot()
+  })
+
+  it('goes back to the input stage with the name that was typed', async () => {
+    vi.mocked(buildExerciseRenamePlanFromVault).mockResolvedValue(basePlan())
+    const modal = new ExerciseRenameModal(createPluginStub() as unknown as FitKitPlugin, {
+      oldName: 'Row',
+    })
+    modal.onOpen()
+    typeName(modal, 'Barbell Row')
+    findButtons(modal.contentEl, 'Preview changes')[0]?.click()
+    await settle()
+
+    findButtons(modal.contentEl, 'Back')[0]?.click()
+
+    expect(nameInput(modal).value).toBe('Barbell Row')
+    expect(vi.mocked(buildExerciseRenamePlanFromVault).mock.calls[0]?.[3]).toBe('Barbell Row')
+  })
+
+  it('goes back from a refusal to the input stage', async () => {
+    vi.mocked(buildExerciseRenamePlanFromVault).mockResolvedValue(
+      basePlan({ operation: null, refusal: { reason: 'unchanged', message: 'Same name.' } }),
+    )
+    const modal = await openPreview(createPluginStub())
+
+    findButtons(modal.contentEl, 'Back')[0]?.click()
+
+    expect(nameInput(modal).value).toBe('Row')
+  })
+})
+
+describe('ExerciseRenameModal input stage', () => {
+  beforeEach(() => {
+    obsidianMock.notices = []
+    vi.mocked(buildExerciseRenamePlanFromVault).mockReset()
+    vi.mocked(applyExerciseRenamePlan).mockReset()
+  })
+
+  it('draws the explanation, the name field and the actions', () => {
+    const modal = new ExerciseRenameModal(createPluginStub() as unknown as FitKitPlugin, {
+      oldName: 'Row',
+    })
+
+    modal.onOpen()
+
+    expect(outline(modal.contentEl)).toMatchSnapshot()
+    expect(findUnstyledClasses(modal.contentEl)).toEqual([])
+  })
+
+  it('starts the field on the old name', () => {
+    const modal = new ExerciseRenameModal(createPluginStub() as unknown as FitKitPlugin, {
+      oldName: 'Row',
+    })
+
+    modal.onOpen()
+
+    expect(nameInput(modal).value).toBe('Row')
+  })
+
+  it('checks the vault with the typed name', async () => {
+    vi.mocked(buildExerciseRenamePlanFromVault).mockResolvedValue(basePlan())
+    const plugin = createPluginStub()
+    const modal = new ExerciseRenameModal(plugin as unknown as FitKitPlugin, { oldName: 'Row' })
+    modal.onOpen()
+
+    typeName(modal, 'Barbell Row')
+    findButtons(modal.contentEl, 'Preview changes')[0]?.click()
+
+    expect(vi.mocked(buildExerciseRenamePlanFromVault).mock.calls[0]?.slice(2)).toEqual([
+      'Row',
+      'Barbell Row',
+    ])
+  })
+
+  it('shows a checking line while the vault is read', () => {
+    vi.mocked(buildExerciseRenamePlanFromVault).mockReturnValue(new Promise(() => {}))
+    const modal = new ExerciseRenameModal(createPluginStub() as unknown as FitKitPlugin, {
+      oldName: 'Row',
+    })
+    modal.onOpen()
+
+    findButtons(modal.contentEl, 'Preview changes')[0]?.click()
+
+    expect(outline(modal.contentEl)).toMatchSnapshot()
+  })
+
+  it('returns to the input with the error when the vault cannot be read', async () => {
+    vi.mocked(buildExerciseRenamePlanFromVault).mockRejectedValue(new Error('Disk gone'))
+    const modal = await openPreview(createPluginStub())
+
+    expect(outline(modal.contentEl)).toMatchSnapshot()
+    expect(nameInput(modal).value).toBe('Row')
   })
 })
 
@@ -317,10 +452,9 @@ describe('ExerciseRenameModal cancel', () => {
 
     modal.onOpen()
 
-    const modalPrivate = modal as unknown as ModalPrivate & { titleEl: HTMLElement }
-    expect(modalPrivate.titleEl.textContent).toBe('Rename exercise')
+    expect(modal.titleEl.textContent).toBe('Rename exercise')
     expect(
-      [...modalPrivate.contentEl.children].some((child) => child.tagName.toLowerCase() === 'h2'),
+      [...modal.contentEl.children].some((child) => child.tagName.toLowerCase() === 'h2'),
     ).toBe(false)
   })
 
@@ -329,9 +463,8 @@ describe('ExerciseRenameModal cancel', () => {
     const modal = new ExerciseRenameModal(plugin as unknown as FitKitPlugin, { oldName: 'Row' })
     const closeSpy = vi.spyOn(modal, 'close')
     modal.onOpen()
-    const modalPrivate = modal as unknown as ModalPrivate
 
-    const cancel = findButtons(modalPrivate.contentEl, 'Cancel')
+    const cancel = findButtons(modal.contentEl, 'Cancel')
     expect(cancel).toHaveLength(1)
     cancel[0]?.click()
 
@@ -346,10 +479,11 @@ describe('ExerciseRenameModal cancel', () => {
     const plugin = createPluginStub()
     const modal = new ExerciseRenameModal(plugin as unknown as FitKitPlugin, { oldName: 'Row' })
     const closeSpy = vi.spyOn(modal, 'close')
-    const modalPrivate = modal as unknown as ModalPrivate
+    modal.onOpen()
+    findButtons(modal.contentEl, 'Preview changes')[0]?.click()
+    await settle()
 
-    await modalPrivate.computePreview()
-    const cancel = findButtons(modalPrivate.contentEl, 'Cancel')
+    const cancel = findButtons(modal.contentEl, 'Cancel')
     expect(cancel).toHaveLength(1)
     cancel[0]?.click()
 
@@ -375,15 +509,11 @@ describe('ExerciseRenameModal confirm', () => {
     )
     const plugin = createPluginStub()
     const onApplied = vi.fn()
-    const modal = new ExerciseRenameModal(plugin as unknown as FitKitPlugin, {
-      oldName: 'Row',
-      onApplied,
-    })
+    const modal = await openPreview(plugin, { onApplied })
     const closeSpy = vi.spyOn(modal, 'close')
-    const modalPrivate = modal as unknown as ModalPrivate
 
-    await modalPrivate.computePreview()
-    await modalPrivate.handleConfirm()
+    findButtons(modal.contentEl, 'Confirm rename')[0]?.click()
+    await settle()
 
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1)
     /**
@@ -398,6 +528,16 @@ describe('ExerciseRenameModal confirm', () => {
     expect(obsidianMock.notices[0]).toContain('Renamed the note file')
     expect(onApplied).toHaveBeenCalledTimes(1)
     expect(closeSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables the actions and says Applying while the rename runs', async () => {
+    vi.mocked(buildExerciseRenamePlanFromVault).mockResolvedValue(basePlan())
+    vi.mocked(applyExerciseRenamePlan).mockReturnValue(new Promise(() => {}))
+    const modal = await openPreview(createPluginStub())
+
+    findButtons(modal.contentEl, 'Confirm rename')[0]?.click()
+
+    expect(outline(modal.contentEl)).toMatchSnapshot()
   })
 
   it('keeps the modal open with a warning banner and a refreshed preview on partial failure', async () => {
@@ -415,40 +555,99 @@ describe('ExerciseRenameModal confirm', () => {
     )
     const plugin = createPluginStub()
     const onApplied = vi.fn()
-    const modal = new ExerciseRenameModal(plugin as unknown as FitKitPlugin, {
-      oldName: 'Row',
-      onApplied,
-    })
+    const modal = await openPreview(plugin, { onApplied })
     const closeSpy = vi.spyOn(modal, 'close')
-    const modalPrivate = modal as unknown as ModalPrivate
 
-    await modalPrivate.computePreview()
-    await modalPrivate.handleConfirm()
+    findButtons(modal.contentEl, 'Confirm rename')[0]?.click()
+    await settle()
 
     expect(closeSpy).not.toHaveBeenCalled()
     expect(onApplied).not.toHaveBeenCalled()
     expect(obsidianMock.notices).toHaveLength(0)
-    const text = collectText(modalPrivate.contentEl).join(' ')
+    const text = collectText(modal.contentEl).join(' ')
     expect(text).toContain('Rename only partly completed')
     expect(text).toContain('Disk full')
     /** The retry preview is recomputed from scratch, matching the engine's rescan design. */
     expect(vi.mocked(buildExerciseRenamePlanFromVault)).toHaveBeenCalledTimes(2)
+    expect(outline(modal.contentEl)).toMatchSnapshot()
   })
 
   it('shows a warning and keeps the modal open when applying throws outright', async () => {
     vi.mocked(buildExerciseRenamePlanFromVault).mockResolvedValue(basePlan())
     vi.mocked(applyExerciseRenamePlan).mockRejectedValue(new Error('Vault write failed'))
-    const plugin = createPluginStub()
-    const modal = new ExerciseRenameModal(plugin as unknown as FitKitPlugin, { oldName: 'Row' })
+    const modal = await openPreview(createPluginStub())
     const closeSpy = vi.spyOn(modal, 'close')
-    const modalPrivate = modal as unknown as ModalPrivate
 
-    await modalPrivate.computePreview()
-    await modalPrivate.handleConfirm()
+    findButtons(modal.contentEl, 'Confirm rename')[0]?.click()
+    await settle()
 
     expect(closeSpy).not.toHaveBeenCalled()
-    const text = collectText(modalPrivate.contentEl).join(' ')
+    const text = collectText(modal.contentEl).join(' ')
     expect(text).toContain('Could not apply the rename')
     expect(text).toContain('Vault write failed')
+  })
+})
+
+describe('ExerciseRenameModal closing', () => {
+  beforeEach(() => {
+    vi.mocked(buildExerciseRenamePlanFromVault).mockReset()
+  })
+
+  afterEach(() => {
+    harnessDocument.body.replaceChildren()
+  })
+
+  it('unmounts its component from every stage', async () => {
+    vi.mocked(buildExerciseRenamePlanFromVault).mockResolvedValue(basePlan())
+    const atInput = new ExerciseRenameModal(createPluginStub() as unknown as FitKitPlugin, {
+      oldName: 'Row',
+    })
+    atInput.onOpen()
+    const atPreview = await openPreview(createPluginStub())
+
+    const unmounts = watchUnmounts()
+    try {
+      atInput.onClose()
+      atPreview.onClose()
+    } finally {
+      unmounts.stop()
+    }
+
+    expect(unmounts.names).toContain('InputStage')
+    expect(unmounts.names).toContain('PreviewStage')
+    expect(atInput.contentEl.children).toHaveLength(0)
+    expect(atPreview.contentEl.children).toHaveLength(0)
+  })
+
+  it('draws nothing when the vault answers after the modal closed', async () => {
+    let answer: (plan: ExerciseRenamePlan) => void = () => {}
+    vi.mocked(buildExerciseRenamePlanFromVault).mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    const modal = new ExerciseRenameModal(createPluginStub() as unknown as FitKitPlugin, {
+      oldName: 'Row',
+    })
+    modal.onOpen()
+    findButtons(modal.contentEl, 'Preview changes')[0]?.click()
+    modal.onClose()
+
+    answer(basePlan())
+    await settle()
+
+    expect(modal.contentEl.children).toHaveLength(0)
+  })
+
+  it('draws again when reopened after closing', () => {
+    const modal = new ExerciseRenameModal(createPluginStub() as unknown as FitKitPlugin, {
+      oldName: 'Row',
+    })
+    modal.onOpen()
+    modal.onClose()
+
+    modal.onOpen()
+
+    expect(nameInput(modal).value).toBe('Row')
   })
 })

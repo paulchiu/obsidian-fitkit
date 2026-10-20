@@ -1,0 +1,499 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`interval plan modal > structure > draws a plan the rows cannot show as text, with its note and Clear plan 1`] = `
+"div.fitkit-set-note-modal
+  div.fitkit-plan-heading
+    span.fitkit-label
+      "Plan"
+    button.fitkit-plan-info[aria-expanded=false][aria-label=Plan examples][type=button]
+      span.fitkit-plan-icon[data-icon=info]
+    div.fitkit-plan-modes
+      button.fitkit-btn[aria-pressed=false][type=button]
+        "Steps"
+      button.fitkit-btn[aria-pressed=true][type=button]
+        "Text"
+  div.fitkit-plan-builder[hidden=]
+  textarea.fitkit-input.fitkit-plan-text[aria-label=Plan][autocapitalize=off][rows=3][spellcheck=false]
+  div.fitkit-plan-note
+    "This plan can't be shown as steps, so edit it as text."
+  div.fitkit-plan-preview
+    "1 rep · 40s"
+  div.fitkit-plan-examples[hidden=]
+    div.fitkit-plan-example
+      code
+        "(x 8 (work 20s 400W) (rest 10s))"
+      div.fitkit-plan-example-about
+        "Eight reps of 20s at 400W. A rest at the end of an x goes between rounds."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(x 3 (over 1m 300W) (under 2m 220W))"
+      div.fitkit-plan-example-about
+        "The first word names the step. Steps with no rest between them run straight on."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(warmup 10m 150W) (x 3 (x 3 (over 1m 300W) (under 2m 220W)) (rest 4m)) (cooldown 5m 120W)"
+      div.fitkit-plan-example-about
+        "Nest x for sets of rounds. A step with no target, like (spin 5m), is timed but not scored."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(x 6 (climb 1m (L8 L10 L12 L14 L12 L10)) (rest 1m))"
+      div.fitkit-plan-example-about
+        "A list of targets takes the next one each round."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(x 6 (every 2m (push open 120kg)))"
+      div.fitkit-plan-example-about
+        "Open work ends when you tap Rest. Every starts each rep on the clock."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "("big gear" 2m 260W)"
+      div.fitkit-plan-example-about
+        "Quote a name with spaces. Targets are watts (300W), load (120kg) or a level (L12)."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "8 x 30s @ 300W, 90s rest"
+      div.fitkit-plan-example-about
+        "The one-line form still works for a single repeat."
+      button.fitkit-btn
+        "Use this"
+    a[href=https://github.com/paulchiu/obsidian-fitkit/blob/main/docs/interval-training.md#plan-syntax]
+      "Full syntax and more examples"
+  div.fitkit-confirm-actions.fitkit-set-note-actions
+    button.fitkit-btn
+      "Clear plan"
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Save""
+`;
+
+exports[`interval plan modal > structure > draws the examples once opened 1`] = `
+"div.fitkit-set-note-modal
+  div.fitkit-plan-heading
+    span.fitkit-label
+      "Plan"
+    button.fitkit-plan-info[aria-expanded=true][aria-label=Plan examples][type=button]
+      span.fitkit-plan-icon[data-icon=info]
+    div.fitkit-plan-modes
+      button.fitkit-btn[aria-pressed=false][type=button]
+        "Steps"
+      button.fitkit-btn[aria-pressed=true][type=button]
+        "Text"
+  div.fitkit-plan-builder[hidden=]
+  textarea.fitkit-input.fitkit-plan-text[aria-label=Plan][autocapitalize=off][rows=3][spellcheck=false]
+  div.fitkit-plan-note
+    "This plan can't be shown as steps, so edit it as text."
+  div.fitkit-plan-preview
+    "1 rep · 40s"
+  div.fitkit-plan-examples
+    div.fitkit-plan-example
+      code
+        "(x 8 (work 20s 400W) (rest 10s))"
+      div.fitkit-plan-example-about
+        "Eight reps of 20s at 400W. A rest at the end of an x goes between rounds."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(x 3 (over 1m 300W) (under 2m 220W))"
+      div.fitkit-plan-example-about
+        "The first word names the step. Steps with no rest between them run straight on."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(warmup 10m 150W) (x 3 (x 3 (over 1m 300W) (under 2m 220W)) (rest 4m)) (cooldown 5m 120W)"
+      div.fitkit-plan-example-about
+        "Nest x for sets of rounds. A step with no target, like (spin 5m), is timed but not scored."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(x 6 (climb 1m (L8 L10 L12 L14 L12 L10)) (rest 1m))"
+      div.fitkit-plan-example-about
+        "A list of targets takes the next one each round."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(x 6 (every 2m (push open 120kg)))"
+      div.fitkit-plan-example-about
+        "Open work ends when you tap Rest. Every starts each rep on the clock."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "("big gear" 2m 260W)"
+      div.fitkit-plan-example-about
+        "Quote a name with spaces. Targets are watts (300W), load (120kg) or a level (L12)."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "8 x 30s @ 300W, 90s rest"
+      div.fitkit-plan-example-about
+        "The one-line form still works for a single repeat."
+      button.fitkit-btn
+        "Use this"
+    a[href=https://github.com/paulchiu/obsidian-fitkit/blob/main/docs/interval-training.md#plan-syntax]
+      "Full syntax and more examples"
+  div.fitkit-confirm-actions.fitkit-set-note-actions
+    button.fitkit-btn
+      "Clear plan"
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Save""
+`;
+
+exports[`interval plan modal > structure > draws the reason in place of the preview when the plan cannot run 1`] = `
+"div.fitkit-set-note-modal
+  div.fitkit-plan-presets
+    span.fitkit-label
+      "Start from"
+    button.fitkit-btn
+      "Sled"
+  div.fitkit-plan-heading
+    span.fitkit-label
+      "Plan"
+    button.fitkit-plan-info[aria-expanded=false][aria-label=Plan examples][hidden=][type=button]
+      span.fitkit-plan-icon[data-icon=info]
+    div.fitkit-plan-modes
+      button.fitkit-btn[aria-pressed=true][type=button]
+        "Steps"
+      button.fitkit-btn[aria-pressed=false][type=button]
+        "Text"
+  div.fitkit-plan-builder
+    div.fitkit-plan-list
+      div.fitkit-plan-repeat
+        div.fitkit-plan-row
+          span.fitkit-plan-word
+            "Repeat"
+          input.fitkit-input.fitkit-plan-count[aria-label=Rounds][autocapitalize=off][autocomplete=off][placeholder=3][spellcheck=false][type=text]
+          span.fitkit-plan-word
+            "times, every"
+          input.fitkit-input.fitkit-plan-time[aria-label=Start every][autocapitalize=off][autocomplete=off][placeholder=off][spellcheck=false][type=text]
+          button.fitkit-plan-options[aria-label=Repeat options][type=button]
+            span.fitkit-plan-icon[data-icon=more-vertical]
+        div.fitkit-plan-repeat-body
+          div.fitkit-plan-list
+            div.fitkit-plan-row
+              input.fitkit-input.fitkit-plan-grow[aria-label=Step name][autocapitalize=off][autocomplete=off][placeholder=name][spellcheck=false][type=text]
+              input.fitkit-input.fitkit-plan-time[aria-label=Work time][autocapitalize=off][autocomplete=off][placeholder=1m][spellcheck=false][type=text]
+              input.fitkit-input.fitkit-plan-target[aria-label=Target][autocapitalize=off][autocomplete=off][placeholder=300W][spellcheck=false][type=text]
+              button.fitkit-plan-options[aria-label=Step options][type=button]
+                span.fitkit-plan-icon[data-icon=more-vertical]
+          button.fitkit-plan-add-foot[aria-label=Add to repeat][type=button]
+            span.fitkit-plan-icon[data-icon=plus]
+    button.fitkit-plan-add-bar[aria-label=Add to plan][type=button]
+      span.fitkit-plan-icon[data-icon=plus]
+      span
+        "Add"
+  textarea.fitkit-input.fitkit-plan-text[aria-label=Plan][autocapitalize=off][hidden=][rows=3][spellcheck=false]
+  div.fitkit-plan-note[hidden=]
+    "This plan can't be shown as steps, so edit it as text."
+  div.fitkit-plan-preview
+    span.fitkit-plan-error
+      "Missing ) to close (x."
+  div.fitkit-plan-examples[hidden=]
+    div.fitkit-plan-example
+      code
+        "(x 8 (work 20s 400W) (rest 10s))"
+      div.fitkit-plan-example-about
+        "Eight reps of 20s at 400W. A rest at the end of an x goes between rounds."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(x 3 (over 1m 300W) (under 2m 220W))"
+      div.fitkit-plan-example-about
+        "The first word names the step. Steps with no rest between them run straight on."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(warmup 10m 150W) (x 3 (x 3 (over 1m 300W) (under 2m 220W)) (rest 4m)) (cooldown 5m 120W)"
+      div.fitkit-plan-example-about
+        "Nest x for sets of rounds. A step with no target, like (spin 5m), is timed but not scored."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(x 6 (climb 1m (L8 L10 L12 L14 L12 L10)) (rest 1m))"
+      div.fitkit-plan-example-about
+        "A list of targets takes the next one each round."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(x 6 (every 2m (push open 120kg)))"
+      div.fitkit-plan-example-about
+        "Open work ends when you tap Rest. Every starts each rep on the clock."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "("big gear" 2m 260W)"
+      div.fitkit-plan-example-about
+        "Quote a name with spaces. Targets are watts (300W), load (120kg) or a level (L12)."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "8 x 30s @ 300W, 90s rest"
+      div.fitkit-plan-example-about
+        "The one-line form still works for a single repeat."
+      button.fitkit-btn
+        "Use this"
+    a[href=https://github.com/paulchiu/obsidian-fitkit/blob/main/docs/interval-training.md#plan-syntax]
+      "Full syntax and more examples"
+  div.fitkit-confirm-actions.fitkit-set-note-actions
+    button.fitkit-btn
+      "Clear plan"
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary[disabled=]
+      "Save""
+`;
+
+exports[`interval plan modal > structure > draws the step editor with a repeat that starts each round on the clock 1`] = `
+"div.fitkit-set-note-modal
+  div.fitkit-plan-presets
+    span.fitkit-label
+      "Start from"
+    button.fitkit-btn
+      "Sled"
+  div.fitkit-plan-heading
+    span.fitkit-label
+      "Plan"
+    button.fitkit-plan-info[aria-expanded=false][aria-label=Plan examples][hidden=][type=button]
+      span.fitkit-plan-icon[data-icon=info]
+    div.fitkit-plan-modes
+      button.fitkit-btn[aria-pressed=true][type=button]
+        "Steps"
+      button.fitkit-btn[aria-pressed=false][type=button]
+        "Text"
+  div.fitkit-plan-builder
+    div.fitkit-plan-list
+      div.fitkit-plan-repeat
+        div.fitkit-plan-row
+          span.fitkit-plan-word
+            "Repeat"
+          input.fitkit-input.fitkit-plan-count[aria-label=Rounds][autocapitalize=off][autocomplete=off][placeholder=3][spellcheck=false][type=text]
+          span.fitkit-plan-word
+            "times, every"
+          input.fitkit-input.fitkit-plan-time[aria-label=Start every][autocapitalize=off][autocomplete=off][placeholder=off][spellcheck=false][type=text]
+          button.fitkit-plan-options[aria-label=Repeat options][type=button]
+            span.fitkit-plan-icon[data-icon=more-vertical]
+        div.fitkit-plan-repeat-body
+          div.fitkit-plan-list
+            div.fitkit-plan-row
+              input.fitkit-input.fitkit-plan-grow[aria-label=Step name][autocapitalize=off][autocomplete=off][placeholder=name][spellcheck=false][type=text]
+              input.fitkit-input.fitkit-plan-time[aria-label=Work time][autocapitalize=off][autocomplete=off][placeholder=1m][spellcheck=false][type=text]
+              input.fitkit-input.fitkit-plan-target[aria-label=Target][autocapitalize=off][autocomplete=off][placeholder=300W][spellcheck=false][type=text]
+              button.fitkit-plan-options[aria-label=Step options][type=button]
+                span.fitkit-plan-icon[data-icon=more-vertical]
+          button.fitkit-plan-add-foot[aria-label=Add to repeat][type=button]
+            span.fitkit-plan-icon[data-icon=plus]
+    button.fitkit-plan-add-bar[aria-label=Add to plan][type=button]
+      span.fitkit-plan-icon[data-icon=plus]
+      span
+        "Add"
+  textarea.fitkit-input.fitkit-plan-text[aria-label=Plan][autocapitalize=off][hidden=][rows=3][spellcheck=false]
+  div.fitkit-plan-note[hidden=]
+    "This plan can't be shown as steps, so edit it as text."
+  div.fitkit-plan-preview
+    "6 reps · 10m"
+  div.fitkit-plan-examples[hidden=]
+    div.fitkit-plan-example
+      code
+        "(x 8 (work 20s 400W) (rest 10s))"
+      div.fitkit-plan-example-about
+        "Eight reps of 20s at 400W. A rest at the end of an x goes between rounds."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(x 3 (over 1m 300W) (under 2m 220W))"
+      div.fitkit-plan-example-about
+        "The first word names the step. Steps with no rest between them run straight on."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(warmup 10m 150W) (x 3 (x 3 (over 1m 300W) (under 2m 220W)) (rest 4m)) (cooldown 5m 120W)"
+      div.fitkit-plan-example-about
+        "Nest x for sets of rounds. A step with no target, like (spin 5m), is timed but not scored."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(x 6 (climb 1m (L8 L10 L12 L14 L12 L10)) (rest 1m))"
+      div.fitkit-plan-example-about
+        "A list of targets takes the next one each round."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(x 6 (every 2m (push open 120kg)))"
+      div.fitkit-plan-example-about
+        "Open work ends when you tap Rest. Every starts each rep on the clock."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "("big gear" 2m 260W)"
+      div.fitkit-plan-example-about
+        "Quote a name with spaces. Targets are watts (300W), load (120kg) or a level (L12)."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "8 x 30s @ 300W, 90s rest"
+      div.fitkit-plan-example-about
+        "The one-line form still works for a single repeat."
+      button.fitkit-btn
+        "Use this"
+    a[href=https://github.com/paulchiu/obsidian-fitkit/blob/main/docs/interval-training.md#plan-syntax]
+      "Full syntax and more examples"
+  div.fitkit-confirm-actions.fitkit-set-note-actions
+    button.fitkit-btn
+      "Clear plan"
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Save""
+`;
+
+exports[`interval plan modal > structure > draws the step editor with presets, a repeat and every row kind 1`] = `
+"div.fitkit-set-note-modal
+  div.fitkit-plan-presets
+    span.fitkit-label
+      "Start from"
+    button.fitkit-btn
+      "Sled"
+  div.fitkit-plan-heading
+    span.fitkit-label
+      "Plan"
+    button.fitkit-plan-info[aria-expanded=false][aria-label=Plan examples][hidden=][type=button]
+      span.fitkit-plan-icon[data-icon=info]
+    div.fitkit-plan-modes
+      button.fitkit-btn[aria-pressed=true][type=button]
+        "Steps"
+      button.fitkit-btn[aria-pressed=false][type=button]
+        "Text"
+  div.fitkit-plan-builder
+    div.fitkit-plan-list
+      div.fitkit-plan-row
+        input.fitkit-input.fitkit-plan-grow[aria-label=Step name][autocapitalize=off][autocomplete=off][placeholder=name][spellcheck=false][type=text]
+        input.fitkit-input.fitkit-plan-time[aria-label=Work time][autocapitalize=off][autocomplete=off][placeholder=1m][spellcheck=false][type=text]
+        input.fitkit-input.fitkit-plan-target[aria-label=Target][autocapitalize=off][autocomplete=off][placeholder=300W][spellcheck=false][type=text]
+        button.fitkit-plan-options[aria-label=Step options][type=button]
+          span.fitkit-plan-icon[data-icon=more-vertical]
+      div.fitkit-plan-repeat
+        div.fitkit-plan-row
+          span.fitkit-plan-word
+            "Repeat"
+          input.fitkit-input.fitkit-plan-count[aria-label=Rounds][autocapitalize=off][autocomplete=off][placeholder=3][spellcheck=false][type=text]
+          span.fitkit-plan-word
+            "times, every"
+          input.fitkit-input.fitkit-plan-time[aria-label=Start every][autocapitalize=off][autocomplete=off][placeholder=off][spellcheck=false][type=text]
+          button.fitkit-plan-options[aria-label=Repeat options][type=button]
+            span.fitkit-plan-icon[data-icon=more-vertical]
+        div.fitkit-plan-repeat-body
+          div.fitkit-plan-list
+            div.fitkit-plan-row
+              input.fitkit-input.fitkit-plan-grow[aria-label=Step name][autocapitalize=off][autocomplete=off][placeholder=name][spellcheck=false][type=text]
+              input.fitkit-input.fitkit-plan-time[aria-label=Work time][autocapitalize=off][autocomplete=off][placeholder=1m][spellcheck=false][type=text]
+              input.fitkit-input.fitkit-plan-target[aria-label=Target][autocapitalize=off][autocomplete=off][placeholder=300W][spellcheck=false][type=text]
+              button.fitkit-plan-options[aria-label=Step options][type=button]
+                span.fitkit-plan-icon[data-icon=more-vertical]
+            div.fitkit-plan-row
+              span.fitkit-plan-word.fitkit-plan-grow
+                "Rest"
+              input.fitkit-input.fitkit-plan-time[aria-label=Rest time][autocapitalize=off][autocomplete=off][placeholder=90s][spellcheck=false][type=text]
+              button.fitkit-plan-options[aria-label=Rest options][type=button]
+                span.fitkit-plan-icon[data-icon=more-vertical]
+          button.fitkit-plan-add-foot[aria-label=Add to repeat][type=button]
+            span.fitkit-plan-icon[data-icon=plus]
+    button.fitkit-plan-add-bar[aria-label=Add to plan][type=button]
+      span.fitkit-plan-icon[data-icon=plus]
+      span
+        "Add"
+  textarea.fitkit-input.fitkit-plan-text[aria-label=Plan][autocapitalize=off][hidden=][rows=3][spellcheck=false]
+  div.fitkit-plan-note[hidden=]
+    "This plan can't be shown as steps, so edit it as text."
+  div.fitkit-plan-preview
+    "4 reps · 17m"
+  div.fitkit-plan-examples[hidden=]
+    div.fitkit-plan-example
+      code
+        "(x 8 (work 20s 400W) (rest 10s))"
+      div.fitkit-plan-example-about
+        "Eight reps of 20s at 400W. A rest at the end of an x goes between rounds."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(x 3 (over 1m 300W) (under 2m 220W))"
+      div.fitkit-plan-example-about
+        "The first word names the step. Steps with no rest between them run straight on."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(warmup 10m 150W) (x 3 (x 3 (over 1m 300W) (under 2m 220W)) (rest 4m)) (cooldown 5m 120W)"
+      div.fitkit-plan-example-about
+        "Nest x for sets of rounds. A step with no target, like (spin 5m), is timed but not scored."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(x 6 (climb 1m (L8 L10 L12 L14 L12 L10)) (rest 1m))"
+      div.fitkit-plan-example-about
+        "A list of targets takes the next one each round."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "(x 6 (every 2m (push open 120kg)))"
+      div.fitkit-plan-example-about
+        "Open work ends when you tap Rest. Every starts each rep on the clock."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "("big gear" 2m 260W)"
+      div.fitkit-plan-example-about
+        "Quote a name with spaces. Targets are watts (300W), load (120kg) or a level (L12)."
+      button.fitkit-btn
+        "Use this"
+    div.fitkit-plan-example
+      code
+        "8 x 30s @ 300W, 90s rest"
+      div.fitkit-plan-example-about
+        "The one-line form still works for a single repeat."
+      button.fitkit-btn
+        "Use this"
+    a[href=https://github.com/paulchiu/obsidian-fitkit/blob/main/docs/interval-training.md#plan-syntax]
+      "Full syntax and more examples"
+  div.fitkit-confirm-actions.fitkit-set-note-actions
+    button.fitkit-btn
+      "Clear plan"
+    button.fitkit-btn
+      "Cancel"
+    button.fitkit-btn.fitkit-btn-primary
+      "Save""
+`;

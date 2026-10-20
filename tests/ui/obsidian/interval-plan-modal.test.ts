@@ -6,18 +6,22 @@ import {
   harnessDocument,
   harnessWindow,
 } from '../../harness/obsidian-dom'
+import { watchUnmounts } from '../../harness/unmount'
+import { outline } from '../../harness/outline'
+import { findUnstyledClasses } from '../../harness/stylesheet'
 
-const menus = vi.hoisted((): Array<Array<{ title: string; click: () => void }>> => [])
+/** Each menu shown, as the entries it listed. */
+const menus = vi.hoisted((): Array<Array<{ title: string; icon: string; click: () => void }>> => [])
 
 vi.mock('obsidian', () => {
   class Menu {
-    items: Array<{ title: string; click: () => void }> = []
+    items: Array<{ title: string; icon: string; click: () => void }> = []
 
     addItem(callback: (item: unknown) => void): this {
-      const state = { title: '', click: (): void => {} }
+      const state = { title: '', icon: '', click: (): void => {} }
       const item = {
         setTitle: (title: string) => ((state.title = title), item),
-        setIcon: () => item,
+        setIcon: (icon: string) => ((state.icon = icon), item),
         onClick: (click: () => void) => ((state.click = click), item),
       }
       callback(item)
@@ -49,7 +53,10 @@ vi.mock('obsidian', () => {
     }
   }
 
-  return { Menu, Modal, setIcon: (): void => {} }
+  /** Names the icon on its element, so a snapshot pins which icon each control draws. */
+  const setIcon = (el: HTMLElement, name: string): void => el.setAttribute('data-icon', name)
+
+  return { Menu, Modal, setIcon }
 })
 
 import type { IntervalPreset } from '../../../src/domain/interval-presets'
@@ -372,6 +379,25 @@ describe('interval plan modal', () => {
         expect(lifted(modal)).toEqual({ up: false, top: '', room: '' })
         modal.close()
       })
+
+      it('puts the sheet back and stops following the keyboard once it closes', () => {
+        const { modal } = open('(x 3 (over 1m 300W))')
+        const { fields } = formWithFields(modal, [400])
+        sheetIn(modal)
+        fields[0]?.focus()
+        keyboardShows(300)
+        const open_ = lifted(modal).up
+
+        modal.close()
+        const closed = lifted(modal)
+        keyboardShows(300)
+
+        expect([open_, closed, lifted(modal)]).toEqual([
+          true,
+          { up: false, top: '', room: '' },
+          { up: false, top: '', room: '' },
+        ])
+      })
     })
   })
 
@@ -556,6 +582,259 @@ describe('interval plan modal', () => {
         afterSteps: [false, false],
         note: "This plan can't be shown as steps, so edit it as text.",
       })
+    })
+  })
+
+  describe('structure', () => {
+    it('draws the step editor with presets, a repeat and every row kind', () => {
+      const { modal } = open('(warmup 10m 150W) (x 3 (over 1m 300W) (rest 2m))')
+
+      expect(outline(modal.contentEl)).toMatchSnapshot()
+      expect(findUnstyledClasses(modal.contentEl)).toEqual([])
+    })
+
+    it('draws the step editor with a repeat that starts each round on the clock', () => {
+      const { modal } = open('6 x open @ 120kg, every 2m')
+
+      expect(outline(modal.contentEl)).toMatchSnapshot()
+    })
+
+    it('draws a plan the rows cannot show as text, with its note and Clear plan', () => {
+      const { modal } = open('(every 1m (work 40s 300W))', [])
+
+      expect(outline(modal.contentEl)).toMatchSnapshot()
+      expect(findUnstyledClasses(modal.contentEl)).toEqual([])
+    })
+
+    it('draws the examples once opened', () => {
+      const { modal } = open('(every 1m (work 40s 300W))', [])
+
+      modal.contentEl
+        .querySelector<HTMLButtonElement>('button[aria-label="Plan examples"]')
+        ?.click()
+
+      expect(outline(modal.contentEl)).toMatchSnapshot()
+      expect(findUnstyledClasses(modal.contentEl)).toEqual([])
+    })
+
+    it('draws the reason in place of the preview when the plan cannot run', () => {
+      const { modal } = open('(x 3 (over 1m 300W))')
+
+      type(modal, '(x 3 (over 1m 300W)')
+
+      expect(outline(modal.contentEl)).toMatchSnapshot()
+    })
+
+    it('marks the shell classes on the sheet and the form', () => {
+      const { modal } = open(undefined)
+
+      expect([
+        modal.modalEl.classList.contains('fitkit-set-note-modal-shell'),
+        modal.contentEl.classList.contains('fitkit-set-note-modal'),
+      ]).toEqual([true, true])
+      modal.close()
+      expect(modal.modalEl.classList.contains('fitkit-set-note-modal-shell')).toBe(false)
+      expect(modal.contentEl.children).toHaveLength(0)
+    })
+  })
+
+  describe('redrawing', () => {
+    afterEach(() => {
+      harnessDocument.body.replaceChildren()
+    })
+
+    /** Focus only lands on a connected element, so the modal renders attached. */
+    const saves = new WeakMap<IntervalPlanModal, ReturnType<typeof vi.fn>>()
+    const onSaved = (modal: IntervalPlanModal): unknown[][] => saves.get(modal)?.mock.calls ?? []
+
+    const openAttached = (initial: string): IntervalPlanModal => {
+      const onSave = vi.fn()
+      const modal = new IntervalPlanModal({} as never, {
+        exerciseName: 'Exercise Bike',
+        initial,
+        presets: [],
+        onSave,
+      })
+      saves.set(modal, onSave)
+      harnessDocument.body.appendChild(modal.contentEl)
+      modal.onOpen()
+      return modal
+    }
+
+    /** `toEqual` compares DOM nodes by content, so identity is checked one by one. */
+    const sameNodes = (actual: unknown[], expected: unknown[]): boolean =>
+      actual.length === expected.length && actual.every((node, at) => node === expected[at])
+
+    const stepInputs = (modal: IntervalPlanModal): HTMLInputElement[] => [
+      ...modal.contentEl.querySelectorAll<HTMLInputElement>('input[aria-label="Step name"]'),
+    ]
+
+    const choose = (
+      modal: IntervalPlanModal,
+      options: string,
+      index: number,
+      title: string,
+    ): void => {
+      const buttons = modal.contentEl.querySelectorAll<HTMLButtonElement>(
+        `button[aria-label="${options}"]`,
+      )
+      buttons[index]?.click()
+      menus
+        .at(-1)
+        ?.find((item) => item.title === title)
+        ?.click()
+    }
+
+    const typeInStep = (input: HTMLInputElement | undefined, value: string): void => {
+      if (!input) {
+        throw new Error('Field not rendered')
+      }
+      input.focus()
+      input.value = value
+      input.dispatchEvent(new harnessWindow.Event('input', { bubbles: true }))
+    }
+
+    it('leaves a step field, its text and its focus alone while it is typed in', () => {
+      const modal = openAttached('(a 1m) (b 2m)')
+      const [first] = stepInputs(modal)
+
+      typeInStep(first, 'warm ')
+      typeInStep(first, 'warm up.')
+
+      expect(stepInputs(modal)[0]).toBe(first)
+      expect(first?.value).toBe('warm up.')
+      expect(harnessDocument.activeElement).toBe(first)
+      expect(text(modal, '.fitkit-plan-preview')).toBe('2 reps · 3m')
+    })
+
+    it('leaves the plan text and its focus alone while it is typed in', () => {
+      const modal = openAttached('(a 1m)')
+      findButtons(modal.contentEl, 'Text')[0]?.click()
+      const field = planField(modal)
+      field.focus()
+
+      type(modal, '(a 1m')
+      type(modal, '(a 1m) ')
+
+      expect(planField(modal)).toBe(field)
+      expect(field.value).toBe('(a 1m) ')
+      expect(harnessDocument.activeElement).toBe(field)
+    })
+
+    it("keeps each row's field with its row when rows are added, moved and removed", () => {
+      const modal = openAttached('(a 1m) (b 2m) (c 3m)')
+      const [a, b, c] = stepInputs(modal)
+
+      choose(modal, 'Step options', 1, 'Move up')
+      const afterMove = stepInputs(modal)
+      choose(modal, 'Step options', 2, 'Delete')
+      const afterDelete = stepInputs(modal)
+      const added = modal.contentEl.querySelector<HTMLButtonElement>(
+        'button[aria-label="Add to plan"]',
+      )
+      added?.click()
+      menus
+        .at(-1)
+        ?.find((item) => item.title === 'Step')
+        ?.click()
+
+      expect(sameNodes(afterMove, [b, a, c])).toBe(true)
+      expect(sameNodes(afterDelete, [b, a])).toBe(true)
+      expect(sameNodes(stepInputs(modal).slice(0, 2), [b, a])).toBe(true)
+      expect(stepInputs(modal)).toHaveLength(3)
+    })
+
+    it('keeps typed text in the field when a sibling row is reordered', () => {
+      const modal = openAttached('(a 1m) (b 2m)')
+      typeInStep(stepInputs(modal)[1], 'bee')
+
+      choose(modal, 'Step options', 1, 'Move up')
+
+      expect(stepInputs(modal).map((input) => input.value)).toEqual(['bee', 'a'])
+    })
+
+    it("lists each row's menu by where the row sits, and moves a row down", () => {
+      const modal = openAttached('(a 1m) (x 2 (b 2m)) (c 3m)')
+      const listed = (options: string, index: number): string[] => {
+        const buttons = modal.contentEl.querySelectorAll<HTMLButtonElement>(
+          `button[aria-label="${options}"]`,
+        )
+        buttons[index]?.click()
+        return menus.at(-1)?.map((item) => `${item.title}:${item.icon}`) ?? []
+      }
+      const entries = {
+        first: listed('Step options', 0),
+        repeat: listed('Repeat options', 0),
+        alone: listed('Step options', 1),
+        last: listed('Step options', 2),
+        add: listed('Add to plan', 0),
+      }
+
+      choose(modal, 'Step options', 0, 'Move down')
+      findButtons(modal.contentEl, 'Save')[0]?.click()
+
+      expect(entries).toEqual({
+        first: [
+          'Move down:arrow-down',
+          'Duplicate:copy',
+          'Put in a repeat:repeat',
+          'Delete:trash-2',
+        ],
+        repeat: [
+          'Move up:arrow-up',
+          'Move down:arrow-down',
+          'Duplicate:copy',
+          'Put in a repeat:repeat',
+          'Ungroup:ungroup',
+          'Delete:trash-2',
+        ],
+        alone: ['Duplicate:copy', 'Put in a repeat:repeat', 'Delete:trash-2'],
+        last: ['Move up:arrow-up', 'Duplicate:copy', 'Put in a repeat:repeat', 'Delete:trash-2'],
+        add: ['Step:activity', 'Rest:pause', 'Repeat:repeat'],
+      })
+      expect(onSaved(modal)).toEqual([['(x 2 (b 2m)) (a 1m) (c 3m)']])
+    })
+
+    it("puts a duplicate straight after its row, keeping the original's field", () => {
+      const modal = openAttached('(a 1m) (b 2m) (c 3m)')
+      const [, b] = stepInputs(modal)
+      typeInStep(b, 'bee')
+
+      choose(modal, 'Step options', 1, 'Duplicate')
+      const after = stepInputs(modal)
+
+      expect(after.map((input) => input.value)).toEqual(['a', 'bee', 'bee', 'c'])
+      expect(after[1]).toBe(b)
+      expect(after[2]).not.toBe(b)
+    })
+
+    it('draws nothing when a menu entry is picked after it closed, and draws again reopened', () => {
+      const modal = openAttached('(a 1m) (b 2m)')
+      modal.contentEl.querySelector<HTMLButtonElement>('button[aria-label="Step options"]')?.click()
+      modal.close()
+
+      menus
+        .at(-1)
+        ?.find((item) => item.title === 'Delete')
+        ?.click()
+      const afterClose = modal.contentEl.children.length
+      modal.onOpen()
+
+      expect([afterClose, stepInputs(modal).map((input) => input.value)]).toEqual([0, ['a', 'b']])
+      modal.close()
+    })
+
+    it('unmounts the form and the step editor when it closes', () => {
+      const modal = openAttached('(a 1m)')
+      const unmounts = watchUnmounts()
+      try {
+        modal.close()
+      } finally {
+        unmounts.stop()
+      }
+
+      expect(unmounts.names).toEqual(expect.arrayContaining(['PlanForm', 'PlanBuilder']))
+      expect(modal.contentEl.children).toHaveLength(0)
     })
   })
 

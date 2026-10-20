@@ -1,4 +1,5 @@
 import { Modal, Notice } from 'obsidian'
+import { render } from 'preact'
 
 import type {
   ExerciseKind,
@@ -15,16 +16,15 @@ import {
   upsertEntry,
   validateEntryDraft,
 } from '../../domain/exercise-registry'
-import { DEFAULT_WEIGHT_UNIT, WEIGHT_UNITS, type WeightUnit } from '../../domain/weight-unit'
+import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../../domain/weight-unit'
 import {
-  EXERCISE_TYPES,
-  EXERCISE_TYPE_LABELS,
   exerciseTypeOf,
   kindOfType,
   parseExerciseType,
   type ExerciseType,
 } from '../../domain/exercise-type'
 import type FitKitPlugin from '../../main'
+import { RegistryEntryForm } from '../components/registry-entry-form'
 
 export type RegistryEntryModalMode =
   | { kind: 'create'; initial?: { name: string; kind: ExerciseKind } }
@@ -38,15 +38,8 @@ export class ExerciseRegistryEntryModal extends Modal {
   private unitTouched: boolean
   private aliasesText: string
   private levels: string[] | undefined
-  private nameInput!: HTMLInputElement
-  private kindSelect!: HTMLSelectElement
-  private unitField!: HTMLDivElement
-  private unitSelect!: HTMLSelectElement
-  private unitWarning!: HTMLDivElement
-  private aliasesTextarea!: HTMLTextAreaElement
-  private saveButton!: HTMLButtonElement
-  private nameError!: HTMLDivElement
-  private aliasError!: HTMLDivElement
+  /** What the last validation found; only a change or a failed save refreshes it. */
+  private errors: ValidationError[] = []
 
   constructor(
     private plugin: FitKitPlugin,
@@ -71,85 +64,67 @@ export class ExerciseRegistryEntryModal extends Modal {
   }
 
   onOpen(): void {
-    const { contentEl } = this
-    contentEl.empty()
-    contentEl.addClass('fitkit-registry-entry-modal')
+    this.contentEl.addClass('fitkit-registry-entry-modal')
     this.setTitle(this.mode.kind === 'edit' ? 'Edit registry entry' : 'Add registry entry')
-
-    const nameField = contentEl.createDiv({ cls: 'fitkit-registry-field' })
-    nameField.createEl('label', { text: 'Name', cls: 'fitkit-registry-field-label' })
-    this.nameInput = nameField.createEl('input', {
-      type: 'text',
-      cls: 'fitkit-registry-input',
-    })
-    this.nameInput.value = this.name
-    this.nameInput.addEventListener('input', () => {
-      this.name = this.nameInput.value
-      this.refreshValidation()
-    })
-    this.nameError = nameField.createDiv({ cls: 'fitkit-registry-field-error' })
-
-    const kindField = contentEl.createDiv({ cls: 'fitkit-registry-field' })
-    kindField.createEl('label', { text: 'Kind', cls: 'fitkit-registry-field-label' })
-    this.kindSelect = kindField.createEl('select', { cls: 'fitkit-registry-select' })
-    for (const type of EXERCISE_TYPES) {
-      this.kindSelect.createEl('option', {
-        value: type,
-        text: EXERCISE_TYPE_LABELS[type],
-      })
-    }
-    this.kindSelect.value = this.exerciseType
-    this.kindSelect.addEventListener('change', () => {
-      this.exerciseType = parseExerciseType(this.kindSelect.value) ?? this.exerciseType
-      this.refreshUnitVisibility()
-    })
-
-    this.unitField = contentEl.createDiv({ cls: 'fitkit-registry-field' })
-    this.unitField.createEl('label', { text: 'Unit', cls: 'fitkit-registry-field-label' })
-    this.unitSelect = this.unitField.createEl('select', { cls: 'fitkit-registry-select' })
-    for (const unit of WEIGHT_UNITS) {
-      this.unitSelect.createEl('option', { value: unit, text: unit })
-    }
-    this.unitSelect.value = this.weightUnit
-    this.unitWarning = this.unitField.createDiv({ cls: 'fitkit-registry-field-warning' })
-    this.unitSelect.addEventListener('change', () => {
-      this.weightUnit = this.unitSelect.value === 'lbs' ? 'lbs' : 'kg'
-      this.unitTouched = true
-      this.refreshUnitWarning()
-    })
-    this.refreshUnitVisibility()
-    this.refreshUnitWarning()
-
-    const aliasField = contentEl.createDiv({ cls: 'fitkit-registry-field' })
-    aliasField.createEl('label', {
-      text: 'Aliases (one per line)',
-      cls: 'fitkit-registry-field-label',
-    })
-    this.aliasesTextarea = aliasField.createEl('textarea', { cls: 'fitkit-registry-textarea' })
-    this.aliasesTextarea.value = this.aliasesText
-    this.aliasesTextarea.rows = 5
-    this.aliasesTextarea.addEventListener('input', () => {
-      this.aliasesText = this.aliasesTextarea.value
-      this.refreshValidation()
-    })
-    this.aliasError = aliasField.createDiv({ cls: 'fitkit-registry-field-error' })
-
-    const actions = contentEl.createDiv({ cls: 'fitkit-import-actions' })
-    const cancel = actions.createEl('button', { cls: 'fitkit-btn', text: 'Cancel' })
-    cancel.addEventListener('click', () => this.close())
-    this.saveButton = actions.createEl('button', {
-      cls: 'fitkit-btn fitkit-btn-primary',
-      text: 'Save',
-    })
-    this.saveButton.addEventListener('click', () => void this.handleSave())
-
-    this.nameInput.focus()
     this.refreshValidation()
   }
 
   onClose(): void {
-    this.contentEl.empty()
+    render(null, this.contentEl)
   }
+
+  private draw(): void {
+    const messages = (field: ValidationError['field']): string =>
+      this.errors
+        .filter((error) => error.field === field)
+        .map((error) => error.message)
+        .join(' ')
+    render(
+      <RegistryEntryForm
+        name={this.name}
+        exerciseType={this.exerciseType}
+        weightUnit={this.weightUnit}
+        aliasesText={this.aliasesText}
+        nameError={messages('name')}
+        aliasError={messages('alias')}
+        unitHidden={kindOfType(this.exerciseType) === 'duration'}
+        unitWarning={this.unitWarning()}
+        saveDisabled={this.errors.length > 0}
+        onName={this.setName}
+        onKind={this.setKind}
+        onUnit={this.setUnit}
+        onAliases={this.setAliases}
+        onCancel={this.cancel}
+        onSave={this.save}
+      />,
+      this.contentEl,
+    )
+  }
+
+  private setName = (value: string): void => {
+    this.name = value
+    this.refreshValidation()
+  }
+
+  private setKind = (value: string): void => {
+    this.exerciseType = parseExerciseType(value) ?? this.exerciseType
+    this.draw()
+  }
+
+  private setUnit = (value: string): void => {
+    this.weightUnit = value === 'lbs' ? 'lbs' : 'kg'
+    this.unitTouched = true
+    this.draw()
+  }
+
+  private setAliases = (value: string): void => {
+    this.aliasesText = value
+    this.refreshValidation()
+  }
+
+  private cancel = (): void => this.close()
+
+  private save = (): void => void this.handleSave()
 
   private buildDraft(): RegistryEntryDraft {
     return sanitizeEntryDraft({
@@ -189,43 +164,25 @@ export class ExerciseRegistryEntryModal extends Modal {
     return this.mode.kind === 'edit' ? this.mode.original.name : undefined
   }
 
-  private refreshUnitVisibility(): void {
-    this.unitField.hidden = kindOfType(this.exerciseType) === 'duration'
-  }
-
   /**
    * Weights and next-time steps are already written into workout notes as bare
    * numbers, so switching unit reinterprets rather than converts them.
    */
-  private refreshUnitWarning(): void {
+  private unitWarning(): string {
     const changed =
       this.mode.kind === 'edit' &&
       this.weightUnit !== (this.mode.original.unit ?? DEFAULT_WEIGHT_UNIT)
-    this.unitWarning.setText(
-      changed
-        ? 'Weights and next-time steps already recorded stay as written. Update them yourself if they need converting.'
-        : '',
-    )
+    return changed
+      ? 'Weights and next-time steps already recorded stay as written. Update them yourself if they need converting.'
+      : ''
   }
 
   private refreshValidation(): void {
     const draft = this.buildDraft()
-    const errors = validateEntryDraft(this.currentRegistry(), draft, {
+    this.errors = validateEntryDraft(this.currentRegistry(), draft, {
       excludeOriginalName: this.excludeOriginalName(),
     })
-    this.renderErrors(errors)
-    this.saveButton.disabled = errors.length > 0
-  }
-
-  private renderErrors(errors: ValidationError[]): void {
-    const nameMessages = errors
-      .filter((error) => error.field === 'name')
-      .map((error) => error.message)
-    const aliasMessages = errors
-      .filter((error) => error.field === 'alias')
-      .map((error) => error.message)
-    this.nameError.setText(nameMessages.join(' '))
-    this.aliasError.setText(aliasMessages.join(' '))
+    this.draw()
   }
 
   private async handleSave(): Promise<void> {
@@ -249,8 +206,8 @@ export class ExerciseRegistryEntryModal extends Modal {
       excludeOriginalName: freshOriginal?.name ?? this.excludeOriginalName(),
     })
     if (errors.length > 0) {
-      this.renderErrors(errors)
-      this.saveButton.disabled = true
+      this.errors = errors
+      this.draw()
       return
     }
 
