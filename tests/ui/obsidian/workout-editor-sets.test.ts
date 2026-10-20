@@ -15,6 +15,8 @@ import {
   chooseMenuItem,
   deleteRow,
   firstRow,
+  modalTitles,
+  pressKey,
   headLabels,
   noteBody,
   openedModal,
@@ -328,12 +330,10 @@ describe('WorkoutEditorView duration rows', () => {
 
     const actions = [...(card(view).querySelector('.fitkit-row-actions')?.children ?? [])]
 
-    expect(actions.map((action) => action.textContent)).toEqual([
-      'Add set',
-      'Repeat',
-      'Start timer',
-    ])
-    expect(actions[2]?.getAttribute('data-icon')).toBe('play')
+    expect(
+      actions.map((action) => action.getAttribute('aria-label') ?? action.textContent),
+    ).toEqual(['Add set', 'Repeat', 'Start timer'])
+    expect(actions[2]?.querySelector('[data-icon]')?.getAttribute('data-icon')).toBe('play')
   })
 
   it('shows the duration set number as a figure rather than an editable field', async () => {
@@ -678,4 +678,75 @@ describe('WorkoutEditorView set row lifetime', () => {
       }
     },
   )
+})
+
+describe('WorkoutEditorView row inputs', () => {
+  const BIKE = (fields: string): string[] =>
+    exercise('Bike', [`[set:: 1] [duration:: 30] ${fields}`])
+
+  it('saves the rest typed into a duration row', async () => {
+    const { view, contents } = await openEditor({ body: BIKE('[rest:: 90]') })
+
+    typeInto(cellInput(firstRow(view), 'Rest') as HTMLInputElement, '2m')
+
+    await savedBody(contents, BIKE('[rest:: 120]'))
+  })
+
+  it.each([
+    { typed: 'soon', shown: '1m30s' },
+    { typed: '120', shown: '2m' },
+  ])(
+    'flags rest text "$typed" only while it is not a duration, and shows "$shown" on blur',
+    async ({ typed, shown }) => {
+      const { view } = await openEditor({ body: BIKE('[rest:: 90]') })
+      const input = cellInput(firstRow(view), 'Rest') as HTMLInputElement
+
+      typeInto(input, typed)
+      const invalid = input.getAttribute('aria-invalid')
+      blur(input)
+
+      expect([invalid, input.hasAttribute('aria-invalid'), input.value]).toEqual([
+        typed === 'soon' ? 'true' : null,
+        false,
+        shown,
+      ])
+    },
+  )
+
+  it.each([
+    { kind: 'watts', label: 'Watts' },
+    { kind: 'load', label: 'Load' },
+    { kind: 'level', label: 'Level' },
+  ])('saves the $kind typed into a duration row', async ({ kind, label }) => {
+    const { view, contents } = await openEditor({ body: BIKE(`[${kind}:: 5]`) })
+
+    typeInto(cellInput(firstRow(view), label) as HTMLInputElement, '7.5')
+
+    await savedBody(contents, BIKE(`[${kind}:: 7.5]`))
+  })
+
+  it('saves the load typed into a bodyweight row', async () => {
+    const pushUp = (load: string): string[] =>
+      exercise('Push-up', [`[set:: 1] [level:: 1] [reps:: 10] [load:: ${load}]`])
+    const { view, contents } = await openEditor({ body: pushUp('5') })
+
+    typeInto(cellInput(firstRow(view), 'Load') as HTMLInputElement, '7.5')
+
+    await savedBody(contents, pushUp('7.5'))
+  })
+
+  it('draws a set note as a line that opens the note editor by click or Enter', async () => {
+    const { view } = await openEditor({
+      body: exercise('Squat', ['[set:: 1] [weight:: 80] [reps:: 5] [notes:: Felt heavy]']),
+    })
+    const line = firstRow(view).querySelector<HTMLElement>('.fitkit-note-line')
+
+    line?.click()
+    const afterClick = modalTitles()
+    if (line) pressKey(line, 'Enter')
+
+    expect(line?.textContent).toBe('Felt heavy')
+    expect(afterClick).toEqual(['Note for set 1'])
+    expect(modalTitles()).toEqual(['Note for set 1', 'Note for set 1'])
+  })
 })

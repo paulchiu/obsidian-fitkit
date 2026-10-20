@@ -153,8 +153,8 @@ exports[`WorkoutEditorView structure > draws a duration card 1`] = `
         "Add set"
       button.fitkit-btn
         "Repeat"
-      button.fitkit-btn.fitkit-timer-button[aria-label=Start timer][data-icon=play]
-        "Start timer""
+      button.fitkit-btn.fitkit-timer-button[aria-label=Start timer]
+        span[data-icon=play]"
 `;
 
 exports[`WorkoutEditorView structure > draws a strength card 1`] = `

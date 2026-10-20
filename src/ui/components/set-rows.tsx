@@ -1,4 +1,4 @@
-import { render, type ComponentChildren, type JSX, type TargetedEvent } from 'preact'
+import type { ComponentChildren, JSX, TargetedEvent } from 'preact'
 
 import {
   formatBodyweightLevelLabel,
@@ -22,9 +22,10 @@ import {
 } from '../model/set-rows'
 import { useDomEffect } from './dom-effect'
 import { HostContext, useIcon, type Host } from './host'
+import { mountTree } from './screen-parts'
 
-/** What every row shares: its name for labels, its note, and the dialogs the view opens for it. */
-export interface RowChrome {
+/** A row's name for labels, its note, and the dialogs the view opens for it. */
+export interface RowControls {
   /** Names the row in labels, such as `set 2`. */
   label: string
   note: string | undefined
@@ -33,27 +34,27 @@ export interface RowChrome {
   openMenu: (trigger: HTMLElement) => void
 }
 
+/** Applies a typed value to a row; the view owns every model write and redraws nothing. */
+export type RowEdit<T> = (row: T, patch: Partial<T>) => void
+
 export interface StrengthRowsProps {
   sets: readonly EditableStrengthSet[]
   /** Whether the set's weight came from the plan and has not been typed over. */
   isSeeded: (set: EditableStrengthSet) => boolean
-  chrome: (index: number) => RowChrome
-  /** The model changed; nothing is redrawn. */
-  onEdit: () => void
-  /** The weight was typed over. */
-  onWeightEdit: (set: EditableStrengthSet) => void
+  controls: (set: EditableStrengthSet, index: number) => RowControls
+  onEdit: RowEdit<EditableStrengthSet>
 }
 
 export interface BodyweightRowsProps {
   sets: readonly EditableBodyweightSet[]
   levels: BodyweightLadder | undefined
   showLoad: boolean
-  chrome: (index: number) => RowChrome
-  onEdit: () => void
-  setLevel: (index: number, level: number) => void
-  /** Opens the level menu for the row at `index` under `trigger`. */
-  openLevelMenu: (index: number, trigger: HTMLElement) => void
-  /** Shortens `label` when `full` overflows its slot. */
+  controls: (set: EditableBodyweightSet, index: number) => RowControls
+  onEdit: RowEdit<EditableBodyweightSet>
+  setLevel: (set: EditableBodyweightSet, level: number) => void
+  /** Opens the set's level menu under `trigger`. */
+  openLevelMenu: (set: EditableBodyweightSet, trigger: HTMLElement) => void
+  /** Shortens `label` when `full` overflows its slot, and unshortens it when it fits. */
   fitLabel: (label: HTMLElement, full: HTMLElement) => void
 }
 
@@ -62,8 +63,8 @@ export interface DurationRowsProps {
   exerciseIndex: number
   columns: IntervalColumns
   markCaughtUp: boolean
-  chrome: (index: number) => RowChrome
-  onEdit: () => void
+  controls: (entry: EditableDurationEntry, index: number) => RowControls
+  onEdit: RowEdit<EditableDurationEntry>
 }
 
 export type SetBarEnd =
@@ -78,45 +79,43 @@ export interface SetBarProps {
   end?: SetBarEnd
 }
 
-/** Draws a strength card's rows into `parent`; the returned function takes them down. */
+/** Draws a strength card's rows into `parent`, in place if they are already there. */
 export function renderStrengthRows(
   parent: HTMLElement,
   props: StrengthRowsProps,
   host: Host,
 ): () => void {
-  return mount(parent, host, <StrengthRows {...props} />)
+  return mountTree(parent, withHost(host, <StrengthRows {...props} />))
 }
 
-/** Draws a bodyweight card's rows into `parent`; the returned function takes them down. */
+/** Draws a bodyweight card's rows into `parent`, in place if they are already there. */
 export function renderBodyweightRows(
   parent: HTMLElement,
   props: BodyweightRowsProps,
   host: Host,
 ): () => void {
-  return mount(parent, host, <BodyweightRows {...props} />)
+  return mountTree(parent, withHost(host, <BodyweightRows {...props} />))
 }
 
-/** Draws a duration card's rows into `parent`; the returned function takes them down. */
+/** Draws a duration card's rows into `parent`, in place if they are already there. */
 export function renderDurationRows(
   parent: HTMLElement,
   props: DurationRowsProps,
   host: Host,
 ): () => void {
-  return mount(parent, host, <DurationRows {...props} />)
+  return mountTree(parent, withHost(host, <DurationRows {...props} />))
 }
 
-/** Draws the Add set and Repeat bar into `parent`; the returned function takes it down. */
+/** Draws the Add set and Repeat bar into `parent`. */
 export function renderSetBar(parent: HTMLElement, props: SetBarProps, host: Host): () => void {
-  return mount(parent, host, <SetBar {...props} />)
+  return mountTree(parent, withHost(host, <SetBar {...props} />))
 }
 
-function mount(parent: HTMLElement, host: Host, tree: JSX.Element): () => void {
-  render(<HostContext.Provider value={host}>{tree}</HostContext.Provider>, parent)
-  return () => render(null, parent)
-}
+const withHost = (host: Host, tree: JSX.Element): JSX.Element => (
+  <HostContext.Provider value={host}>{tree}</HostContext.Provider>
+)
 
-function StrengthRows(props: StrengthRowsProps): JSX.Element {
-  const { sets } = props
+function StrengthRows({ sets, isSeeded, controls, onEdit }: StrengthRowsProps): JSX.Element {
   return (
     <>
       {sets.map((set, i) => (
@@ -125,10 +124,9 @@ function StrengthRows(props: StrengthRowsProps): JSX.Element {
           set={set}
           index={i}
           live={i === sets.length - 1}
-          seeded={props.isSeeded(set)}
-          chrome={props.chrome(i)}
-          onEdit={props.onEdit}
-          onWeightEdit={props.onWeightEdit}
+          seeded={isSeeded(set)}
+          controls={controls(set, i)}
+          onEdit={onEdit}
         />
       ))}
     </>
@@ -140,21 +138,19 @@ function StrengthRow({
   index,
   live,
   seeded,
-  chrome,
+  controls,
   onEdit,
-  onWeightEdit,
 }: {
   set: EditableStrengthSet
   index: number
   /** The logging loop only touches the bottom row; the ones above it are session history. */
   live: boolean
   seeded: boolean
-  chrome: RowChrome
-  onEdit: () => void
-  onWeightEdit: (set: EditableStrengthSet) => void
+  controls: RowControls
+  onEdit: RowEdit<EditableStrengthSet>
 }): JSX.Element {
   return (
-    <Row cls={live ? 'fitkit-row fitkit-row--live' : 'fitkit-row'} chrome={chrome}>
+    <Row cls={live ? 'fitkit-row fitkit-row--live' : 'fitkit-row'} controls={controls}>
       <div class="fitkit-set-row">
         <Cell label="Set" cls="fitkit-set-figure">
           {String(set.set ?? index + 1)}
@@ -168,12 +164,7 @@ function StrengthRow({
             numeric
             step="0.1"
             inputmode="decimal"
-            onInput={(input) => {
-              onWeightEdit(set)
-              input.classList.remove('fitkit-input--unconfirmed')
-              set.weight = parseNumberInput(input.value)
-              onEdit()
-            }}
+            onInput={(input) => onEdit(set, { weight: parseNumberInput(input.value) })}
           />
         </Cell>
         <Cell label="Reps">
@@ -183,10 +174,7 @@ function StrengthRow({
             label="Reps"
             numeric
             inputmode="numeric"
-            onInput={(input) => {
-              set.reps = parseNumberInput(input.value)
-              onEdit()
-            }}
+            onInput={(input) => onEdit(set, { reps: parseNumberInput(input.value) })}
           />
         </Cell>
       </div>
@@ -204,10 +192,10 @@ function BodyweightRows(props: BodyweightRowsProps): JSX.Element {
           index={i}
           levels={props.levels}
           showLoad={props.showLoad}
-          chrome={props.chrome(i)}
+          controls={props.controls(set, i)}
           onEdit={props.onEdit}
-          setLevel={(level) => props.setLevel(i, level)}
-          openLevelMenu={(trigger) => props.openLevelMenu(i, trigger)}
+          setLevel={(level) => props.setLevel(set, level)}
+          openLevelMenu={(trigger) => props.openLevelMenu(set, trigger)}
           fitLabel={props.fitLabel}
         />
       ))}
@@ -220,7 +208,7 @@ function BodyweightRow({
   index,
   levels,
   showLoad,
-  chrome,
+  controls,
   onEdit,
   setLevel,
   openLevelMenu,
@@ -230,14 +218,14 @@ function BodyweightRow({
   index: number
   levels: BodyweightLadder | undefined
   showLoad: boolean
-  chrome: RowChrome
-  onEdit: () => void
+  controls: RowControls
+  onEdit: RowEdit<EditableBodyweightSet>
   setLevel: (level: number) => void
   openLevelMenu: (trigger: HTMLElement) => void
   fitLabel: (label: HTMLElement, full: HTMLElement) => void
 }): JSX.Element {
   return (
-    <Row cls="fitkit-row" chrome={chrome}>
+    <Row cls="fitkit-row" controls={controls}>
       <div class={showLoad ? 'fitkit-bodyweight-row has-load' : 'fitkit-bodyweight-row'}>
         <Cell label="Set" cls="fitkit-set-figure">
           {String(set.set ?? index + 1)}
@@ -259,10 +247,7 @@ function BodyweightRow({
             label="Reps"
             numeric
             inputmode="numeric"
-            onInput={(input) => {
-              set.reps = parseNumberInput(input.value)
-              onEdit()
-            }}
+            onInput={(input) => onEdit(set, { reps: parseNumberInput(input.value) })}
           />
         </Cell>
         {showLoad && (
@@ -275,10 +260,7 @@ function BodyweightRow({
                 numeric
                 step="0.1"
                 inputmode="decimal"
-                onInput={(input) => {
-                  set.load = parseNumberInput(input.value)
-                  onEdit()
-                }}
+                onInput={(input) => onEdit(set, { load: parseNumberInput(input.value) })}
               />
             )}
           </Cell>
@@ -308,14 +290,16 @@ function LevelStepper({
   const minus = useIcon<HTMLButtonElement>('minus')
   const plus = useIcon<HTMLButtonElement>('plus')
   const chevron = useIcon<HTMLSpanElement>('chevron-down')
+  /** The label's classes are set here, not drawn, so the fit's `is-label-short` survives a render. */
   const label = useDomEffect<HTMLButtonElement>(
     (el) => {
+      el.classList.add('fitkit-bodyweight-level-label')
       const full = el.querySelector<HTMLElement>('.fitkit-bodyweight-level-full')
       if (full) {
         fitLabel(el, full)
       }
     },
-    [level, name],
+    [name],
   )
   return (
     <div class="fitkit-bodyweight-stepper">
@@ -334,7 +318,6 @@ function LevelStepper({
       <button
         ref={label}
         type="button"
-        class="fitkit-bodyweight-level-label"
         aria-haspopup="menu"
         aria-label={`Level for set ${position}: ${name}`}
         onClick={(evt) => openMenu(evt.currentTarget)}
@@ -370,7 +353,7 @@ function DurationRows(props: DurationRowsProps): JSX.Element {
           exerciseIndex={props.exerciseIndex}
           columns={props.columns}
           marked={props.markCaughtUp && isCaughtUp(entry)}
-          chrome={props.chrome(i)}
+          controls={props.controls(entry, i)}
           onEdit={props.onEdit}
         />
       ))}
@@ -384,7 +367,7 @@ function DurationRow({
   exerciseIndex,
   columns,
   marked,
-  chrome,
+  controls,
   onEdit,
 }: {
   entry: EditableDurationEntry
@@ -393,14 +376,14 @@ function DurationRow({
   columns: IntervalColumns
   /** A caught-up rep in a card that explains the asterisk, so its note shows there instead. */
   marked: boolean
-  chrome: RowChrome
-  onEdit: () => void
+  controls: RowControls
+  onEdit: RowEdit<EditableDurationEntry>
 }): JSX.Element {
   const intensity = columns.intensity
   return (
     <Row
       cls="fitkit-row"
-      chrome={chrome}
+      controls={controls}
       hideNoteLine={marked}
       timerRow={`${exerciseIndex}:${index}`}
     >
@@ -414,7 +397,13 @@ function DurationRow({
           )}
         </Cell>
         <Cell label="Duration">
-          <DurationField entry={entry} onEdit={onEdit} />
+          <DurationField
+            entry={entry}
+            field="durationSeconds"
+            label="Duration"
+            onEdit={onEdit}
+            normalise
+          />
         </Cell>
         {intensity && (
           <Cell label={INTENSITY_LABELS[intensity]}>
@@ -426,15 +415,16 @@ function DurationRow({
               step="0.1"
               inputmode="decimal"
               onInput={(input) => {
-                entry[intensity] = parseNumberInput(input.value)
-                onEdit()
+                const patch: EditableDurationEntry = {}
+                patch[intensity] = parseNumberInput(input.value)
+                onEdit(entry, patch)
               }}
             />
           </Cell>
         )}
         {columns.rest && (
           <Cell label="Rest">
-            <RestField entry={entry} onEdit={onEdit} />
+            <DurationField entry={entry} field="restSeconds" label="Rest" onEdit={onEdit} />
           </Cell>
         )}
       </div>
@@ -442,77 +432,49 @@ function DurationRow({
   )
 }
 
-/** Normalises its text on blur and flags text that is not a duration. */
+/**
+ * A duration typed as text. Text that is not a duration is flagged and left unsaved; blur
+ * shows the stored value again, in its typed form when `normalise` is set and the text parses.
+ */
 function DurationField({
   entry,
+  field,
+  label,
   onEdit,
+  normalise = false,
 }: {
   entry: EditableDurationEntry
-  onEdit: () => void
+  field: 'durationSeconds' | 'restSeconds'
+  label: string
+  onEdit: RowEdit<EditableDurationEntry>
+  normalise?: boolean
 }): JSX.Element {
   return (
     <Field
       model={entry}
-      text={formatDurationInput(entry.durationSeconds)}
-      label="Duration"
+      text={formatDurationInput(entry[field])}
+      label={label}
       cls="fitkit-input fitkit-duration-input"
-      inputmode="text"
+      inputmode={normalise ? 'text' : undefined}
       placeholder={ZERO_DURATION_DISPLAY}
-      defaultFocus
+      defaultFocus={normalise}
       onInput={(input) => {
         const parsed = parseDurationInput(input.value)
         flagInvalid(input, parsed === null)
         if (parsed !== null) {
-          entry.durationSeconds = parsed.seconds
-          onEdit()
+          onEdit(entry, { [field]: parsed.seconds })
         }
       }}
       onBlur={(input) => {
-        const parsed = parseDurationInput(input.value)
+        const parsed = normalise ? parseDurationInput(input.value) : null
         flagInvalid(input, false)
-        if (parsed === null) {
-          input.value = formatDurationInput(entry.durationSeconds)
-          return
-        }
-        entry.durationSeconds = parsed.seconds
-        input.value = parsed.display
-      }}
-    />
-  )
-}
-
-function RestField({
-  entry,
-  onEdit,
-}: {
-  entry: EditableDurationEntry
-  onEdit: () => void
-}): JSX.Element {
-  return (
-    <Field
-      model={entry}
-      text={formatDurationInput(entry.restSeconds)}
-      label="Rest"
-      cls="fitkit-input fitkit-duration-input"
-      placeholder={ZERO_DURATION_DISPLAY}
-      onInput={(input) => {
-        const parsed = parseDurationInput(input.value)
-        flagInvalid(input, parsed === null)
-        if (parsed !== null) {
-          entry.restSeconds = parsed.seconds
-          onEdit()
-        }
-      }}
-      onBlur={(input) => {
-        flagInvalid(input, false)
-        input.value = formatDurationInput(entry.restSeconds)
+        input.value = parsed ? parsed.display : formatDurationInput(entry[field])
       }}
     />
   )
 }
 
 function SetBar({ repeatDisabled, onAdd, onRepeat, end }: SetBarProps): JSX.Element {
-  const play = useIcon<HTMLButtonElement>('play')
   return (
     <>
       <button class="fitkit-btn" onClick={onAdd}>
@@ -521,7 +483,7 @@ function SetBar({ repeatDisabled, onAdd, onRepeat, end }: SetBarProps): JSX.Elem
       <button class="fitkit-btn" disabled={repeatDisabled} onClick={onRepeat}>
         Repeat
       </button>
-      {end === undefined ? null : end.kind === 'run' ? (
+      {end?.kind === 'run' && (
         <button
           class="fitkit-btn fitkit-btn-primary fitkit-run-button"
           aria-label="Start interval plan"
@@ -530,37 +492,39 @@ function SetBar({ repeatDisabled, onAdd, onRepeat, end }: SetBarProps): JSX.Elem
         >
           {end.text}
         </button>
-      ) : (
-        <button
-          ref={play}
-          class="fitkit-btn fitkit-timer-button"
-          aria-label="Start timer"
-          onClick={end.onClick}
-        >
-          Start timer
-        </button>
       )}
+      {end?.kind === 'timer' && <TimerButton onClick={end.onClick} />}
     </>
+  )
+}
+
+/** Icon only, named by its label, as Obsidian's `setIcon` left it before the port. */
+function TimerButton({ onClick }: { onClick: () => void }): JSX.Element {
+  const icon = useIcon<HTMLSpanElement>('play')
+  return (
+    <button class="fitkit-btn fitkit-timer-button" aria-label="Start timer" onClick={onClick}>
+      <span ref={icon} />
+    </button>
   )
 }
 
 /** A set row: its cells, the options button beside them, and the note line under them. */
 function Row({
   cls,
-  chrome,
+  controls,
   hideNoteLine = false,
   timerRow,
   children,
 }: {
   cls: string
-  chrome: RowChrome
+  controls: RowControls
   /** The note stays editable from the menu; the row shows it some other way. */
   hideNoteLine?: boolean
   timerRow?: string
   children: ComponentChildren
 }): JSX.Element {
   const kebab = useIcon<HTMLButtonElement>('more-vertical')
-  const { note, openNote } = chrome
+  const { note, openNote } = controls
   return (
     <div class={cls} data-fitkit-timer-row={timerRow}>
       <div class="fitkit-row-body">
@@ -569,10 +533,10 @@ function Row({
           ref={kebab}
           type="button"
           class="fitkit-btn fitkit-btn-muted fitkit-row-kebab"
-          aria-label={`Options for ${chrome.label}`}
+          aria-label={`Options for ${controls.label}`}
           onClick={(evt) => {
             evt.stopPropagation()
-            chrome.openMenu(evt.currentTarget)
+            controls.openMenu(evt.currentTarget)
           }}
         />
       </div>

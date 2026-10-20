@@ -105,7 +105,7 @@ import {
   renderDurationRows,
   renderSetBar,
   renderStrengthRows,
-  type RowChrome,
+  type RowControls,
   type SetBarProps,
 } from '../components/set-rows'
 import { renderRestTimer, renderSetTimer } from '../components/timer-screen'
@@ -406,12 +406,7 @@ export class WorkoutEditorView extends FileView {
     }
   }
 
-  /**
-   * Refit every rung label after a resize. Labels fit themselves on first
-   * render; only a width change afterwards can overflow a new one. Each
-   * label unshortens before measuring, so the measure always reads live
-   * widths and every tick converges instead of oscillating.
-   */
+  /** Refit every rung label after a resize; labels fit themselves when drawn. */
   private refreshLevelLabels(): void {
     for (const label of this.contentEl.querySelectorAll('.fitkit-bodyweight-level-label')) {
       if (!label.instanceOf(HTMLElement)) {
@@ -421,7 +416,6 @@ export class WorkoutEditorView extends FileView {
       if (!full?.instanceOf(HTMLElement)) {
         continue
       }
-      label.removeClass('is-label-short')
       this.fitLevelLabel(label, full)
     }
   }
@@ -736,44 +730,27 @@ export class WorkoutEditorView extends FileView {
     header.createSpan({ cls: 'fitkit-set-label', text: 'Weight' })
     header.createSpan({ cls: 'fitkit-set-label', text: 'Reps' })
 
-    this.renderSetRows(wrap, ex, (rows) =>
-      renderStrengthRows(
-        rows,
-        {
-          sets: ex.strengthSets,
-          isSeeded: (set) => this.seededWeights.has(set),
-          chrome: (i) => {
-            const set = ex.strengthSets[i]
-            return this.rowChrome({
-              label: `set ${i + 1}`,
-              currentNote: set?.note,
-              onDelete: () => {
-                ex.strengthSets.splice(i, 1)
-                this.markDirty()
-                this.render()
-              },
-              onNoteSave: (next) => {
-                if (set) {
-                  set.note = next
-                }
-                this.markDirty()
-                this.render()
-              },
-              onRenumber: () => {
-                ex.strengthSets.forEach((row, index) => {
-                  row.set = index + 1
-                })
-                this.markDirty()
-                this.render()
-              },
-            })
+    this.renderSetRows(wrap, ex, (rows) => {
+      /** Typing over a seeded weight redraws the rows in place to drop its unconfirmed mark. */
+      const draw = (): (() => void) =>
+        renderStrengthRows(
+          rows,
+          {
+            sets: ex.strengthSets,
+            isSeeded: (set) => this.seededWeights.has(set),
+            controls: (set, i) => this.rowControls(ex.strengthSets, set, i, `set ${i + 1}`),
+            onEdit: (set, patch) => {
+              const confirmed = 'weight' in patch && this.seededWeights.delete(set)
+              this.editRow(set, patch)
+              if (confirmed) {
+                draw()
+              }
+            },
           },
-          onEdit: () => this.markDirty(),
-          onWeightEdit: (set) => this.seededWeights.delete(set),
-        },
-        obsidianHost,
-      ),
-    )
+          obsidianHost,
+        )
+      return draw()
+    })
 
     this.renderSetBar(wrap, {
       repeatDisabled: ex.strengthSets.length === 0,
@@ -834,10 +811,23 @@ export class WorkoutEditorView extends FileView {
           sets: ex.bodyweightSets,
           levels,
           showLoad,
-          chrome: (i) => this.bodyweightChrome(ex, i),
-          onEdit: () => this.markDirty(),
-          setLevel: (i, level) => this.setBodyweightLevel(ex, i, level),
-          openLevelMenu: (i, trigger) => this.openLevelMenu(ex, i, levels, trigger),
+          controls: (set, i) =>
+            this.rowControls(ex.bodyweightSets, set, i, `bodyweight entry ${i + 1}`, {
+              hasLoad: set.load !== undefined,
+              onAddLoad: () => {
+                set.load = ex.bodyweightSets[i - 1]?.load ?? 0
+                this.markDirty()
+                this.render()
+              },
+              onRemoveLoad: () => {
+                set.load = undefined
+                this.markDirty()
+                this.render()
+              },
+            }),
+          onEdit: (set, patch) => this.editRow(set, patch),
+          setLevel: (set, level) => this.setBodyweightLevel(set, level),
+          openLevelMenu: (set, trigger) => this.openLevelMenu(set, levels, trigger),
           fitLabel: (label, full) => this.fitLevelLabel(label, full),
         },
         obsidianHost,
@@ -869,58 +859,12 @@ export class WorkoutEditorView extends FileView {
     })
   }
 
-  private bodyweightChrome(ex: ExerciseCard, i: number): RowChrome {
-    const set = ex.bodyweightSets[i]
-    return this.rowChrome({
-      label: `bodyweight entry ${i + 1}`,
-      currentNote: set?.note,
-      onDelete: () => {
-        ex.bodyweightSets.splice(i, 1)
-        this.markDirty()
-        this.render()
-      },
-      onNoteSave: (next) => {
-        if (set) {
-          set.note = next
-        }
-        this.markDirty()
-        this.render()
-      },
-      onRenumber: () => {
-        ex.bodyweightSets.forEach((entry, index) => {
-          entry.set = index + 1
-        })
-        this.markDirty()
-        this.render()
-      },
-      loadMenu: {
-        hasLoad: set?.load !== undefined,
-        onAddLoad: () => {
-          const previous = ex.bodyweightSets[i - 1]
-          if (set) {
-            set.load = previous?.load ?? 0
-          }
-          this.markDirty()
-          this.render()
-        },
-        onRemoveLoad: () => {
-          if (set) {
-            set.load = undefined
-          }
-          this.markDirty()
-          this.render()
-        },
-      },
-    })
-  }
-
   private openLevelMenu(
-    ex: ExerciseCard,
-    rowIndex: number,
+    set: EditableBodyweightSet,
     levels: BodyweightLadder | undefined,
     trigger: HTMLElement,
   ): void {
-    const level = ex.bodyweightSets[rowIndex]?.level ?? 1
+    const level = set.level ?? 1
     const menu = new Menu()
     const top = Math.max(levels?.length ?? 0, level)
     for (let n = 1; n <= top; n++) {
@@ -929,39 +873,27 @@ export class WorkoutEditorView extends FileView {
         item
           .setTitle(formatBodyweightLevelLabel(levels, target))
           .setChecked(target === level)
-          .onClick(() => this.setBodyweightLevel(ex, rowIndex, target)),
+          .onClick(() => this.setBodyweightLevel(set, target)),
       )
     }
     menu.showAtPosition(menuAnchorForTrigger(trigger.getBoundingClientRect()))
   }
 
-  private setBodyweightLevel(ex: ExerciseCard, rowIndex: number, level: number): void {
-    const set = ex.bodyweightSets[rowIndex]
-    if (!set) {
-      return
-    }
+  private setBodyweightLevel(set: EditableBodyweightSet, level: number): void {
     set.level = level
     this.markDirty()
     this.render()
   }
 
   /**
-   * Shorten a rung name that overflows its own text slot. A shortened label
-   * hides its measured span, so fitting one directly keeps it short; resize
-   * refits unshorten first so the measure below always reads live widths.
+   * Shortens a rung name that overflows its own text slot. It unshortens first, since a
+   * shortened label hides the span it measures, so every refit reads live widths and converges.
    */
-  private fitLevelLabel(
-    label: HTMLElement,
-    full: HTMLElement,
-    widths: LevelLabelWidths = measureLevelLabelWidths(full),
-  ): void {
-    if (label.hasClass('is-label-short')) {
-      return
-    }
+  private fitLevelLabel(label: HTMLElement, full: HTMLElement): void {
+    label.removeClass('is-label-short')
+    const widths = measureLevelLabelWidths(full)
     if (shouldShortenLevelLabel(widths.content, widths.available)) {
       label.addClass('is-label-short')
-    } else {
-      label.removeClass('is-label-short')
     }
   }
 
@@ -1003,8 +935,9 @@ export class WorkoutEditorView extends FileView {
           exerciseIndex,
           columns,
           markCaughtUp,
-          chrome: (i) => this.durationChrome(ex, i),
-          onEdit: () => this.markDirty(),
+          controls: (entry, i) =>
+            this.rowControls(ex.durationEntries, entry, i, `duration entry ${i + 1}`),
+          onEdit: (entry, patch) => this.editRow(entry, patch),
         },
         obsidianHost,
       ),
@@ -1018,18 +951,12 @@ export class WorkoutEditorView extends FileView {
     this.renderSetBar(wrap, {
       repeatDisabled: ex.durationEntries.length === 0,
       onAdd: () => {
-        if (this.runningSetTimer()?.card === ex) {
-          this.stopTimer({ write: true })
-        }
         ex.durationEntries.push(carriedIntervalFields(ex.durationEntries.at(-1)))
         this.expandedSetLists.add(ex)
         this.markDirty()
         this.render()
       },
       onRepeat: () => {
-        if (this.runningSetTimer()?.card === ex) {
-          this.stopTimer({ write: true })
-        }
         const last = ex.durationEntries[ex.durationEntries.length - 1]
         ex.durationEntries.push({
           set: nextSetNumber(ex.durationEntries),
@@ -1048,36 +975,6 @@ export class WorkoutEditorView extends FileView {
             onClick: () => this.startIntervalRun(ex, program),
           }
         : { kind: 'timer', onClick: () => this.openSetTimer(ex) },
-    })
-  }
-
-  private durationChrome(ex: ExerciseCard, i: number): RowChrome {
-    const entry = ex.durationEntries[i]
-    return this.rowChrome({
-      label: `duration entry ${i + 1}`,
-      currentNote: entry?.note,
-      onDelete: () => {
-        if (entry && this.runningSetTimer()?.entry === entry) {
-          this.abortTimer()
-        }
-        ex.durationEntries.splice(i, 1)
-        this.markDirty()
-        this.render()
-      },
-      onNoteSave: (next) => {
-        if (entry) {
-          entry.note = next
-        }
-        this.markDirty()
-        this.render()
-      },
-      onRenumber: () => {
-        ex.durationEntries.forEach((row, index) => {
-          row.set = index + 1
-        })
-        this.markDirty()
-        this.render()
-      },
     })
   }
 
@@ -1205,21 +1102,42 @@ export class WorkoutEditorView extends FileView {
     this.render()
   }
 
-  /** What a row's note line and options menu do, for the row component to call. */
-  private rowChrome(opts: {
-    label: string
-    currentNote: string | undefined
-    onDelete: () => void
-    onNoteSave: (next: string | undefined) => void
-    onRenumber?: () => void
-    loadMenu?: { hasLoad: boolean; onAddLoad: () => void; onRemoveLoad: () => void }
-  }): RowChrome {
-    const { loadMenu, onRenumber } = opts
+  /** Writes a typed value into a row; typing never redraws. */
+  private editRow<T extends object>(row: T, patch: Partial<T>): void {
+    Object.assign(row, patch)
+    this.markDirty()
+  }
+
+  /** What the note line and options menu of `row`, at `index` in `rows`, do when used. */
+  private rowControls<T extends { set?: number; note?: string }>(
+    rows: T[],
+    row: T,
+    index: number,
+    label: string,
+    loadMenu?: { hasLoad: boolean; onAddLoad: () => void; onRemoveLoad: () => void },
+  ): RowControls {
+    const changed = (): void => {
+      this.markDirty()
+      this.render()
+    }
+    const onRenumber = (): void => {
+      rows.forEach((entry, i) => {
+        entry.set = i + 1
+      })
+      changed()
+    }
+    const onDelete = (): void => {
+      rows.splice(index, 1)
+      changed()
+    }
     const openNote = (): void => {
       new SetNoteModal(this.app, {
-        title: `Note for ${opts.label}`,
-        initial: opts.currentNote ?? '',
-        onSave: opts.onNoteSave,
+        title: `Note for ${label}`,
+        initial: row.note ?? '',
+        onSave: (next) => {
+          row.note = next
+          changed()
+        },
       }).open()
     }
     const openMenu = (trigger: HTMLElement): void => {
@@ -1236,21 +1154,19 @@ export class WorkoutEditorView extends FileView {
           )
         }
       }
-      if (onRenumber) {
-        menu.addItem((item) =>
-          item.setTitle('Renumber sets').setIcon('list-ordered').onClick(onRenumber),
-        )
-      }
+      menu.addItem((item) =>
+        item.setTitle('Renumber sets').setIcon('list-ordered').onClick(onRenumber),
+      )
       menu.addItem((item) =>
         item
           .setTitle('Delete row')
           .setIcon('trash-2')
           .setWarning(true)
-          .onClick(() => void this.confirmAndDeleteRow(opts.label, opts.onDelete)),
+          .onClick(() => void this.confirmAndDeleteRow(label, onDelete)),
       )
       menu.showAtPosition(menuAnchorForTrigger(trigger.getBoundingClientRect()))
     }
-    return { label: opts.label, note: opts.currentNote, openNote, openMenu }
+    return { label, note: row.note, openNote, openMenu }
   }
 
   private async confirmAndDeleteRow(label: string, onDelete: () => void): Promise<void> {

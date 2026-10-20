@@ -194,7 +194,10 @@ export function createObsidianMock(): Record<string, unknown> {
     SuggestModal,
     TFile,
     normalizePath: (path: string) => path.replace(/\/+/g, '/'),
-    /** Marks where an icon lands, so structure snapshots pin it. */
-    setIcon: (el: HTMLElement, name: string) => el.setAttribute('data-icon', name),
+    /** Marks where an icon lands, so structure snapshots pin it, and clears the element as Obsidian does. */
+    setIcon: (el: HTMLElement, name: string) => {
+      el.replaceChildren()
+      el.setAttribute('data-icon', name)
+    },
   }
 }
