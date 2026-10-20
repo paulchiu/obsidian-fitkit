@@ -33,6 +33,7 @@
     "@vitest/coverage-v8": "^5.0.5",
     "dejavu-fonts-ttf": "^2.37.3",
     "esbuild": "^0.28.2",
+    "eslint": "^10.13.0",
     "eslint-plugin-obsidianmd": "^0.4.2",
     "globals": "^17.13.0",
     "jiti": "^2.7.0",
@@ -47,6 +48,12 @@
   },
   "overrides": {
     "@emnapi/core": "1.11.3",
-    "@emnapi/runtime": "1.11.3"
+    "@emnapi/runtime": "1.11.3",
+    "eslint": "$eslint",
+    "moment": "2.31.0"
+  },
+  "allowScripts": {
+    "esbuild": true,
+    "fsevents": false
   }
 }
