@@ -192,6 +192,7 @@ exports[`interval plan modal > structure > draws the reason in place of the prev
               button.fitkit-plan-options[aria-label=Step options][type=button]
           button.fitkit-plan-add-foot[aria-label=Add to repeat][type=button]
     button.fitkit-plan-add-bar[aria-label=Add to plan][type=button]
+      span.fitkit-plan-add-icon
       span
         "Add"
   textarea.fitkit-input.fitkit-plan-text[aria-label=Plan][autocapitalize=off][hidden=][rows=3][spellcheck=false]
@@ -297,6 +298,7 @@ exports[`interval plan modal > structure > draws the step editor with a repeat t
               button.fitkit-plan-options[aria-label=Step options][type=button]
           button.fitkit-plan-add-foot[aria-label=Add to repeat][type=button]
     button.fitkit-plan-add-bar[aria-label=Add to plan][type=button]
+      span.fitkit-plan-add-icon
       span
         "Add"
   textarea.fitkit-input.fitkit-plan-text[aria-label=Plan][autocapitalize=off][hidden=][rows=3][spellcheck=false]
@@ -411,6 +413,7 @@ exports[`interval plan modal > structure > draws the step editor with presets, a
               button.fitkit-plan-options[aria-label=Rest options][type=button]
           button.fitkit-plan-add-foot[aria-label=Add to repeat][type=button]
     button.fitkit-plan-add-bar[aria-label=Add to plan][type=button]
+      span.fitkit-plan-add-icon
       span
         "Add"
   textarea.fitkit-input.fitkit-plan-text[aria-label=Plan][autocapitalize=off][hidden=][rows=3][spellcheck=false]

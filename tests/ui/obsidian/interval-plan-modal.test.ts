@@ -6,6 +6,7 @@ import {
   harnessDocument,
   harnessWindow,
 } from '../../harness/obsidian-dom'
+import { watchUnmounts } from '../../harness/unmount'
 import { outline } from '../../harness/outline'
 import { findUnstyledClasses } from '../../harness/stylesheet'
 
@@ -610,6 +611,130 @@ describe('interval plan modal', () => {
       ]).toEqual([true, true])
       modal.close()
       expect(modal.modalEl.classList.contains('fitkit-set-note-modal-shell')).toBe(false)
+      expect(modal.contentEl.children).toHaveLength(0)
+    })
+  })
+
+  describe('redrawing', () => {
+    afterEach(() => {
+      harnessDocument.body.replaceChildren()
+    })
+
+    /** Focus only lands on a connected element, so the modal renders attached. */
+    const openAttached = (initial: string): IntervalPlanModal => {
+      const modal = new IntervalPlanModal({} as never, {
+        exerciseName: 'Exercise Bike',
+        initial,
+        presets: [],
+        onSave: vi.fn(),
+      })
+      harnessDocument.body.appendChild(modal.contentEl)
+      modal.onOpen()
+      return modal
+    }
+
+    /** `toEqual` compares DOM nodes by content, so identity is checked one by one. */
+    const sameNodes = (actual: unknown[], expected: unknown[]): boolean =>
+      actual.length === expected.length && actual.every((node, at) => node === expected[at])
+
+    const stepInputs = (modal: IntervalPlanModal): HTMLInputElement[] => [
+      ...modal.contentEl.querySelectorAll<HTMLInputElement>('input[aria-label="Step name"]'),
+    ]
+
+    const choose = (
+      modal: IntervalPlanModal,
+      options: string,
+      index: number,
+      title: string,
+    ): void => {
+      const buttons = modal.contentEl.querySelectorAll<HTMLButtonElement>(
+        `button[aria-label="${options}"]`,
+      )
+      buttons[index]?.click()
+      menus
+        .at(-1)
+        ?.find((item) => item.title === title)
+        ?.click()
+    }
+
+    const typeInStep = (input: HTMLInputElement | undefined, value: string): void => {
+      if (!input) {
+        throw new Error('Field not rendered')
+      }
+      input.focus()
+      input.value = value
+      input.dispatchEvent(new harnessWindow.Event('input', { bubbles: true }))
+    }
+
+    it('leaves a step field, its text and its focus alone while it is typed in', () => {
+      const modal = openAttached('(a 1m) (b 2m)')
+      const [first] = stepInputs(modal)
+
+      typeInStep(first, 'warm ')
+      typeInStep(first, 'warm up.')
+
+      expect(stepInputs(modal)[0]).toBe(first)
+      expect(first?.value).toBe('warm up.')
+      expect(harnessDocument.activeElement).toBe(first)
+      expect(text(modal, '.fitkit-plan-preview')).toBe('2 reps · 3m')
+    })
+
+    it('leaves the plan text and its focus alone while it is typed in', () => {
+      const modal = openAttached('(a 1m)')
+      findButtons(modal.contentEl, 'Text')[0]?.click()
+      const field = planField(modal)
+      field.focus()
+
+      type(modal, '(a 1m')
+      type(modal, '(a 1m) ')
+
+      expect(planField(modal)).toBe(field)
+      expect(field.value).toBe('(a 1m) ')
+      expect(harnessDocument.activeElement).toBe(field)
+    })
+
+    it("keeps each row's field with its row when rows are added, moved and removed", () => {
+      const modal = openAttached('(a 1m) (b 2m) (c 3m)')
+      const [a, b, c] = stepInputs(modal)
+
+      choose(modal, 'Step options', 1, 'Move up')
+      const afterMove = stepInputs(modal)
+      choose(modal, 'Step options', 2, 'Delete')
+      const afterDelete = stepInputs(modal)
+      const added = modal.contentEl.querySelector<HTMLButtonElement>(
+        'button[aria-label="Add to plan"]',
+      )
+      added?.click()
+      menus
+        .at(-1)
+        ?.find((item) => item.title === 'Step')
+        ?.click()
+
+      expect(sameNodes(afterMove, [b, a, c])).toBe(true)
+      expect(sameNodes(afterDelete, [b, a])).toBe(true)
+      expect(sameNodes(stepInputs(modal).slice(0, 2), [b, a])).toBe(true)
+      expect(stepInputs(modal)).toHaveLength(3)
+    })
+
+    it('keeps typed text in the field when a sibling row is reordered', () => {
+      const modal = openAttached('(a 1m) (b 2m)')
+      typeInStep(stepInputs(modal)[1], 'bee')
+
+      choose(modal, 'Step options', 1, 'Move up')
+
+      expect(stepInputs(modal).map((input) => input.value)).toEqual(['bee', 'a'])
+    })
+
+    it('unmounts the form and the step editor when it closes', () => {
+      const modal = openAttached('(a 1m)')
+      const unmounts = watchUnmounts()
+      try {
+        modal.close()
+      } finally {
+        unmounts.stop()
+      }
+
+      expect(unmounts.names).toEqual(expect.arrayContaining(['PlanForm', 'PlanBuilder']))
       expect(modal.contentEl.children).toHaveLength(0)
     })
   })

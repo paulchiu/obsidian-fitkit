@@ -34,3 +34,8 @@ export function DestructiveActions({
     </ActionBar>
   )
 }
+
+/** The button row of the import and registry modals. */
+export function ImportActions({ children }: { children: ComponentChildren }): JSX.Element {
+  return <div class="fitkit-import-actions">{children}</div>
+}

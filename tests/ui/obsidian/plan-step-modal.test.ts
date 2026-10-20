@@ -7,6 +7,7 @@ import {
   harnessWindow,
   modalElements,
 } from '../../harness/obsidian-dom'
+import { watchUnmounts } from '../../harness/unmount'
 import { outline } from '../../harness/outline'
 import { findUnstyledClasses } from '../../harness/stylesheet'
 
@@ -192,5 +193,17 @@ describe('plan step modal', () => {
     save?.click()
 
     expect(onSave).toHaveBeenCalledTimes(1)
+  })
+
+  it('unmounts its component when it closes', () => {
+    const modal = openAttached('strength', '3')
+    const unmounts = watchUnmounts()
+    try {
+      modal.close()
+    } finally {
+      unmounts.stop()
+    }
+
+    expect(unmounts.names).toContain('PlanStepForm')
   })
 })

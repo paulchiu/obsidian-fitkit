@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createTestRoot, findButtons, harnessWindow } from '../../harness/obsidian-dom'
+import { watchUnmounts } from '../../harness/unmount'
 import { outline } from '../../harness/outline'
 import { findUnstyledClasses } from '../../harness/stylesheet'
 
@@ -60,6 +61,7 @@ function row(overrides: Partial<ExerciseImportPlanRow>): ExerciseImportPlanRow {
   return {
     name: 'Foam roll thigh',
     type: 'duration',
+    unit: 'kg',
     status: 'known',
     registryName: 'Foam roll thigh',
     notePath: null,
@@ -118,7 +120,7 @@ async function openModalWithRows(rows: ExerciseImportPlanRow[]): Promise<{
 
 describe('ImportExercisesModal kind select', () => {
   it('lists strength, duration, interval then bodyweight with their current labels', async () => {
-    const { modal } = await openModalWithRows([row({ status: 'unknown', registryName: null })])
+    const { modal } = await openModalWithRows([row({ status: 'missing', registryName: null })])
     const select = kindSelectForModal(modal)
     const options = [...select.querySelectorAll('option')]
 
@@ -137,7 +139,7 @@ describe('ImportExercisesModal kind select', () => {
   })
 
   it('keeps the row type when the select reports an unrecognised value', async () => {
-    const target = row({ type: 'duration', status: 'unknown', registryName: null })
+    const target = row({ type: 'duration', status: 'missing', registryName: null })
     const { modal } = await openModalWithRows([target])
     const select = kindSelectForModal(modal)
 
@@ -230,7 +232,7 @@ describe('ImportExercisesModal', () => {
       row({ name: 'Matched', type: 'strength' }),
       row({
         name: 'Fresh',
-        status: 'unknown',
+        status: 'missing',
         registryName: null,
         type: 'duration',
         noteExists: false,
@@ -268,7 +270,7 @@ describe('ImportExercisesModal', () => {
 
   it('swaps Create note and No-note entry so only one is chosen', async () => {
     const { modal } = await openModalWithRows([
-      row({ name: 'Fresh', status: 'unknown', registryName: null }),
+      row({ name: 'Fresh', status: 'missing', registryName: null }),
     ])
 
     tick(checkbox(modal, 'Create note'), true)
@@ -308,7 +310,7 @@ describe('ImportExercisesModal', () => {
       notePathsCreated: [],
     })
     const { modal } = await openModalWithRows([
-      row({ name: 'Fresh', status: 'unknown', registryName: null, type: 'strength' }),
+      row({ name: 'Fresh', status: 'missing', registryName: null, type: 'strength' }),
     ])
     const select = kindSelectForModal(modal)
 
@@ -348,7 +350,7 @@ describe('ImportExercisesModal', () => {
   it('keeps the modal open with a warning when applying fails', async () => {
     vi.mocked(applyExerciseImportPlan).mockRejectedValue(new Error('Disk full'))
     const { modal } = await openModalWithRows([
-      row({ name: 'Fresh', status: 'unknown', registryName: null }),
+      row({ name: 'Fresh', status: 'missing', registryName: null }),
     ])
     const closeSpy = vi.spyOn(modal, 'close')
 
@@ -368,5 +370,48 @@ describe('ImportExercisesModal', () => {
 
     expect(closeSpy).toHaveBeenCalledTimes(1)
     expect(applyExerciseImportPlan).not.toHaveBeenCalled()
+  })
+
+  it('unmounts its component when it closes', async () => {
+    const { modal } = await openModalWithRows([row({})])
+    const unmounts = watchUnmounts()
+    try {
+      modal.onClose()
+    } finally {
+      unmounts.stop()
+    }
+
+    expect(unmounts.names).toContain('ImportExercisesBody')
+    expect(modal.contentEl.children).toHaveLength(0)
+  })
+
+  it('draws nothing when the plan arrives after the modal closed', async () => {
+    let arrive: (plan: { rows: ExerciseImportPlanRow[] }) => void = () => {}
+    vi.mocked(buildExerciseImportPlan).mockReturnValue(
+      new Promise((resolve) => {
+        arrive = resolve
+      }),
+    )
+    const modal = new ImportExercisesModal({ app: {} } as never, {})
+    modal.onOpen()
+    modal.onClose()
+
+    arrive({ rows: [row({})] })
+    await settle()
+
+    expect(modal.contentEl.children).toHaveLength(0)
+  })
+
+  it('keeps a row where it is when a choice redraws the table', async () => {
+    const { modal } = await openModalWithRows([
+      row({ name: 'Fresh', status: 'missing', registryName: null }),
+      row({ name: 'Other', status: 'missing', registryName: null }),
+    ])
+    const rows = [...modal.contentEl.querySelectorAll('tbody tr')]
+
+    tick(checkbox(modal, 'Create note'), true)
+
+    const after = [...modal.contentEl.querySelectorAll('tbody tr')]
+    expect(after.every((tr, at) => tr === rows[at])).toBe(true)
   })
 })

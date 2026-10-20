@@ -1,6 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createTestRoot, findButtons, harnessWindow } from '../../harness/obsidian-dom'
+import {
+  createTestRoot,
+  findButtons,
+  harnessDocument,
+  harnessWindow,
+} from '../../harness/obsidian-dom'
+import { watchUnmounts } from '../../harness/unmount'
 import { outline } from '../../harness/outline'
 import { findUnstyledClasses } from '../../harness/stylesheet'
 
@@ -579,5 +585,73 @@ describe('ExerciseRenameModal confirm', () => {
     const text = collectText(modal.contentEl).join(' ')
     expect(text).toContain('Could not apply the rename')
     expect(text).toContain('Vault write failed')
+  })
+})
+
+describe('ExerciseRenameModal closing', () => {
+  beforeEach(() => {
+    vi.mocked(buildExerciseRenamePlanFromVault).mockReset()
+  })
+
+  afterEach(() => {
+    harnessDocument.body.replaceChildren()
+  })
+
+  it('unmounts its component from every stage', async () => {
+    vi.mocked(buildExerciseRenamePlanFromVault).mockResolvedValue(basePlan())
+    const atInput = new ExerciseRenameModal(createPluginStub() as unknown as FitKitPlugin, {
+      oldName: 'Row',
+    })
+    atInput.onOpen()
+    const atPreview = await openPreview(createPluginStub())
+
+    const unmounts = watchUnmounts()
+    try {
+      atInput.onClose()
+      atPreview.onClose()
+    } finally {
+      unmounts.stop()
+    }
+
+    expect(unmounts.names).toContain('InputStage')
+    expect(unmounts.names).toContain('PreviewStage')
+    expect(atInput.contentEl.children).toHaveLength(0)
+    expect(atPreview.contentEl.children).toHaveLength(0)
+  })
+
+  it('draws nothing when the vault answers after the modal closed', async () => {
+    let answer: (plan: ExerciseRenamePlan) => void = () => {}
+    vi.mocked(buildExerciseRenamePlanFromVault).mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+    const modal = new ExerciseRenameModal(createPluginStub() as unknown as FitKitPlugin, {
+      oldName: 'Row',
+    })
+    modal.onOpen()
+    findButtons(modal.contentEl, 'Preview changes')[0]?.click()
+    modal.onClose()
+
+    answer(basePlan())
+    await settle()
+
+    expect(modal.contentEl.children).toHaveLength(0)
+  })
+
+  it('keeps the node and text of a name being typed when the form redraws', () => {
+    const modal = new ExerciseRenameModal(createPluginStub() as unknown as FitKitPlugin, {
+      oldName: 'Row',
+    })
+    harnessDocument.body.appendChild(modal.contentEl)
+    modal.onOpen()
+    const input = nameInput(modal)
+
+    typeName(modal, 'Barbell Row.')
+    modal.onOpen()
+
+    expect(nameInput(modal)).toBe(input)
+    expect(input.value).toBe('Barbell Row.')
+    expect(harnessDocument.activeElement).toBe(input)
   })
 })

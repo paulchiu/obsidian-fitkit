@@ -1,6 +1,12 @@
-import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
-import { createTestRoot, findButtons, harnessWindow } from '../../harness/obsidian-dom'
+import {
+  createTestRoot,
+  findButtons,
+  harnessDocument,
+  harnessWindow,
+} from '../../harness/obsidian-dom'
+import { watchUnmounts } from '../../harness/unmount'
 import { outline } from '../../harness/outline'
 import { findUnstyledClasses } from '../../harness/stylesheet'
 
@@ -470,5 +476,43 @@ describe('ExerciseRegistryEntryModal form', () => {
 
     expect(closeSpy).toHaveBeenCalledTimes(1)
     expect(plugin.saveSettings).not.toHaveBeenCalled()
+  })
+})
+
+describe('ExerciseRegistryEntryModal redraws', () => {
+  afterEach(() => {
+    harnessDocument.body.replaceChildren()
+  })
+
+  it('leaves the text being typed, and its focus, alone while validation redraws', () => {
+    const modal = new ExerciseRegistryEntryModal(
+      createPluginStub([]) as unknown as FitKitPlugin,
+      { kind: 'create' },
+      vi.fn(),
+    )
+    harnessDocument.body.appendChild(modal.contentEl)
+    modal.onOpen()
+    const name = field(modal, 'input') as HTMLInputElement
+    const aliases = field(modal, 'textarea') as HTMLTextAreaElement
+
+    typeInto(name, 'Chin-up ')
+    typeInto(aliases, 'Chin\n')
+
+    expect(field(modal, 'input')).toBe(name)
+    expect([name.value, aliases.value]).toEqual(['Chin-up ', 'Chin\n'])
+    expect(harnessDocument.activeElement).toBe(name)
+  })
+
+  it('unmounts its component when it closes', () => {
+    const modal = openModal(createPluginStub([]), { kind: 'create' })
+    const unmounts = watchUnmounts()
+    try {
+      modal.onClose()
+    } finally {
+      unmounts.stop()
+    }
+
+    expect(unmounts.names).toContain('RegistryEntryForm')
+    expect(modal.contentEl.children).toHaveLength(0)
   })
 })
