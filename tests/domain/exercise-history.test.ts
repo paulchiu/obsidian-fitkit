@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   buildExerciseHistoryMap,
@@ -8,6 +8,11 @@ import {
   resolveWorkoutAnchorDate,
 } from '../../src/domain/exercise-history'
 import type { ExerciseIndexRow, FitKitIndex, IndexEntry } from '../../src/domain/types'
+
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllEnvs()
+})
 
 function fitKitIndex(entries: IndexEntry[]): FitKitIndex {
   return {
@@ -634,6 +639,14 @@ describe('exercise history aggregation', () => {
         today: '2026-04-27',
       }),
     ).toBe('2026-04-27')
+  })
+
+  it('falls back to the local calendar date when no today is given', () => {
+    vi.stubEnv('TZ', 'Australia/Sydney')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-30T23:30:00Z'))
+
+    expect(resolveWorkoutAnchorDate({ sourcePath: 'Fitness/Workouts/Draft.md' })).toBe('2026-10-01')
   })
 })
 

@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const noticeMessages = vi.hoisted(() => [] as string[])
-const registeredCommandIds = vi.hoisted(() => [] as string[])
+const registeredCommands = vi.hoisted(
+  () => [] as Array<{ id: string; callback?: () => Promise<void> }>,
+)
 
 vi.mock('obsidian', async () => {
   const { mixinFileView } = await import('./fixtures/obsidian-file-view')
@@ -20,8 +22,8 @@ vi.mock('obsidian', async () => {
     registerMarkdownCodeBlockProcessor(): void {}
     registerMarkdownPostProcessor(): void {}
     registerView(): void {}
-    addCommand(command: { id: string }): void {
-      registeredCommandIds.push(command.id)
+    addCommand(command: { id: string; callback?: () => Promise<void> }): void {
+      registeredCommands.push(command)
     }
     addSettingTab(): void {}
     async loadData(): Promise<unknown> {
@@ -191,6 +193,9 @@ interface MockVault {
   getFolderByPath: (path: string) => MockVaultFolder | null
   read: (file: TFile) => Promise<string>
   process: (file: TFile, callback: (live: string) => string) => Promise<void>
+  getAbstractFileByPath?: (path: string) => TFile | null
+  createFolder?: (path: string) => Promise<void>
+  create?: (path: string, data: string) => Promise<TFile>
 }
 
 interface MockApp {
@@ -343,11 +348,13 @@ afterEach(() => {
 
 describe('FitKitPlugin command registration', () => {
   beforeEach(() => {
-    registeredCommandIds.length = 0
+    registeredCommands.length = 0
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.useRealTimers()
+    vi.unstubAllEnvs()
   })
 
   it('keeps daily commands in the palette and prunes settings maintenance actions', async () => {
@@ -355,6 +362,7 @@ describe('FitKitPlugin command registration', () => {
     const plugin = new (FitKitPlugin as unknown as { new (app: MockApp): FitKitPlugin })(app)
 
     await plugin.onload()
+    const registeredCommandIds = registeredCommands.map((command) => command.id)
 
     expect(registeredCommandIds).toHaveLength(2)
     expect(registeredCommandIds).toEqual(
@@ -365,6 +373,30 @@ describe('FitKitPlugin command registration', () => {
     expect(registeredCommandIds).not.toContain('restore-hidden-sections')
     expect(registeredCommandIds).not.toContain('show-parse-diagnostics')
     expect(registeredCommandIds).not.toContain('sync-exercise-notes')
+  })
+
+  it("creates today's workout named for the local calendar date", async () => {
+    vi.stubEnv('TZ', 'Australia/Sydney')
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-20T13:30:00Z'))
+    const create = vi.fn(async (path: string) => makeWorkoutFile(path))
+    const app = makeApp(
+      {},
+      {
+        getAbstractFileByPath: vi.fn(() => null),
+        createFolder: vi.fn(async () => undefined),
+        create,
+      },
+    )
+    const plugin = new (FitKitPlugin as unknown as { new (app: MockApp): FitKitPlugin })(app)
+    await plugin.onload()
+
+    await registeredCommands.find((command) => command.id === 'open-todays-workout')?.callback?.()
+
+    expect(create).toHaveBeenCalledWith(
+      'Fitness/Workouts/2026-10-21.md',
+      '---\ntype: workout\ndate: 2026-10-21\nname: \n---\n',
+    )
   })
 })
 

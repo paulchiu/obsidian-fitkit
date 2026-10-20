@@ -38,7 +38,7 @@ import {
   unitForName,
   type ExerciseRegistry,
 } from '../../domain/exercise-registry'
-import { formatLocalTimestamp } from '../../domain/local-timestamp'
+import { formatLocalTimestamp } from '../../domain/dates'
 import { DEFAULT_WEIGHT_UNIT } from '../../domain/weight-unit'
 import {
   EXERCISE_TYPES,
