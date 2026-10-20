@@ -82,7 +82,7 @@ describe('FileSession', () => {
     expect(await read()).toBe('First saved workout')
   })
 
-  it('blocks a save after an external edit that a 32-bit fingerprint could miss', async () => {
+  it('blocks a save after an external edit to non-ASCII text', async () => {
     const { session, read, edit } = createVault()
     edit('A\u0001')
     await session.load()
