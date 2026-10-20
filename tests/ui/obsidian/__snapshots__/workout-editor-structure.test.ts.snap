@@ -464,3 +464,13 @@ exports[`WorkoutEditorView structure > draws the loading skeleton while the work
     div.fitkit-skeleton-line
     div.fitkit-skeleton-line.is-medium"
 `;
+
+exports[`WorkoutEditorView structure > draws the warning in place of the cards when the note is not a workout 1`] = `
+"div.fitkit-container
+  div.fitkit-header
+    div.fitkit-meta
+      span.fitkit-meta-line
+        "2026-06-15"
+  div.fitkit-warn
+    "This note has no \`type: workout\` frontmatter. The editor will not save changes here.""
+`;

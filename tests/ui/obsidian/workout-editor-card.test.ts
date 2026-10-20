@@ -731,3 +731,88 @@ describe('WorkoutEditorView menu placement', () => {
     expectWithin(box, 360)
   })
 })
+
+describe('WorkoutEditorView drag to reorder', () => {
+  const THREE = [
+    '## [[Squat]]',
+    '',
+    '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+    '',
+    '## [[Deadlift]]',
+    '',
+    '- [exercise:: [[Deadlift]]] [set:: 1] [weight:: 140] [reps:: 3]',
+    '',
+    '## [[Press]]',
+    '',
+    '- [exercise:: [[Press]]] [set:: 1] [weight:: 50] [reps:: 8]',
+  ]
+
+  const names = (view: WorkoutEditorView): string[] =>
+    [...view.contentEl.querySelectorAll('.fitkit-name-button-text')].map(
+      (el) => el.textContent ?? '',
+    )
+
+  /** jsdom has no layout, so each card stands 100px tall from the top and the handle lacks pointer capture. */
+  const layOut = (view: WorkoutEditorView): HTMLElement => {
+    const cards = view.contentEl.querySelectorAll<HTMLElement>(
+      '.fitkit-exercise-list > .fitkit-card',
+    )
+    cards.forEach((el, i) => {
+      el.getBoundingClientRect = () => new harnessWindow.DOMRect(0, i * 100, 300, 100)
+    })
+    const handle = card(view, 0).querySelector<HTMLElement>('.fitkit-drag-handle')
+    if (!handle) throw new Error('no drag handle drawn')
+    Object.assign(handle, {
+      setPointerCapture: () => {},
+      hasPointerCapture: () => false,
+      releasePointerCapture: () => {},
+    })
+    return handle
+  }
+
+  const pointer = (type: string, clientY: number): Event => {
+    const evt = new harnessWindow.MouseEvent(type, { clientY, bubbles: true })
+    Object.defineProperty(evt, 'pointerId', { value: 1 })
+    return evt
+  }
+
+  it('commits the new order once when the handle is released between two other cards', async () => {
+    const { view, contents } = await openEditor({ body: THREE })
+    const handle = layOut(view)
+
+    handle.dispatchEvent(pointer('pointerdown', 50))
+    handle.dispatchEvent(pointer('pointermove', 180))
+    const dragging = card(view, 0).classList.contains('is-dragging')
+    harnessWindow.dispatchEvent(pointer('pointerup', 180))
+    harnessWindow.dispatchEvent(pointer('lostpointercapture', 180))
+
+    expect([dragging, names(view)]).toEqual([true, ['Deadlift', 'Squat', 'Press']])
+    expect(view.contentEl.querySelector('.fitkit-drop-indicator')).toBeNull()
+    await savedBody(contents, [
+      '## [[Deadlift]]',
+      '',
+      '- [exercise:: [[Deadlift]]] [set:: 1] [weight:: 140] [reps:: 3]',
+      '',
+      '## [[Squat]]',
+      '',
+      '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]',
+      '',
+      '## [[Press]]',
+      '',
+      '- [exercise:: [[Press]]] [set:: 1] [weight:: 50] [reps:: 8]',
+    ])
+  })
+
+  it('leaves the order alone when the drag is cancelled', async () => {
+    const { view } = await openEditor({ body: THREE })
+    const handle = layOut(view)
+
+    handle.dispatchEvent(pointer('pointerdown', 50))
+    handle.dispatchEvent(pointer('pointermove', 180))
+    harnessWindow.dispatchEvent(pointer('pointercancel', 180))
+
+    expect(names(view)).toEqual(['Squat', 'Deadlift', 'Press'])
+    expect(view.contentEl.querySelector('.fitkit-drop-indicator')).toBeNull()
+    expect(card(view, 0).classList.contains('is-dragging')).toBe(false)
+  })
+})
