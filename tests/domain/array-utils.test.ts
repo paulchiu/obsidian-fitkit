@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { reorderArray } from '../../src/domain/array-utils'
+import { reorderArray, sameStrings } from '../../src/domain/array-utils'
 
 describe('reorderArray', () => {
   it('moves an element forward', () => {
@@ -47,5 +47,18 @@ describe('reorderArray', () => {
     const input = ['a', 'b', 'c']
     reorderArray(input, 0, 2)
     expect(input).toEqual(['a', 'b', 'c'])
+  })
+})
+
+describe('sameStrings', () => {
+  it('is true for the same strings in the same order', () => {
+    expect(sameStrings(['a', 'b'], ['a', 'b'])).toBe(true)
+    expect(sameStrings([], [])).toBe(true)
+  })
+
+  it('is false when order, length or any value differs', () => {
+    expect(sameStrings(['a', 'b'], ['b', 'a'])).toBe(false)
+    expect(sameStrings(['a'], ['a', 'b'])).toBe(false)
+    expect(sameStrings(['a', 'b'], ['a', 'c'])).toBe(false)
   })
 })
