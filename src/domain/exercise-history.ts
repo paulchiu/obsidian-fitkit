@@ -6,6 +6,7 @@ import {
   pickBestBodyweightSet,
   type BodyweightLadder,
 } from './bodyweight-levels'
+import { formatIsoDate, isoDatePrefix } from './dates'
 import { formatDurationInput } from './duration-input'
 import { pickHeaviestSet } from './epley'
 import {
@@ -84,8 +85,6 @@ interface ExerciseHistoryDraft {
   nextPlan?: SessionMetric<NextPlan>
   lastDurationPlan?: SessionMetric<string | undefined>
 }
-
-const ISO_DATE_PREFIX = /^(\d{4}-\d{2}-\d{2})/
 
 export function buildExerciseHistoryMap(
   index: FitKitIndex,
@@ -293,7 +292,7 @@ export function resolveWorkoutAnchorDate(anchor: ExerciseHistoryAnchor): string 
     return filenameDate
   }
 
-  return anchor.today ?? formatTodayIsoDate()
+  return anchor.today ?? formatIsoDate(new Date())
 }
 
 function addEntryToDrafts(
@@ -520,18 +519,6 @@ function formatNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(1)))
 }
 
-function isoDatePrefix(value: string): string | null {
-  return value.match(ISO_DATE_PREFIX)?.[1] ?? null
-}
-
 function normalizePathKey(path: string): string {
   return path.replace(/^\/+/, '').replace(/\/+/g, '/')
-}
-
-function formatTodayIsoDate(): string {
-  const date = new Date()
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
 }

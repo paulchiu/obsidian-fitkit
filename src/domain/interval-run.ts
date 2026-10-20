@@ -7,7 +7,7 @@
 
 import type { IntervalProgram, PlanStep } from './interval-program'
 import type { DurationEntry } from './workout-note-model'
-import { formatLocalTimestamp } from './local-timestamp'
+import { formatLocalTimestamp } from './dates'
 
 /** A duration row while a run may still be filling it in, so its time can be missing. */
 export type RunRow = Partial<DurationEntry>

@@ -8,6 +8,7 @@ import {
   normalizePath,
 } from 'obsidian'
 
+import { formatIsoDate } from './domain/dates'
 import { formatErrorMessage } from './domain/error'
 import { createRegistry } from './domain/exercise-registry'
 import { migrateExerciseNote } from './domain/exercise-note-migrate'
@@ -34,13 +35,6 @@ import {
 import { buildExerciseRegistrySnapshot } from './vault/exercise-registry-vault'
 import { markdownFilesInFolder } from './vault/folder-scan'
 import { createWorkoutIndex, type WorkoutIndex } from './vault/workout-index'
-
-function formatTodayIsoDate(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-    d.getDate(),
-  ).padStart(2, '0')}`
-}
 
 function emptyWorkoutMarkdown(date: string): string {
   return `---\ntype: workout\ndate: ${date}\nname: \n---\n`
@@ -144,7 +138,7 @@ export default class FitKitPlugin extends Plugin {
       id: 'open-todays-workout',
       name: "Open today's workout",
       callback: async () => {
-        const today = formatTodayIsoDate()
+        const today = formatIsoDate(new Date())
         const folder = normalizePath(workoutsFolder(this.settings))
         const path = normalizePath(`${folder}/${workoutFilename(today)}`)
         let file = this.app.vault.getAbstractFileByPath(path)
