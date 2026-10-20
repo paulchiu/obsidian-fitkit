@@ -47,6 +47,11 @@
   },
   "overrides": {
     "@emnapi/core": "1.11.3",
-    "@emnapi/runtime": "1.11.3"
+    "@emnapi/runtime": "1.11.3",
+    "moment": "2.31.0"
+  },
+  "allowScripts": {
+    "esbuild": true,
+    "fsevents": false
   }
 }
