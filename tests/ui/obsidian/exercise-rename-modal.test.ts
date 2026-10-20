@@ -639,19 +639,15 @@ describe('ExerciseRenameModal closing', () => {
     expect(modal.contentEl.children).toHaveLength(0)
   })
 
-  it('keeps the node and text of a name being typed when the form redraws', () => {
+  it('draws again when reopened after closing', () => {
     const modal = new ExerciseRenameModal(createPluginStub() as unknown as FitKitPlugin, {
       oldName: 'Row',
     })
-    harnessDocument.body.appendChild(modal.contentEl)
     modal.onOpen()
-    const input = nameInput(modal)
+    modal.onClose()
 
-    typeName(modal, 'Barbell Row.')
     modal.onOpen()
 
-    expect(nameInput(modal)).toBe(input)
-    expect(input.value).toBe('Barbell Row.')
-    expect(harnessDocument.activeElement).toBe(input)
+    expect(nameInput(modal).value).toBe('Row')
   })
 })

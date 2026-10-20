@@ -4,17 +4,15 @@ import { useLayoutEffect } from 'preact/hooks'
 import { useDomEffect } from './dom-effect'
 
 /**
- * Fields the user types in are uncontrolled: `value` is written to the element only when it
- * differs, so a redraw triggered by typing never rewrites what is being typed (`1.` stays `1.`).
+ * Fields are uncontrolled: `value` is written to the element whenever it changes, so a draft must
+ * echo the raw text typed (`1.`, not `1`); writing back the same text leaves the caret alone.
  */
 type ValueElement = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
 
 function useValue<T extends ValueElement>(value: string): RefObject<T | null> {
   return useDomEffect<T>(
     (el) => {
-      if (el.value !== value) {
-        el.value = value
-      }
+      el.value = value
     },
     [value],
   )
@@ -48,7 +46,7 @@ export interface TextFieldProps {
   'aria-label'?: string
   placeholder?: string
   value: string
-  onValueInput?: (value: string) => void
+  onValueInput: (value: string) => void
   focusOnMount?: boolean
   attributes?: Record<string, string>
 }
@@ -69,18 +67,20 @@ export function TextField({
       type="text"
       {...rest}
       ref={ref}
-      onInput={(event) => onValueInput?.(event.currentTarget.value)}
+      onInput={(event) => onValueInput(event.currentTarget.value)}
     />
   )
 }
 
 export interface TextAreaFieldProps {
+  /** Receives the text box once mounted, for a shell that needs its node. */
+  fieldRef?: RefObject<HTMLTextAreaElement | null>
   class?: string
   'aria-label'?: string
   rows?: number
   hidden?: boolean
   value: string
-  onValueInput?: (value: string) => void
+  onValueInput: (value: string) => void
   attributes?: Record<string, string>
 }
 
@@ -89,12 +89,18 @@ export function TextAreaField({
   value,
   onValueInput,
   attributes,
+  fieldRef,
   ...rest
 }: TextAreaFieldProps): JSX.Element {
   const ref = useValue<HTMLTextAreaElement>(value)
   useAttributes(ref, attributes)
+  useLayoutEffect(() => {
+    if (fieldRef) {
+      fieldRef.current = ref.current
+    }
+  }, [])
   return (
-    <textarea {...rest} ref={ref} onInput={(event) => onValueInput?.(event.currentTarget.value)} />
+    <textarea {...rest} ref={ref} onInput={(event) => onValueInput(event.currentTarget.value)} />
   )
 }
 
@@ -121,8 +127,9 @@ export function SelectField({
 
 /** An option that always carries a `value` attribute, which Preact skips when it equals the label. */
 export function Choice({ value, label }: { value: string; label: string }): JSX.Element {
+  const option = useDomEffect<HTMLOptionElement>((el) => el.setAttribute('value', value), [value])
   return (
-    <option value={value} ref={(el) => el?.setAttribute('value', value)}>
+    <option value={value} ref={option}>
       {label}
     </option>
   )

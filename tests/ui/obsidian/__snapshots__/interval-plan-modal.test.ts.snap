@@ -6,6 +6,7 @@ exports[`interval plan modal > structure > draws a plan the rows cannot show as 
     span.fitkit-label
       "Plan"
     button.fitkit-plan-info[aria-expanded=false][aria-label=Plan examples][type=button]
+      span.fitkit-plan-icon[data-icon=info]
     div.fitkit-plan-modes
       button.fitkit-btn[aria-pressed=false][type=button]
         "Steps"
@@ -84,6 +85,7 @@ exports[`interval plan modal > structure > draws the examples once opened 1`] = 
     span.fitkit-label
       "Plan"
     button.fitkit-plan-info[aria-expanded=true][aria-label=Plan examples][type=button]
+      span.fitkit-plan-icon[data-icon=info]
     div.fitkit-plan-modes
       button.fitkit-btn[aria-pressed=false][type=button]
         "Steps"
@@ -167,6 +169,7 @@ exports[`interval plan modal > structure > draws the reason in place of the prev
     span.fitkit-label
       "Plan"
     button.fitkit-plan-info[aria-expanded=false][aria-label=Plan examples][hidden=][type=button]
+      span.fitkit-plan-icon[data-icon=info]
     div.fitkit-plan-modes
       button.fitkit-btn[aria-pressed=true][type=button]
         "Steps"
@@ -183,6 +186,7 @@ exports[`interval plan modal > structure > draws the reason in place of the prev
             "times, every"
           input.fitkit-input.fitkit-plan-time[aria-label=Start every][autocapitalize=off][autocomplete=off][placeholder=off][spellcheck=false][type=text]
           button.fitkit-plan-options[aria-label=Repeat options][type=button]
+            span.fitkit-plan-icon[data-icon=more-vertical]
         div.fitkit-plan-repeat-body
           div.fitkit-plan-list
             div.fitkit-plan-row
@@ -190,9 +194,11 @@ exports[`interval plan modal > structure > draws the reason in place of the prev
               input.fitkit-input.fitkit-plan-time[aria-label=Work time][autocapitalize=off][autocomplete=off][placeholder=1m][spellcheck=false][type=text]
               input.fitkit-input.fitkit-plan-target[aria-label=Target][autocapitalize=off][autocomplete=off][placeholder=300W][spellcheck=false][type=text]
               button.fitkit-plan-options[aria-label=Step options][type=button]
+                span.fitkit-plan-icon[data-icon=more-vertical]
           button.fitkit-plan-add-foot[aria-label=Add to repeat][type=button]
+            span.fitkit-plan-icon[data-icon=plus]
     button.fitkit-plan-add-bar[aria-label=Add to plan][type=button]
-      span.fitkit-plan-add-icon
+      span.fitkit-plan-icon[data-icon=plus]
       span
         "Add"
   textarea.fitkit-input.fitkit-plan-text[aria-label=Plan][autocapitalize=off][hidden=][rows=3][spellcheck=false]
@@ -273,6 +279,7 @@ exports[`interval plan modal > structure > draws the step editor with a repeat t
     span.fitkit-label
       "Plan"
     button.fitkit-plan-info[aria-expanded=false][aria-label=Plan examples][hidden=][type=button]
+      span.fitkit-plan-icon[data-icon=info]
     div.fitkit-plan-modes
       button.fitkit-btn[aria-pressed=true][type=button]
         "Steps"
@@ -289,6 +296,7 @@ exports[`interval plan modal > structure > draws the step editor with a repeat t
             "times, every"
           input.fitkit-input.fitkit-plan-time[aria-label=Start every][autocapitalize=off][autocomplete=off][placeholder=off][spellcheck=false][type=text]
           button.fitkit-plan-options[aria-label=Repeat options][type=button]
+            span.fitkit-plan-icon[data-icon=more-vertical]
         div.fitkit-plan-repeat-body
           div.fitkit-plan-list
             div.fitkit-plan-row
@@ -296,9 +304,11 @@ exports[`interval plan modal > structure > draws the step editor with a repeat t
               input.fitkit-input.fitkit-plan-time[aria-label=Work time][autocapitalize=off][autocomplete=off][placeholder=1m][spellcheck=false][type=text]
               input.fitkit-input.fitkit-plan-target[aria-label=Target][autocapitalize=off][autocomplete=off][placeholder=300W][spellcheck=false][type=text]
               button.fitkit-plan-options[aria-label=Step options][type=button]
+                span.fitkit-plan-icon[data-icon=more-vertical]
           button.fitkit-plan-add-foot[aria-label=Add to repeat][type=button]
+            span.fitkit-plan-icon[data-icon=plus]
     button.fitkit-plan-add-bar[aria-label=Add to plan][type=button]
-      span.fitkit-plan-add-icon
+      span.fitkit-plan-icon[data-icon=plus]
       span
         "Add"
   textarea.fitkit-input.fitkit-plan-text[aria-label=Plan][autocapitalize=off][hidden=][rows=3][spellcheck=false]
@@ -378,6 +388,7 @@ exports[`interval plan modal > structure > draws the step editor with presets, a
     span.fitkit-label
       "Plan"
     button.fitkit-plan-info[aria-expanded=false][aria-label=Plan examples][hidden=][type=button]
+      span.fitkit-plan-icon[data-icon=info]
     div.fitkit-plan-modes
       button.fitkit-btn[aria-pressed=true][type=button]
         "Steps"
@@ -390,6 +401,7 @@ exports[`interval plan modal > structure > draws the step editor with presets, a
         input.fitkit-input.fitkit-plan-time[aria-label=Work time][autocapitalize=off][autocomplete=off][placeholder=1m][spellcheck=false][type=text]
         input.fitkit-input.fitkit-plan-target[aria-label=Target][autocapitalize=off][autocomplete=off][placeholder=300W][spellcheck=false][type=text]
         button.fitkit-plan-options[aria-label=Step options][type=button]
+          span.fitkit-plan-icon[data-icon=more-vertical]
       div.fitkit-plan-repeat
         div.fitkit-plan-row
           span.fitkit-plan-word
@@ -399,6 +411,7 @@ exports[`interval plan modal > structure > draws the step editor with presets, a
             "times, every"
           input.fitkit-input.fitkit-plan-time[aria-label=Start every][autocapitalize=off][autocomplete=off][placeholder=off][spellcheck=false][type=text]
           button.fitkit-plan-options[aria-label=Repeat options][type=button]
+            span.fitkit-plan-icon[data-icon=more-vertical]
         div.fitkit-plan-repeat-body
           div.fitkit-plan-list
             div.fitkit-plan-row
@@ -406,14 +419,17 @@ exports[`interval plan modal > structure > draws the step editor with presets, a
               input.fitkit-input.fitkit-plan-time[aria-label=Work time][autocapitalize=off][autocomplete=off][placeholder=1m][spellcheck=false][type=text]
               input.fitkit-input.fitkit-plan-target[aria-label=Target][autocapitalize=off][autocomplete=off][placeholder=300W][spellcheck=false][type=text]
               button.fitkit-plan-options[aria-label=Step options][type=button]
+                span.fitkit-plan-icon[data-icon=more-vertical]
             div.fitkit-plan-row
               span.fitkit-plan-word.fitkit-plan-grow
                 "Rest"
               input.fitkit-input.fitkit-plan-time[aria-label=Rest time][autocapitalize=off][autocomplete=off][placeholder=90s][spellcheck=false][type=text]
               button.fitkit-plan-options[aria-label=Rest options][type=button]
+                span.fitkit-plan-icon[data-icon=more-vertical]
           button.fitkit-plan-add-foot[aria-label=Add to repeat][type=button]
+            span.fitkit-plan-icon[data-icon=plus]
     button.fitkit-plan-add-bar[aria-label=Add to plan][type=button]
-      span.fitkit-plan-add-icon
+      span.fitkit-plan-icon[data-icon=plus]
       span
         "Add"
   textarea.fitkit-input.fitkit-plan-text[aria-label=Plan][autocapitalize=off][hidden=][rows=3][spellcheck=false]

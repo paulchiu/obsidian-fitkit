@@ -39,7 +39,7 @@ export class PlanStepModal extends Modal {
         initial={this.options.initial}
         onSave={this.commit}
         onCancel={this.cancel}
-        onFilled={focusAndSelect}
+        focusInput={focusAndSelect}
       />,
       contentEl,
     )

@@ -2,7 +2,7 @@ import type { JSX } from 'preact'
 
 import { EXERCISE_TYPES, EXERCISE_TYPE_LABELS, type ExerciseType } from '../../domain/exercise-type'
 import { WEIGHT_UNITS } from '../../domain/weight-unit'
-import { ImportActions } from './action-bar'
+import { ButtonRow } from './action-bar'
 import { Choice, SelectField, TextAreaField, TextField } from './fields'
 
 export interface RegistryEntryFormProps {
@@ -72,7 +72,7 @@ export function RegistryEntryForm(props: RegistryEntryFormProps): JSX.Element {
         />
         <div class="fitkit-registry-field-error">{props.aliasError}</div>
       </div>
-      <ImportActions>
+      <ButtonRow>
         <button class="fitkit-btn" onClick={props.onCancel}>
           Cancel
         </button>
@@ -83,7 +83,7 @@ export function RegistryEntryForm(props: RegistryEntryFormProps): JSX.Element {
         >
           Save
         </button>
-      </ImportActions>
+      </ButtonRow>
     </>
   )
 }

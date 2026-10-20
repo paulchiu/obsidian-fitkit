@@ -1,7 +1,7 @@
 import type { JSX } from 'preact'
 
 import type { ExerciseRenamePlan } from '../../domain/exercise-rename-planner'
-import { ImportActions } from './action-bar'
+import { ButtonRow } from './action-bar'
 import { TextField } from './fields'
 
 export type RenamePhase = 'input' | 'loading' | 'preview'
@@ -59,14 +59,14 @@ function InputStage({
         />
       </div>
       {inputError ? <div class="fitkit-warn">{inputError}</div> : null}
-      <ImportActions>
+      <ButtonRow>
         <button class="fitkit-btn" onClick={onCancel}>
           Cancel
         </button>
         <button class="fitkit-btn fitkit-btn-primary" onClick={onPreview}>
           Preview changes
         </button>
-      </ImportActions>
+      </ButtonRow>
     </>
   )
 }
@@ -83,14 +83,14 @@ function PreviewStage({
       <>
         <h3>Can't rename this exercise</h3>
         <p>{plan.refusal.message}</p>
-        <ImportActions>
+        <ButtonRow>
           <button class="fitkit-btn" onClick={onBack}>
             Back
           </button>
           <button class="fitkit-btn" onClick={onCancel}>
             Cancel
           </button>
-        </ImportActions>
+        </ButtonRow>
       </>
     )
   }
@@ -111,7 +111,7 @@ function PreviewStage({
       <AliasSummary plan={plan} />
       <StaleSummary plan={plan} />
       {plan.operation === 'merge' ? <MergeWarning plan={plan} /> : null}
-      <ImportActions>
+      <ButtonRow>
         <button class="fitkit-btn" disabled={applying} onClick={onBack}>
           Back
         </button>
@@ -121,7 +121,7 @@ function PreviewStage({
         <button class="fitkit-btn fitkit-btn-primary" disabled={applying} onClick={onConfirm}>
           {confirmText}
         </button>
-      </ImportActions>
+      </ButtonRow>
     </>
   )
 }

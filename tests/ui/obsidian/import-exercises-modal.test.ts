@@ -402,16 +402,29 @@ describe('ImportExercisesModal', () => {
     expect(modal.contentEl.children).toHaveLength(0)
   })
 
-  it('keeps a row where it is when a choice redraws the table', async () => {
+  it('clears both choices when Restore is unticked, so retick starts from a note again', async () => {
     const { modal } = await openModalWithRows([
-      row({ name: 'Fresh', status: 'missing', registryName: null }),
-      row({ name: 'Other', status: 'missing', registryName: null }),
+      row({ name: 'Gone', status: 'ignored', registryName: null }),
     ])
-    const rows = [...modal.contentEl.querySelectorAll('tbody tr')]
+    tick(checkbox(modal, 'Restore'), true)
+    tick(checkbox(modal, 'No-note entry'), true)
 
-    tick(checkbox(modal, 'Create note'), true)
+    tick(checkbox(modal, 'Restore'), false)
+    tick(checkbox(modal, 'Restore'), true)
 
-    const after = [...modal.contentEl.querySelectorAll('tbody tr')]
-    expect(after.every((tr, at) => tr === rows[at])).toBe(true)
+    expect([
+      checkbox(modal, 'Create note').checked,
+      checkbox(modal, 'No-note entry').checked,
+    ]).toEqual([true, false])
+  })
+
+  it('draws again when reopened after closing', async () => {
+    const { modal } = await openModalWithRows([row({})])
+    modal.onClose()
+
+    modal.onOpen()
+    await settle()
+
+    expect(modal.contentEl.querySelector('table')).not.toBeNull()
   })
 })

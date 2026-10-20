@@ -1,4 +1,5 @@
 import type { JSX } from 'preact'
+import { useLayoutEffect, useRef } from 'preact/hooks'
 
 import type { IntervalPreset } from '../../domain/interval-presets'
 import type { DraftItem } from '../model/plan-draft'
@@ -29,6 +30,14 @@ export interface PlanFormProps {
   preview: PlanPreview
   canClear: boolean
   actions: PlanFormActions
+  /** Receives, once mounted, the parts the shell keeps in view over the phone keyboard. */
+  onLayout: (parts: PlanFormLayout) => void
+}
+
+export interface PlanFormLayout {
+  heading: HTMLElement
+  field: HTMLTextAreaElement
+  bar: HTMLElement
 }
 
 const TEXT_ATTRIBUTES = { spellcheck: 'false', autocapitalize: 'off' }
@@ -46,8 +55,17 @@ export function PlanForm({
   preview,
   canClear,
   actions,
+  onLayout,
 }: PlanFormProps): JSX.Element {
   const inSteps = rows !== null
+  const heading = useRef<HTMLDivElement>(null)
+  const field = useRef<HTMLTextAreaElement>(null)
+  const bar = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (heading.current && field.current && bar.current) {
+      onLayout({ heading: heading.current, field: field.current, bar: bar.current })
+    }
+  }, [])
   return (
     <>
       {presets.length > 0 ? (
@@ -64,7 +82,7 @@ export function PlanForm({
           ))}
         </div>
       ) : null}
-      <div class="fitkit-plan-heading">
+      <div class="fitkit-plan-heading" ref={heading}>
         <span class="fitkit-label">Plan</span>
         <IconButton
           cls="fitkit-plan-info"
@@ -91,6 +109,7 @@ export function PlanForm({
         aria-label="Plan"
         rows={3}
         attributes={TEXT_ATTRIBUTES}
+        fieldRef={field}
         hidden={inSteps}
         value={text}
         onValueInput={actions.onTextInput}
@@ -113,7 +132,7 @@ export function PlanForm({
         ))}
         <a href={DOCS_URL}>Full syntax and more examples</a>
       </div>
-      <ActionBar cls="fitkit-set-note-actions">
+      <ActionBar cls="fitkit-set-note-actions" barRef={bar}>
         {canClear ? (
           <button class="fitkit-btn" onClick={actions.onClear}>
             Clear plan

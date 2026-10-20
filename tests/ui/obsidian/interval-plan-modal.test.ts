@@ -10,17 +10,18 @@ import { watchUnmounts } from '../../harness/unmount'
 import { outline } from '../../harness/outline'
 import { findUnstyledClasses } from '../../harness/stylesheet'
 
-const menus = vi.hoisted((): Array<Array<{ title: string; click: () => void }>> => [])
+/** Each menu shown, as the entries it listed. */
+const menus = vi.hoisted((): Array<Array<{ title: string; icon: string; click: () => void }>> => [])
 
 vi.mock('obsidian', () => {
   class Menu {
-    items: Array<{ title: string; click: () => void }> = []
+    items: Array<{ title: string; icon: string; click: () => void }> = []
 
     addItem(callback: (item: unknown) => void): this {
-      const state = { title: '', click: (): void => {} }
+      const state = { title: '', icon: '', click: (): void => {} }
       const item = {
         setTitle: (title: string) => ((state.title = title), item),
-        setIcon: () => item,
+        setIcon: (icon: string) => ((state.icon = icon), item),
         onClick: (click: () => void) => ((state.click = click), item),
       }
       callback(item)
@@ -52,7 +53,10 @@ vi.mock('obsidian', () => {
     }
   }
 
-  return { Menu, Modal, setIcon: (): void => {} }
+  /** Names the icon on its element, so a snapshot pins which icon each control draws. */
+  const setIcon = (el: HTMLElement, name: string): void => el.setAttribute('data-icon', name)
+
+  return { Menu, Modal, setIcon }
 })
 
 import type { IntervalPreset } from '../../../src/domain/interval-presets'
@@ -375,6 +379,25 @@ describe('interval plan modal', () => {
         expect(lifted(modal)).toEqual({ up: false, top: '', room: '' })
         modal.close()
       })
+
+      it('puts the sheet back and stops following the keyboard once it closes', () => {
+        const { modal } = open('(x 3 (over 1m 300W))')
+        const { fields } = formWithFields(modal, [400])
+        sheetIn(modal)
+        fields[0]?.focus()
+        keyboardShows(300)
+        const open_ = lifted(modal).up
+
+        modal.close()
+        const closed = lifted(modal)
+        keyboardShows(300)
+
+        expect([open_, closed, lifted(modal)]).toEqual([
+          true,
+          { up: false, top: '', room: '' },
+          { up: false, top: '', room: '' },
+        ])
+      })
     })
   })
 
@@ -621,13 +644,18 @@ describe('interval plan modal', () => {
     })
 
     /** Focus only lands on a connected element, so the modal renders attached. */
+    const saves = new WeakMap<IntervalPlanModal, ReturnType<typeof vi.fn>>()
+    const onSaved = (modal: IntervalPlanModal): unknown[][] => saves.get(modal)?.mock.calls ?? []
+
     const openAttached = (initial: string): IntervalPlanModal => {
+      const onSave = vi.fn()
       const modal = new IntervalPlanModal({} as never, {
         exerciseName: 'Exercise Bike',
         initial,
         presets: [],
-        onSave: vi.fn(),
+        onSave,
       })
+      saves.set(modal, onSave)
       harnessDocument.body.appendChild(modal.contentEl)
       modal.onOpen()
       return modal
@@ -723,6 +751,77 @@ describe('interval plan modal', () => {
       choose(modal, 'Step options', 1, 'Move up')
 
       expect(stepInputs(modal).map((input) => input.value)).toEqual(['bee', 'a'])
+    })
+
+    it("lists each row's menu by where the row sits, and moves a row down", () => {
+      const modal = openAttached('(a 1m) (x 2 (b 2m)) (c 3m)')
+      const listed = (options: string, index: number): string[] => {
+        const buttons = modal.contentEl.querySelectorAll<HTMLButtonElement>(
+          `button[aria-label="${options}"]`,
+        )
+        buttons[index]?.click()
+        return menus.at(-1)?.map((item) => `${item.title}:${item.icon}`) ?? []
+      }
+      const entries = {
+        first: listed('Step options', 0),
+        repeat: listed('Repeat options', 0),
+        alone: listed('Step options', 1),
+        last: listed('Step options', 2),
+        add: listed('Add to plan', 0),
+      }
+
+      choose(modal, 'Step options', 0, 'Move down')
+      findButtons(modal.contentEl, 'Save')[0]?.click()
+
+      expect(entries).toEqual({
+        first: [
+          'Move down:arrow-down',
+          'Duplicate:copy',
+          'Put in a repeat:repeat',
+          'Delete:trash-2',
+        ],
+        repeat: [
+          'Move up:arrow-up',
+          'Move down:arrow-down',
+          'Duplicate:copy',
+          'Put in a repeat:repeat',
+          'Ungroup:ungroup',
+          'Delete:trash-2',
+        ],
+        alone: ['Duplicate:copy', 'Put in a repeat:repeat', 'Delete:trash-2'],
+        last: ['Move up:arrow-up', 'Duplicate:copy', 'Put in a repeat:repeat', 'Delete:trash-2'],
+        add: ['Step:activity', 'Rest:pause', 'Repeat:repeat'],
+      })
+      expect(onSaved(modal)).toEqual([['(x 2 (b 2m)) (a 1m) (c 3m)']])
+    })
+
+    it("puts a duplicate straight after its row, keeping the original's field", () => {
+      const modal = openAttached('(a 1m) (b 2m) (c 3m)')
+      const [, b] = stepInputs(modal)
+      typeInStep(b, 'bee')
+
+      choose(modal, 'Step options', 1, 'Duplicate')
+      const after = stepInputs(modal)
+
+      expect(after.map((input) => input.value)).toEqual(['a', 'bee', 'bee', 'c'])
+      expect(after[1]).toBe(b)
+      expect(after[2]).not.toBe(b)
+    })
+
+    it('draws nothing when a menu entry is picked after it closed, and draws again reopened', () => {
+      const modal = openAttached('(a 1m) (b 2m)')
+      modal.contentEl.querySelector<HTMLButtonElement>('button[aria-label="Step options"]')?.click()
+      modal.close()
+
+      menus
+        .at(-1)
+        ?.find((item) => item.title === 'Delete')
+        ?.click()
+      const afterClose = modal.contentEl.children.length
+      modal.onOpen()
+
+      expect([afterClose, stepInputs(modal).map((input) => input.value)]).toEqual([0, ['a', 'b']])
+      modal.close()
     })
 
     it('unmounts the form and the step editor when it closes', () => {

@@ -35,7 +35,7 @@ export function PlanBuilder({
         aria-label="Add to plan"
         onClick={(event) => actions.onAdd(null, event.currentTarget)}
       >
-        <span class="fitkit-plan-add-icon" ref={plus} />
+        <span class="fitkit-plan-icon" ref={plus} />
         <span>Add</span>
       </button>
     </>
@@ -124,7 +124,7 @@ function PlanRow({ item, actions }: { item: DraftItem; actions: PlanBuilderActio
   )
 }
 
-/** A button drawn as just an icon. */
+/** A button drawn as just an icon, in a span of its own since `setIcon` replaces children. */
 export function IconButton({
   cls,
   label,
@@ -141,7 +141,7 @@ export function IconButton({
   expanded?: boolean
   onClick: (trigger: HTMLElement) => void
 }): JSX.Element {
-  const glyph = useIcon<HTMLButtonElement>(icon)
+  const glyph = useIcon<HTMLSpanElement>(icon)
   return (
     <button
       type="button"
@@ -149,8 +149,9 @@ export function IconButton({
       aria-label={label}
       aria-expanded={expanded}
       hidden={hidden}
-      ref={glyph}
       onClick={(event) => onClick(event.currentTarget)}
-    />
+    >
+      <span class="fitkit-plan-icon" ref={glyph} />
+    </button>
   )
 }

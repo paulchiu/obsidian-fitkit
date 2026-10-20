@@ -36,6 +36,7 @@ export class ImportExercisesModal extends Modal {
   }
 
   onOpen(): void {
+    this.closed = false
     this.contentEl.addClass('fitkit-import-modal')
     this.setTitle(this.options.title ?? 'Import exercises')
     this.draw()

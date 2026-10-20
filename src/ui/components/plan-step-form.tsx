@@ -10,8 +10,8 @@ export interface PlanStepFormProps {
   initial: string
   onSave: (text: string) => void
   onCancel: () => void
-  /** Receives the input once it holds `initial`, so the shell can focus it. */
-  onFilled: (input: HTMLInputElement) => void
+  /** Receives the input once it holds `initial`, to focus and select it. */
+  focusInput: (input: HTMLInputElement) => void
 }
 
 /** A labelled step box over Cancel and Save; Enter in the box saves. */
@@ -20,12 +20,12 @@ export function PlanStepForm({
   initial,
   onSave,
   onCancel,
-  onFilled,
+  focusInput,
 }: PlanStepFormProps): JSX.Element {
   const input = useDomEffect<HTMLInputElement>(
     (el) => {
       el.value = initial
-      onFilled(el)
+      focusInput(el)
     },
     [initial],
   )

@@ -13,7 +13,7 @@ export interface ImportRow {
 }
 
 /** Ticking Restore on an ignored exercise offers a note when it has neither; unticking clears both choices. */
-export function withRestore<R extends ImportRow>(row: R, checked: boolean): R {
+export function withRestore(row: ImportRow, checked: boolean): ImportRow {
   if (checked) {
     return {
       ...row,
@@ -25,17 +25,17 @@ export function withRestore<R extends ImportRow>(row: R, checked: boolean): R {
 }
 
 /** Creating a note and creating a no-note entry exclude each other. */
-export function withCreateNote<R extends ImportRow>(row: R, checked: boolean): R {
+export function withCreateNote(row: ImportRow, checked: boolean): ImportRow {
   return { ...row, createNote: checked, createNoNoteEntry: checked ? false : row.createNoNoteEntry }
 }
 
-export function withNoNoteEntry<R extends ImportRow>(row: R, checked: boolean): R {
+export function withNoNoteEntry(row: ImportRow, checked: boolean): ImportRow {
   return { ...row, createNoNoteEntry: checked, createNote: checked ? false : row.createNote }
 }
 
-/** The checkboxes a row offers, in order, or null when it needs no action. */
 export type RowChoice = 'restore' | 'create-note' | 'no-note-entry'
 
+/** The checkboxes a row offers, in order, or null when it needs no action. */
 export function rowChoices(row: ImportRow): RowChoice[] | null {
   if (row.status === 'known' && row.noteExists) {
     return null

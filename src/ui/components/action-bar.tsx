@@ -1,15 +1,19 @@
-import type { ComponentChildren, JSX } from 'preact'
+import type { ComponentChildren, JSX, Ref } from 'preact'
 
 /** A modal's bottom button row; `cls` adds a variant such as the sheet-pinned bar. */
 export function ActionBar({
   cls,
+  barRef,
   children,
 }: {
   cls?: string
+  barRef?: Ref<HTMLDivElement>
   children: ComponentChildren
 }): JSX.Element {
   return (
-    <div class={cls ? `fitkit-confirm-actions ${cls}` : 'fitkit-confirm-actions'}>{children}</div>
+    <div ref={barRef} class={cls ? `fitkit-confirm-actions ${cls}` : 'fitkit-confirm-actions'}>
+      {children}
+    </div>
   )
 }
 
@@ -35,7 +39,7 @@ export function DestructiveActions({
   )
 }
 
-/** The button row of the import and registry modals. */
-export function ImportActions({ children }: { children: ComponentChildren }): JSX.Element {
+/** The button row of the rename, registry entry and import modals. */
+export function ButtonRow({ children }: { children: ComponentChildren }): JSX.Element {
   return <div class="fitkit-import-actions">{children}</div>
 }

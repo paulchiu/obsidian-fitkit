@@ -101,6 +101,7 @@ export class ExerciseRenameModal extends Modal {
   }
 
   onOpen(): void {
+    this.closed = false
     this.contentEl.addClass('fitkit-import-modal')
     this.setTitle('Rename exercise')
     this.draw()

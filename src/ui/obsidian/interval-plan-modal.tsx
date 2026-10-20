@@ -3,7 +3,7 @@ import { render } from 'preact'
 
 import type { IntervalPreset } from '../../domain/interval-presets'
 import { outlineFromPlan, outlineProblem, planFromOutline } from '../../domain/plan-outline'
-import { PlanForm, type PlanFormActions } from '../components/plan-form'
+import { PlanForm, type PlanFormActions, type PlanFormLayout } from '../components/plan-form'
 import { HostContext } from '../components/host'
 import {
   append,
@@ -47,6 +47,7 @@ export class IntervalPlanModal extends Modal {
   private showNote = false
   private examplesOpen = false
   private lastId = 0
+  private closed = false
   private stopKeepingPlanInView?: () => void
 
   constructor(
@@ -62,24 +63,23 @@ export class IntervalPlanModal extends Modal {
     contentEl.addClass('fitkit-set-note-modal')
     this.setTitle(`Interval plan for ${this.options.exerciseName}`)
 
+    this.closed = false
     this.text = this.options.initial ?? this.options.suggested ?? DEFAULT_PLAN
     this.show(true)
-    this.stopKeepingPlanInView = keepInViewOverKeyboard(contentEl, {
-      top: this.part('.fitkit-plan-heading'),
-      field: this.part('textarea.fitkit-plan-text'),
-      bar: this.part('.fitkit-set-note-actions'),
-      sheet: this.modalEl,
-      area: this.containerEl,
-    })
   }
 
   onClose(): void {
+    this.closed = true
     this.stopKeepingPlanInView?.()
+    this.stopKeepingPlanInView = undefined
     this.modalEl.removeClass('fitkit-set-note-modal-shell')
     render(null, this.contentEl)
   }
 
   private draw(): void {
+    if (this.closed) {
+      return
+    }
     const { rows, text } = this
     const preview = planPreview(text, rows ? outlineProblem(rows) : null)
     render(
@@ -93,18 +93,21 @@ export class IntervalPlanModal extends Modal {
           preview={preview}
           canClear={this.options.initial !== undefined}
           actions={this.actions}
+          onLayout={this.keepInView}
         />
       </HostContext.Provider>,
       this.contentEl,
     )
   }
 
-  private part(selector: string): HTMLElement {
-    const found = this.contentEl.querySelector<HTMLElement>(selector)
-    if (!found) {
-      throw new Error(`The plan form did not draw ${selector}.`)
-    }
-    return found
+  private keepInView = ({ heading, field, bar }: PlanFormLayout): void => {
+    this.stopKeepingPlanInView = keepInViewOverKeyboard(this.contentEl, {
+      top: heading,
+      field,
+      bar,
+      sheet: this.modalEl,
+      area: this.containerEl,
+    })
   }
 
   private newId = (): number => ++this.lastId

@@ -9,7 +9,7 @@ import {
   type ImportRow,
   type RowChoice,
 } from '../model/import-rows'
-import { ImportActions } from './action-bar'
+import { ButtonRow } from './action-bar'
 import { Choice, SelectField } from './fields'
 
 export type ImportPhase = 'loading' | 'ready' | 'error'
@@ -33,11 +33,11 @@ export function ImportExercisesBody(props: ImportExercisesBodyProps): JSX.Elemen
     return (
       <>
         <div class="fitkit-warn">{errorMessage}</div>
-        <ImportActions>
+        <ButtonRow>
           <button class="fitkit-btn" onClick={onCancel}>
             Close
           </button>
-        </ImportActions>
+        </ButtonRow>
       </>
     )
   }
@@ -73,14 +73,14 @@ export function ImportExercisesBody(props: ImportExercisesBodyProps): JSX.Elemen
         )
       ) : null}
       {phase === 'ready' ? (
-        <ImportActions>
+        <ButtonRow>
           <button class="fitkit-btn" onClick={onCancel}>
             Cancel
           </button>
           <button class="fitkit-btn fitkit-btn-primary" onClick={onApply}>
             Apply
           </button>
-        </ImportActions>
+        </ButtonRow>
       ) : null}
     </>
   )
