@@ -4,8 +4,8 @@ import type { FileSession, SaveResult } from '../../src/vault/file-session'
 import { createAutosaver, type AutosaverDeps } from '../../src/vault/autosaver'
 
 const PATH = 'Fitness/Workouts/2026-08-15.md'
-const OK: SaveResult = { ok: true, hash: 'h', mtime: 1 }
-const CONFLICT: SaveResult = { ok: false, reason: 'hash' }
+const OK: SaveResult = { ok: true, mtime: 1 }
+const CONFLICT: SaveResult = { ok: false, reason: 'conflict' }
 const DEBOUNCE_MS = 600
 
 interface Gate {
