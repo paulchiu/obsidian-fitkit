@@ -23,7 +23,7 @@ function formatWeight(value: number | undefined, unit: WeightUnit): string {
   return value === undefined || !Number.isFinite(value) ? '-' : `${value} ${unit}`
 }
 
-function formatReps(value: number | undefined): string {
+function repsCell(value: number | undefined): string {
   return value === undefined || !Number.isFinite(value) ? '-' : String(value)
 }
 
@@ -82,7 +82,7 @@ function countAndTable(
                 rows: sets.map((set) => [
                   formatSet(set.set),
                   formatWeight(set.weight, unit),
-                  formatReps(set.reps),
+                  repsCell(set.reps),
                   set.note ?? '-',
                 ]),
               },
@@ -100,7 +100,7 @@ function countAndTable(
                 rows: sets.map((set, index) => [
                   formatSet(set.set ?? index + 1),
                   bodyweightLevelName(levels, set.level),
-                  formatReps(set.reps),
+                  repsCell(set.reps),
                   formatWeight(set.load, unit),
                   set.note ?? '-',
                 ]),

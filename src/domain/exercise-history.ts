@@ -9,6 +9,7 @@ import {
 import { formatIsoDate, isoDatePrefix } from './dates'
 import { formatDurationInput } from './duration-input'
 import { pickHeaviestSet } from './epley'
+import { formatNumber, formatReps } from './number-format'
 import {
   formatNextPlanLabel,
   nextPlanTargetLevel,
@@ -504,19 +505,10 @@ function formatWeightSetShort(set: WeightSet, opts?: { weightOnly?: boolean }): 
   return `${formatNumber(set.weight)}x${formatNumber(set.reps)}`
 }
 
-function formatReps(reps: number): string {
-  const formatted = formatNumber(reps)
-  return `${formatted} rep${formatted === '1' ? '' : 's'}`
-}
-
 /** Badge-sized bodyweight set: rung name and rep count, never a weight. */
 function formatBodyweightSet(set: BodyweightBestSet, levels?: BodyweightLadder): string {
   const name = bodyweightLevelName(levels, set.level)
   return set.reps > 0 ? `${name} x ${formatNumber(set.reps)}` : name
-}
-
-function formatNumber(value: number): string {
-  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(1)))
 }
 
 function normalizePathKey(path: string): string {

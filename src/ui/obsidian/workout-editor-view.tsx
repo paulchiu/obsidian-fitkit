@@ -46,14 +46,10 @@ import {
   loggedTypeOf,
   type ExerciseType,
 } from '../../domain/exercise-type'
+import { formatNumber } from '../../domain/number-format'
 import { planTypeSwitch, type TypeSwitchPlan } from '../../domain/exercise-type-switch'
 import { filterSuggestableNames } from '../../domain/exercise-suggestions'
-import {
-  formatNumber as formatPlanNumber,
-  nextPlanTargetWeight,
-  type NextPlan,
-  type NextPlanDirection,
-} from '../../domain/next-plan'
+import { nextPlanTargetWeight, type NextPlan, type NextPlanDirection } from '../../domain/next-plan'
 import {
   parseWorkoutNote,
   relabelSetsAsFirstLevel,
@@ -1516,7 +1512,7 @@ export class WorkoutEditorView extends FileView {
           new PlanStepModal(this.app, {
             exerciseName: ex.name,
             kind: ex.kind,
-            initial: plan.step === undefined ? '' : formatPlanNumber(plan.step),
+            initial: plan.step === undefined ? '' : formatNumber(plan.step, 2),
             onSave: (step) => {
               ex.next = buildNextPlan(plan.direction, step)
               this.markDirty()

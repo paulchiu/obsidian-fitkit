@@ -5,6 +5,7 @@
  */
 
 import { formatRungUnit } from './bodyweight-levels'
+import { formatNumber } from './number-format'
 import type { ExerciseKind } from './exercise-kind'
 import type { WeightUnit } from './weight-unit'
 
@@ -40,7 +41,9 @@ export function parseNextPlan(value: string | undefined): NextPlan | null {
 }
 
 export function formatNextPlan(plan: NextPlan): string {
-  return plan.step === undefined ? plan.direction : `${plan.direction} ${formatNumber(plan.step)}`
+  return plan.step === undefined
+    ? plan.direction
+    : `${plan.direction} ${formatNumber(plan.step, 2)}`
 }
 
 const SAME_LABELS: Record<ExerciseKind, string> = {
@@ -60,7 +63,7 @@ export function formatNextPlanLabel(plan: NextPlan, kind: ExerciseKind): string 
   const direction = plan.direction === 'up' ? 'Up' : 'Down'
   return plan.step === undefined || kind === 'duration'
     ? direction
-    : `${direction} ${formatNumber(plan.step)}`
+    : `${direction} ${formatNumber(plan.step, 2)}`
 }
 
 /**
@@ -113,10 +116,6 @@ export function nextPlanTargetWeight(plan: NextPlan, baseWeight: number): number
  */
 export function planStepUnit(kind: ExerciseKind, step: number, unit: WeightUnit): string {
   return kind === 'bodyweight' ? formatRungUnit(step) : unit
-}
-
-export function formatNumber(value: number): string {
-  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)))
 }
 
 function parseStep(raw: string | undefined): number | null {
