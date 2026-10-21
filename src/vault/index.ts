@@ -1,4 +1,5 @@
-import type { App, TAbstractFile, TFile } from 'obsidian'
+import type { App, TFile } from 'obsidian'
+import { isMarkdownFile } from './vault-utils'
 
 import { pickBestBodyweightSet } from '../domain/bodyweight-levels'
 import { pickBestSet, pickHeaviestSet } from '../domain/epley'
@@ -12,7 +13,7 @@ import {
   type WorkoutNoteModel,
 } from '../domain/workout-note-model'
 import type { FitKitSettings } from '../settings'
-import { normalizeFolder, workoutsFolder } from '../settings-paths'
+import { isInFolder, normalizeFolder, workoutsFolder } from '../settings-paths'
 import { markdownFilesInFolder } from './folder-scan'
 
 /**
@@ -152,14 +153,6 @@ function targetedDuration(
     return {}
   }
   return { targetedDurationSeconds: targetedSeconds(exercise.durationEntries, parsed.program) }
-}
-
-function isInFolder(path: string, folder: string): boolean {
-  return path !== folder && path.startsWith(`${folder}/`)
-}
-
-export function isMarkdownFile(file: TAbstractFile | null): file is TFile {
-  return file !== null && (file as { extension?: unknown }).extension === 'md'
 }
 
 function sortEntries(entries: ReadonlyArray<IndexEntry>): IndexEntry[] {

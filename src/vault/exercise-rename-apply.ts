@@ -16,10 +16,10 @@ import {
 } from '../domain/exercise-rename-planner'
 import { parseWorkoutNote } from '../domain/workout-note-model'
 import type { FitKitSettings } from '../settings'
-import { exercisesFolder, normalizeFolder, workoutsFolder } from '../settings-paths'
+import { dirnameOf, exercisesFolder, normalizeFolder, workoutsFolder } from '../settings-paths'
 import { findExerciseNoteFile, readExerciseCatalog } from './exercise-catalog'
 import { markdownFilesInFolder } from './folder-scan'
-import { isMarkdownFile } from './index'
+import { isMarkdownFile } from './vault-utils'
 
 /**
  * Gathers the vault state a rename plan needs (registry overlay, exercise
@@ -427,11 +427,6 @@ function isTargetPathOccupiedByUnrelatedFile(
   const dir = sourceNote ? dirnameOf(sourceNote.path) : normalizeFolder(exercisesFolder(settings))
   const prospectivePath = normalizePath(`${dir}/${trimmedNewName}.md`)
   return app.vault.getAbstractFileByPath(prospectivePath) !== null
-}
-
-function dirnameOf(path: string): string {
-  const index = path.lastIndexOf('/')
-  return index < 0 ? '' : path.slice(0, index)
 }
 
 function getMarkdownFile(app: App, path: string): TFile | null {

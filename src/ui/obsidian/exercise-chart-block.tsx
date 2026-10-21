@@ -10,6 +10,7 @@ import {
   parseExerciseChartBlock,
   resolveExerciseChartMetric,
 } from '../../domain/exercise-chart-block-parse'
+import { frontmatterTypeIs, readFrontmatterField } from '../../domain/frontmatter'
 import { buildExerciseChartSeries } from '../../domain/exercise-chart'
 import {
   EXERCISE_KINDS,
@@ -203,8 +204,7 @@ function isExerciseSourceFile(file: TFile | null, plugin: FitKitPlugin): boolean
     return false
   }
   const frontmatter = plugin.app.metadataCache.getFileCache(file)?.frontmatter
-  const typeValue = readFrontmatterField(frontmatter, 'type')
-  return typeof typeValue === 'string' && typeValue.toLowerCase() === 'exercise'
+  return frontmatterTypeIs(frontmatter, 'exercise')
 }
 
 /** Advice fragment naming every known kind, so the note text cannot drift from `EXERCISE_KINDS`. */
@@ -239,14 +239,6 @@ function resolveExerciseWeightUnit(
   return resolved.kind === 'match'
     ? (resolved.entry.unit ?? DEFAULT_WEIGHT_UNIT)
     : DEFAULT_WEIGHT_UNIT
-}
-
-function readFrontmatterField(
-  frontmatter: CachedMetadata['frontmatter'] | undefined,
-  key: string,
-): unknown {
-  const record: Record<string, unknown> | null = frontmatter ?? null
-  return record === null ? undefined : record[key]
 }
 
 function uniqueNames(names: string[]): string[] {

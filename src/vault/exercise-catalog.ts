@@ -1,3 +1,4 @@
+import { frontmatterTypeIs, readFrontmatterField } from '../domain/frontmatter'
 import type { App, CachedMetadata, TFile } from 'obsidian'
 
 import { parseExerciseKind } from '../domain/exercise-kind'
@@ -72,7 +73,7 @@ export function readExerciseCatalog(app: App, settings: FitKitSettings): Exercis
 
   for (const file of markdownFilesInFolder(app, exercisesFolder(settings))) {
     const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter
-    if (!isExerciseFrontmatter(frontmatter)) {
+    if (!frontmatterTypeIs(frontmatter, 'exercise')) {
       continue
     }
 
@@ -103,11 +104,6 @@ export function readExerciseCatalog(app: App, settings: FitKitSettings): Exercis
   diagnostics.sort((left, right) => left.path.localeCompare(right.path))
 
   return { entries, diagnostics }
-}
-
-function isExerciseFrontmatter(frontmatter: CachedMetadata['frontmatter'] | undefined): boolean {
-  const type = readFrontmatterField(frontmatter, 'type')
-  return typeof type === 'string' && type.trim().toLowerCase() === 'exercise'
 }
 
 /** Strength-only rule: only strength notes carry a unit; other kinds have none. */
@@ -152,12 +148,4 @@ function levelsFromFrontmatter(
     return { warning: 'Exercise note has an invalid levels list.' }
   }
   return { levels }
-}
-
-function readFrontmatterField(
-  frontmatter: CachedMetadata['frontmatter'] | undefined,
-  key: string,
-): unknown {
-  const record: Record<string, unknown> | null = frontmatter ?? null
-  return record === null ? undefined : record[key]
 }

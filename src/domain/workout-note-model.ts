@@ -634,7 +634,7 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
       for (const set of exercise.strengthSets) {
         const parts = [`[exercise:: [[${exercise.exerciseName}]]]`, `[set:: ${set.set}]`]
         if (set.weight !== undefined) {
-          parts.push(`[weight:: ${formatNumber(set.weight)}]`)
+          parts.push(`[weight:: ${String(set.weight)}]`)
         }
         if (set.reps !== undefined) {
           parts.push(`[reps:: ${set.reps}]`)
@@ -652,12 +652,12 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
         if (set.set !== undefined) {
           parts.push(`[set:: ${set.set}]`)
         }
-        parts.push(`[level:: ${formatNumber(set.level)}]`)
+        parts.push(`[level:: ${String(set.level)}]`)
         if (set.reps !== undefined) {
           parts.push(`[reps:: ${set.reps}]`)
         }
         if (set.load !== undefined) {
-          parts.push(`[load:: ${formatNumber(set.load)}]`)
+          parts.push(`[load:: ${String(set.load)}]`)
         }
         if (set.note !== undefined) {
           parts.push(`[notes:: ${set.note}]`)
@@ -675,11 +675,11 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
         if (entry.step !== undefined) {
           parts.push(`[step:: ${entry.step}]`)
         }
-        parts.push(`[duration:: ${formatNumber(entry.durationSeconds)}]`)
+        parts.push(`[duration:: ${String(entry.durationSeconds)}]`)
         for (const [field, key] of DURATION_NUMBER_FIELDS) {
           const value = entry[key]
           if (value !== undefined) {
-            parts.push(`[${field}:: ${formatNumber(value)}]`)
+            parts.push(`[${field}:: ${String(value)}]`)
           }
         }
         if (entry.startedAt !== undefined) {
@@ -1057,12 +1057,4 @@ function collectInlineFields(bullet: string): Map<string, string> {
     map.set(key, value)
   }
   return map
-}
-
-function formatNumber(n: number): string {
-  if (!Number.isFinite(n)) {
-    return String(n)
-  }
-  /** Render integers without decimal, floats with their natural representation. */
-  return Number.isInteger(n) ? String(n) : String(n)
 }

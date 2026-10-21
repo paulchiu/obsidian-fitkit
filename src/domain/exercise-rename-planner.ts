@@ -21,6 +21,7 @@
  * than silently leaving (or wrongly "fixing") a reference.
  */
 
+import { dirnameOf } from '../settings-paths'
 import { exerciseTypeOf } from './exercise-type'
 import { normalize, type ExerciseKind, type ExerciseRegistryEntry } from './exercise-registry'
 import { escapeRegExp } from './regex-utils'
@@ -493,11 +494,6 @@ function stripFencedBlocks(lines: readonly string[]): string[] {
     }
   }
   return result
-}
-
-function dirnameOf(path: string): string {
-  const index = path.lastIndexOf('/')
-  return index < 0 ? '' : path.slice(0, index)
 }
 
 function joinNotePath(dir: string, name: string): string {

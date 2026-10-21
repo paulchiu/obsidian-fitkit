@@ -40,7 +40,8 @@ function renderExercise(exercise: CanonicalExercise): string {
   for (const row of exercise.rows) {
     if (row.kind === 'strength') {
       parts.push(
-        `- [exercise:: [[${exercise.canonicalName}]]] [set:: ${setNumber}] [weight:: ${formatNumber(row.weight)}] [reps:: ${formatNumber(row.reps)}]`,
+        /** `String(10.0)` is `'10'`, so whole numbers serialise without a decimal. */
+        `- [exercise:: [[${exercise.canonicalName}]]] [set:: ${setNumber}] [weight:: ${String(row.weight)}] [reps:: ${String(row.reps)}]`,
       )
       setNumber += 1
     } else {
@@ -55,10 +56,6 @@ function renderExercise(exercise: CanonicalExercise): string {
  * Format a number without trailing zero noise: `10` not `10.0`, `13.6` kept.
  * `String(n)` already collapses `10.0` to `'10'` in JS, so this is the canonical write path.
  */
-function formatNumber(value: number): string {
-  return String(value)
-}
-
 export function serializeWorkout(workout: CanonicalWorkout): string {
   const blocks: string[] = [frontmatter(workout.name, workout.date)]
   for (const exercise of workout.exercises) {

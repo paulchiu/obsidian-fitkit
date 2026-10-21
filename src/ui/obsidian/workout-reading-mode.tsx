@@ -1,3 +1,4 @@
+import { frontmatterTypeIs, type Frontmatter } from '../../domain/frontmatter'
 import { TFile, type MarkdownPostProcessorContext } from 'obsidian'
 import { render } from 'preact'
 
@@ -48,22 +49,14 @@ export function renderWorkoutReadingModeSection(
 }
 
 function isWorkoutContext(plugin: FitKitPlugin, ctx: MarkdownPostProcessorContext): boolean {
-  if (frontmatterIsWorkout(ctx.frontmatter)) {
+  if (frontmatterTypeIs(ctx.frontmatter as Frontmatter, 'workout')) {
     return true
   }
   const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath)
   if (!(file instanceof TFile)) {
     return false
   }
-  return frontmatterIsWorkout(plugin.app.metadataCache.getFileCache(file)?.frontmatter)
-}
-
-function frontmatterIsWorkout(frontmatter: unknown): boolean {
-  if (!frontmatter || typeof frontmatter !== 'object' || !('type' in frontmatter)) {
-    return false
-  }
-  const { type } = frontmatter
-  return typeof type === 'string' && type.toLowerCase() === 'workout'
+  return frontmatterTypeIs(plugin.app.metadataCache.getFileCache(file)?.frontmatter, 'workout')
 }
 
 function hasReadingPreview(el: HTMLElement): boolean {
