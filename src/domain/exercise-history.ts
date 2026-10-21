@@ -180,12 +180,8 @@ export function formatExerciseHistoryBadges(
 }
 
 /**
- * Badge for the plan in force on the card. A plan recorded on the open card
- * wins over the one carried in from last session, since it is the more recent
- * statement of intent and is the only readout the card offers for it; it is
- * measured against that card's own heaviest set. Shows the resulting weight
- * when the plan carries a step and there is a base to apply it to, since that
- * is the number acted on at the rack; otherwise the direction alone.
+ * Badge for the plan in force: a plan on the open card wins over the carried-in one.
+ * Shows the resulting weight when the plan has a step and a base, otherwise the direction alone.
  */
 export function formatNextPlanBadge(
   summary: ExerciseHistorySummary | undefined,

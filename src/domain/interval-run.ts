@@ -1,8 +1,6 @@
 /**
- * The interval run as a pure function of the note. A run's whole state is the plan,
- * the rows and one `[started::]` stamp on the open row, the same accumulator-plus-stamp
- * rule the duration timer uses. The stamp times `rest` when the row has a rest field,
- * and `duration` otherwise. Nothing lives only in memory, so a killed app loses nothing.
+ * The interval run as a pure function of the note: the plan, the rows and one `[started::]` stamp on the open row.
+ * The stamp times `rest` when the row has a rest field, else `duration`, so nothing lives only in memory.
  */
 
 import type { IntervalProgram, PlanStep } from './interval-program'
@@ -336,10 +334,8 @@ export const marksCaughtUpReps = (rows: ReadonlyArray<{ note?: string }>): boole
 const CUT_OFF_GRACE_MS = 2 * 60 * 1000
 
 /**
- * Picks a run back up after the app was away. Reps whose end passed in the meantime are
- * filled with the target and flagged. A plan that ended, or open work that ran a whole
- * period, more than a grace period ago means the athlete stopped, so it reports a
- * cut-off and leaves the rows alone.
+ * Picks a run back up after the app was away, filling elapsed reps with the target and flagging them.
+ * A run that ended, or open work that overran, more than a grace period ago reports a cut-off and leaves rows alone.
  */
 export function catchUpRun(
   rows: readonly RunRow[],

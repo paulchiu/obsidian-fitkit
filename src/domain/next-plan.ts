@@ -67,11 +67,8 @@ export function formatNextPlanLabel(plan: NextPlan, kind: ExerciseKind): string 
 }
 
 /**
- * Apply the plan to the rung it was recorded against. The step counts rungs,
- * so a fractional step lands on the nearest rung and the target clamps to
- * the ends of the ladder. Returns null when the plan carries no step or
- * names no usable base. The caller always passes a real ladder length, so a
- * missing ladder never reaches here as an empty one.
+ * Apply the plan to the rung it was recorded against, clamping to the ends of the ladder.
+ * Returns null when the plan carries no step or names no usable base.
  */
 export function nextPlanTargetLevel(
   plan: NextPlan,

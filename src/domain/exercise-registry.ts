@@ -10,10 +10,8 @@ import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from './weight-unit'
 export type { ExerciseKind }
 
 /**
- * `unit` is only present when explicitly recorded (via the registry editor or
- * import). Absence means "no unit on file", distinct from an explicit 'kg';
- * callers fall back to `DEFAULT_WEIGHT_UNIT` themselves rather than have this
- * type silently synthesize one.
+ * `unit` is only present when explicitly recorded; absence means "no unit on file", distinct from 'kg'.
+ * Callers fall back to `DEFAULT_WEIGHT_UNIT` themselves.
  */
 export type ExerciseRegistryEntry = {
   name: string
@@ -284,9 +282,7 @@ export function dedupeAliases(candidates: readonly string[], excludeKey: string)
 }
 
 /**
- * Trim and dedupe a raw form draft. Drops empty aliases, dedupes aliases
- * by normalized form (first occurrence wins, original casing kept). Self
- * aliases (those that normalize to the draft's own canonical) are dropped.
+ * Trim and dedupe a form draft: empty and self aliases are dropped, the first alias per normalized form wins.
  * Idempotent.
  */
 export function sanitizeEntryDraft(draft: RegistryEntryDraft): RegistryEntryDraft {
@@ -377,10 +373,8 @@ export function validateEntryDraft(
 }
 
 /**
- * Return an updated registry with the entry under `oldName` replaced by `next`.
- * If the canonical name changes (under normalize), the old name is prepended to
- * `next.aliases` (deduped on normalized form). Aliases that normalize to the
- * new canonical are dropped. Caller passes a sanitized draft.
+ * Replace the entry under `oldName` with `next`, prepending the old name to its aliases on a canonical change.
+ * Caller passes a sanitized draft.
  */
 export function renameEntry(
   registry: ExerciseRegistry,
