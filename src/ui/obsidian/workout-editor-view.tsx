@@ -506,19 +506,27 @@ export class WorkoutEditorView extends FileView {
       return
     }
     const screen = this.screens.current()
-    if (screen?.kind === 'run') {
-      this.draw(this.runScene(screen))
-    } else if (screen?.kind === 'set') {
-      this.draw(this.setTimerScene(screen))
-    } else if (screen?.kind === 'rest') {
-      this.draw({
-        kind: 'rest',
-        seconds: this.liveRestSeconds(screen),
-        stop: () => this.stopRestTimer(),
-        clock: screen.clock,
-      })
-    } else {
+    if (!screen) {
       this.draw({ kind: 'editor', page: this.page(this.model) })
+      return
+    }
+    switch (screen.kind) {
+      case 'run':
+        this.draw(this.runScene(screen))
+        return
+      case 'set':
+        this.draw(this.setTimerScene(screen))
+        return
+      case 'rest':
+        this.draw({
+          kind: 'rest',
+          seconds: this.liveRestSeconds(screen),
+          stop: () => this.stopRestTimer(),
+          clock: screen.clock,
+        })
+        return
+      default:
+        return assertUnreachableKind(screen)
     }
   }
 

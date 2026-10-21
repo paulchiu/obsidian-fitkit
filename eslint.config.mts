@@ -248,6 +248,10 @@ export default defineConfig(
     files: ['src/**/*.{ts,tsx}'],
     rules: {
       'no-console': 'error',
+      '@typescript-eslint/switch-exhaustiveness-check': [
+        'error',
+        { considerDefaultExhaustiveForUnions: true, requireDefaultForNonUnion: false },
+      ],
     },
   },
   {
