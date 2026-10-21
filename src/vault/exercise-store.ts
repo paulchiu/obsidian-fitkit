@@ -84,10 +84,8 @@ export interface ExerciseStore {
 }
 
 /**
- * Writes an exercise's durable state to whichever store wins on read: the
- * exercise note when one exists, else its registry entry. Ladder writes are
- * remembered for the store's lifetime because the metadata cache reports a
- * note write only after it lands on disk.
+ * Writes an exercise's durable state to whichever store wins on read: its note if one exists, else its registry entry.
+ * Ladder writes are remembered because the metadata cache reports a note write only after it lands.
  */
 export function createExerciseStore(app: App, holder: SettingsHolder): ExerciseStore {
   const ladderOverrides = new Map<string, string[]>()

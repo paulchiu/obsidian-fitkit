@@ -13,11 +13,8 @@ export interface HistoryOnlyCandidate {
 }
 
 /**
- * Exercise names referenced by `[exercise:: [[Name]]]` inline fields in workout
- * notes whose normalized key is absent from `knownKeys` (the union of exercise
- * note names and overlay registry names and aliases). `readMode: 'fresh'` reads current disk
- * contents via `vault.read`; `'cached'` uses `vault.cachedRead` for cheaper
- * display-only scans.
+ * Exercise names in workout-note `[exercise:: [[Name]]]` fields whose normalized key is absent from `knownKeys`.
+ * `readMode: 'fresh'` reads via `vault.read`; `'cached'` uses `vault.cachedRead` for display-only scans.
  */
 export async function collectHistoryOnlyCandidates(
   app: App,

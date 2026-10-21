@@ -68,9 +68,7 @@ export interface ExerciseDashboardMaps {
 
 /**
  * Pure: build full dashboard markdown from index.
- * @param index - The FitKit index.
  * @param workoutsFolderPath - Resolved folder path for Dataview queries.
- * @param exercisesFolderPath - Resolved folder path for path-qualified exercise wikilinks.
  * @param hiddenKeys - Set of keys like 'exercise:Squat' to exclude.
  */
 export function composeDashboard(

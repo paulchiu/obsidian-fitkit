@@ -24,16 +24,9 @@ interface BackfillSource {
 }
 
 /**
- * Pure merge step for "Rebuild registry". For every note-backed or history-only
- * name missing from the overlay, adds an entry carrying the source's current
- * kind and no unit (materializing a unit would recreate the frontmatter data
- * loss bug fixed alongside this feature). Never touches an existing overlay
- * entry, keyed on `normalize()` over both an entry's name and its aliases, so
- * a name already consolidated as an alias is not re-added as its own entry.
- * Idempotent: replaying with `existingOverlay` extended by a prior run's
- * `entriesToAdd` yields an empty `entriesToAdd`. Also dedupes within a single
- * run, so two sources that normalize to the same key (e.g. a whitespace
- * variant) never both land in `entriesToAdd`.
+ * Pure merge step for "Rebuild registry": adds a unit-less overlay entry for every note-backed or
+ * history-only name missing from it (matched via `normalize()` over names and aliases).
+ * Idempotent, and dedupes sources that normalize to the same key.
  */
 export function computeRegistryBackfillPlan(
   catalogEntries: readonly BackfillSource[],

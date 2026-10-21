@@ -21,10 +21,8 @@ export interface RegistryTableRow {
   interval?: true
   aliases: string[]
   /**
-   * 'note': backed by an exercise note, which wins on read; editing name or
-   * kind through the overlay would have no effect. 'overlay': a no-note
-   * registry entry, fully editable here. 'history': seen only in workout
-   * notes, with neither a note nor an overlay entry.
+   * 'note': backed by an exercise note, which wins on read. 'overlay': a no-note entry, fully editable.
+   * 'history': seen only in workout notes.
    */
   provenance: RegistryRowProvenance
   notePath: string | null
@@ -32,10 +30,8 @@ export interface RegistryTableRow {
 }
 
 /**
- * The comprehensive registry list for the settings table: every exercise note,
- * every overlay entry, and every workout-history-only name (tombstones
- * excluded), each tagged with the provenance that determines whether editing
- * it through this table actually takes effect.
+ * The settings table's registry list: every exercise note, overlay entry and history-only name (minus tombstones),
+ * each tagged with the provenance that decides whether editing it takes effect.
  */
 export async function buildRegistryTableRows(
   app: App,
