@@ -6,7 +6,7 @@ FitKit derives two reporting surfaces from your workout notes: a single dashboar
 
 ![Generated dashboard with recent workouts, PBs, and next session plans](images/dashboard.png)
 
-`Rebuild dashboard`, under `Setup and maintenance`, rescans your workout notes and regenerates `Fitness/Fitness Dashboard.md` in full. Treat it as output; anything you write into it is overwritten on the next rebuild.
+The `Rebuild dashboard` step of `Sync and repair everything`, under `Setup and maintenance`, rescans your workout notes and regenerates `Fitness/Fitness Dashboard.md` in full. Treat it as output; anything you write into it is overwritten on the next rebuild.
 
 The generated note has four kinds of section:
 
@@ -15,9 +15,9 @@ The generated note has four kinds of section:
 - `Next session plans` appears only when at least one exercise carries a plan, and shows the direction, the change, and the date you recorded it.
 - One section per exercise, linking to its exercise note and embedding a Dataview query over that exercise's rows.
 
-`Rebuild index` does the scanning half on its own, without rewriting the dashboard. It also refreshes the parse diagnostics that `Show parse diagnostics` reports, which is the quickest way to find a workout note FitKit could not read.
+Checking with `Sync and repair everything` does the scanning half on its own, without rewriting the dashboard. When it finds a workout note FitKit could not read, the dialog offers a `Parse diagnostics` button that lists it.
 
-`Restore hidden dashboard sections` clears per-exercise hidden-section state for the dashboard and regenerates it.
+Its `Restore hidden dashboard sections` step clears per-exercise hidden-section state for the dashboard and regenerates it.
 
 ## How a PB is chosen
 
@@ -72,4 +72,4 @@ A level series draws as a step line, holding each rung until the next session, w
 
 Under `## Recent sessions`, FitKit writes a Dataview query that pulls that exercise's rows out of your workout notes: the last ten sets for a strength or bodyweight exercise (Level, Reps, and Load columns for bodyweight), or the last twelve entries for a duration one. There is a matching query behind `## Notes` that collects the per-set notes you wrote.
 
-Both are ordinary Dataview blocks. Customise one and `Sync and repair exercise notes` leaves your version in place and reports it rather than overwriting, unless it still points at a name the exercise no longer uses.
+Both are ordinary Dataview blocks. Customise one and the `Sync exercise notes` step leaves your version in place and reports it rather than overwriting, unless it still points at a name the exercise no longer uses.

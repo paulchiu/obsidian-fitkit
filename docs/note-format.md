@@ -121,7 +121,7 @@ Your own training notes live here.
 
 `kind:` is `strength`, `duration`, or `bodyweight`. An interval exercise is `kind: duration` with an `interval: true` line, so a version of FitKit from before interval training reads it as an ordinary duration exercise. `unit:` is `kg` or `lbs` and applies to strength exercises only, as does `metric:`, which selects what the progress chart plots. A bodyweight note carries neither; it carries a `levels:` ladder instead, see [Dashboard and charts](dashboard-and-charts.md#chart-blocks).
 
-FitKit seeds the three sections when it creates a note, and `Sync and repair exercise notes` refreshes them in notes you already have. The `Notes` section is yours; nothing regenerates over it.
+FitKit seeds the three sections when it creates a note, and the `Sync exercise notes` step of `Sync and repair everything` refreshes them in notes you already have. The `Notes` section is yours; nothing regenerates over it.
 
 A bodyweight note declares its ladder instead of a unit and a metric:
 

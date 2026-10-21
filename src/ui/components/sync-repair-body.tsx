@@ -50,7 +50,7 @@ export function SyncRepairBody(props: SyncRepairBodyProps): JSX.Element {
                 class={result.ok ? 'fitkit-sync-result' : 'fitkit-sync-result fitkit-warn'}
               >
                 {result.ok
-                  ? `${SYNC_REPAIR_STEP_NAMES[result.step]}: ${result.summary}`
+                  ? result.summary
                   : `${SYNC_REPAIR_STEP_NAMES[result.step]} failed: ${result.message}`}
               </li>
             ))}
@@ -76,7 +76,6 @@ function StepPicker(
     <>
       <p class="fitkit-import-muted">
         Scanned {preview.workoutCount} workouts and {preview.exerciseNoteCount} exercise notes.
-        Nothing changes until you apply.
       </p>
       <DiagnosticsLinks {...props} diagnostics={preview.diagnostics} />
       <div class="fitkit-sync-steps">

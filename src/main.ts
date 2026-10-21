@@ -209,22 +209,8 @@ export default class FitKitPlugin extends Plugin {
     return this.workoutIndex.getIndex()
   }
 
-  async rebuildWorkoutIndex(): Promise<void> {
-    this.workoutIndex.invalidate()
-    const index = await this.getIndex()
-    new Notice(
-      `Indexed ${index.entries.length} workout(s)${
-        this.lastDiagnostics.length ? `, ${this.lastDiagnostics.length} diagnostic(s)` : ''
-      }.`,
-    )
-  }
-
   refreshIndexEntry(path: string): Promise<void> {
     return this.workoutIndex.refreshEntry(path)
-  }
-
-  async rebuildDashboard(): Promise<void> {
-    new Notice(await this.regenerateDashboardFresh())
   }
 
   private async regenerateDashboardFresh(): Promise<string> {
@@ -232,10 +218,6 @@ export default class FitKitPlugin extends Plugin {
     const index = await this.getIndex()
     const result = await regenerateDashboard(this.app, this.settings, index)
     return `Dashboard rebuilt: ${result.sectionCount} section(s) at ${result.path}.`
-  }
-
-  async restoreHiddenDashboardSections(): Promise<void> {
-    new Notice(await this.restoreHiddenSectionsAndRegenerate())
   }
 
   private async restoreHiddenSectionsAndRegenerate(): Promise<string> {
@@ -258,14 +240,7 @@ export default class FitKitPlugin extends Plugin {
     new ParseDiagnosticsModal(this.app, this.lastDiagnostics).open()
   }
 
-  /**
-   * Backfills `settings.exerciseRegistry` with every note-backed and history-only exercise.
-   * Never touches an existing overlay entry or materializes a unit.
-   */
-  async rebuildExerciseRegistry(): Promise<void> {
-    new Notice(await this.backfillExerciseRegistry())
-  }
-
+  /** Adds every note-backed and history-only exercise, never touching an entry or inventing a unit. */
   private async backfillExerciseRegistry(): Promise<string> {
     const plan = await buildRegistryBackfillPlan(this.app, this.settings)
     this.settings.exerciseRegistry = applyRegistryBackfillPlan(
@@ -488,12 +463,6 @@ export default class FitKitPlugin extends Plugin {
       parse: this.lastDiagnostics.length,
       registry: buildExerciseRegistrySnapshot(this.app, this.settings).diagnostics.length,
     }
-  }
-
-  async syncExerciseNotes(): Promise<void> {
-    const plan = await planExerciseNoteSync(this.app, this.settings, this.settings.exerciseRegistry)
-    const applied = await applyExerciseNoteSync(this.app, plan)
-    new Notice(formatExerciseNoteSyncSummary(summariseExerciseNoteSync(applied)))
   }
 
   async loadSettings(): Promise<void> {
