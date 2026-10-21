@@ -28,6 +28,7 @@ import {
 import { dashboardPath, workoutFilename, workoutsFolder } from './settings-paths'
 import { renderExerciseChartBlock } from './ui/obsidian/exercise-chart-block'
 import { ParseDiagnosticsModal } from './ui/obsidian/parse-diagnostics-modal'
+import { SyncRepairModal } from './ui/obsidian/sync-repair-modal'
 import { renderWorkoutReadingModeSection } from './ui/obsidian/workout-reading-mode'
 import {
   VIEW_TYPE_FITKIT_WORKOUT_EDITOR,
@@ -408,6 +409,15 @@ export default class FitKitPlugin extends Plugin {
 
   private isWorkoutFile(file: TFile): boolean {
     return frontmatterTypeIs(this.app.metadataCache.getFileCache(file)?.frontmatter, 'workout')
+  }
+
+  openSyncRepair(): void {
+    new SyncRepairModal(this.app, {
+      preview: () => this.previewSyncRepair(),
+      apply: (steps) => this.applySyncRepair(steps),
+      showParseDiagnostics: () => this.showParseDiagnostics(),
+      showRegistryDiagnostics: () => this.showExerciseRegistryDiagnostics(),
+    }).open()
   }
 
   /** Scans what each sync and repair step would change, writing nothing. */

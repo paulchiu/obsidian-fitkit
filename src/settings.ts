@@ -374,6 +374,15 @@ export class FitKitSettingTab extends PluginSettingTab {
           },
           {
             kind: 'action',
+            name: 'Sync and repair everything',
+            desc: 'Scan the registry, exercise notes and dashboard, see what each step would change, then apply the ones you tick.',
+            buttonText: 'Check',
+            onClick: () => {
+              this.plugin.openSyncRepair()
+            },
+          },
+          {
+            kind: 'action',
             name: 'Rebuild index',
             desc: 'Scan workout notes and cache the latest index plus parse diagnostics.',
             buttonText: 'Rebuild',

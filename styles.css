@@ -1858,3 +1858,54 @@ body.is-mobile .fitkit-editor-root {
   align-items: center;
   gap: 6px;
 }
+
+.fitkit-sync-steps {
+  display: grid;
+}
+
+.fitkit-sync-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.fitkit-sync-step:first-child {
+  border-top: 0;
+}
+
+.fitkit-sync-step input {
+  grid-row: span 2;
+  margin-top: 3px;
+}
+
+.fitkit-sync-step-name {
+  font-weight: 500;
+}
+
+.fitkit-sync-step-detail {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.fitkit-sync-step-current .fitkit-sync-step-name {
+  color: var(--text-faint);
+}
+
+.fitkit-sync-diagnostics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fitkit-sync-results {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.fitkit-sync-result {
+  overflow-wrap: anywhere;
+}

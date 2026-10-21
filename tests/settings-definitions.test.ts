@@ -138,7 +138,7 @@ describe('setting definitions', () => {
   it('gives every searchable row a description so settings search can match it', () => {
     const searchable = allRows(createTab().tab).filter((row) => row.searchable !== false)
 
-    expect(searchable).toHaveLength(14)
+    expect(searchable).toHaveLength(15)
     for (const row of searchable) {
       expect(row.name.length).toBeGreaterThan(0)
       expect(typeof row.desc).toBe('string')
@@ -146,7 +146,7 @@ describe('setting definitions', () => {
     }
   })
 
-  it('keeps the seven maintenance actions as searchable rows', () => {
+  it('leads the maintenance actions with sync and repair everything, all searchable', () => {
     const maintenance = groups(createTab().tab).find(
       (group) => group.heading === 'Setup and maintenance',
     )
@@ -154,6 +154,7 @@ describe('setting definitions', () => {
     expect(
       maintenance?.items.filter((row) => row.searchable !== false).map((row) => row.name),
     ).toEqual([
+      'Sync and repair everything',
       'Rebuild index',
       'Rebuild dashboard',
       'Restore hidden dashboard sections',

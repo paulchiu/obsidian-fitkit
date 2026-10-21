@@ -168,7 +168,16 @@ describe('display fallback', () => {
       .filter((entry) => entry.buttonText !== undefined)
       .map((entry) => entry.buttonText)
 
-    expect(buttons).toEqual(['Rebuild', 'Rebuild', 'Restore', 'Show', 'Show', 'Sync', 'Rebuild'])
+    expect(buttons).toEqual([
+      'Check',
+      'Rebuild',
+      'Rebuild',
+      'Restore',
+      'Show',
+      'Show',
+      'Sync',
+      'Rebuild',
+    ])
   })
 
   it('edits the interval presets in a multi-line box', () => {
