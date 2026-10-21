@@ -1,24 +1,7 @@
 /**
- * Pure planner for renaming or merging an exercise: renaming the exercise
- * note file, rewriting `[exercise:: [[Name]]]` fields and `## [[Name]]`
- * headings across workout notes, and folding aliases and tombstones so the
- * registry overlay stays consistent. See `applyExerciseRenamePlan`
- * (src/vault/exercise-rename-apply.ts) for the vault-facing execution of a
- * plan this module produces.
- *
- * Substitution is deliberately narrow: only the two structurally-anchored
- * bare-wikilink forms above are rewritten, matched with the text between
- * `[[` and `]]` required to equal the name exactly, case-insensitively and
- * via the same `normalize()` the rest of the registry uses (so renaming
- * "Row" never touches "Barbell Row", but does catch "[[row]]"). A
- * hand-edited note may also reference the exercise
- * via a pathed wikilink (`[[Folder/Name]]`) or an aliased one
- * (`[[Name|Display]]`, with or without a path). Resolving whether a pathed
- * link actually targets this exercise's note requires real vault link
- * resolution, which this pure module deliberately does not have; rather than
- * guess, every such occurrence is counted as `staleOccurrences` and surfaced
- * in the plan instead of rewritten, so the caller can warn the user rather
- * than silently leaving (or wrongly "fixing") a reference.
+ * Pure planner for renaming or merging an exercise: note file, `[exercise:: [[Name]]]` and `## [[Name]]` rewrites, alias folding.
+ * Only exact bare wikilinks are rewritten; pathed or aliased links need vault resolution, so they are counted as `staleOccurrences`.
+ * See `applyExerciseRenamePlan` (src/vault/exercise-rename-apply.ts) for execution.
  */
 
 import { dirnameOf } from '../settings-paths'
@@ -191,12 +174,7 @@ export function buildExerciseRenamePlan(input: ExerciseRenamePlanInput): Exercis
   const sameKey = newKey === oldKey
   const sourceNote = input.catalog.find((entry) => normalize(entry.name) === oldKey) ?? null
   /**
-   * When the typed name resolves to an existing entry only via one of its
-   * aliases (not its canonical name), the surviving identity is that entry's
-   * own canonical name, not the alias the user happened to type: the note
-   * file is titled after the canonical name, and workout notes must end up
-   * pointing at that title, not at an alias that still needs its own
-   * resolution.
+   * A name typed as an alias resolves to the entry's canonical name, since the note file and workout links use that title.
    */
   const resultName = distinctTargetEntry ? distinctTargetEntry.name : trimmedNewName
   const resultKey = normalize(resultName)
@@ -281,16 +259,8 @@ export interface RewriteWorkoutNoteOccurrencesResult {
 }
 
 /**
- * Rewrites `[exercise:: [[oldName]]]` fields and `## [[oldName]]` headings
- * in `text` to `newName`. Matches only these two forms; see the module doc
- * for pathed/aliased wikilinks. Text inside a fenced code block is never
- * rewritten, even if it happens to look like one of these forms (a
- * documentation or example block quoting the field syntax, say): fences are
- * the one construct `serializeWorkoutNote` already preserves verbatim, so
- * this rewriter holds itself to the same bar. Idempotent: a second call over
- * already-rewritten text returns the text unchanged with both counts zero,
- * which is what makes the vault apply step's rescan-and-rewrite safe to
- * re-run.
+ * Rewrites `[exercise:: [[oldName]]]` fields and `## [[oldName]]` headings to `newName`, skipping fenced code blocks.
+ * Idempotent, so the vault apply step can safely re-run it; pathed and aliased links are covered in the module doc.
  */
 export function rewriteWorkoutNoteOccurrences(
   text: string,
@@ -403,10 +373,7 @@ function isWithinRanges(position: number, ranges: readonly (readonly [number, nu
 }
 
 /**
- * Matches case-insensitively (`i` flag): registry and note lookups already
- * treat `[[row]]` and `[[Row]]` as the same exercise via `normalize()`, so a
- * rename must catch and rewrite both, not silently skip the differently-cased
- * one.
+ * Case-insensitive, matching how `normalize()` treats `[[row]]` and `[[Row]]` as one exercise.
  */
 function headingLinePattern(escapedName: string): RegExp {
   return new RegExp(`^(##[ \\t]+)\\[\\[${escapedName}\\]\\]([ \\t]*)$`, 'gmi')
@@ -434,10 +401,8 @@ function findOwnerEntry(
 }
 
 /**
- * Folds `oldName` plus both entries' existing aliases into one deduped list
- * for the surviving entry, dropping anything that now normalizes to the new
- * canonical name. Used for both a plain rename (`targetEntry` null) and a
- * merge (`targetEntry` the entry being merged into).
+ * Folds `oldName` and both entries' aliases into one deduped list for the survivor, dropping the new canonical name.
+ * `targetEntry` is null for a plain rename and the merge target otherwise.
  */
 function foldAliases(
   sourceEntry: ExerciseRegistryEntry | null,
