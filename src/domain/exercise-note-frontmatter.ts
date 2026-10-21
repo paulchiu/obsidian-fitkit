@@ -221,7 +221,10 @@ function strengthUnitForName(registry: ExerciseRegistry, name: string): WeightUn
   return unitForName(registry, name)
 }
 
-function frontmatterBlock(
+/**
+ * Builds the exercise note frontmatter block, ending with a blank line after the closing fence.
+ */
+export function frontmatterBlock(
   type: ExerciseType | null,
   exerciseName: string,
   unit: WeightUnit,

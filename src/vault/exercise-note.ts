@@ -1,4 +1,4 @@
-import { defaultBodyweightLevels } from '../domain/bodyweight-levels'
+import { frontmatterBlock } from '../domain/exercise-note-frontmatter'
 import { kindOfType, type ExerciseType } from '../domain/exercise-type'
 import { buildNotesBlock, buildRecentSessionsBlock } from '../domain/exercise-note-template'
 import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
@@ -20,26 +20,6 @@ export function composeExerciseNote(
 ): string {
   const kind = kindOfType(type)
   const lines: string[] = []
-  lines.push('---')
-  lines.push('type: exercise')
-  lines.push(`kind: ${kind}`)
-  if (type === 'interval') {
-    lines.push('interval: true')
-  }
-  /** Strength-only rule: metric and unit are strength concerns; other kinds need neither. */
-  if (kind === 'strength') {
-    lines.push('metric: e1rm')
-    lines.push(`unit: ${unit}`)
-  }
-  /** A new bodyweight note starts with a usable ladder instead of an empty menu. */
-  if (kind === 'bodyweight') {
-    lines.push('levels:')
-    for (const rung of defaultBodyweightLevels(exerciseName)) {
-      lines.push(`  - ${rung}`)
-    }
-  }
-  lines.push('---')
-  lines.push('')
   lines.push('## Progress chart')
   lines.push('')
   lines.push('```fitkit-chart')
@@ -54,7 +34,7 @@ export function composeExerciseNote(
   lines.push('## Notes')
   lines.push('')
   lines.push(buildNotesBlock(exerciseName, fitnessRootFromWorkouts(workoutsFolderPath)))
-  return `${lines.join('\n')}\n`
+  return `${frontmatterBlock(type, exerciseName, unit)}${lines.join('\n')}\n`
 }
 
 function fitnessRootFromWorkouts(workoutsFolderPath: string): string {
