@@ -56,6 +56,7 @@
   - `noImplicitAny`, `strictNullChecks`, `noUncheckedIndexedAccess` enabled.
   - No `any`. Use `unknown` and narrow.
   - `import type { ... }` for type-only imports.
+  - Branch on discriminated unions with `switch` plus a never guard (no pattern-matching library); `@typescript-eslint/switch-exhaustiveness-check` enforces it.
 - **Comments & docs:**
   - Default to no comments. Let names carry the meaning.
   - When a comment is warranted (non-obvious invariant, workaround, subtle edge case), write a JSDoc block (`/** ... */`) rather than stacked `//` lines.
