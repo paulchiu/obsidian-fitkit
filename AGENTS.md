@@ -61,6 +61,7 @@
   - Default to no comments. Let names carry the meaning.
   - When a comment is warranted (non-obvious invariant, workaround, subtle edge case), write a JSDoc block (`/** ... */`) rather than stacked `//` lines.
   - Document _why_, not _what_. Don't reference PR numbers, tickets, or the current task (they rot).
+  - Keep doc comments to at most 3 lines: one sentence on the contract plus at most one short why.
 - **Error handling:**
   - Recoverable: return `null` or a typed result (e.g., `{ok: false, reason}`). Don't throw across module boundaries.
   - User-facing: surface via `Notice` for quick feedback, or a modal banner for anything the user must acknowledge. Never swallow errors silently.
