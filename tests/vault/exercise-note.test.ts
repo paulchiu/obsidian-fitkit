@@ -140,6 +140,24 @@ describe('exercise-note composer', () => {
     expect(markdown).toContain(buildNotesBlock('Machine Pushdown', 'Fitness'))
   })
 
+  it('writes the exact frontmatter for each exercise type', () => {
+    const head = (
+      name: string,
+      type: Parameters<typeof composeExerciseNote>[1],
+      unit?: 'kg' | 'lbs',
+    ) => composeExerciseNote(name, type, 'Fitness/Workouts', unit).split('## Progress chart')[0]
+    expect(head('Squat', 'strength', 'lbs')).toBe(
+      '---\ntype: exercise\nkind: strength\nmetric: e1rm\nunit: lbs\n---\n\n',
+    )
+    expect(head('Plank', 'duration')).toBe('---\ntype: exercise\nkind: duration\n---\n\n')
+    expect(head('Run', 'interval')).toBe(
+      '---\ntype: exercise\nkind: duration\ninterval: true\n---\n\n',
+    )
+    expect(head('Pull-up', 'bodyweight')).toMatch(
+      /^---\ntype: exercise\nkind: bodyweight\nlevels:\n( {2}- .+\n)+---\n\n$/,
+    )
+  })
+
   it('is idempotent for the same inputs', () => {
     expect(composeExerciseNote('Squat', 'strength', 'Fitness/Workouts')).toBe(
       composeExerciseNote('Squat', 'strength', 'Fitness/Workouts'),

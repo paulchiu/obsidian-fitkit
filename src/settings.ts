@@ -8,7 +8,13 @@ import type {
 
 import { formatErrorMessage } from './domain/error'
 import type { ExerciseRegistryEntry } from './domain/exercise-registry'
-import { createRegistry, intervalMarker, normalize, removeEntry } from './domain/exercise-registry'
+import {
+  createRegistry,
+  intervalMarker,
+  normalize,
+  removeEntry,
+  uniqueNormalizedKeys,
+} from './domain/exercise-registry'
 import { parseExerciseKind } from './domain/exercise-kind'
 import { exerciseTypeOf } from './domain/exercise-type'
 import {
@@ -63,17 +69,7 @@ export const DEFAULT_SETTINGS: FitKitSettings = {
 export function normalizeDeletedExerciseTombstones(
   deletedExercises: readonly string[] = [],
 ): string[] {
-  const tombstones: string[] = []
-  const seen = new Set<string>()
-  for (const name of deletedExercises) {
-    const key = normalize(name)
-    if (key.length === 0 || seen.has(key)) {
-      continue
-    }
-    seen.add(key)
-    tombstones.push(key)
-  }
-  return tombstones
+  return uniqueNormalizedKeys(deletedExercises)
 }
 
 export function addDeletedExerciseTombstone(

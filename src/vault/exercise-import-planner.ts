@@ -7,6 +7,7 @@ import {
   kindForName,
   normalize,
   resolve,
+  uniqueNormalizedKeys,
   upsertEntry,
 } from '../domain/exercise-registry'
 import { exerciseTypeOf, kindOfType, type ExerciseType } from '../domain/exercise-type'
@@ -189,7 +190,7 @@ export async function applyExerciseImportPlan(
 
   if (settingsChanged) {
     settings.exerciseRegistry = registry.entries
-    settings.deletedExercises = normalizeTombstones(deletedExercises)
+    settings.deletedExercises = uniqueNormalizedKeys(deletedExercises)
   }
 
   return {
@@ -259,18 +260,4 @@ function dedupeExercises(exercises: ExerciseEntry[]): ExerciseEntry[] {
     byName.set(key, exercise)
   }
   return [...byName.values()]
-}
-
-function normalizeTombstones(names: readonly string[]): string[] {
-  const tombstones: string[] = []
-  const seen = new Set<string>()
-  for (const name of names) {
-    const key = normalize(name)
-    if (key.length === 0 || seen.has(key)) {
-      continue
-    }
-    seen.add(key)
-    tombstones.push(key)
-  }
-  return tombstones
 }

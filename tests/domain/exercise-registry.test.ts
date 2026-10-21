@@ -4,6 +4,7 @@ import type { ExerciseRegistry, ExerciseRegistryEntry } from '../../src/domain/e
 import {
   bootstrapFromStems,
   createRegistry,
+  dedupeAliases,
   kindForName,
   levelsForName,
   mergeRegistries,
@@ -12,6 +13,7 @@ import {
   resolve,
   sanitizeEntryDraft,
   typeForName,
+  uniqueNormalizedKeys,
   unitForName,
   upsertEntry,
   validateEntryDraft,
@@ -487,5 +489,23 @@ describe('interval exercises', () => {
 
     expect(typeForName(registry, 'Bike Intervals')).toBe('interval')
     expect(typeForName(renamed, 'Bike Sprints')).toBe('interval')
+  })
+})
+
+describe('uniqueNormalizedKeys', () => {
+  it('normalizes, drops empties and keeps first occurrence order', () => {
+    expect(uniqueNormalizedKeys(['  Squat ', 'squat', '', '   ', 'Bench Press'])).toEqual([
+      'squat',
+      'bench press',
+    ])
+  })
+})
+
+describe('dedupeAliases', () => {
+  it('trims, drops empties, the excluded key and duplicates, keeping first casing', () => {
+    expect(dedupeAliases([' Back Squat ', '', 'back squat', 'SQUAT', 'Low Bar'], 'squat')).toEqual([
+      'Back Squat',
+      'Low Bar',
+    ])
   })
 })

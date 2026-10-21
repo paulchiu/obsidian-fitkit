@@ -246,6 +246,44 @@ export type ValidationError = {
 }
 
 /**
+ * Normalizes each name, dropping empties and duplicates (first occurrence wins).
+ */
+export function uniqueNormalizedKeys(names: readonly string[]): string[] {
+  const keys: string[] = []
+  const seen = new Set<string>()
+  for (const name of names) {
+    const key = normalize(name)
+    if (key.length === 0 || seen.has(key)) {
+      continue
+    }
+    seen.add(key)
+    keys.push(key)
+  }
+  return keys
+}
+
+/**
+ * Trims candidates and drops empties, `excludeKey` matches and normalized duplicates (first casing wins).
+ */
+export function dedupeAliases(candidates: readonly string[], excludeKey: string): string[] {
+  const seen = new Set<string>()
+  const aliases: string[] = []
+  for (const candidate of candidates) {
+    const trimmed = candidate.trim()
+    if (trimmed.length === 0) {
+      continue
+    }
+    const key = normalize(trimmed)
+    if (key.length === 0 || key === excludeKey || seen.has(key)) {
+      continue
+    }
+    seen.add(key)
+    aliases.push(trimmed)
+  }
+  return aliases
+}
+
+/**
  * Trim and dedupe a raw form draft. Drops empty aliases, dedupes aliases
  * by normalized form (first occurrence wins, original casing kept). Self
  * aliases (those that normalize to the draft's own canonical) are dropped.
@@ -254,26 +292,7 @@ export type ValidationError = {
 export function sanitizeEntryDraft(draft: RegistryEntryDraft): RegistryEntryDraft {
   const name = draft.name.trim()
   const canonicalKey = normalize(name)
-  const seen = new Set<string>()
-  const aliases: string[] = []
-  for (const raw of draft.aliases) {
-    const trimmed = raw.trim()
-    if (trimmed.length === 0) {
-      continue
-    }
-    const key = normalize(trimmed)
-    if (key.length === 0) {
-      continue
-    }
-    if (key === canonicalKey) {
-      continue
-    }
-    if (seen.has(key)) {
-      continue
-    }
-    seen.add(key)
-    aliases.push(trimmed)
-  }
+  const aliases = dedupeAliases(draft.aliases, canonicalKey)
   return {
     name,
     kind: draft.kind,
@@ -371,20 +390,7 @@ export function renameEntry(
   const oldKey = normalize(oldName)
   const newKey = normalize(next.name)
   const aliasesWithOld = oldKey === newKey ? [...next.aliases] : [oldName, ...next.aliases]
-  const seen = new Set<string>()
-  const dedupedAliases: string[] = []
-  for (const alias of aliasesWithOld) {
-    const trimmed = alias.trim()
-    if (trimmed.length === 0) {
-      continue
-    }
-    const key = normalize(trimmed)
-    if (key.length === 0 || key === newKey || seen.has(key)) {
-      continue
-    }
-    seen.add(key)
-    dedupedAliases.push(trimmed)
-  }
+  const dedupedAliases = dedupeAliases(aliasesWithOld, newKey)
   const without = removeEntry(registry, oldName)
   return upsertEntry(without, {
     name: next.name,
