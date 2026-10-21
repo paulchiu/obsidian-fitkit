@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [1.10.0] - 2026-10-21
+
+### Added
+
 - Sync and repair everything in Setup and maintenance: one check scans the registry, exercise notes and dashboard, shows what each step would change, and applies only the steps you tick, in the right order.
 
 ### Changed
