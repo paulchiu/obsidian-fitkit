@@ -76,7 +76,6 @@ function StepPicker(
     <>
       <p class="fitkit-import-muted">
         Scanned {preview.workoutCount} workouts and {preview.exerciseNoteCount} exercise notes.
-        Nothing changes until you apply.
       </p>
       <DiagnosticsLinks {...props} diagnostics={preview.diagnostics} />
       <div class="fitkit-sync-steps">
