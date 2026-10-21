@@ -10,9 +10,6 @@ import {
 
 import { frontmatterTypeIs } from './domain/frontmatter'
 import { formatIsoDate } from './domain/dates'
-import { formatErrorMessage } from './domain/error'
-import { createRegistry } from './domain/exercise-registry'
-import { migrateExerciseNote } from './domain/exercise-note-migrate'
 import type { FitKitIndex, IndexDiagnostic } from './domain/types'
 import {
   DEFAULT_SETTINGS,
@@ -20,7 +17,7 @@ import {
   settingsFromStored,
   type FitKitSettings,
 } from './settings'
-import { dashboardPath, exercisesFolder, workoutFilename, workoutsFolder } from './settings-paths'
+import { dashboardPath, workoutFilename, workoutsFolder } from './settings-paths'
 import { renderExerciseChartBlock } from './ui/obsidian/exercise-chart-block'
 import { ParseDiagnosticsModal } from './ui/obsidian/parse-diagnostics-modal'
 import { renderWorkoutReadingModeSection } from './ui/obsidian/workout-reading-mode'
@@ -33,8 +30,13 @@ import {
   applyRegistryBackfillPlan,
   buildRegistryBackfillPlan,
 } from './vault/exercise-registry-backfill'
+import {
+  applyExerciseNoteSync,
+  formatExerciseNoteSyncSummary,
+  planExerciseNoteSync,
+  summariseExerciseNoteSync,
+} from './vault/exercise-note-sync'
 import { buildExerciseRegistrySnapshot } from './vault/exercise-registry-vault'
-import { markdownFilesInFolder } from './vault/folder-scan'
 import { createWorkoutIndex, type WorkoutIndex } from './vault/workout-index'
 
 function emptyWorkoutMarkdown(date: string): string {
@@ -388,100 +390,9 @@ export default class FitKitPlugin extends Plugin {
   }
 
   async syncExerciseNotes(): Promise<void> {
-    const files = markdownFilesInFolder(this.app, exercisesFolder(this.settings))
-    const snapshot = buildExerciseRegistrySnapshot(this.app, this.settings)
-    const registry = createRegistry(this.settings.exerciseRegistry)
-    const conflictPaths = new Set<string>()
-    for (const diagnostic of snapshot.diagnostics) {
-      if (diagnostic.kind === 'registry-kind-conflict' && diagnostic.path) {
-        conflictPaths.add(diagnostic.path)
-      }
-    }
-
-    let updated = 0
-    let already = 0
-    let skipped = 0
-    let skippedMalformedFrontmatter = 0
-    let needsValidation = 0
-    let failed = 0
-    const failedPaths: string[] = []
-    let customisedRecentSessions = 0
-    let customisedNotesSections = 0
-    for (const file of files) {
-      try {
-        const source = await this.app.vault.read(file)
-        const input = {
-          name: file.basename,
-          registry,
-          fitnessRoot: this.settings.fitnessRoot,
-        }
-        const result = migrateExerciseNote(source, input)
-        if (result.status === 'skipped-non-exercise-type') {
-          skipped += 1
-          continue
-        }
-        if (result.status === 'skipped-malformed-frontmatter') {
-          skippedMalformedFrontmatter += 1
-          continue
-        }
-
-        if (result.warnings.some((warning) => warning.kind === 'custom-recent-sessions')) {
-          customisedRecentSessions += 1
-        }
-        if (result.warnings.some((warning) => warning.kind === 'custom-notes-section')) {
-          customisedNotesSections += 1
-        }
-        if (result.warnings.some((warning) => warning.kind === 'registry-kind-conflict')) {
-          conflictPaths.add(file.path)
-        }
-
-        if (result.changed) {
-          await this.app.vault.process(file, (live) => migrateExerciseNote(live, input).markdown)
-        }
-
-        if (result.status === 'unknown') {
-          needsValidation += 1
-        }
-        if (result.changed) {
-          updated += 1
-        } else {
-          already += 1
-        }
-      } catch (error) {
-        failed += 1
-        failedPaths.push(`${file.path}: ${formatErrorMessage(error)}`)
-      }
-    }
-
-    const failedHint = failedPaths[0] ? ` (first failure: ${failedPaths[0]})` : ''
-    const customisedWarnings = [
-      customisedRecentSessions > 0
-        ? `${customisedRecentSessions} customised recent sessions block${
-            customisedRecentSessions === 1 ? '' : 's'
-          }`
-        : null,
-      customisedNotesSections > 0
-        ? `${customisedNotesSections} customised notes section${
-            customisedNotesSections === 1 ? '' : 's'
-          }`
-        : null,
-    ].filter((warning): warning is string => warning !== null)
-    const customisedSummary =
-      customisedWarnings.length > 0 ? ` ${customisedWarnings.join(', ')} left alone.` : ''
-    const validationSummary =
-      needsValidation > 0
-        ? ` (${needsValidation} ${
-            needsValidation === 1 ? 'needs' : 'need'
-          } validation: kind inferred/defaulted without registry, review kind and metric)`
-        : ''
-    const conflictSummary =
-      conflictPaths.size > 0
-        ? `, ${conflictPaths.size} registry kind conflict${
-            conflictPaths.size === 1 ? '' : 's'
-          } preserved`
-        : ''
-    const summary = `Synced ${files.length} exercise note${files.length === 1 ? '' : 's'}; ${updated} updated${validationSummary}, ${already} already current, ${skipped} skipped (non-exercise type), ${skippedMalformedFrontmatter} skipped (malformed frontmatter), ${failed} failed${failedHint}${conflictSummary}.${customisedSummary}`
-    new Notice(summary)
+    const plan = await planExerciseNoteSync(this.app, this.settings, this.settings.exerciseRegistry)
+    const applied = await applyExerciseNoteSync(this.app, plan)
+    new Notice(formatExerciseNoteSyncSummary(summariseExerciseNoteSync(applied)))
   }
 
   async loadSettings(): Promise<void> {
