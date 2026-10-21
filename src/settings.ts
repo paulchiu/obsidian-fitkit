@@ -261,10 +261,8 @@ export class FitKitSettingTab extends PluginSettingTab {
   }
 
   /**
-   * Obsidian 1.13 and later render the tab from these definitions and skip
-   * display() entirely, and the settings search indexes them, so a row only
-   * becomes findable once its name and description live here rather than
-   * inside a render callback.
+   * Obsidian 1.13+ renders the tab from these definitions and skips `display()`,
+   * so a row is only searchable once its name and description live here.
    */
   getSettingDefinitions(): SettingDefinitionItem[] {
     return this.sections().map((section): SettingDefinitionGroup<FitKitSettingKey> => ({
@@ -782,12 +780,8 @@ export class FitKitSettingTab extends PluginSettingTab {
   }
 
   /**
-   * Handles all three row provenances. An overlay entry (found in `fresh`)
-   * always has its overlay row removed. `alsoDeleteFile` additionally trashes
-   * a note and tombstones the name, whatever its provenance. Without an
-   * overlay entry and without deleting the file, a note-backed row is left
-   * alone (the note still drives it); a history-only row is tombstoned, since
-   * that is the only way to make it stop reappearing.
+   * Removes the overlay row if present; `alsoDeleteFile` also trashes the note and tombstones the name.
+   * Otherwise a note-backed row is left alone and a history-only row is tombstoned.
    */
   private async deleteRegistryEntry(
     name: string,

@@ -240,10 +240,8 @@ export default class FitKitPlugin extends Plugin {
   }
 
   /**
-   * Backfills settings.exerciseRegistry so it lists every exercise the plugin
-   * knows about: notes in the exercises folder, and names logged only in
-   * workout history. Never touches an existing overlay entry or materializes
-   * a unit; see exercise-registry-backfill.ts for the invariants.
+   * Backfills `settings.exerciseRegistry` with every note-backed and history-only exercise.
+   * Never touches an existing overlay entry or materializes a unit.
    */
   async rebuildExerciseRegistry(): Promise<void> {
     const plan = await buildRegistryBackfillPlan(this.app, this.settings)
