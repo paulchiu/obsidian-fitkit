@@ -15,6 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Removed
 
+## [1.11.0] - 2026-10-21
+
+### Added
+
+### Changed
+
+### Fixed
+
+### Removed
+
 - The seven separate maintenance buttons. Sync and repair everything does all of their work, in the right order, and offers the diagnostics when there are any.
 
 ## [1.10.0] - 2026-10-21
