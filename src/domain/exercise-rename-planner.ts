@@ -23,7 +23,12 @@
 
 import { dirnameOf } from '../settings-paths'
 import { exerciseTypeOf } from './exercise-type'
-import { normalize, type ExerciseKind, type ExerciseRegistryEntry } from './exercise-registry'
+import {
+  dedupeAliases,
+  normalize,
+  type ExerciseKind,
+  type ExerciseRegistryEntry,
+} from './exercise-registry'
 import { escapeRegExp } from './regex-utils'
 import type { WeightUnit } from './weight-unit'
 
@@ -442,21 +447,7 @@ function foldAliases(
 ): string[] {
   const newKey = normalize(newName)
   const candidates = [oldName, ...(sourceEntry?.aliases ?? []), ...(targetEntry?.aliases ?? [])]
-  const seen = new Set<string>()
-  const result: string[] = []
-  for (const candidate of candidates) {
-    const trimmed = candidate.trim()
-    if (trimmed.length === 0) {
-      continue
-    }
-    const key = normalize(trimmed)
-    if (key.length === 0 || key === newKey || seen.has(key)) {
-      continue
-    }
-    seen.add(key)
-    result.push(trimmed)
-  }
-  return result
+  return dedupeAliases(candidates, newKey)
 }
 
 function notesSectionHasProse(noteText: string): boolean {
