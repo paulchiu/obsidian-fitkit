@@ -28,23 +28,28 @@ Changing the root does not move existing files. Move them yourself first, then p
 
 ## Setup and maintenance
 
-![The seven maintenance actions](images/maintenance-actions.png)
+![Sync and repair everything under Setup and maintenance](images/maintenance-actions.png)
 
-| Action                               | What it does                                                                                                  |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `Rebuild index`                      | Rescans workout notes and caches the index plus parse diagnostics.                                            |
-| `Rebuild dashboard`                  | Rebuilds the index, then regenerates the dashboard note in full.                                              |
-| `Restore hidden dashboard sections`  | Clears hidden-section state for the dashboard and regenerates it.                                             |
-| `Show parse diagnostics`             | Lists workout notes the last index build could not read cleanly.                                              |
-| `Show exercise registry diagnostics` | Reports notes missing a valid `kind:`, and registry entries that disagree with one.                           |
-| `Sync and repair exercise notes`     | Refreshes frontmatter, chart blocks, `Recent sessions`, and headings in existing exercise notes.              |
-| `Rebuild registry`                   | Adds every exercise note and history-only name missing from the registry. Never overwrites an existing entry. |
+`Sync and repair everything` is the one maintenance action. `Check` scans the vault without writing anything and opens a dialog that says what each step would change:
 
-None of these rewrite your workout history. `Rebuild dashboard` and `Rebuild registry` are the two that write, and each is additive or fully regenerated output.
+![The sync and repair dialog after a scan](images/sync-and-repair.png)
+
+| Step                                | What it does                                                                                                  |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `Rebuild registry`                  | Adds every exercise note and history-only name missing from the registry. Never overwrites an existing entry. |
+| `Sync exercise notes`               | Refreshes frontmatter, chart blocks, `Recent sessions`, and headings in existing exercise notes.              |
+| `Restore hidden dashboard sections` | Clears hidden-section state for the dashboard and regenerates it.                                             |
+| `Rebuild dashboard`                 | Rescans workout notes, then regenerates the dashboard note in full.                                           |
+
+Steps with nothing to change start unticked and say `Up to date`, but you can tick any of them. `Apply` runs the ticked steps in the order above, because syncing notes reads the registry and the dashboard reads everything, then lists each step's result. A step that fails stops the ones after it.
+
+When the scan finds workout notes FitKit could not read, or exercise notes whose `kind:` is missing or disagrees with the registry, the dialog offers `Parse diagnostics` and `Registry diagnostics` buttons that list them.
+
+None of the steps rewrite your workout history.
 
 ## Registry
 
-The registry table sits below the maintenance actions and has its own page, see [Exercise registry](exercise-registry.md).
+The registry table sits below Setup and maintenance and has its own page, see [Exercise registry](exercise-registry.md).
 
 ## Commands
 

@@ -161,23 +161,14 @@ describe('display fallback', () => {
     ).toBe(true)
   })
 
-  it('labels each maintenance action button', () => {
+  it('labels the maintenance action button', () => {
     displayTab()
 
     const buttons = rendered
       .filter((entry) => entry.buttonText !== undefined)
       .map((entry) => entry.buttonText)
 
-    expect(buttons).toEqual([
-      'Check',
-      'Rebuild',
-      'Rebuild',
-      'Restore',
-      'Show',
-      'Show',
-      'Sync',
-      'Rebuild',
-    ])
+    expect(buttons).toEqual(['Check'])
   })
 
   it('edits the interval presets in a multi-line box', () => {

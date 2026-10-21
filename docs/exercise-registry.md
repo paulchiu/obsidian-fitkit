@@ -20,14 +20,14 @@ The search box above the table matches on name and on aliases, so searching 'pus
 
 ## Filling in what is missing
 
-`Rebuild registry`, under `Setup and maintenance`, adds every exercise note and history-only name that is not already in the registry, and adds nothing else.
+The `Rebuild registry` step of `Sync and repair everything`, under `Setup and maintenance`, adds every exercise note and history-only name that is not already in the registry, and adds nothing else.
 
 - Existing entries, aliases, kinds, and units are left exactly as you curated them.
 - A name already recorded as an alias of another entry is not re-added as its own entry.
 - Exercises you deleted stay deleted.
 - Running it twice changes nothing the second time.
 
-Backfilled entries deliberately carry no unit, because an explicit registry unit is what `Sync and repair exercise notes` writes into note frontmatter, and inventing one would stamp a unit you never chose onto your notes.
+Backfilled entries deliberately carry no unit, because an explicit registry unit is what the `Sync exercise notes` step writes into note frontmatter, and inventing one would stamp a unit you never chose onto your notes.
 
 `Import exercises`, the button beside `Add entry`, is the interactive version. It lists names found in workout notes with their registry and note-file status, and lets you choose per exercise whether to create a note, a no-note entry, or neither.
 
@@ -84,6 +84,6 @@ Adding a tombstoned exercise back through the editor's `Add exercise` prompt cle
 
 ## Diagnostics
 
-`Show exercise registry diagnostics` reports inconsistencies from the current vault state: an exercise note missing a valid `kind:` or carrying an unusable `levels:` list, and a registry entry whose kind or ladder disagrees with its note (where the note wins). It says nothing when all are clean.
+The `Registry diagnostics` button in the `Sync and repair everything` dialog reports inconsistencies from the current vault state: an exercise note missing a valid `kind:` or carrying an unusable `levels:` list, and a registry entry whose kind or ladder disagrees with its note (where the note wins). The button only appears when there is something to report.
 
-`Sync and repair exercise notes` is the fixer for the note side, refreshing frontmatter, chart blocks, `Recent sessions`, and headings in existing notes without overwriting a unit you set by hand. On a bodyweight note that means seeding a missing `levels:` ladder and dropping `metric:` and `unit:` lines, which only belong to strength notes.
+The `Sync exercise notes` step is the fixer for the note side, refreshing frontmatter, chart blocks, `Recent sessions`, and headings in existing notes without overwriting a unit you set by hand. On a bodyweight note that means seeding a missing `levels:` ladder and dropping `metric:` and `unit:` lines, which only belong to strength notes.

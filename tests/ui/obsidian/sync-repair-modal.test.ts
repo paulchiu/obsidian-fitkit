@@ -136,10 +136,7 @@ describe('sync and repair modal', () => {
     expect(actions.applied).toEqual([['registry', 'dashboard']])
     expect(
       [...modal.contentEl.querySelectorAll('.fitkit-sync-result')].map((row) => row.textContent),
-    ).toEqual([
-      'Rebuild registry: Rebuilt registry: 4 added.',
-      'Rebuild dashboard failed: disk full',
-    ])
+    ).toEqual(['Rebuilt registry: 4 added.', 'Rebuild dashboard failed: disk full'])
     expect(findUnstyledClasses(modal.contentEl)).toEqual([])
   })
 

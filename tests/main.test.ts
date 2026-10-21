@@ -219,8 +219,6 @@ interface TestPlugin {
   sweepLeavesForWorkout(): void
   openWorkoutEditor(file: TFile): Promise<void>
   showExerciseRegistryDiagnostics(): void
-  syncExerciseNotes(): Promise<void>
-  rebuildExerciseRegistry(): Promise<void>
   previewSyncRepair(): Promise<SyncRepairPreview>
   applySyncRepair(steps: readonly SyncRepairStep[]): Promise<SyncRepairOutcome>
   saveSettings(): Promise<void>
@@ -585,11 +583,16 @@ describe('FitKitPlugin file-open routing (no editor open)', () => {
   })
 })
 
-describe('FitKitPlugin syncExerciseNotes', () => {
-  beforeEach(() => {
-    noticeMessages.length = 0
-  })
+/** The summary of a run's one step, failing the test if that step did not succeed. */
+const onlySummary = (outcome: SyncRepairOutcome): string => {
+  const [result] = outcome.results
+  if (!result?.ok) {
+    throw new Error(`Expected one successful step, got ${JSON.stringify(outcome.results)}`)
+  }
+  return result.summary
+}
 
+describe('FitKitPlugin exercise note sync step', () => {
   it('repairs no-registry missing kind and reports validation guidance', async () => {
     const file = makeWorkoutFile('Fitness/Exercises/Mystery.md')
     const contents = new Map<string, string>([
@@ -619,7 +622,7 @@ type: exercise
       fitnessRoot: 'Fitness',
     })
 
-    await plugin.syncExerciseNotes()
+    const summary = onlySummary(await plugin.applySyncRepair(['notes']))
 
     expect(contents.get(file.path)).toContain(`type: exercise
 kind: strength
@@ -627,10 +630,9 @@ metric: e1rm
 unit: kg
 ---`)
     expect(contents.get(file.path)).toContain('## Recent sessions')
-    expect(noticeMessages).toHaveLength(1)
-    expect(noticeMessages[0]).toContain('1 updated (1 needs validation')
-    expect(noticeMessages[0]).toContain('0 already current')
-    expect(noticeMessages[0]).toContain('kind inferred/defaulted without registry')
+    expect(summary).toContain('1 updated (1 needs validation')
+    expect(summary).toContain('0 already current')
+    expect(summary).toContain('kind inferred/defaulted without registry')
   })
 
   it('preserves valid note kind when the saved registry kind differs and reports conflict', async () => {
@@ -666,22 +668,17 @@ kind: duration
       fitnessRoot: 'Fitness',
     })
 
-    await plugin.syncExerciseNotes()
+    const summary = onlySummary(await plugin.applySyncRepair(['notes']))
 
     expect(contents.get(file.path)).toContain(`type: exercise
 kind: duration
 ---`)
     expect(contents.get(file.path)).not.toContain('kind: strength')
-    expect(noticeMessages).toHaveLength(1)
-    expect(noticeMessages[0]).toContain('1 registry kind conflict preserved')
+    expect(summary).toContain('1 registry kind conflict preserved')
   })
 })
 
-describe('FitKitPlugin rebuildExerciseRegistry', () => {
-  beforeEach(() => {
-    noticeMessages.length = 0
-  })
-
+describe('FitKitPlugin registry rebuild step', () => {
   it('backfills note-backed and history-only exercises, skips tombstoned, reports counts, and is idempotent', async () => {
     const workoutFile = makeWorkoutFile('Fitness/Workouts/2026-05-08.md')
     const squatFile = makeWorkoutFile('Fitness/Exercises/Squat.md')
@@ -727,35 +724,33 @@ name: Test
       deletedExercises: ['Old Lift'],
     })
 
-    await plugin.rebuildExerciseRegistry()
+    const first = onlySummary(await plugin.applySyncRepair(['registry']))
 
     expect(plugin.settings.exerciseRegistry).toEqual([
       { name: 'New Plank', kind: 'duration', aliases: [] },
       { name: 'Squat', kind: 'strength', aliases: [] },
     ])
     expect(plugin.settings.exerciseRegistry.every((entry) => entry.unit === undefined)).toBe(true)
-    expect(noticeMessages).toHaveLength(1)
-    expect(noticeMessages[0]).toContain('1 added from notes')
-    expect(noticeMessages[0]).toContain('1 added from history')
-    expect(noticeMessages[0]).toContain('0 already present')
-    expect(noticeMessages[0]).toContain('1 skipped')
+    expect(first).toContain('1 added from notes')
+    expect(first).toContain('1 added from history')
+    expect(first).toContain('0 already present')
+    expect(first).toContain('1 skipped')
 
-    await plugin.rebuildExerciseRegistry()
+    const second = onlySummary(await plugin.applySyncRepair(['registry']))
 
     expect(plugin.settings.exerciseRegistry).toEqual([
       { name: 'New Plank', kind: 'duration', aliases: [] },
       { name: 'Squat', kind: 'strength', aliases: [] },
     ])
-    expect(noticeMessages).toHaveLength(2)
-    expect(noticeMessages[1]).toContain('0 added from notes')
-    expect(noticeMessages[1]).toContain('0 added from history')
+    expect(second).toContain('0 added from notes')
+    expect(second).toContain('0 added from history')
     /**
      * 'New Plank' is now an overlay entry, so it's excluded from history-only
      * candidates entirely on the second pass (not merely re-flagged as already
      * present); only 'Squat' still surfaces via the note catalog to be counted.
      */
-    expect(noticeMessages[1]).toContain('1 already present')
-    expect(noticeMessages[1]).toContain('1 skipped')
+    expect(second).toContain('1 already present')
+    expect(second).toContain('1 skipped')
   })
 })
 
@@ -1559,7 +1554,7 @@ const applyIndexChange = async (
   } else if (change === 'cache reset') {
     plugin.cachedIndex = null
   } else if (change === 'manual rebuild') {
-    await plugin.rebuildWorkoutIndex()
+    await plugin.previewSyncRepair()
   } else {
     emit('modify', files[0]!)
   }
@@ -1648,7 +1643,7 @@ describe('Workout index freshness', () => {
 
   it('renders a fresh chart after an external edit without writing the vault', async () => {
     const { plugin, files, contents, emit, app } = await makeFreshnessVault()
-    await plugin.rebuildWorkoutIndex()
+    await plugin.previewSyncRepair()
     contents.set(files[0]!.path, freshnessSource(80))
     app.vault.process = async () => {
       throw new Error('Rendering must not save workout drafts')
@@ -1813,7 +1808,7 @@ describe('Workout index freshness', () => {
 
   it('reads externally modified history without rendering an editor', async () => {
     const { plugin, files, contents, emit } = await makeFreshnessVault()
-    await plugin.rebuildWorkoutIndex()
+    await plugin.previewSyncRepair()
     contents.set(files[0]!.path, freshnessSource(80))
     emit('modify', files[0]!)
 

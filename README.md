@@ -71,7 +71,7 @@ Because the run lives in the note, a phone closing Obsidian mid-session does not
 
 ## After a few sessions
 
-Run `Rebuild dashboard` from FitKit's settings to generate `Fitness/Fitness Dashboard.md`. It lists your recent sessions, a personal best per exercise, and any next-session plans you recorded, followed by a per-exercise section backed by a Dataview query.
+Run `Sync and repair everything` from FitKit's settings to generate `Fitness/Fitness Dashboard.md`. It lists your recent sessions, a personal best per exercise, and any next-session plans you recorded, followed by a per-exercise section backed by a Dataview query.
 
 ![Generated dashboard with recent workouts, PBs, and next session plans](docs/images/dashboard.png)
 

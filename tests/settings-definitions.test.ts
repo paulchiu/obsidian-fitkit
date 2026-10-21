@@ -138,7 +138,7 @@ describe('setting definitions', () => {
   it('gives every searchable row a description so settings search can match it', () => {
     const searchable = allRows(createTab().tab).filter((row) => row.searchable !== false)
 
-    expect(searchable).toHaveLength(15)
+    expect(searchable).toHaveLength(8)
     for (const row of searchable) {
       expect(row.name.length).toBeGreaterThan(0)
       expect(typeof row.desc).toBe('string')
@@ -146,23 +146,14 @@ describe('setting definitions', () => {
     }
   })
 
-  it('leads the maintenance actions with sync and repair everything, all searchable', () => {
+  it('offers sync and repair everything as the only maintenance action', () => {
     const maintenance = groups(createTab().tab).find(
       (group) => group.heading === 'Setup and maintenance',
     )
 
     expect(
       maintenance?.items.filter((row) => row.searchable !== false).map((row) => row.name),
-    ).toEqual([
-      'Sync and repair everything',
-      'Rebuild index',
-      'Rebuild dashboard',
-      'Restore hidden dashboard sections',
-      'Show parse diagnostics',
-      'Show exercise registry diagnostics',
-      'Sync and repair exercise notes',
-      'Rebuild registry',
-    ])
+    ).toEqual(['Sync and repair everything'])
   })
 
   it('excludes rows that own their markup from search', () => {
@@ -170,7 +161,7 @@ describe('setting definitions', () => {
 
     expect(excluded.map((row) => row.name)).toEqual([
       'Derived paths',
-      'About these actions',
+      'About sync and repair',
       'About the registry',
       'Exercises',
     ])

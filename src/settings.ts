@@ -364,10 +364,10 @@ export class FitKitSettingTab extends PluginSettingTab {
         rows: [
           {
             kind: 'block',
-            name: 'About these actions',
+            name: 'About sync and repair',
             render: (el) => {
               el.createDiv({
-                text: 'Use these actions when setting up the plugin, repairing generated exercise notes, or refreshing dashboard data.',
+                text: 'Run this after setting up the plugin, importing workouts, or editing notes outside FitKit. It brings the registry, exercise notes and dashboard up to date, and shows any notes FitKit could not read.',
                 cls: 'setting-item-description',
               })
             },
@@ -381,69 +381,6 @@ export class FitKitSettingTab extends PluginSettingTab {
               this.plugin.openSyncRepair()
             },
           },
-          {
-            kind: 'action',
-            name: 'Rebuild index',
-            desc: 'Scan workout notes and cache the latest index plus parse diagnostics.',
-            buttonText: 'Rebuild',
-            onClick: () => {
-              void this.plugin.rebuildWorkoutIndex()
-            },
-          },
-          {
-            kind: 'action',
-            name: 'Rebuild dashboard',
-            desc: 'Rebuild the workout index, then regenerate the dashboard note.',
-            buttonText: 'Rebuild',
-            onClick: () => {
-              void this.plugin.rebuildDashboard()
-            },
-          },
-          {
-            kind: 'action',
-            name: 'Restore hidden dashboard sections',
-            desc: 'Clear hidden-section state for the dashboard and regenerate it.',
-            buttonText: 'Restore',
-            onClick: () => {
-              void this.plugin.restoreHiddenDashboardSections()
-            },
-          },
-          {
-            kind: 'action',
-            name: 'Show parse diagnostics',
-            desc: 'Open diagnostics from the last index build, or report that none exist.',
-            buttonText: 'Show',
-            onClick: () => {
-              void this.plugin.showParseDiagnostics()
-            },
-          },
-          {
-            kind: 'action',
-            name: 'Show exercise registry diagnostics',
-            desc: 'Open exercise catalog and registry diagnostics from the current vault state.',
-            buttonText: 'Show',
-            onClick: () => {
-              void this.plugin.showExerciseRegistryDiagnostics()
-            },
-          },
-          {
-            kind: 'action',
-            name: 'Sync and repair exercise notes',
-            desc: 'Repair exercise note frontmatter, chart blocks, recent sessions, and note headings.',
-            buttonText: 'Sync',
-            onClick: () => {
-              void this.plugin.syncExerciseNotes()
-            },
-          },
-          {
-            kind: 'action',
-            name: 'Rebuild registry',
-            desc: 'Add every exercise note and workout-history-only name missing from the registry below. Never overwrites an existing entry or its unit.',
-            buttonText: 'Rebuild',
-            onClick: () => {
-              void this.plugin.rebuildExerciseRegistry()
-            },
-          },
         ],
       },
       {
@@ -454,7 +391,7 @@ export class FitKitSettingTab extends PluginSettingTab {
             name: 'About the registry',
             render: (el) => {
               el.createDiv({
-                text: 'Every exercise the plugin knows about: notes in your exercises folder, no-note registry entries, and names logged only in workout history. This is the central place to fix wording, casing, or splitting; use the rebuild action above to pull in anything missing.',
+                text: 'Every exercise the plugin knows about: notes in your exercises folder, no-note registry entries, and names logged only in workout history. This is the central place to fix wording, casing, or splitting; use Sync and repair everything above to pull in anything missing.',
                 cls: 'setting-item-description',
               })
             },
