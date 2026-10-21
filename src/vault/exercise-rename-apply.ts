@@ -22,10 +22,8 @@ import { markdownFilesInFolder } from './folder-scan'
 import { isMarkdownFile } from './vault-utils'
 
 /**
- * Gathers the vault state a rename plan needs (registry overlay, exercise
- * catalog, tombstones, and the raw text of every workout note) and builds
- * the plan via the pure `buildExerciseRenamePlan`. Reads with `vault.read`
- * (not `cachedRead`) so the preview reflects current on-disk text.
+ * Gathers the vault state a rename plan needs and builds it via the pure `buildExerciseRenamePlan`.
+ * Reads with `vault.read` (not `cachedRead`) so the preview reflects current on-disk text.
  */
 export async function buildExerciseRenamePlanFromVault(
   app: App,
@@ -84,39 +82,22 @@ export interface ExerciseRenameApplyResult {
   loserNoteRemoved: boolean
   tombstonesReconciled: number
   /**
-   * Warnings from regenerating the surviving note's Dataview blocks
-   * (`migrateExerciseNote`), e.g. a Notes-section query that didn't follow
-   * the rename because it looks customised. Surface these to the user:
-   * the note's frontmatter and heading are correct, but its query text may
-   * still reference the old name.
+   * Warnings from regenerating the surviving note's Dataview blocks, e.g. a customised query that
+   * didn't follow the rename. Surface these to the user.
    */
   noteMigrationWarnings: ExerciseNoteMigrationWarning[]
   /**
-   * Workout notes actually rewritten, for the caller to refresh in its own
-   * cached index. Deliberately not done here: this function has no access
-   * to `plugin.refreshIndexEntry`'s queue, so it cannot serialize against a
-   * concurrent index refresh started by unrelated activity elsewhere in the
-   * app; only the plugin, via that queue, can update the index safely.
+   * Workout notes actually rewritten, for the caller to refresh in its cached index.
+   * Left to the plugin because only its `refreshIndexEntry` queue can update the index safely.
    */
   touchedWorkoutPaths: string[]
   failures: ExerciseRenameApplyFailure[]
 }
 
 /**
- * Executes a confirmed rename/merge plan. Order is chosen to stay safely
- * re-runnable: the note file is renamed first (the one step every later
- * step depends on, so a failure here aborts the whole apply without
- * touching the registry or any workout note); then the registry overlay and
- * tombstones are updated; then every workout note is independently
- * rescanned and rewritten (only occurrences still naming `plan.oldName`,
- * so a second run over already-fixed notes is a no-op) with per-file
- * failures recorded but not fatal, since one bad file should not stop the
- * other N from being fixed and the rescan makes a retry safe; then the
- * surviving note's Dataview blocks are regenerated for the new name; then,
- * for a merge with two files, the losing note's prose is carried over and
- * the note is removed. The caller is responsible for refreshing its own
- * cached index for every path in the returned `touchedWorkoutPaths`; this
- * function has no access to that queue (see `touchedWorkoutPaths` doc).
+ * Executes a confirmed rename/merge plan in a re-runnable order: rename the note (failure aborts), update
+ * registry and tombstones, rewrite each workout note (per-file failures recorded, not fatal), regenerate
+ * Dataview blocks, then fold in and remove the losing note on a two-file merge.
  */
 export async function applyExerciseRenamePlan(
   app: App,
@@ -290,12 +271,9 @@ function emptyResult(
 }
 
 /**
- * Removes the source entry (and, on a merge, whatever entry currently owns
- * the target name or alias) and upserts one surviving entry under
- * `plan.newName` carrying `plan.aliasesToKeep`, `plan.resultKind`, and
- * `plan.resultUnit`. `resultUnit` is only ever a unit already recorded on
- * one of the folded-in entries: this never synthesizes a unit for an entry
- * that lacked one.
+ * Removes the source entry (and, on a merge, the target's owner) and upserts one entry under
+ * `plan.newName` with `plan.aliasesToKeep`, `plan.resultKind` and `plan.resultUnit`.
+ * Never synthesizes a unit the folded-in entries lacked.
  */
 function updateRegistryOverlay(settings: FitKitSettings, plan: ExerciseRenamePlan): void {
   let registry = createRegistry(settings.exerciseRegistry)

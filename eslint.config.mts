@@ -183,12 +183,8 @@ export default defineConfig(
   ...obsidianmd.configs.recommended,
   {
     /**
-     * obsidianmd's hybrid recommended config enables its typed rules (which
-     * call getParserServices()) globally rather than only on TypeScript files. On
-     * package.json (parsed with the JSON language) and on *.mjs/config files they
-     * crash with "rule which requires type information". Turn the typed rules off
-     * everywhere; the block below re-enables them on real TypeScript source where
-     * parser services exist.
+     * obsidianmd's recommended config enables typed rules globally, so they crash without parser services
+     * (package.json, *.mjs). Turn them off everywhere; the block below re-enables them on TypeScript source.
      */
     rules: {
       'obsidianmd/no-plugin-as-component': 'off',
@@ -202,14 +198,8 @@ export default defineConfig(
   {
     files: ['**/*.{ts,cts,mts,tsx,js,cjs,mjs,jsx}'],
     /**
-     * Restates obsidianmd's `no-restricted-disable` list (ESLint replaces rule
-     * options rather than merging them) so `no-global-this` can still be
-     * silenced inline for the test-harness `vi.stubGlobal('activeWindow',
-     * globalThis)` bootstrapping.
-     *
-     * Patterns are matched with gitignore semantics, so `obsidianmd/*` excludes
-     * the `obsidianmd/ui` segment wholesale. The `ui` pair below reopens that
-     * segment before restricting its rules individually.
+     * Restates obsidianmd's `no-restricted-disable` list (ESLint replaces rule options) so `no-global-this`
+     * can be silenced inline for `vi.stubGlobal('activeWindow', globalThis)`; the `ui` pair below reopens that segment.
      */
     rules: {
       'eslint-comments/no-restricted-disable': [

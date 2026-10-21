@@ -41,14 +41,9 @@ export function expectAppliedThemeToken(element: Element, property: string, toke
 }
 
 /**
- * Classes on a rendered subtree that `styles.css` never styles, sorted, so a
- * `cls:` typo fails with the offender named instead of rendering unstyled.
- *
- * A class passes when it is styled (named by any selector, standalone or
- * compound) or recognised: `is-*` and `has-*` state hooks toggled at
- * runtime, and the Obsidian classes below. Anything else is reported,
- * including a mistyped prefix. Extend `OBSIDIAN_CLASSES` when the plugin
- * renders an Obsidian class the stylesheet does not name.
+ * Classes on a rendered subtree that `styles.css` never styles, sorted, so a `cls:` typo fails by name.
+ * Styled, `is-*`/`has-*` state hooks and the Obsidian classes below pass;
+ * extend `OBSIDIAN_CLASSES` when rendering one the stylesheet does not name.
  */
 export function findUnstyledClasses(root: Element): string[] {
   ensureStylesheetLoaded()

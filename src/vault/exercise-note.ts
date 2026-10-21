@@ -5,12 +5,8 @@ import { DEFAULT_WEIGHT_UNIT, type WeightUnit } from '../domain/weight-unit'
 
 /**
  * Pure: build the seeded markdown body for a freshly-created exercise note.
- *
  * The Recent sessions Dataview block must stay byte-aligned with `dataviewQuery`
- * in `src/vault/dashboard.ts` so the two views over the same data agree. The
- * Progress chart block is rendered by the plugin's `fitkit-chart` code-block
- * processor; an empty body inherits all defaults (name from filename, kind
- * from frontmatter, window from settings).
+ * in `src/vault/dashboard.ts` so the two views agree.
  */
 export function composeExerciseNote(
   exerciseName: string,

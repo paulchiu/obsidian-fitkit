@@ -639,10 +639,8 @@ describe('WorkoutEditorView next-time plan', () => {
 
 describe('WorkoutEditorView menu placement', () => {
   /**
-   * The left edge Obsidian gives a menu for a position def, mirroring
-   * `Menu.showAtPosition` in the shipped app: it right-aligns the menu to the
-   * anchor's far edge when `left` is set and the menu fits there, otherwise
-   * left-aligns to the near edge, clamped to the window.
+   * The left edge Obsidian gives a menu for a position def, mirroring `Menu.showAtPosition`:
+   * right-aligned to the anchor's far edge if `left` is set and it fits, else left-aligned, clamped to the window.
    */
   const menuBox = (
     position: MockMenuPosition,
