@@ -151,6 +151,7 @@ import { MarkdownView, Modal, TFile, type App, type Menu } from 'obsidian'
 
 import FitKitPlugin from '../src/main'
 import { DEFAULT_SETTINGS, type FitKitSettings } from '../src/settings'
+import type { SyncRepairPreview } from '../src/domain/sync-repair'
 import {
   VIEW_TYPE_FITKIT_WORKOUT_EDITOR,
   WorkoutEditorView,
@@ -216,6 +217,7 @@ interface TestPlugin {
   showExerciseRegistryDiagnostics(): void
   syncExerciseNotes(): Promise<void>
   rebuildExerciseRegistry(): Promise<void>
+  previewSyncRepair(): Promise<SyncRepairPreview>
 }
 
 const makeEditorView = (
@@ -748,6 +750,110 @@ name: Test
      */
     expect(noticeMessages[1]).toContain('1 already present')
     expect(noticeMessages[1]).toContain('1 skipped')
+  })
+})
+
+/** A vault with one workout logging Squat and New Plank, a Squat note needing repair, and no dashboard. */
+const makeSyncRepairVault = (
+  settingsOverrides: Partial<FitKitSettings> = {},
+): {
+  plugin: TestPlugin
+  contents: Map<string, string>
+  app: MockApp
+} => {
+  const workoutFile = makeWorkoutFile('Fitness/Workouts/2026-05-08.md')
+  const squatFile = makeWorkoutFile('Fitness/Exercises/Squat.md')
+  for (const file of [workoutFile, squatFile]) {
+    Object.assign(file, { stat: { mtime: 1, ctime: 1, size: 1 } })
+  }
+  const contents = new Map<string, string>([
+    [
+      workoutFile.path,
+      `---
+type: workout
+date: 2026-05-08
+name: Test
+---
+
+## [[Squat]]
+
+- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]
+
+## [[New Plank]]
+
+- [exercise:: [[New Plank]]] [duration:: 60]
+`,
+    ],
+    [
+      squatFile.path,
+      `---
+type: exercise
+kind: strength
+---
+`,
+    ],
+  ])
+  const app = makeApp(
+    {},
+    {
+      getFolderByPath: buildMockVaultFolderTree([workoutFile, squatFile]).getFolderByPath,
+      read: vi.fn(async (target: TFile) => contents.get(target.path) ?? ''),
+      process: vi.fn(async (target: TFile, callback: (live: string) => string) => {
+        contents.set(target.path, callback(contents.get(target.path) ?? ''))
+      }),
+      getAbstractFileByPath: vi.fn((path: string) =>
+        contents.has(path) ? (mockVaultFiles.get(path) ?? null) : null,
+      ),
+      create: vi.fn(async (path: string, data: string) => {
+        contents.set(path, data)
+        return makeWorkoutFile(path)
+      }),
+    },
+  )
+  app.metadataCache.getFileCache = vi.fn((target: TFile) =>
+    target.path === squatFile.path
+      ? { frontmatter: { type: 'exercise', kind: 'strength' } }
+      : target.path === workoutFile.path
+        ? { frontmatter: { type: 'workout' } }
+        : null,
+  )
+  const plugin = createPlugin(app, {
+    ...DEFAULT_SETTINGS,
+    fitnessRoot: 'Fitness',
+    exerciseRegistry: [],
+    ...settingsOverrides,
+  })
+  return { plugin, contents, app }
+}
+
+describe('FitKitPlugin sync and repair preview', () => {
+  it('counts what each step would change', async () => {
+    const { plugin } = makeSyncRepairVault({
+      hiddenDashboardSectionsByPath: { 'Fitness/Fitness Dashboard.md': ['exercise:New Plank'] },
+    })
+
+    const preview = await plugin.previewSyncRepair()
+
+    expect(preview).toMatchObject({
+      workoutCount: 1,
+      exerciseNoteCount: 1,
+      registry: { toAdd: 2, fromNotes: 1, fromHistory: 1 },
+      notes: { toUpdate: 1, current: 0, skipped: 0 },
+      hiddenSections: 1,
+      dashboard: { sectionCount: 1, changed: true },
+    })
+  })
+
+  it('changes no note and no setting', async () => {
+    const { plugin, contents, app } = makeSyncRepairVault()
+    const before = new Map(contents)
+    const settingsBefore = structuredClone(plugin.settings)
+
+    await plugin.previewSyncRepair()
+
+    expect(contents).toEqual(before)
+    expect(app.vault.create).not.toHaveBeenCalled()
+    expect(plugin.settings).toEqual(settingsBefore)
   })
 })
 

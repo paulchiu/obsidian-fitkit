@@ -10,6 +10,7 @@ import {
 
 import { frontmatterTypeIs } from './domain/frontmatter'
 import { formatIsoDate } from './domain/dates'
+import type { SyncRepairPreview } from './domain/sync-repair'
 import type { FitKitIndex, IndexDiagnostic } from './domain/types'
 import {
   DEFAULT_SETTINGS,
@@ -25,7 +26,7 @@ import {
   VIEW_TYPE_FITKIT_WORKOUT_EDITOR,
   WorkoutEditorView,
 } from './ui/obsidian/workout-editor-view'
-import { regenerateDashboard } from './vault/dashboard'
+import { previewDashboard, regenerateDashboard } from './vault/dashboard'
 import {
   applyRegistryBackfillPlan,
   buildRegistryBackfillPlan,
@@ -387,6 +388,44 @@ export default class FitKitPlugin extends Plugin {
 
   private isWorkoutFile(file: TFile): boolean {
     return frontmatterTypeIs(this.app.metadataCache.getFileCache(file)?.frontmatter, 'workout')
+  }
+
+  /** Scans what each sync and repair step would change, writing nothing. */
+  async previewSyncRepair(): Promise<SyncRepairPreview> {
+    this.workoutIndex.invalidate()
+    const index = await this.getIndex()
+    const registryPlan = await buildRegistryBackfillPlan(this.app, this.settings)
+    const notesPlan = await planExerciseNoteSync(
+      this.app,
+      this.settings,
+      applyRegistryBackfillPlan(this.settings.exerciseRegistry, registryPlan.entriesToAdd),
+    )
+    const notes = summariseExerciseNoteSync(notesPlan)
+    const dashboard = await previewDashboard(this.app, this.settings, index)
+    return {
+      workoutCount: index.entries.length,
+      exerciseNoteCount: notes.files,
+      registry: {
+        toAdd: registryPlan.entriesToAdd.length,
+        fromNotes: registryPlan.addedFromNotes,
+        fromHistory: registryPlan.addedFromHistory,
+      },
+      notes: {
+        toUpdate: notes.updated,
+        current: notes.already,
+        skipped: notes.skipped + notes.skippedMalformedFrontmatter,
+      },
+      hiddenSections: this.settings.hiddenDashboardSectionsByPath[dashboard.path]?.length ?? 0,
+      dashboard: { sectionCount: dashboard.sectionCount, changed: dashboard.changed },
+      diagnostics: this.diagnosticCounts(),
+    }
+  }
+
+  private diagnosticCounts(): SyncRepairPreview['diagnostics'] {
+    return {
+      parse: this.lastDiagnostics.length,
+      registry: buildExerciseRegistrySnapshot(this.app, this.settings).diagnostics.length,
+    }
   }
 
   async syncExerciseNotes(): Promise<void> {
