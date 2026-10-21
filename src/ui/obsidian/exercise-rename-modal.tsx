@@ -29,11 +29,8 @@ export function describeRenameApplyFailure(failure: ExerciseRenameApplyFailure):
 }
 
 /**
- * The apply step keeps going past a per-file failure (see
- * `applyExerciseRenamePlan`), so this reports what did not complete while
- * making clear that whatever did complete was already saved and that a
- * confirm on the refreshed preview will pick up exactly what is left,
- * because the rescan it re-runs is idempotent.
+ * Reports what did not complete after `applyExerciseRenamePlan` continued past per-file failures.
+ * Completed work is already saved, and confirming the refreshed preview finishes only what is left.
  */
 export function describeRenameApplyFailures(
   failures: readonly ExerciseRenameApplyFailure[],
@@ -75,13 +72,9 @@ export function describeRenameApplySuccess(
 }
 
 /**
- * Renames or merges an exercise, end to end: the user types a new name, a
- * plan is computed from the current vault state (`buildExerciseRenamePlanFromVault`),
- * and every effect is shown before anything is written. Nothing is applied
- * until 'Confirm rename' / 'Confirm merge' is clicked; Cancel and closing the
- * modal at any earlier stage write nothing. A partial apply failure keeps the
- * modal open with a warning banner and a freshly recomputed preview, so
- * confirming again safely finishes the job (see `describeRenameApplyFailures`).
+ * Renames or merges an exercise: previews every effect from the current vault state, and writes
+ * nothing until the user confirms. A partial apply failure keeps the modal open with a refreshed
+ * preview (see `describeRenameApplyFailures`), so confirming again finishes the job.
  */
 export class ExerciseRenameModal extends Modal {
   private newName: string
@@ -182,10 +175,8 @@ export class ExerciseRenameModal extends Modal {
       const result = await applyExerciseRenamePlan(this.plugin.app, this.plugin.settings, plan)
       await this.plugin.saveSettings()
       /**
-       * Routed through the plugin's own queue (not a raw `cachedIndex`
-       * assignment) so this can't clobber a concurrent `refreshIndexEntry`
-       * call for an unrelated workout note; see `touchedWorkoutPaths` doc
-       * on `ExerciseRenameApplyResult`.
+       * Goes through the plugin's queue rather than assigning `cachedIndex`, so it can't clobber
+       * a concurrent `refreshIndexEntry` (see `touchedWorkoutPaths` on `ExerciseRenameApplyResult`).
        */
       for (const path of result.touchedWorkoutPaths) {
         await this.plugin.refreshIndexEntry(path)
