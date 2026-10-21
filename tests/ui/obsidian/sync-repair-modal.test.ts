@@ -153,6 +153,34 @@ describe('sync and repair modal', () => {
     expect(actions.shown).toEqual(['parse'])
   })
 
+  it('opens the registry diagnostics when the scan found some', async () => {
+    const actions = fakeActions(undefined, async () => ({
+      ...preview,
+      diagnostics: { parse: 0, registry: 2 },
+    }))
+    const modal = await openModal(actions)
+
+    expect(() => button(modal, 'Parse diagnostics')).toThrow()
+    button(modal, 'Registry diagnostics (2)').click()
+
+    expect(actions.shown).toEqual(['registry'])
+  })
+
+  it('applies an up-to-date step once it is ticked', async () => {
+    const actions = fakeActions()
+    const modal = await openModal(actions)
+    modal.contentEl.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[2]!.click()
+
+    button(modal, 'Apply').click()
+    await vi.waitFor(() => {
+      if (actions.applied.length === 0) {
+        throw new Error('Waiting for apply.')
+      }
+    })
+
+    expect(actions.applied).toEqual([['registry', 'notes', 'hidden-sections', 'dashboard']])
+  })
+
   it('disables apply when nothing is ticked', async () => {
     const modal = await openModal(
       fakeActions(undefined, async () => ({

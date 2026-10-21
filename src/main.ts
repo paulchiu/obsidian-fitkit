@@ -235,22 +235,19 @@ export default class FitKitPlugin extends Plugin {
   }
 
   async restoreHiddenDashboardSections(): Promise<void> {
-    await this.clearHiddenDashboardSections()
-    this.workoutIndex.invalidate()
-    const index = await this.getIndex()
-    const result = await regenerateDashboard(this.app, this.settings, index)
-    new Notice(`Restored hidden sections; ${result.sectionCount} section(s) now in dashboard.`)
+    new Notice(await this.restoreHiddenSectionsAndRegenerate())
   }
 
-  /** Returns how many sections were hidden. */
-  private async clearHiddenDashboardSections(): Promise<number> {
+  private async restoreHiddenSectionsAndRegenerate(): Promise<string> {
     const path = normalizePath(dashboardPath(this.settings))
-    const hidden = this.settings.hiddenDashboardSectionsByPath[path]
-    if (hidden) {
+    if (this.settings.hiddenDashboardSectionsByPath[path]) {
       delete this.settings.hiddenDashboardSectionsByPath[path]
       await this.saveSettings()
     }
-    return hidden?.length ?? 0
+    this.workoutIndex.invalidate()
+    const index = await this.getIndex()
+    const result = await regenerateDashboard(this.app, this.settings, index)
+    return `Restored hidden sections; ${result.sectionCount} section(s) now in dashboard.`
   }
 
   showParseDiagnostics(): void {
@@ -479,10 +476,8 @@ export default class FitKitPlugin extends Plugin {
           summariseExerciseNoteSync(await applyExerciseNoteSync(this.app, plan)),
         )
       }
-      case 'hidden-sections': {
-        const restored = await this.clearHiddenDashboardSections()
-        return `Restored ${restored} hidden section(s).`
-      }
+      case 'hidden-sections':
+        return this.restoreHiddenSectionsAndRegenerate()
       case 'dashboard':
         return this.regenerateDashboardFresh()
     }

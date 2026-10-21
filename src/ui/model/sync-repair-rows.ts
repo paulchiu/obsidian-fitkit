@@ -38,7 +38,7 @@ function stepDetail(preview: SyncRepairPreview, step: SyncRepairStep): string {
     }
     case 'hidden-sections':
       return preview.hiddenSections > 0
-        ? `${preview.hiddenSections} hidden ${preview.hiddenSections === 1 ? 'section' : 'sections'} to restore`
+        ? `${sections(preview.hiddenSections)} hidden to restore`
         : 'Up to date: none hidden'
     case 'dashboard':
       return preview.dashboard.changed

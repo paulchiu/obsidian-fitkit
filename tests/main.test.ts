@@ -854,9 +854,11 @@ describe('FitKitPlugin sync and repair preview', () => {
     const { plugin, contents, app } = makeSyncRepairVault()
     const before = new Map(contents)
     const settingsBefore = structuredClone(plugin.settings)
+    const saveData = vi.spyOn(plugin as unknown as FitKitPlugin, 'saveData')
 
     await plugin.previewSyncRepair()
 
+    expect(saveData).not.toHaveBeenCalled()
     expect(contents).toEqual(before)
     expect(app.vault.create).not.toHaveBeenCalled()
     expect(plugin.settings).toEqual(settingsBefore)
@@ -883,17 +885,42 @@ describe('FitKitPlugin sync and repair apply', () => {
   })
 
   it('leaves unticked steps alone', async () => {
+    const { plugin, contents } = makeSyncRepairVault()
+    const note = contents.get('Fitness/Exercises/Squat.md')
+
+    await plugin.applySyncRepair(['registry'])
+
+    expect(plugin.settings.exerciseRegistry).toHaveLength(2)
+    expect(contents.get('Fitness/Exercises/Squat.md')).toBe(note)
+    expect(contents.has('Fitness/Fitness Dashboard.md')).toBe(false)
+  })
+
+  it('puts restored hidden sections back on the dashboard', async () => {
     const { plugin, contents } = makeSyncRepairVault({
       hiddenDashboardSectionsByPath: { 'Fitness/Fitness Dashboard.md': ['exercise:Squat'] },
     })
-    const note = contents.get('Fitness/Exercises/Squat.md')
 
     await plugin.applySyncRepair(['hidden-sections'])
 
     expect(plugin.settings.hiddenDashboardSectionsByPath).toEqual({})
-    expect(plugin.settings.exerciseRegistry).toEqual([])
-    expect(contents.get('Fitness/Exercises/Squat.md')).toBe(note)
-    expect(contents.has('Fitness/Fitness Dashboard.md')).toBe(false)
+    expect(contents.get('Fitness/Fitness Dashboard.md')).toContain('Squat')
+  })
+
+  it('re-reads the vault at apply time rather than trusting the preview', async () => {
+    const { plugin } = makeSyncRepairVault()
+    expect((await plugin.previewSyncRepair()).registry.toAdd).toBe(2)
+    plugin.settings.exerciseRegistry = [
+      { name: 'New Plank', kind: 'duration', aliases: [] },
+      { name: 'Squat', kind: 'strength', aliases: [] },
+    ]
+
+    const outcome = await plugin.applySyncRepair(['registry'])
+
+    expect(outcome.results[0]).toMatchObject({ ok: true })
+    expect(plugin.settings.exerciseRegistry.map((entry) => entry.name)).toEqual([
+      'New Plank',
+      'Squat',
+    ])
   })
 
   it('stops at a failed step and skips the steps after it', async () => {

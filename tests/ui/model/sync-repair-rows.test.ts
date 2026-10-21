@@ -54,7 +54,7 @@ describe('syncRepairRows', () => {
     expect(rows.map((row) => row.detail)).toEqual([
       'Up to date: nothing to add',
       'Up to date: 38 already current',
-      '3 hidden sections to restore',
+      '3 sections hidden to restore',
       'Up to date: 1 section',
     ])
   })
