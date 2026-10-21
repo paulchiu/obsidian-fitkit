@@ -8,6 +8,12 @@ export function isInFolder(path: string, folder: string): boolean {
   return normalized === '' || path.startsWith(`${normalized}/`)
 }
 
+/** Parent folder of a vault path, or an empty string when it has none. */
+export function dirnameOf(path: string): string {
+  const index = path.lastIndexOf('/')
+  return index < 0 ? '' : path.slice(0, index)
+}
+
 export interface FitKitSettingsPathInput {
   fitnessRoot: string
 }
