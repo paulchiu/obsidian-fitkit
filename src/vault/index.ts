@@ -13,7 +13,7 @@ import {
   type WorkoutNoteModel,
 } from '../domain/workout-note-model'
 import type { FitKitSettings } from '../settings'
-import { normalizeFolder, workoutsFolder } from '../settings-paths'
+import { isInFolder, normalizeFolder, workoutsFolder } from '../settings-paths'
 import { markdownFilesInFolder } from './folder-scan'
 
 /**
@@ -153,10 +153,6 @@ function targetedDuration(
     return {}
   }
   return { targetedDurationSeconds: targetedSeconds(exercise.durationEntries, parsed.program) }
-}
-
-function isInFolder(path: string, folder: string): boolean {
-  return path !== folder && path.startsWith(`${folder}/`)
 }
 
 function sortEntries(entries: ReadonlyArray<IndexEntry>): IndexEntry[] {
