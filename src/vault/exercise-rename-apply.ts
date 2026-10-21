@@ -19,7 +19,7 @@ import type { FitKitSettings } from '../settings'
 import { dirnameOf, exercisesFolder, normalizeFolder, workoutsFolder } from '../settings-paths'
 import { findExerciseNoteFile, readExerciseCatalog } from './exercise-catalog'
 import { markdownFilesInFolder } from './folder-scan'
-import { isMarkdownFile } from './index'
+import { isMarkdownFile } from './vault-utils'
 
 /**
  * Gathers the vault state a rename plan needs (registry overlay, exercise

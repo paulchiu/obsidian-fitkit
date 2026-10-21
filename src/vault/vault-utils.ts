@@ -1,4 +1,4 @@
-import type { App } from 'obsidian'
+import type { App, TAbstractFile, TFile } from 'obsidian'
 
 /**
  * Walk the parent path of `filePath` segment by segment, creating any missing
@@ -18,4 +18,9 @@ export async function ensureParentFolder(app: App, filePath: string): Promise<vo
       await app.vault.createFolder(current).catch(() => undefined)
     }
   }
+}
+
+/** Whether a vault entry is a markdown file. */
+export function isMarkdownFile(file: TAbstractFile | null): file is TFile {
+  return file !== null && (file as { extension?: unknown }).extension === 'md'
 }

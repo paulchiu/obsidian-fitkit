@@ -1,4 +1,5 @@
-import type { App, CachedMetadata, TAbstractFile, TFile } from 'obsidian'
+import type { App, CachedMetadata } from 'obsidian'
+import { isMarkdownFile } from './vault-utils'
 
 import {
   bodyweightLevelName,
@@ -327,10 +328,6 @@ function dataviewQuery(exercise: ExerciseAggregate, workoutsFolderPath: string):
         'LIMIT 10',
       ]
   }
-}
-
-function isMarkdownFile(file: TAbstractFile | null): file is TFile {
-  return file !== null && (file as { extension?: unknown }).extension === 'md'
 }
 
 function pickDashboardSet(row: ExerciseIndexRow, metric: ExerciseMetric): StrengthPbSet | null {
