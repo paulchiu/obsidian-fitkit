@@ -1,4 +1,5 @@
-import type { App, CachedMetadata } from 'obsidian'
+import { frontmatterTypeIs, readFrontmatterField } from '../domain/frontmatter'
+import type { App } from 'obsidian'
 import { isMarkdownFile } from './vault-utils'
 
 import {
@@ -465,12 +466,10 @@ function readExerciseNoteMetrics(app: App, settings: FitKitSettings): Map<string
 
   for (const file of markdownFilesInFolder(app, exercisesFolder(settings))) {
     const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter
-    const type = readFrontmatterField(frontmatter, 'type')
     const kind = readFrontmatterField(frontmatter, 'kind')
     /** Strength-only statistic read from frontmatter; other kinds contribute nothing. */
     if (
-      typeof type !== 'string' ||
-      type.toLowerCase().trim() !== 'exercise' ||
+      !frontmatterTypeIs(frontmatter, 'exercise') ||
       typeof kind !== 'string' ||
       kind.toLowerCase().trim() !== 'strength'
     ) {
@@ -513,12 +512,10 @@ function readExerciseNoteUnits(app: App, settings: FitKitSettings): Map<string, 
 
   for (const file of markdownFilesInFolder(app, exercisesFolder(settings))) {
     const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter
-    const type = readFrontmatterField(frontmatter, 'type')
     const kind = readFrontmatterField(frontmatter, 'kind')
     /** Strength-only statistic read from frontmatter; other kinds contribute nothing. */
     if (
-      typeof type !== 'string' ||
-      type.toLowerCase().trim() !== 'exercise' ||
+      !frontmatterTypeIs(frontmatter, 'exercise') ||
       typeof kind !== 'string' ||
       kind.toLowerCase().trim() !== 'strength'
     ) {
@@ -550,14 +547,6 @@ function getExerciseUnit(
   }
 
   return noteUnits.get(normalize(resolved.entry.name)) ?? resolved.entry.unit ?? DEFAULT_WEIGHT_UNIT
-}
-
-function readFrontmatterField(
-  frontmatter: CachedMetadata['frontmatter'] | undefined,
-  key: string,
-): unknown {
-  const record: Record<string, unknown> | null = frontmatter ?? null
-  return record === null ? undefined : record[key]
 }
 
 function recentWorkouts(index: FitKitIndex): IndexEntry[] {

@@ -1,3 +1,4 @@
+import { readFrontmatterField, type Frontmatter } from './frontmatter'
 import { parseExerciseKind } from './exercise-kind'
 import {
   DEFAULT_BODYWEIGHT_EXERCISE_METRIC,
@@ -18,7 +19,7 @@ export interface ParsedExerciseChartBlock {
   windowFallback: boolean
 }
 
-export type ExerciseChartFrontmatter = Record<string, unknown> | undefined
+export type ExerciseChartFrontmatter = Frontmatter
 
 export function parseExerciseChartBlock(source: string): ParsedExerciseChartBlock {
   const result: ParsedExerciseChartBlock = {
@@ -121,11 +122,6 @@ function resolveKindMetric(
 
 function metricFromFrontmatter(frontmatter: ExerciseChartFrontmatter): ExerciseMetric | null {
   return parseExerciseMetric(readFrontmatterField(frontmatter, 'metric'))
-}
-
-function readFrontmatterField(frontmatter: ExerciseChartFrontmatter, key: string): unknown {
-  const record: Record<string, unknown> | null = frontmatter ?? null
-  return record === null ? undefined : record[key]
 }
 
 function normalizeMetricValue(value: string): string | null {

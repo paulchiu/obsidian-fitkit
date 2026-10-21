@@ -8,6 +8,7 @@ import {
   normalizePath,
 } from 'obsidian'
 
+import { frontmatterTypeIs } from './domain/frontmatter'
 import { formatIsoDate } from './domain/dates'
 import { formatErrorMessage } from './domain/error'
 import { createRegistry } from './domain/exercise-registry'
@@ -385,9 +386,7 @@ export default class FitKitPlugin extends Plugin {
   }
 
   private isWorkoutFile(file: TFile): boolean {
-    const frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter
-    const type: unknown = frontmatter?.type
-    return typeof type === 'string' && type.toLowerCase() === 'workout'
+    return frontmatterTypeIs(this.app.metadataCache.getFileCache(file)?.frontmatter, 'workout')
   }
 
   async syncExerciseNotes(): Promise<void> {
