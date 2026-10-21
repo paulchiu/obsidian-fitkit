@@ -151,7 +151,11 @@ import { MarkdownView, Modal, TFile, type App, type Menu } from 'obsidian'
 
 import FitKitPlugin from '../src/main'
 import { DEFAULT_SETTINGS, type FitKitSettings } from '../src/settings'
-import type { SyncRepairPreview } from '../src/domain/sync-repair'
+import type {
+  SyncRepairOutcome,
+  SyncRepairPreview,
+  SyncRepairStep,
+} from '../src/domain/sync-repair'
 import {
   VIEW_TYPE_FITKIT_WORKOUT_EDITOR,
   WorkoutEditorView,
@@ -218,6 +222,8 @@ interface TestPlugin {
   syncExerciseNotes(): Promise<void>
   rebuildExerciseRegistry(): Promise<void>
   previewSyncRepair(): Promise<SyncRepairPreview>
+  applySyncRepair(steps: readonly SyncRepairStep[]): Promise<SyncRepairOutcome>
+  saveSettings(): Promise<void>
 }
 
 const makeEditorView = (
@@ -854,6 +860,54 @@ describe('FitKitPlugin sync and repair preview', () => {
     expect(contents).toEqual(before)
     expect(app.vault.create).not.toHaveBeenCalled()
     expect(plugin.settings).toEqual(settingsBefore)
+  })
+})
+
+describe('FitKitPlugin sync and repair apply', () => {
+  it('runs the ticked steps in order and reports each result', async () => {
+    const { plugin, contents } = makeSyncRepairVault()
+
+    const outcome = await plugin.applySyncRepair(['dashboard', 'registry', 'notes'])
+
+    expect(outcome.results.map((result) => [result.step, result.ok])).toEqual([
+      ['registry', true],
+      ['notes', true],
+      ['dashboard', true],
+    ])
+    expect(plugin.settings.exerciseRegistry.map((entry) => entry.name)).toEqual([
+      'New Plank',
+      'Squat',
+    ])
+    expect(contents.get('Fitness/Exercises/Squat.md')).toContain('## Recent sessions')
+    expect(contents.get('Fitness/Fitness Dashboard.md')).toContain('# FitKit Dashboard')
+  })
+
+  it('leaves unticked steps alone', async () => {
+    const { plugin, contents } = makeSyncRepairVault({
+      hiddenDashboardSectionsByPath: { 'Fitness/Fitness Dashboard.md': ['exercise:Squat'] },
+    })
+    const note = contents.get('Fitness/Exercises/Squat.md')
+
+    await plugin.applySyncRepair(['hidden-sections'])
+
+    expect(plugin.settings.hiddenDashboardSectionsByPath).toEqual({})
+    expect(plugin.settings.exerciseRegistry).toEqual([])
+    expect(contents.get('Fitness/Exercises/Squat.md')).toBe(note)
+    expect(contents.has('Fitness/Fitness Dashboard.md')).toBe(false)
+  })
+
+  it('stops at a failed step and skips the steps after it', async () => {
+    const { plugin, contents } = makeSyncRepairVault()
+    const note = contents.get('Fitness/Exercises/Squat.md')
+    plugin.saveSettings = async () => {
+      throw new Error('disk full')
+    }
+
+    const outcome = await plugin.applySyncRepair(['registry', 'notes', 'dashboard'])
+
+    expect(outcome.results).toEqual([{ step: 'registry', ok: false, message: 'disk full' }])
+    expect(contents.get('Fitness/Exercises/Squat.md')).toBe(note)
+    expect(contents.has('Fitness/Fitness Dashboard.md')).toBe(false)
   })
 })
 

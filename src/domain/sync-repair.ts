@@ -36,3 +36,12 @@ export function stepHasWork(preview: SyncRepairPreview, step: SyncRepairStep): b
 export function defaultSyncRepairSelection(preview: SyncRepairPreview): SyncRepairStep[] {
   return SYNC_REPAIR_STEPS.filter((step) => stepHasWork(preview, step))
 }
+
+export type SyncRepairResult =
+  | { step: SyncRepairStep; ok: true; summary: string }
+  | { step: SyncRepairStep; ok: false; message: string }
+
+export interface SyncRepairOutcome {
+  results: SyncRepairResult[]
+  diagnostics: SyncRepairPreview['diagnostics']
+}

@@ -10,7 +10,14 @@ import {
 
 import { frontmatterTypeIs } from './domain/frontmatter'
 import { formatIsoDate } from './domain/dates'
-import type { SyncRepairPreview } from './domain/sync-repair'
+import {
+  SYNC_REPAIR_STEPS,
+  type SyncRepairOutcome,
+  type SyncRepairPreview,
+  type SyncRepairResult,
+  type SyncRepairStep,
+} from './domain/sync-repair'
+import { formatErrorMessage } from './domain/error'
 import type { FitKitIndex, IndexDiagnostic } from './domain/types'
 import {
   DEFAULT_SETTINGS,
@@ -216,22 +223,33 @@ export default class FitKitPlugin extends Plugin {
   }
 
   async rebuildDashboard(): Promise<void> {
+    new Notice(await this.regenerateDashboardFresh())
+  }
+
+  private async regenerateDashboardFresh(): Promise<string> {
     this.workoutIndex.invalidate()
     const index = await this.getIndex()
     const result = await regenerateDashboard(this.app, this.settings, index)
-    new Notice(`Dashboard rebuilt: ${result.sectionCount} section(s) at ${result.path}.`)
+    return `Dashboard rebuilt: ${result.sectionCount} section(s) at ${result.path}.`
   }
 
   async restoreHiddenDashboardSections(): Promise<void> {
-    const path = normalizePath(dashboardPath(this.settings))
-    if (this.settings.hiddenDashboardSectionsByPath[path]) {
-      delete this.settings.hiddenDashboardSectionsByPath[path]
-      await this.saveSettings()
-    }
+    await this.clearHiddenDashboardSections()
     this.workoutIndex.invalidate()
     const index = await this.getIndex()
     const result = await regenerateDashboard(this.app, this.settings, index)
     new Notice(`Restored hidden sections; ${result.sectionCount} section(s) now in dashboard.`)
+  }
+
+  /** Returns how many sections were hidden. */
+  private async clearHiddenDashboardSections(): Promise<number> {
+    const path = normalizePath(dashboardPath(this.settings))
+    const hidden = this.settings.hiddenDashboardSectionsByPath[path]
+    if (hidden) {
+      delete this.settings.hiddenDashboardSectionsByPath[path]
+      await this.saveSettings()
+    }
+    return hidden?.length ?? 0
   }
 
   showParseDiagnostics(): void {
@@ -247,15 +265,17 @@ export default class FitKitPlugin extends Plugin {
    * Never touches an existing overlay entry or materializes a unit.
    */
   async rebuildExerciseRegistry(): Promise<void> {
+    new Notice(await this.backfillExerciseRegistry())
+  }
+
+  private async backfillExerciseRegistry(): Promise<string> {
     const plan = await buildRegistryBackfillPlan(this.app, this.settings)
     this.settings.exerciseRegistry = applyRegistryBackfillPlan(
       this.settings.exerciseRegistry,
       plan.entriesToAdd,
     )
     await this.saveSettings()
-    new Notice(
-      `Rebuilt registry: ${plan.addedFromNotes} added from notes, ${plan.addedFromHistory} added from history-only exercises, ${plan.alreadyPresent} already present, ${plan.skippedTombstoned} skipped (ignored).`,
-    )
+    return `Rebuilt registry: ${plan.addedFromNotes} added from notes, ${plan.addedFromHistory} added from history-only exercises, ${plan.alreadyPresent} already present, ${plan.skippedTombstoned} skipped (ignored).`
   }
 
   showExerciseRegistryDiagnostics(): void {
@@ -418,6 +438,43 @@ export default class FitKitPlugin extends Plugin {
       hiddenSections: this.settings.hiddenDashboardSectionsByPath[dashboard.path]?.length ?? 0,
       dashboard: { sectionCount: dashboard.sectionCount, changed: dashboard.changed },
       diagnostics: this.diagnosticCounts(),
+    }
+  }
+
+  /** Runs the ticked steps in order, re-reading the vault for each, and stops at the first failure. */
+  async applySyncRepair(steps: readonly SyncRepairStep[]): Promise<SyncRepairOutcome> {
+    const results: SyncRepairResult[] = []
+    for (const step of SYNC_REPAIR_STEPS.filter((candidate) => steps.includes(candidate))) {
+      try {
+        results.push({ step, ok: true, summary: await this.runSyncRepairStep(step) })
+      } catch (error) {
+        results.push({ step, ok: false, message: formatErrorMessage(error) })
+        break
+      }
+    }
+    return { results, diagnostics: this.diagnosticCounts() }
+  }
+
+  private async runSyncRepairStep(step: SyncRepairStep): Promise<string> {
+    switch (step) {
+      case 'registry':
+        return this.backfillExerciseRegistry()
+      case 'notes': {
+        const plan = await planExerciseNoteSync(
+          this.app,
+          this.settings,
+          this.settings.exerciseRegistry,
+        )
+        return formatExerciseNoteSyncSummary(
+          summariseExerciseNoteSync(await applyExerciseNoteSync(this.app, plan)),
+        )
+      }
+      case 'hidden-sections': {
+        const restored = await this.clearHiddenDashboardSections()
+        return `Restored ${restored} hidden section(s).`
+      }
+      case 'dashboard':
+        return this.regenerateDashboardFresh()
     }
   }
 
