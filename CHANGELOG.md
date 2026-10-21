@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+### Fixed
+
+### Removed
+
+## [1.9.2] - 2026-10-21
+
+### Added
+
+### Changed
+
 - Internal tidy-up: shared helpers for dates, numbers and note frontmatter, smaller note migration modules, and stricter checks that every case is handled. Nothing should look or behave differently.
 
 ### Fixed
