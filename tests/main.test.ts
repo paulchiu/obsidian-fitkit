@@ -1498,13 +1498,16 @@ describe('FitKitPlugin open dashboard from a workout', () => {
     const workout = makeWorkoutFile('Workouts/A.md')
     const journal = makeWorkoutFile('Journal/today.md')
     const events = await loadPluginCapturingEvents(makeWorkoutApp())
-    const menus = [makeRecordingMenu(), makeRecordingMenu(), makeRecordingMenu()]
+    const offered = (leaf: MockLeaf, source?: string): boolean => {
+      const menu = makeRecordingMenu()
+      events.showMenu(leaf, menu.menu, source)
+      return menu.titles().includes('Open dashboard')
+    }
 
-    events.showMenu(makeLeafShowingFile(journal), menus[0].menu)
-    events.showMenu(makeEditorLeaf(workout), menus[1].menu, 'tab-header')
-    events.showMenu(makeLeafShowingFile(workout), menus[2].menu, 'file-explorer-context-menu')
-
-    expect(menus.flatMap((menu) => menu.titles())).not.toContain('Open dashboard')
+    expect(offered(makeLeafShowingFile(journal))).toBe(false)
+    expect(offered(makeEditorLeaf(journal))).toBe(false)
+    expect(offered(makeEditorLeaf(workout), 'tab-header')).toBe(false)
+    expect(offered(makeLeafShowingFile(workout), 'file-explorer-context-menu')).toBe(false)
   })
 
   it('rebuilds the dashboard, keeping hidden sections hidden, and opens it in a new tab', async () => {
@@ -1544,6 +1547,23 @@ describe('FitKitPlugin open dashboard from a workout', () => {
 
     expect(contents.get('Fitness/Fitness Dashboard.md')).toContain('## New Plank')
     expect(newTabs.map((tab) => tab.file?.path)).toEqual(['Fitness/Fitness Dashboard.md'])
+  })
+
+  it('says why and opens nothing when the dashboard cannot be written', async () => {
+    const { app } = makeSyncRepairVault()
+    app.vault.create = vi.fn(async () => {
+      throw new Error('Disk full')
+    })
+    const newTabs = recordNewTabs(app)
+    const events = await loadPluginCapturingEvents(app)
+    const menu = makeRecordingMenu()
+    events.showMenu(makeLeafShowingFile(vaultFileAt('Fitness/Workouts/2026-05-08.md')), menu.menu)
+    noticeMessages.length = 0
+
+    await menu.click('Open dashboard')
+
+    expect(noticeMessages).toEqual(['Could not open dashboard: Disk full'])
+    expect(newTabs).toEqual([])
   })
 })
 

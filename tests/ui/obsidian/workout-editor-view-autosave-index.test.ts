@@ -45,6 +45,7 @@ vi.mock('obsidian', async () => {
         clientWidth: 0,
       }
     }
+    onPaneMenu(): void {}
   }
 
   class MarkdownView {
@@ -512,5 +513,85 @@ describe('WorkoutEditorView autosave survives teardown races on the shared view'
     const entryB = plugin.cachedIndex?.entries.find((candidate) => candidate.path === fileB.path)
     expect(entryA?.exercises[0]?.next).toEqual({ direction: 'down', step: 2.5 })
     expect(entryB?.exercises[0]?.next).toEqual({ direction: 'up', step: 2.5 })
+  })
+})
+
+describe('WorkoutEditorView "Open dashboard" includes edits still waiting to autosave', () => {
+  beforeEach(stubAutosaveGlobals)
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('saves the pending edit before rebuilding the dashboard it opens', async () => {
+    const { view, contents } = await createHarness()
+    const dashboardFile = Object.assign(new TFile(), {
+      path: 'Fitness/Fitness Dashboard.md',
+      extension: 'md',
+      basename: 'Fitness Dashboard',
+    })
+    const workoutFile = view.app.vault.getAbstractFileByPath(WORKOUT_PATH)
+    const openedTabs: string[] = []
+    Object.assign(view.app, {
+      workspace: {
+        getLeavesOfType: () => [{ view }],
+        getLeaf: () => ({
+          openFile: async (file: TFile) => {
+            openedTabs.push(file.path)
+          },
+        }),
+      },
+      metadataCache: { getFileCache: () => ({ frontmatter: { type: 'workout' } }) },
+    })
+    Object.assign(view.app.vault, {
+      getAbstractFileByPath: (path: string) =>
+        path === dashboardFile.path
+          ? contents.has(path)
+            ? dashboardFile
+            : null
+          : path === WORKOUT_PATH
+            ? workoutFile
+            : null,
+      create: async (path: string, data: string) => {
+        contents.set(path, data)
+        return dashboardFile
+      },
+    })
+    const exercise = view.model?.exercises[0]
+    if (!exercise) {
+      throw new Error('test setup: exercise not present on model')
+    }
+    exercise.strengthSets[0] = { set: 1, weight: 120, reps: 5 }
+    view.markDirty()
+    let openDashboard: (() => unknown) | undefined
+    const menu = {
+      addItem(build: (item: unknown) => void) {
+        let title = ''
+        const item = {
+          setSection: () => item,
+          setIcon: () => item,
+          setTitle: (text: string) => {
+            title = text
+            return item
+          },
+          onClick: (handler: () => unknown) => {
+            if (title === 'Open dashboard') {
+              openDashboard = handler
+            }
+            return item
+          },
+        }
+        build(item)
+        return menu
+      },
+    }
+
+    ;(view as unknown as WorkoutEditorView).onPaneMenu(
+      menu as unknown as Parameters<WorkoutEditorView['onPaneMenu']>[0],
+      'more-options',
+    )
+    await openDashboard?.()
+
+    expect(contents.get('Fitness/Fitness Dashboard.md')).toContain('120')
+    expect(openedTabs).toEqual(['Fitness/Fitness Dashboard.md'])
   })
 })
