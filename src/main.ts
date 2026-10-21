@@ -10,9 +10,14 @@ import {
 
 import { frontmatterTypeIs } from './domain/frontmatter'
 import { formatIsoDate } from './domain/dates'
+import {
+  SYNC_REPAIR_STEPS,
+  type SyncRepairOutcome,
+  type SyncRepairPreview,
+  type SyncRepairResult,
+  type SyncRepairStep,
+} from './domain/sync-repair'
 import { formatErrorMessage } from './domain/error'
-import { createRegistry } from './domain/exercise-registry'
-import { migrateExerciseNote } from './domain/exercise-note-migrate'
 import type { FitKitIndex, IndexDiagnostic } from './domain/types'
 import {
   DEFAULT_SETTINGS,
@@ -20,21 +25,27 @@ import {
   settingsFromStored,
   type FitKitSettings,
 } from './settings'
-import { dashboardPath, exercisesFolder, workoutFilename, workoutsFolder } from './settings-paths'
+import { dashboardPath, workoutFilename, workoutsFolder } from './settings-paths'
 import { renderExerciseChartBlock } from './ui/obsidian/exercise-chart-block'
 import { ParseDiagnosticsModal } from './ui/obsidian/parse-diagnostics-modal'
+import { SyncRepairModal } from './ui/obsidian/sync-repair-modal'
 import { renderWorkoutReadingModeSection } from './ui/obsidian/workout-reading-mode'
 import {
   VIEW_TYPE_FITKIT_WORKOUT_EDITOR,
   WorkoutEditorView,
 } from './ui/obsidian/workout-editor-view'
-import { regenerateDashboard } from './vault/dashboard'
+import { previewDashboard, regenerateDashboard } from './vault/dashboard'
 import {
   applyRegistryBackfillPlan,
   buildRegistryBackfillPlan,
 } from './vault/exercise-registry-backfill'
+import {
+  applyExerciseNoteSync,
+  formatExerciseNoteSyncSummary,
+  planExerciseNoteSync,
+  summariseExerciseNoteSync,
+} from './vault/exercise-note-sync'
 import { buildExerciseRegistrySnapshot } from './vault/exercise-registry-vault'
-import { markdownFilesInFolder } from './vault/folder-scan'
 import { createWorkoutIndex, type WorkoutIndex } from './vault/workout-index'
 
 function emptyWorkoutMarkdown(date: string): string {
@@ -213,13 +224,21 @@ export default class FitKitPlugin extends Plugin {
   }
 
   async rebuildDashboard(): Promise<void> {
+    new Notice(await this.regenerateDashboardFresh())
+  }
+
+  private async regenerateDashboardFresh(): Promise<string> {
     this.workoutIndex.invalidate()
     const index = await this.getIndex()
     const result = await regenerateDashboard(this.app, this.settings, index)
-    new Notice(`Dashboard rebuilt: ${result.sectionCount} section(s) at ${result.path}.`)
+    return `Dashboard rebuilt: ${result.sectionCount} section(s) at ${result.path}.`
   }
 
   async restoreHiddenDashboardSections(): Promise<void> {
+    new Notice(await this.restoreHiddenSectionsAndRegenerate())
+  }
+
+  private async restoreHiddenSectionsAndRegenerate(): Promise<string> {
     const path = normalizePath(dashboardPath(this.settings))
     if (this.settings.hiddenDashboardSectionsByPath[path]) {
       delete this.settings.hiddenDashboardSectionsByPath[path]
@@ -228,7 +247,7 @@ export default class FitKitPlugin extends Plugin {
     this.workoutIndex.invalidate()
     const index = await this.getIndex()
     const result = await regenerateDashboard(this.app, this.settings, index)
-    new Notice(`Restored hidden sections; ${result.sectionCount} section(s) now in dashboard.`)
+    return `Restored hidden sections; ${result.sectionCount} section(s) now in dashboard.`
   }
 
   showParseDiagnostics(): void {
@@ -244,15 +263,17 @@ export default class FitKitPlugin extends Plugin {
    * Never touches an existing overlay entry or materializes a unit.
    */
   async rebuildExerciseRegistry(): Promise<void> {
+    new Notice(await this.backfillExerciseRegistry())
+  }
+
+  private async backfillExerciseRegistry(): Promise<string> {
     const plan = await buildRegistryBackfillPlan(this.app, this.settings)
     this.settings.exerciseRegistry = applyRegistryBackfillPlan(
       this.settings.exerciseRegistry,
       plan.entriesToAdd,
     )
     await this.saveSettings()
-    new Notice(
-      `Rebuilt registry: ${plan.addedFromNotes} added from notes, ${plan.addedFromHistory} added from history-only exercises, ${plan.alreadyPresent} already present, ${plan.skippedTombstoned} skipped (ignored).`,
-    )
+    return `Rebuilt registry: ${plan.addedFromNotes} added from notes, ${plan.addedFromHistory} added from history-only exercises, ${plan.alreadyPresent} already present, ${plan.skippedTombstoned} skipped (ignored).`
   }
 
   showExerciseRegistryDiagnostics(): void {
@@ -387,101 +408,92 @@ export default class FitKitPlugin extends Plugin {
     return frontmatterTypeIs(this.app.metadataCache.getFileCache(file)?.frontmatter, 'workout')
   }
 
-  async syncExerciseNotes(): Promise<void> {
-    const files = markdownFilesInFolder(this.app, exercisesFolder(this.settings))
-    const snapshot = buildExerciseRegistrySnapshot(this.app, this.settings)
-    const registry = createRegistry(this.settings.exerciseRegistry)
-    const conflictPaths = new Set<string>()
-    for (const diagnostic of snapshot.diagnostics) {
-      if (diagnostic.kind === 'registry-kind-conflict' && diagnostic.path) {
-        conflictPaths.add(diagnostic.path)
-      }
-    }
+  openSyncRepair(): void {
+    new SyncRepairModal(this.app, {
+      preview: () => this.previewSyncRepair(),
+      apply: (steps) => this.applySyncRepair(steps),
+      showParseDiagnostics: () => this.showParseDiagnostics(),
+      showRegistryDiagnostics: () => this.showExerciseRegistryDiagnostics(),
+    }).open()
+  }
 
-    let updated = 0
-    let already = 0
-    let skipped = 0
-    let skippedMalformedFrontmatter = 0
-    let needsValidation = 0
-    let failed = 0
-    const failedPaths: string[] = []
-    let customisedRecentSessions = 0
-    let customisedNotesSections = 0
-    for (const file of files) {
+  /** Scans what each sync and repair step would change, writing nothing. */
+  async previewSyncRepair(): Promise<SyncRepairPreview> {
+    this.workoutIndex.invalidate()
+    const index = await this.getIndex()
+    const registryPlan = await buildRegistryBackfillPlan(this.app, this.settings)
+    const notesPlan = await planExerciseNoteSync(
+      this.app,
+      this.settings,
+      applyRegistryBackfillPlan(this.settings.exerciseRegistry, registryPlan.entriesToAdd),
+    )
+    const notes = summariseExerciseNoteSync(notesPlan)
+    const dashboard = await previewDashboard(this.app, this.settings, index)
+    return {
+      workoutCount: index.entries.length,
+      exerciseNoteCount: notes.files,
+      registry: {
+        toAdd: registryPlan.entriesToAdd.length,
+        fromNotes: registryPlan.addedFromNotes,
+        fromHistory: registryPlan.addedFromHistory,
+      },
+      notes: {
+        toUpdate: notes.updated,
+        current: notes.already,
+        skipped: notes.skipped + notes.skippedMalformedFrontmatter,
+      },
+      hiddenSections: this.settings.hiddenDashboardSectionsByPath[dashboard.path]?.length ?? 0,
+      dashboard: { sectionCount: dashboard.sectionCount, changed: dashboard.changed },
+      diagnostics: this.diagnosticCounts(),
+    }
+  }
+
+  /** Runs the ticked steps in order, re-reading the vault for each, and stops at the first failure. */
+  async applySyncRepair(steps: readonly SyncRepairStep[]): Promise<SyncRepairOutcome> {
+    const results: SyncRepairResult[] = []
+    for (const step of SYNC_REPAIR_STEPS.filter((candidate) => steps.includes(candidate))) {
       try {
-        const source = await this.app.vault.read(file)
-        const input = {
-          name: file.basename,
-          registry,
-          fitnessRoot: this.settings.fitnessRoot,
-        }
-        const result = migrateExerciseNote(source, input)
-        if (result.status === 'skipped-non-exercise-type') {
-          skipped += 1
-          continue
-        }
-        if (result.status === 'skipped-malformed-frontmatter') {
-          skippedMalformedFrontmatter += 1
-          continue
-        }
-
-        if (result.warnings.some((warning) => warning.kind === 'custom-recent-sessions')) {
-          customisedRecentSessions += 1
-        }
-        if (result.warnings.some((warning) => warning.kind === 'custom-notes-section')) {
-          customisedNotesSections += 1
-        }
-        if (result.warnings.some((warning) => warning.kind === 'registry-kind-conflict')) {
-          conflictPaths.add(file.path)
-        }
-
-        if (result.changed) {
-          await this.app.vault.process(file, (live) => migrateExerciseNote(live, input).markdown)
-        }
-
-        if (result.status === 'unknown') {
-          needsValidation += 1
-        }
-        if (result.changed) {
-          updated += 1
-        } else {
-          already += 1
-        }
+        results.push({ step, ok: true, summary: await this.runSyncRepairStep(step) })
       } catch (error) {
-        failed += 1
-        failedPaths.push(`${file.path}: ${formatErrorMessage(error)}`)
+        results.push({ step, ok: false, message: formatErrorMessage(error) })
+        break
       }
     }
+    return { results, diagnostics: this.diagnosticCounts() }
+  }
 
-    const failedHint = failedPaths[0] ? ` (first failure: ${failedPaths[0]})` : ''
-    const customisedWarnings = [
-      customisedRecentSessions > 0
-        ? `${customisedRecentSessions} customised recent sessions block${
-            customisedRecentSessions === 1 ? '' : 's'
-          }`
-        : null,
-      customisedNotesSections > 0
-        ? `${customisedNotesSections} customised notes section${
-            customisedNotesSections === 1 ? '' : 's'
-          }`
-        : null,
-    ].filter((warning): warning is string => warning !== null)
-    const customisedSummary =
-      customisedWarnings.length > 0 ? ` ${customisedWarnings.join(', ')} left alone.` : ''
-    const validationSummary =
-      needsValidation > 0
-        ? ` (${needsValidation} ${
-            needsValidation === 1 ? 'needs' : 'need'
-          } validation: kind inferred/defaulted without registry, review kind and metric)`
-        : ''
-    const conflictSummary =
-      conflictPaths.size > 0
-        ? `, ${conflictPaths.size} registry kind conflict${
-            conflictPaths.size === 1 ? '' : 's'
-          } preserved`
-        : ''
-    const summary = `Synced ${files.length} exercise note${files.length === 1 ? '' : 's'}; ${updated} updated${validationSummary}, ${already} already current, ${skipped} skipped (non-exercise type), ${skippedMalformedFrontmatter} skipped (malformed frontmatter), ${failed} failed${failedHint}${conflictSummary}.${customisedSummary}`
-    new Notice(summary)
+  private async runSyncRepairStep(step: SyncRepairStep): Promise<string> {
+    switch (step) {
+      case 'registry':
+        return this.backfillExerciseRegistry()
+      case 'notes': {
+        const plan = await planExerciseNoteSync(
+          this.app,
+          this.settings,
+          this.settings.exerciseRegistry,
+        )
+        return formatExerciseNoteSyncSummary(
+          summariseExerciseNoteSync(await applyExerciseNoteSync(this.app, plan)),
+        )
+      }
+      case 'hidden-sections':
+        return this.restoreHiddenSectionsAndRegenerate()
+      case 'dashboard':
+        return this.regenerateDashboardFresh()
+    }
+  }
+
+  private diagnosticCounts(): SyncRepairPreview['diagnostics'] {
+    return {
+      parse: this.lastDiagnostics.length,
+      registry: buildExerciseRegistrySnapshot(this.app, this.settings).diagnostics.length,
+    }
+  }
+
+  async syncExerciseNotes(): Promise<void> {
+    const plan = await planExerciseNoteSync(this.app, this.settings, this.settings.exerciseRegistry)
+    const applied = await applyExerciseNoteSync(this.app, plan)
+    new Notice(formatExerciseNoteSyncSummary(summariseExerciseNoteSync(applied)))
   }
 
   async loadSettings(): Promise<void> {

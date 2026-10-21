@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { FitKitIndex } from '../../src/domain/types'
 import type { FitKitSettings } from '../../src/settings'
-import { composeDashboard, regenerateDashboard } from '../../src/vault/dashboard'
+import { composeDashboard, previewDashboard, regenerateDashboard } from '../../src/vault/dashboard'
 import { buildMockVaultFolderTree } from '../fixtures/mock-vault-folder-tree'
 
 const emptyIndex: FitKitIndex = {
@@ -1037,5 +1037,65 @@ describe('dashboard composer', () => {
     )
 
     expect(markdown).toContain('- **[[#Machine Pushdown|Machine Pushdown]]:** no completed sets')
+  })
+})
+
+describe('previewDashboard', () => {
+  const settings = settingsWithRegistry([])
+  const dashboardFile = { path: 'Fitness/Fitness Dashboard.md', basename: 'Fitness Dashboard' }
+
+  /** An app whose vault holds a dashboard note with `existing`, or none when null. */
+  function appWithDashboard(existing: string | null): App {
+    const file = existing === null ? null : { ...dashboardFile, extension: 'md' }
+    return {
+      vault: {
+        ...buildMockVaultFolderTree([]),
+        getAbstractFileByPath: (path: string) => (path === dashboardFile.path ? file : null),
+        read: async () => existing ?? '',
+      },
+      metadataCache: { getFileCache: () => null },
+    } as unknown as App
+  }
+
+  const builtAt = (index: FitKitIndex, at: number): FitKitIndex => ({ ...index, builtAt: at })
+
+  it('reports a dashboard that differs only by its generated line as current', async () => {
+    const existing = composeDashboard(
+      builtAt(mixedIndex, 0),
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+    )
+
+    const preview = await previewDashboard(
+      appWithDashboard(existing),
+      settings,
+      builtAt(mixedIndex, 86_400_000),
+    )
+
+    expect(preview).toEqual({
+      path: 'Fitness/Fitness Dashboard.md',
+      sectionCount: 2,
+      changed: false,
+    })
+  })
+
+  it('reports a dashboard with outdated sections as changed', async () => {
+    const existing = composeDashboard(
+      emptyIndex,
+      'Fitness/Workouts',
+      'Fitness/Exercises',
+      new Set(),
+    )
+
+    const preview = await previewDashboard(appWithDashboard(existing), settings, mixedIndex)
+
+    expect(preview.changed).toBe(true)
+  })
+
+  it('reports a missing dashboard note as changed', async () => {
+    const preview = await previewDashboard(appWithDashboard(null), settings, mixedIndex)
+
+    expect(preview.changed).toBe(true)
   })
 })
