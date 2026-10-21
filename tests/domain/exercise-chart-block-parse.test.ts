@@ -202,3 +202,18 @@ window: 12
     expect(notes).toEqual([])
   })
 })
+
+describe('exercise chart metric scalars', () => {
+  it('keeps # inside quotes and drops an unquoted trailing comment', () => {
+    expect(parseExerciseChartBlock('metric: "weight # x"').invalidMetricValue).toBe('weight # x')
+    expect(parseExerciseChartBlock('metric: weight # note').metric).toBe('weight')
+  })
+
+  it('trims whitespace inside surrounding quotes', () => {
+    expect(parseExerciseChartBlock("metric: '  weight  '").metric).toBe('weight')
+  })
+
+  it('treats a lone quote as not supplied', () => {
+    expect(parseExerciseChartBlock('metric: "').metricSupplied).toBe(false)
+  })
+})

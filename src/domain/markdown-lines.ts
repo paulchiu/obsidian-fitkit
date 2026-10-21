@@ -286,7 +286,8 @@ export function scalarValue(line: string): string {
   return stripScalarQuotes(stripInlineComment(line.slice(colon + 1)).trim()).toLowerCase()
 }
 
-function stripInlineComment(value: string): string {
+/** Drops a trailing `# comment` that sits outside quotes, plus the whitespace before it. */
+export function stripInlineComment(value: string): string {
   let quote: '"' | "'" | null = null
   for (let index = 0; index < value.length; index += 1) {
     const char = value[index]

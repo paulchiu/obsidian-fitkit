@@ -1,5 +1,6 @@
 import { readFrontmatterField, type Frontmatter } from './frontmatter'
 import { parseExerciseKind } from './exercise-kind'
+import { stripInlineComment } from './markdown-lines'
 import {
   DEFAULT_BODYWEIGHT_EXERCISE_METRIC,
   DEFAULT_EXERCISE_METRIC,
@@ -127,25 +128,6 @@ function metricFromFrontmatter(frontmatter: ExerciseChartFrontmatter): ExerciseM
 function normalizeMetricValue(value: string): string | null {
   const stripped = stripSurroundingQuotes(stripInlineComment(value).trim())
   return stripped.length === 0 ? null : stripped
-}
-
-function stripInlineComment(value: string): string {
-  let quote: '"' | "'" | null = null
-  for (let index = 0; index < value.length; index += 1) {
-    const char = value[index]
-    if ((char === '"' || char === "'") && quote === null) {
-      quote = char
-      continue
-    }
-    if (char === quote) {
-      quote = null
-      continue
-    }
-    if (char === '#' && quote === null) {
-      return value.slice(0, index).trimEnd()
-    }
-  }
-  return value
 }
 
 /** Quoted metric values mirror YAML-ish code blocks, so surrounding quotes are ignored. */
