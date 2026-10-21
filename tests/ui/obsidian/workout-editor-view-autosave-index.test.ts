@@ -229,12 +229,8 @@ interface Harness {
 }
 
 /**
- * Builds a WorkoutEditorView wired to a real FileSession and a real
- * FitKitPlugin instance (via its prototype, matching the harness style in
- * tests/main.test.ts) so plugin.cachedIndex is the genuine
- * FitKitPlugin#cachedIndex field, not a stand-in. plugin.cachedIndex starts
- * seeded by the real rebuildIndex(), matching what the plugin would have
- * cached before the user's edit.
+ * Builds a WorkoutEditorView on a real FileSession and a real FitKitPlugin (via its prototype,
+ * as in tests/main.test.ts) so `plugin.cachedIndex` is the genuine field, seeded by `rebuildIndex()`.
  */
 const createHarness = async (): Promise<Harness> => {
   const file = Object.assign(new TFile(), {

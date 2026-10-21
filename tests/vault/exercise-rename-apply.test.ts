@@ -160,10 +160,8 @@ describe('applyExerciseRenamePlan: plain rename', () => {
     expect(content.get('Fitness/Workouts/2026-05-08.md')).toContain('[exercise:: [[Barbell Row]]]')
 
     /**
-     * migrateExerciseNote ran with the NEW name: both the Recent sessions and
-     * Notes blocks follow the rename (Notes mirrors Recent sessions'
-     * staleness-following, so an uncustomised query is silently rewritten
-     * rather than left pointing at the old name).
+     * migrateExerciseNote ran with the NEW name: both Recent sessions and Notes blocks follow the rename,
+     * so an uncustomised query is rewritten rather than left on the old name.
      */
     const renamedNote = content.get('Fitness/Exercises/Barbell Row.md') ?? ''
     expect(renamedNote).toContain('link("Barbell Row")')

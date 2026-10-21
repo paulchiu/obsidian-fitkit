@@ -864,12 +864,9 @@ describe('workout note model', () => {
     )
 
     /**
-     * Content must stay attached to the section it was written under, not
-     * just survive somewhere in the output. The preamble comes before
-     * Bench Press, the plate-math fence sits directly above the Bench Press
-     * heading, the nested bullet stays between Bench Press's two set rows,
-     * and the inter-section note stays between Bench Press and Overhead
-     * Press, not after Overhead Press's own row.
+     * Content must stay attached to the section it was written under, not just survive somewhere:
+     * preamble before Bench Press, fence above its heading, nested bullet between its set rows,
+     * and the inter-section note between Bench Press and Overhead Press.
      */
     const lines = serialized.split('\n')
     const indexOf = (needle: string) => lines.findIndex((line) => line.includes(needle))

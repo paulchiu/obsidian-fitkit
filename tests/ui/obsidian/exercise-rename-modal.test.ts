@@ -117,11 +117,8 @@ function baseResult(overrides: Partial<ExerciseRenameApplyResult> = {}): Exercis
 }
 
 /**
- * Returned type deliberately keeps `saveSettings` as `Mock`, not the real
- * class method signature: asserting on a bound class method (`expect(plugin.saveSettings)...`)
- * trips `@typescript-eslint/unbound-method`. Cast to `FitKitPlugin` only at
- * the `ExerciseRenameModal` constructor call site, where it is passed rather
- * than asserted on.
+ * Keeps `saveSettings` typed as `Mock` so asserting on it avoids `@typescript-eslint/unbound-method`.
+ * Cast to `FitKitPlugin` only where the modal constructor receives it.
  */
 function createPluginStub() {
   return {
