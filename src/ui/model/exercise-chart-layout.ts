@@ -1,4 +1,5 @@
 import { bodyweightLevelName, type BodyweightLadder } from '../../domain/bodyweight-levels'
+import { formatNumber, formatReps } from '../../domain/number-format'
 import { niceRange, pickXTickIndices, type ChartSeries } from '../../domain/exercise-chart'
 
 const VIEW_WIDTH = 800
@@ -347,8 +348,7 @@ export function formatChartValue(
     return `${formatNumber(value)}${series.unit}`
   }
   if (series.unit === 'reps') {
-    const formatted = formatNumber(value)
-    return `${formatted} rep${formatted === '1' ? '' : 's'}`
+    return formatReps(value)
   }
   if (value < 60) {
     return `${formatNumber(value)}s`
@@ -359,11 +359,4 @@ export function formatChartValue(
     return `${minutes}m`
   }
   return `${minutes}m ${seconds}s`
-}
-
-function formatNumber(value: number): string {
-  if (Number.isInteger(value)) {
-    return String(value)
-  }
-  return String(Number(value.toFixed(1)))
 }
