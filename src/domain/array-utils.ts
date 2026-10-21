@@ -20,3 +20,11 @@ export function reorderArray<T>(items: ReadonlyArray<T>, from: number, to: numbe
   next.splice(to, 0, moved)
   return next
 }
+
+/** True when both arrays hold the same strings in the same order. */
+export function sameStrings(left: ReadonlyArray<string>, right: ReadonlyArray<string>): boolean {
+  if (left.length !== right.length) {
+    return false
+  }
+  return left.every((value, index) => value === right[index])
+}
