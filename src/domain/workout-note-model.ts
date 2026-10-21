@@ -630,73 +630,80 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
       rowCount += 1
       insertBucket(`${i}:${rowCount}`)
     }
-    if (exercise.kind === 'strength') {
-      for (const set of exercise.strengthSets) {
-        const parts = [`[exercise:: [[${exercise.exerciseName}]]]`, `[set:: ${set.set}]`]
-        if (set.weight !== undefined) {
-          parts.push(`[weight:: ${String(set.weight)}]`)
-        }
-        if (set.reps !== undefined) {
-          parts.push(`[reps:: ${set.reps}]`)
-        }
-        if (set.note !== undefined) {
-          parts.push(`[notes:: ${set.note}]`)
-        }
-        bodyLines.push(`- ${parts.join(' ')}`)
-        rowCount += 1
-        insertBucket(`${i}:${rowCount}`)
-      }
-    } else if (exercise.kind === 'bodyweight') {
-      for (const set of exercise.bodyweightSets) {
-        const parts = [`[exercise:: [[${exercise.exerciseName}]]]`]
-        if (set.set !== undefined) {
-          parts.push(`[set:: ${set.set}]`)
-        }
-        parts.push(`[level:: ${String(set.level)}]`)
-        if (set.reps !== undefined) {
-          parts.push(`[reps:: ${set.reps}]`)
-        }
-        if (set.load !== undefined) {
-          parts.push(`[load:: ${String(set.load)}]`)
-        }
-        if (set.note !== undefined) {
-          parts.push(`[notes:: ${set.note}]`)
-        }
-        bodyLines.push(`- ${parts.join(' ')}`)
-        rowCount += 1
-        insertBucket(`${i}:${rowCount}`)
-      }
-    } else if (exercise.kind === 'duration') {
-      for (const entry of exercise.durationEntries) {
-        const parts = [`[exercise:: [[${exercise.exerciseName}]]]`]
-        if (entry.set !== undefined) {
-          parts.push(`[set:: ${entry.set}]`)
-        }
-        if (entry.step !== undefined) {
-          parts.push(`[step:: ${entry.step}]`)
-        }
-        parts.push(`[duration:: ${String(entry.durationSeconds)}]`)
-        for (const [field, key] of DURATION_NUMBER_FIELDS) {
-          const value = entry[key]
-          if (value !== undefined) {
-            parts.push(`[${field}:: ${String(value)}]`)
+    switch (exercise.kind) {
+      case 'strength': {
+        for (const set of exercise.strengthSets) {
+          const parts = [`[exercise:: [[${exercise.exerciseName}]]]`, `[set:: ${set.set}]`]
+          if (set.weight !== undefined) {
+            parts.push(`[weight:: ${String(set.weight)}]`)
           }
+          if (set.reps !== undefined) {
+            parts.push(`[reps:: ${set.reps}]`)
+          }
+          if (set.note !== undefined) {
+            parts.push(`[notes:: ${set.note}]`)
+          }
+          bodyLines.push(`- ${parts.join(' ')}`)
+          rowCount += 1
+          insertBucket(`${i}:${rowCount}`)
         }
-        if (entry.startedAt !== undefined) {
-          parts.push(`[started:: ${entry.startedAt}]`)
-        }
-        if (entry.paused) {
-          parts.push('[paused:: true]')
-        }
-        if (entry.note !== undefined) {
-          parts.push(`[notes:: ${entry.note}]`)
-        }
-        bodyLines.push(`- ${parts.join(' ')}`)
-        rowCount += 1
-        insertBucket(`${i}:${rowCount}`)
+        break
       }
-    } else {
-      return assertUnreachableKind(exercise)
+      case 'bodyweight': {
+        for (const set of exercise.bodyweightSets) {
+          const parts = [`[exercise:: [[${exercise.exerciseName}]]]`]
+          if (set.set !== undefined) {
+            parts.push(`[set:: ${set.set}]`)
+          }
+          parts.push(`[level:: ${String(set.level)}]`)
+          if (set.reps !== undefined) {
+            parts.push(`[reps:: ${set.reps}]`)
+          }
+          if (set.load !== undefined) {
+            parts.push(`[load:: ${String(set.load)}]`)
+          }
+          if (set.note !== undefined) {
+            parts.push(`[notes:: ${set.note}]`)
+          }
+          bodyLines.push(`- ${parts.join(' ')}`)
+          rowCount += 1
+          insertBucket(`${i}:${rowCount}`)
+        }
+        break
+      }
+      case 'duration': {
+        for (const entry of exercise.durationEntries) {
+          const parts = [`[exercise:: [[${exercise.exerciseName}]]]`]
+          if (entry.set !== undefined) {
+            parts.push(`[set:: ${entry.set}]`)
+          }
+          if (entry.step !== undefined) {
+            parts.push(`[step:: ${entry.step}]`)
+          }
+          parts.push(`[duration:: ${String(entry.durationSeconds)}]`)
+          for (const [field, key] of DURATION_NUMBER_FIELDS) {
+            const value = entry[key]
+            if (value !== undefined) {
+              parts.push(`[${field}:: ${String(value)}]`)
+            }
+          }
+          if (entry.startedAt !== undefined) {
+            parts.push(`[started:: ${entry.startedAt}]`)
+          }
+          if (entry.paused) {
+            parts.push('[paused:: true]')
+          }
+          if (entry.note !== undefined) {
+            parts.push(`[notes:: ${entry.note}]`)
+          }
+          bodyLines.push(`- ${parts.join(' ')}`)
+          rowCount += 1
+          insertBucket(`${i}:${rowCount}`)
+        }
+        break
+      }
+      default:
+        return assertUnreachableKind(exercise)
     }
   }
 

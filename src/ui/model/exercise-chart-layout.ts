@@ -1,5 +1,6 @@
 import { bodyweightLevelName, type BodyweightLadder } from '../../domain/bodyweight-levels'
 import { formatNumber, formatReps } from '../../domain/number-format'
+import { assertUnreachableMetric } from '../../domain/exercise-metric'
 import { niceRange, pickXTickIndices, type ChartSeries } from '../../domain/exercise-chart'
 
 const VIEW_WIDTH = 800
@@ -314,19 +315,20 @@ export function formatChartTooltip(
 }
 
 export function chartYAxisTitle(series: ChartSeries): string | null {
-  if (series.metric === 'e1rm') {
-    return `e1rm (${series.unit})`
+  switch (series.metric) {
+    case 'e1rm':
+      return `e1rm (${series.unit})`
+    case 'weight':
+      return series.unit === 'kg' || series.unit === 'lbs' ? `weight (${series.unit})` : null
+    case 'reps':
+      return 'reps'
+    case 'level':
+      return 'level'
+    case 'duration':
+      return null
+    default:
+      return assertUnreachableMetric(series.metric)
   }
-  if (series.metric === 'weight' && (series.unit === 'kg' || series.unit === 'lbs')) {
-    return `weight (${series.unit})`
-  }
-  if (series.metric === 'reps') {
-    return 'reps'
-  }
-  if (series.metric === 'level') {
-    return 'level'
-  }
-  return null
 }
 
 /**
@@ -338,15 +340,26 @@ export function formatChartValue(
   series: ChartSeries,
   ladder: BodyweightLadder | undefined,
 ): string {
-  if (series.metric === 'level') {
-    return bodyweightLevelName(ladder, value)
+  switch (series.metric) {
+    case 'level':
+      return bodyweightLevelName(ladder, value)
+    case 'e1rm':
+      return `${value.toFixed(1)}${series.unit}`
+    case 'weight':
+      if (series.unit === 'kg' || series.unit === 'lbs') {
+        return `${formatNumber(value)}${series.unit}`
+      }
+      return formatUnitValue(value, series)
+    case 'reps':
+    case 'duration':
+      return formatUnitValue(value, series)
+    default:
+      return assertUnreachableMetric(series.metric)
   }
-  if (series.metric === 'e1rm') {
-    return `${value.toFixed(1)}${series.unit}`
-  }
-  if (series.metric === 'weight' && (series.unit === 'kg' || series.unit === 'lbs')) {
-    return `${formatNumber(value)}${series.unit}`
-  }
+}
+
+/** Reps for a reps unit, otherwise seconds rendered as `Ns` or `Nm Ns`. */
+function formatUnitValue(value: number, series: ChartSeries): string {
   if (series.unit === 'reps') {
     return formatReps(value)
   }
