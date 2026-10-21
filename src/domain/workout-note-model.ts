@@ -1,39 +1,7 @@
 /**
- * Internal model + parser + serializer for FitKit workout notes.
- *
- * A workout note has YAML frontmatter with `type: workout`, a `date`, and a
- * `name`, followed by one or more `## [[Exercise Name]]` (or `## Exercise
- * Name`) sections. Each section has bullet rows that use inline Dataview
- * fields of the form `[key:: value]`.
- *
- * The canonical "truth" field in a bullet is `[exercise:: [[Name]]]`. If the
- * H2 and the inline exercise disagree we trust the inline and emit a warning.
- *
- * Bullet kinds:
- *  - Exercise-level note: has `[exercise::]` and optional `[notes::]` /
- *    `[next::]` only.
- *  - Strength row: has `[set::]`, optional `[weight::]`, optional `[reps::]`, optional `[notes::]`.
- *  - Duration row: has `[duration::]` (seconds), optional `[set::]`, optional `[step::]`
- *    (the interval plan step it ran), optional intensity
- *    (`[watts::]`, `[load::]` or `[level::]`), optional `[rest::]` (seconds rested after it),
- *    optional `[started::]` (the ISO start time of a timer still running on that row),
- *    optional `[paused:: true]`, optional `[notes::]`. A duration exercise's note row may
- *    also carry `[plan::]`, an interval plan kept as written (see `interval-program.ts`).
- *  - Bodyweight row: has `[level::]`, optional `[set::]`, optional `[reps::]`, optional `[load::]`, optional `[notes::]`.
- *
- * A round-trip (parse then serialize) is content-preserving for anything the
- * model above does not represent: unrecognised frontmatter keys, fenced code
- * blocks, non-exercise bullets (including task checkboxes), nested bullets,
- * and any other body line (prose, ordinary headings, blockquotes,
- * embeds, tables). All of that is captured verbatim at parse time as a
- * `PreserveBlock`, anchored to the exercise section (and row within it) it
- * appeared under rather than to a raw line number, so it lands back in the
- * same section on serialize even though the regenerated body has a
- * different line count and blank-line convention than the source. See
- * `preserveBlocks` and `frontmatterExtra`. The one deliberate exception is
- * an inline field FitKit does not recognise (for example `[rpe:: 7]`): it is
- * read and then dropped on next save, since a bullet is rebuilt
- * field-by-field from the model. This is documented in README.md.
+ * Model, parser and serializer for FitKit workout notes: `type: workout` frontmatter, then `## [[Exercise]]` sections of `[key:: value]` bullet rows.
+ * The inline `[exercise:: [[Name]]]` wins over the H2 on disagreement; row shapes are the row types below.
+ * Round-trips preserve unmodeled content via `PreserveBlock`s, but unrecognised inline fields (e.g. `[rpe:: 7]`) are dropped on save (see README.md).
  */
 
 import { assertUnreachableKind, EXERCISE_KINDS, type ExerciseKind } from './exercise-kind'
@@ -173,10 +141,8 @@ export interface PreserveBlock {
    */
   exerciseIndex: number
   /**
-   * Number of rows (the optional note/next row, then each strength or
-   * duration row, in emission order) already written for that exercise
-   * when this block appeared. The block is re-inserted immediately after
-   * that many rows have been (re-)emitted.
+   * Rows (the optional note/next row, then each set row) already emitted for the exercise when this block appeared.
+   * The block is re-inserted right after that many rows.
    */
   afterRowCount: number
   /** Original parse order, used only to keep blocks sharing an anchor in relative order. */
@@ -242,11 +208,8 @@ function mixedKindWarning(
 }
 
 /**
- * Number of rows a serialized exercise section will have: the optional
- * note/next row, then each set row. Used on both sides of
- * a `PreserveBlock` anchor, at parse time (to record `afterRowCount`) and
- * at serialize time (to know when to re-insert it and to clamp a stale
- * anchor to a row count the edited exercise still has).
+ * Number of rows a serialized exercise section will have: the optional note/next row, then each set row.
+ * Shared by parse (recording `afterRowCount`) and serialize (re-insertion and stale-anchor clamping).
  */
 function rowCountOf(exercise: ExerciseEntry): number {
   return (hasNoteRow(exercise) ? 1 : 0) + setRowCount(exercise)
@@ -521,14 +484,8 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
 }
 
 /**
- * Group `preserveBlocks` by where they land in a freshly generated body:
- * `'preamble'` for anything anchored before the first exercise (or when the
- * model has no exercises at all), otherwise `'<exerciseIndex>:<rowCount>'`.
- * An anchor whose `exerciseIndex` or `afterRowCount` no longer exists
- * (an exercise was deleted or reordered, or rows were added/removed since
- * parse) is clamped to the nearest still-valid position on the same or the
- * last exercise, so the block is never dropped, only nudged. Blocks sharing
- * a bucket keep their original relative order.
+ * Group `preserveBlocks` by landing spot: `'preamble'`, otherwise `'<exerciseIndex>:<rowCount>'`, keeping original order within a bucket.
+ * A stale anchor is clamped to the nearest valid position so a block is nudged, never dropped.
  */
 function bucketPreserveBlocks(
   blocks: PreserveBlock[],
@@ -564,12 +521,8 @@ function bucketPreserveBlocks(
 }
 
 /**
- * Serialize a model back into markdown using the canonical format.
- * `frontmatterExtra` lines are re-emitted after the three core frontmatter
- * keys. `preserveBlocks` (fenced code blocks and any other content the
- * model does not represent) are re-inserted at the exercise section (and
- * row within it) they were anchored to at parse time, see
- * `bucketPreserveBlocks`.
+ * Serialize a model back into canonical markdown.
+ * `frontmatterExtra` follows the core keys and `preserveBlocks` return to their anchors (see `bucketPreserveBlocks`).
  */
 export function serializeWorkoutNote(model: WorkoutNoteModel): string {
   const lines: string[] = []
@@ -600,11 +553,7 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
       continue
     }
     /**
-     * Between exercises this is unconditional, matching the pre-fix
-     * behaviour exactly regardless of whether the prior exercise had rows.
-     * Before the first exercise it only fires if preserved preamble content
-     * left the last line non-blank, so a note with no preserved content
-     * keeps its original i===0 (no leading blank) output byte-for-byte.
+     * Unconditional between exercises; before the first it fires only when preserved preamble left the last line non-blank.
      */
     if (i > 0) {
       bodyLines.push('')
@@ -716,10 +665,7 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
 }
 
 /**
- * Canonicalize a model for equality comparison. Strips `sourcePath` and
- * `preserveBlocks` (those are positional, not semantic), keeps
- * `frontmatterExtra` since it is user content, and trims/normalizes notes.
- * Used by `semanticEqual`.
+ * Canonicalize a model for `semanticEqual`: drops the positional `sourcePath` and `preserveBlocks`, keeps `frontmatterExtra`, and normalizes notes.
  */
 export function canonicalizeForEquality(model: WorkoutNoteModel): unknown {
   return {
@@ -786,11 +732,8 @@ export function semanticEqual(a: WorkoutNoteModel, b: WorkoutNoteModel): boolean
 const CORE_FRONTMATTER_KEYS = new Set(['type', 'date', 'name'])
 
 /**
- * Read the leading frontmatter block. Returns a map of key -> string value,
- * the index of the closing `---`, and the raw lines for every key other than
- * `type` / `date` / `name` (including that key's own indented continuation
- * lines, e.g. YAML list items), so callers can carry unrecognised
- * frontmatter through a round-trip.
+ * Read the leading frontmatter: key/value map, closing `---` index, and the raw lines (with continuations) of keys other than `type`/`date`/`name`.
+ * Callers carry those extra lines through a round-trip.
  */
 function readFrontmatter(lines: string[]): {
   frontmatter: Map<string, string> | null
@@ -825,12 +768,8 @@ function readFrontmatter(lines: string[]): {
 }
 
 /**
- * A block of preserved text keyed by its 0-based start line in the
- * *original* body. This is an intermediate representation only: the parser
- * converts each one into a `PreserveBlock` anchored to an exercise section
- * (see `anchorRawBlocksAt` in `parseWorkoutNote`) before it reaches the
- * model, since the original line index has no meaning once the body is
- * regenerated at serialize time.
+ * A preserved text block keyed by its 0-based start line in the original body.
+ * Intermediate only: the parser re-anchors it to an exercise section, as the line index is meaningless after regeneration.
  */
 interface RawBlock {
   index: number
@@ -881,10 +820,7 @@ function extractFencedBlocks(bodyLines: string[]): ExtractResult {
 }
 
 /**
- * True for a bullet line the parser will model as an exercise row: no
- * leading indentation (a nested bullet is always preserved verbatim, see
- * item 5 in the round-trip fidelity design notes) and an `[exercise::]`
- * inline field.
+ * True for an unindented bullet with an `[exercise::]` field; nested bullets are always preserved verbatim.
  */
 function exerciseNameFromModeledBulletLine(line: string): string | null {
   if (/^\s/.test(line)) {
@@ -960,16 +896,8 @@ function findPreservedBlockRange(
 }
 
 /**
- * Extend `extractFencedBlocks` to also preserve any other body content the
- * model does not represent: non-exercise bullets (including task
- * checkboxes), nested bullets, ordinary headings, and other prose. An H2 is
- * an exercise heading only when its section contains a modeled row. Adjacent
- * non-modeled lines are grouped into a single block so interior blank lines
- * survive. Separator blanks after a modeled row are included in the following
- * block, while spacing between modeled elements remains generated by the
- * serializer. Blocks share the same raw (original-line-index) coordinate
- * system as the fenced-block blocks above; `parseWorkoutNote` converts all of
- * them into section-anchored `PreserveBlock`s in a single pass afterward.
+ * Also preserve non-modeled body content (non-exercise bullets, nested bullets, headings, prose) as raw-coordinate blocks.
+ * Adjacent lines group into one block so interior blanks survive; an H2 is an exercise heading only when it holds a modeled row.
  */
 function extractPreserveBlocks(bodyLines: string[]): ExtractResult {
   const { cleanedLines: cleaned, rawBlocks: fencedBlocks } = extractFencedBlocks(bodyLines)
