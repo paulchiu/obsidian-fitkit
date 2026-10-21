@@ -82,18 +82,36 @@ export function composeDashboard(
   return composeDashboardFromAggregates(index, workoutsFolderPath, exercisesFolderPath, exercises)
 }
 
+interface ComposedDashboard {
+  path: string
+  markdown: string
+  sectionCount: number
+}
+
+function composeDashboardForVault(
+  app: App,
+  settings: FitKitSettings,
+  index: FitKitIndex,
+): ComposedDashboard {
+  const path = normalizeFolder(dashboardPath(settings))
+  const hiddenKeys = new Set(settings.hiddenDashboardSectionsByPath[path] ?? [])
+  const maps = buildExerciseDashboardMaps(app, settings, index)
+  const exercises = visibleExerciseAggregates(index, hiddenKeys, maps)
+  const markdown = composeDashboardFromAggregates(
+    index,
+    workoutsFolder(settings),
+    exercisesFolder(settings),
+    exercises,
+  )
+  return { path, markdown, sectionCount: exercises.length }
+}
+
 export async function regenerateDashboard(
   app: App,
   settings: FitKitSettings,
   index: FitKitIndex,
 ): Promise<{ path: string; sectionCount: number }> {
-  const path = normalizeFolder(dashboardPath(settings))
-  const hiddenKeys = new Set(settings.hiddenDashboardSectionsByPath[path] ?? [])
-  const folder = workoutsFolder(settings)
-  const exercisesPath = exercisesFolder(settings)
-  const maps = buildExerciseDashboardMaps(app, settings, index)
-  const exercises = visibleExerciseAggregates(index, hiddenKeys, maps)
-  const markdown = composeDashboardFromAggregates(index, folder, exercisesPath, exercises)
+  const { path, markdown, sectionCount } = composeDashboardForVault(app, settings, index)
   const existing = app.vault.getAbstractFileByPath(path)
 
   if (isMarkdownFile(existing)) {
@@ -102,10 +120,29 @@ export async function regenerateDashboard(
     await app.vault.create(path, markdown)
   }
 
-  return {
-    path,
-    sectionCount: exercises.length,
-  }
+  return { path, sectionCount }
+}
+
+/** Read-only: what regenerating the dashboard would write, and whether it differs from the note. */
+export async function previewDashboard(
+  app: App,
+  settings: FitKitSettings,
+  index: FitKitIndex,
+): Promise<{ path: string; sectionCount: number; changed: boolean }> {
+  const { path, markdown, sectionCount } = composeDashboardForVault(app, settings, index)
+  const existing = app.vault.getAbstractFileByPath(path)
+  const current = isMarkdownFile(existing) ? await app.vault.read(existing) : null
+  const changed =
+    current === null || withoutGeneratedLine(current) !== withoutGeneratedLine(markdown)
+  return { path, sectionCount, changed }
+}
+
+/** The generated line stamps the build time, so every rebuild would otherwise read as a change. */
+function withoutGeneratedLine(markdown: string): string {
+  return markdown
+    .split('\n')
+    .filter((line) => !line.startsWith('_Generated '))
+    .join('\n')
 }
 
 function composeDashboardFromAggregates(
