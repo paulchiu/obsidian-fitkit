@@ -2,10 +2,9 @@
 const KEYBOARD_CLEARANCE = 16
 
 /**
- * Keeps what is being typed in visible over the phone keyboard, which covers the form rather than
- * shrinking it. The sheet ends at the keyboard, so the Save bar rests on it; the plan text scrolls
- * `top` to the top of the form, since with the examples open iOS can scroll past the field it
- * revealed, and a step field scrolls up just enough to clear the Save bar. Returns the cleanup.
+ * Keeps the focused field visible over the phone keyboard by ending the sheet at the keyboard.
+ * The plan text scrolls `top` (iOS can overshoot with examples open); step fields clear the Save bar.
+ * Returns the cleanup.
  */
 export function keepInViewOverKeyboard(
   form: HTMLElement,

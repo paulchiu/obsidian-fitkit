@@ -141,10 +141,8 @@ export class ExerciseRegistryEntryModal extends Modal {
   }
 
   /**
-   * Only record a unit when the user actually specified one: creating a new
-   * entry, editing one that already had an explicit unit, or having touched
-   * the unit dropdown this session. Otherwise stay unrecorded rather than
-   * synthesizing DEFAULT_WEIGHT_UNIT as if it were a deliberate choice.
+   * Only record a unit when the user specified one (new entry, existing explicit unit, or
+   * touched the dropdown); otherwise don't synthesise DEFAULT_WEIGHT_UNIT as a deliberate choice.
    */
   private resolveDraftUnit(): WeightUnit | undefined {
     if (this.mode.kind === 'create') {
