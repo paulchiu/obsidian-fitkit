@@ -286,6 +286,7 @@ export class WorkoutEditorView extends FileView {
         .setIcon('file-text')
         .onClick(() => this.plugin.openLeafAsMarkdown(this.leaf, file)),
     )
+    this.plugin.addOpenDashboardItem(menu)
   }
 
   refreshSettingsDrivenUi(): void {

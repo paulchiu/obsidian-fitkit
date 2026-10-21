@@ -8,6 +8,8 @@ FitKit derives two reporting surfaces from your workout notes: a single dashboar
 
 The `Rebuild dashboard` step of `Sync and repair everything`, under `Setup and maintenance`, rescans your workout notes and regenerates `Fitness/Fitness Dashboard.md` in full. Treat it as output; anything you write into it is overwritten on the next rebuild.
 
+To check the dashboard mid-session, choose `Open dashboard` from a workout note's more options (⋯) menu, in either the workout editor or the Markdown view. It rebuilds the dashboard first, so the sets you just logged show, then opens it in a new tab.
+
 The generated note has four kinds of section:
 
 - `Recent workouts` lists the ten most recent sessions, newest first, each linked and labelled with its workout name.

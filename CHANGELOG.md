@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `Open dashboard` in a workout note's more options (⋯) menu rebuilds the dashboard and opens it in a new tab.
+
 ### Changed
 
 ### Fixed
