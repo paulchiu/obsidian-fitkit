@@ -1,5 +1,6 @@
 import {
   MarkdownView,
+  type Menu,
   Notice,
   Plugin,
   TFile,
@@ -140,6 +141,7 @@ export default class FitKitPlugin extends Plugin {
               .setIcon('dumbbell')
               .onClick(() => this.openLeafInWorkoutEditor(leaf, file)),
           )
+          this.addOpenDashboardItem(menu)
         }
       }),
     )
@@ -181,6 +183,34 @@ export default class FitKitPlugin extends Plugin {
         return true
       },
     })
+  }
+
+  addOpenDashboardItem(menu: Menu): void {
+    menu.addItem((item) =>
+      item
+        .setSection('pane')
+        .setTitle('Open dashboard')
+        .setIcon('layout-dashboard')
+        .onClick(() => this.openDashboard()),
+    )
+  }
+
+  /** The dashboard is a snapshot, so save pending edits and rebuild it first to include the sets just logged. */
+  private async openDashboard(): Promise<void> {
+    try {
+      for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_FITKIT_WORKOUT_EDITOR)) {
+        if (leaf.view instanceof WorkoutEditorView) {
+          await leaf.view.settleEdits()
+        }
+      }
+      const { path } = await regenerateDashboard(this.app, this.settings, await this.getIndex())
+      const file = this.app.vault.getAbstractFileByPath(path)
+      if (file instanceof TFile) {
+        await this.app.workspace.getLeaf('tab').openFile(file)
+      }
+    } catch (error) {
+      new Notice(`Could not open dashboard: ${formatErrorMessage(error)}`)
+    }
   }
 
   refreshWorkoutEditorViews(): void {
@@ -379,7 +409,7 @@ export default class FitKitPlugin extends Plugin {
     return this.settings?.autoOpenWorkoutEditor !== false
   }
 
-  private isWorkoutFile(file: TFile): boolean {
+  isWorkoutFile(file: TFile): boolean {
     return frontmatterTypeIs(this.app.metadataCache.getFileCache(file)?.frontmatter, 'workout')
   }
 

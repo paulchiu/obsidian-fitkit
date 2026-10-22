@@ -286,6 +286,14 @@ export class WorkoutEditorView extends FileView {
         .setIcon('file-text')
         .onClick(() => this.plugin.openLeafAsMarkdown(this.leaf, file)),
     )
+    if (this.plugin.isWorkoutFile(file)) {
+      this.plugin.addOpenDashboardItem(menu)
+    }
+  }
+
+  /** Writes any edit still waiting on the autosave debounce. */
+  settleEdits(): Promise<void> {
+    return this.autosaver.settle()
   }
 
   refreshSettingsDrivenUi(): void {

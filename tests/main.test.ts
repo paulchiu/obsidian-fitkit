@@ -1287,6 +1287,7 @@ const makeRecordingMenu = (): {
 const loadPluginCapturingEvents = async (
   app: MockApp,
 ): Promise<{
+  plugin: FitKitPlugin
   handlers: Map<string, (...args: unknown[]) => unknown>
   showMenu: (leaf: MockLeaf, menu: unknown, source?: string) => void
 }> => {
@@ -1305,7 +1306,7 @@ const loadPluginCapturingEvents = async (
     }
     handlers.get('file-menu')?.(menu, (leaf.view as MarkdownView).file, source, leaf)
   }
-  return { handlers, showMenu }
+  return { plugin, handlers, showMenu }
 }
 
 const makeWorkoutApp = (overrides: Partial<MockWorkspace> = {}): MockApp => {
@@ -1458,6 +1459,111 @@ describe('FitKitPlugin tab menu view switch', () => {
     events.handlers.get('file-menu')?.(menu.menu, file, 'more-options', makeEditorLeaf(file))
 
     expect(menu.titles()).not.toContain('Open in workout editor')
+  })
+})
+
+/** Makes getLeaf('tab') hand out recorded tabs, each remembering the file it was asked to open. */
+const recordNewTabs = (app: MockApp): Array<{ file: TFile | null }> => {
+  const tabs: Array<{ file: TFile | null }> = []
+  app.workspace.getLeaf = vi.fn((mode?: string) => {
+    const tab = {
+      file: null as TFile | null,
+      openFile: vi.fn(async (file: TFile) => {
+        tab.file = file
+      }),
+    }
+    if (mode === 'tab') {
+      tabs.push(tab)
+    }
+    return tab as unknown as MockLeaf
+  })
+  return tabs
+}
+
+describe('FitKitPlugin open dashboard from a workout', () => {
+  it('offers "Open dashboard" in the more-options menu of a workout in either view', async () => {
+    const file = makeWorkoutFile('Workouts/A.md')
+    const events = await loadPluginCapturingEvents(makeWorkoutApp())
+    const editorMenu = makeRecordingMenu()
+    const markdownMenu = makeRecordingMenu()
+
+    events.showMenu(makeEditorLeaf(file), editorMenu.menu)
+    events.showMenu(makeLeafShowingFile(file), markdownMenu.menu)
+
+    expect(editorMenu.titles()).toContain('Open dashboard')
+    expect(markdownMenu.titles()).toContain('Open dashboard')
+  })
+
+  it('does not offer "Open dashboard" on other notes or outside the more-options menu', async () => {
+    const workout = makeWorkoutFile('Workouts/A.md')
+    const journal = makeWorkoutFile('Journal/today.md')
+    const events = await loadPluginCapturingEvents(makeWorkoutApp())
+    const offered = (leaf: MockLeaf, source?: string): boolean => {
+      const menu = makeRecordingMenu()
+      events.showMenu(leaf, menu.menu, source)
+      return menu.titles().includes('Open dashboard')
+    }
+
+    expect(offered(makeLeafShowingFile(journal))).toBe(false)
+    expect(offered(makeEditorLeaf(journal))).toBe(false)
+    expect(offered(makeEditorLeaf(workout), 'tab-header')).toBe(false)
+    expect(offered(makeLeafShowingFile(workout), 'file-explorer-context-menu')).toBe(false)
+  })
+
+  it('rebuilds the dashboard, keeping hidden sections hidden, and opens it in a new tab', async () => {
+    const { app, contents } = makeSyncRepairVault()
+    contents.set(
+      makeWorkoutFile('Fitness/Fitness Dashboard.md').path,
+      '# FitKit Dashboard\n\nStale.\n',
+    )
+    const newTabs = recordNewTabs(app)
+    const events = await loadPluginCapturingEvents(app)
+    events.plugin.settings.hiddenDashboardSectionsByPath = {
+      'Fitness/Fitness Dashboard.md': ['exercise:New Plank'],
+    }
+    const workoutLeaf = makeEditorLeaf(vaultFileAt('Fitness/Workouts/2026-05-08.md'))
+    const workoutView = workoutLeaf.view
+    const menu = makeRecordingMenu()
+    events.showMenu(workoutLeaf, menu.menu)
+
+    await menu.click('Open dashboard')
+
+    const dashboard = contents.get('Fitness/Fitness Dashboard.md')
+    expect(dashboard).toContain('## Squat')
+    expect(dashboard).not.toContain('## New Plank')
+    expect(dashboard).not.toContain('Stale.')
+    expect(newTabs.map((tab) => tab.file?.path)).toEqual(['Fitness/Fitness Dashboard.md'])
+    expect(workoutLeaf.view).toBe(workoutView)
+  })
+
+  it('creates the dashboard and opens it when there is none yet', async () => {
+    const { app, contents } = makeSyncRepairVault()
+    const newTabs = recordNewTabs(app)
+    const events = await loadPluginCapturingEvents(app)
+    const menu = makeRecordingMenu()
+    events.showMenu(makeLeafShowingFile(vaultFileAt('Fitness/Workouts/2026-05-08.md')), menu.menu)
+
+    await menu.click('Open dashboard')
+
+    expect(contents.get('Fitness/Fitness Dashboard.md')).toContain('## New Plank')
+    expect(newTabs.map((tab) => tab.file?.path)).toEqual(['Fitness/Fitness Dashboard.md'])
+  })
+
+  it('says why and opens nothing when the dashboard cannot be written', async () => {
+    const { app } = makeSyncRepairVault()
+    app.vault.create = vi.fn(async () => {
+      throw new Error('Disk full')
+    })
+    const newTabs = recordNewTabs(app)
+    const events = await loadPluginCapturingEvents(app)
+    const menu = makeRecordingMenu()
+    events.showMenu(makeLeafShowingFile(vaultFileAt('Fitness/Workouts/2026-05-08.md')), menu.menu)
+    noticeMessages.length = 0
+
+    await menu.click('Open dashboard')
+
+    expect(noticeMessages).toEqual(['Could not open dashboard: Disk full'])
+    expect(newTabs).toEqual([])
   })
 })
 
