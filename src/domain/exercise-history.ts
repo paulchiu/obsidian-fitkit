@@ -17,7 +17,14 @@ import {
   planStepUnit,
   type NextPlan,
 } from './next-plan'
-import type { BodyweightBestSet, FitKitIndex, IndexEntry, LastSessionMax, WeightSet } from './types'
+import type {
+  BodyweightBestSet,
+  ExerciseIndexRow,
+  FitKitIndex,
+  IndexEntry,
+  LastSessionMax,
+  WeightSet,
+} from './types'
 import type { WeightUnit } from './weight-unit'
 
 export interface ExerciseHistoryAnchor {
@@ -45,7 +52,7 @@ export interface ExerciseHistorySummary {
   strength?: StrengthExerciseHistory
   duration?: DurationExerciseHistory
   bodyweight?: BodyweightExerciseHistory
-  /** Most recent plan the user recorded for this exercise, at any point in the past. */
+  /** The plan recorded in the exercise's latest prior session, absent when that session had none. */
   nextPlan?: LastSessionMax<NextPlan>
   /** The interval plan of the latest prior duration session, absent when that session had none. */
   intervalPlan?: LastSessionMax<string>
@@ -83,7 +90,7 @@ interface ExerciseHistoryDraft {
   durationLastSessionMaxSeconds?: SessionMetric<number>
   bodyweightPersonalBest?: BodyweightBestSet
   bodyweightLastSessionMax?: SessionMetric<BodyweightBestSet>
-  nextPlan?: SessionMetric<NextPlan>
+  latestPlan?: SessionMetric<NextPlan | undefined>
   lastDurationPlan?: SessionMetric<string | undefined>
 }
 
@@ -301,16 +308,12 @@ function addEntryToDrafts(
     const draft = drafts.get(row.exerciseName) ?? {}
     let hasMetric = false
 
-    if (row.next) {
-      hasMetric = true
-      const candidate = {
-        date: entryDate,
-        mtime: entry.mtime,
-        path: entry.path,
-        value: row.next,
-      }
-      if (!draft.nextPlan || isLaterSession(candidate, draft.nextPlan)) {
-        draft.nextPlan = candidate
+    /** A plan is for the next occurrence only, so a later session without one retires it. */
+    if (isPlanOccurrence(row)) {
+      hasMetric ||= row.next !== undefined
+      const occurrence = { date: entryDate, mtime: entry.mtime, path: entry.path, value: row.next }
+      if (!draft.latestPlan || isLaterSession(occurrence, draft.latestPlan)) {
+        draft.latestPlan = occurrence
       }
     }
 
@@ -407,8 +410,8 @@ function finalizeDrafts(drafts: Map<string, ExerciseHistoryDraft>): ExerciseHist
           : undefined,
       }
     }
-    if (draft.nextPlan) {
-      summary.nextPlan = { value: draft.nextPlan.value, date: draft.nextPlan.date }
+    if (draft.latestPlan?.value !== undefined) {
+      summary.nextPlan = { value: draft.latestPlan.value, date: draft.latestPlan.date }
     }
     if (draft.lastDurationPlan?.value !== undefined) {
       summary.intervalPlan = {
@@ -445,6 +448,11 @@ function finalizeDrafts(drafts: Map<string, ExerciseHistoryDraft>): ExerciseHist
   }
 
   return history
+}
+
+/** A session counts as an occurrence when it logged a set or recorded a plan; an exercise added and left empty does not. */
+export function isPlanOccurrence(row: ExerciseIndexRow): boolean {
+  return (row.totalSets ?? 0) > 0 || row.next !== undefined
 }
 
 function nextPlanIcon(plan: NextPlan): string {
