@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [1.12.1] - 2026-10-22
+
+### Added
+
+### Changed
+
+### Fixed
+
 - A next-session plan now shows for the next session that logs the exercise only, so going up once no longer needs a neutral plan to stop it.
 
 ### Removed
