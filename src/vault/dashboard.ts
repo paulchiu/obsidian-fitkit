@@ -48,8 +48,8 @@ interface ExerciseAggregate {
   totalSets: number
   totalDurationSeconds: number
   sessionCount: number
-  /** The exercise's latest occurrence, whose plan is the one in force; absent value when it recorded none. */
-  latestPlan?: PlannedSession
+  /** The exercise's latest occurrence; its plan, when it recorded one, is the plan in force. */
+  latestOccurrence?: PlannedSession
 }
 
 interface PlannedSession {
@@ -181,13 +181,18 @@ function composeDashboardFromAggregates(
     lines.push(formatPb(exercise))
   }
 
-  const planned = exercises.filter((exercise) => exercise.latestPlan?.value !== undefined)
+  const planned = exercises.flatMap((exercise) => {
+    const occurrence = exercise.latestOccurrence
+    return occurrence?.value === undefined
+      ? []
+      : [{ exercise, plan: occurrence.value, date: occurrence.date }]
+  })
   if (planned.length > 0) {
     lines.push('')
     lines.push('## Next session plans')
     lines.push('')
-    for (const exercise of planned) {
-      lines.push(formatNextPlanLine(exercise))
+    for (const { exercise, plan, date } of planned) {
+      lines.push(formatNextPlanLine(exercise, plan, date))
     }
   }
 
@@ -246,8 +251,8 @@ function aggregateExercises(index: FitKitIndex, maps: ExerciseDashboardMaps): Ex
           mtime: entry.mtime,
           path: entry.path,
         }
-        if (!aggregate.latestPlan || isMoreRecentPlan(planned, aggregate.latestPlan)) {
-          aggregate.latestPlan = planned
+        if (!aggregate.latestOccurrence || isMoreRecentPlan(planned, aggregate.latestOccurrence)) {
+          aggregate.latestOccurrence = planned
         }
       }
     }
@@ -304,18 +309,14 @@ function formatPb(exercise: ExerciseAggregate): string {
   }
 }
 
-function formatNextPlanLine(exercise: ExerciseAggregate): string {
+function formatNextPlanLine(exercise: ExerciseAggregate, plan: NextPlan, date: string): string {
   const link = `[[#${exercise.exerciseName}|${exercise.exerciseName}]]`
-  const plan = exercise.latestPlan?.value
-  if (!plan) {
-    return `- **${link}:** no plan`
-  }
   const label = formatNextPlanLabel(plan, exercise.kind).toLowerCase()
   const change =
     plan.step === undefined
       ? label
       : `${label} ${planStepUnit(exercise.kind, plan.step, exercise.unit)}`
-  return `- **${link}:** ${change} (planned ${exercise.latestPlan?.date})`
+  return `- **${link}:** ${change} (planned ${date})`
 }
 
 function isMoreRecentPlan(candidate: PlannedSession, current: PlannedSession): boolean {

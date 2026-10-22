@@ -90,7 +90,7 @@ interface ExerciseHistoryDraft {
   durationLastSessionMaxSeconds?: SessionMetric<number>
   bodyweightPersonalBest?: BodyweightBestSet
   bodyweightLastSessionMax?: SessionMetric<BodyweightBestSet>
-  latestPlan?: SessionMetric<NextPlan | undefined>
+  latestOccurrence?: SessionMetric<NextPlan | undefined>
   lastDurationPlan?: SessionMetric<string | undefined>
 }
 
@@ -308,12 +308,11 @@ function addEntryToDrafts(
     const draft = drafts.get(row.exerciseName) ?? {}
     let hasMetric = false
 
-    /** A plan is for the next occurrence only, so a later session without one retires it. */
     if (isPlanOccurrence(row)) {
       hasMetric ||= row.next !== undefined
       const occurrence = { date: entryDate, mtime: entry.mtime, path: entry.path, value: row.next }
-      if (!draft.latestPlan || isLaterSession(occurrence, draft.latestPlan)) {
-        draft.latestPlan = occurrence
+      if (!draft.latestOccurrence || isLaterSession(occurrence, draft.latestOccurrence)) {
+        draft.latestOccurrence = occurrence
       }
     }
 
@@ -410,8 +409,8 @@ function finalizeDrafts(drafts: Map<string, ExerciseHistoryDraft>): ExerciseHist
           : undefined,
       }
     }
-    if (draft.latestPlan?.value !== undefined) {
-      summary.nextPlan = { value: draft.latestPlan.value, date: draft.latestPlan.date }
+    if (draft.latestOccurrence?.value !== undefined) {
+      summary.nextPlan = { value: draft.latestOccurrence.value, date: draft.latestOccurrence.date }
     }
     if (draft.lastDurationPlan?.value !== undefined) {
       summary.intervalPlan = {
@@ -450,7 +449,10 @@ function finalizeDrafts(drafts: Map<string, ExerciseHistoryDraft>): ExerciseHist
   return history
 }
 
-/** A session counts as an occurrence when it logged a set or recorded a plan; an exercise added and left empty does not. */
+/**
+ * A plan is for the next occurrence only, so a later occurrence without one retires it.
+ * A session is an occurrence when it logged a set or recorded a plan; an exercise added and left empty is not.
+ */
 export function isPlanOccurrence(row: ExerciseIndexRow): boolean {
   return (row.totalSets ?? 0) > 0 || row.next !== undefined
 }

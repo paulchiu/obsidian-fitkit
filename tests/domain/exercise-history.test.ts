@@ -459,7 +459,7 @@ describe('exercise history aggregation', () => {
       { sourcePath: 'Fitness/Workouts/2026-08-17.md', date: '2026-08-17' },
     )
 
-    expect(history.get('Squat')?.nextPlan).toBeUndefined()
+    expect(formatNextPlanBadge(history.get('Squat'), 'strength', 'kg')).toBeNull()
     expect(history.get('Squat')?.strength?.lastSessionMax?.value).toEqual({ weight: 92.5, reps: 5 })
   })
 
@@ -482,9 +482,10 @@ describe('exercise history aggregation', () => {
       { sourcePath: 'Fitness/Workouts/2026-08-17.md', date: '2026-08-17' },
     )
 
-    expect(history.get('Squat')?.nextPlan).toEqual({
-      value: { direction: 'up', step: 2.5 },
-      date: '2026-08-03',
+    expect(formatNextPlanBadge(history.get('Squat'), 'strength', 'kg')).toEqual({
+      text: 'Next: 102.5 kg',
+      title: 'Planned on 2026-08-03: up 2.5 kg from 100 kg',
+      icon: 'arrow-up',
     })
   })
 

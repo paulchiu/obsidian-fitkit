@@ -11,9 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- A next-session plan now applies to the next session that logs the exercise, then stops showing, instead of staying in force until you record another plan.
-
 ### Fixed
+
+- A next-session plan now shows for the next session that logs the exercise only, so going up once no longer needs a neutral plan to stop it.
 
 ### Removed
 
