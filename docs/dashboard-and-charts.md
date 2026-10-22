@@ -14,7 +14,7 @@ The generated note has four kinds of section:
 
 - `Recent workouts` lists the ten most recent sessions, newest first, each linked and labelled with its workout name.
 - `PBs` gives one line per exercise.
-- `Next session plans` appears only when at least one exercise carries a plan, and shows the direction, the change, and the date you recorded it.
+- `Next session plans` appears only when at least one exercise carries a plan, and shows the direction, the change, and the date you recorded it. A plan is listed until the exercise is logged again.
 - One section per exercise, linking to its exercise note and embedding a Dataview query over that exercise's rows.
 
 Checking with `Sync and repair everything` does the scanning half on its own, without rewriting the dashboard. When it finds a workout note FitKit could not read, the dialog offers a `Parse diagnostics` button that lists it.

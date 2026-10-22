@@ -435,7 +435,7 @@ describe('exercise history aggregation', () => {
     })
   })
 
-  it('keeps a plan from an older session when later sessions recorded none', () => {
+  it('drops a plan once a later session logs the exercise without one', () => {
     const history = buildExerciseHistoryMap(
       fitKitIndex([
         entry('Fitness/Workouts/2026-05-01.md', '2026-05-01', [
@@ -443,17 +443,50 @@ describe('exercise history aggregation', () => {
             exerciseName: 'Squat',
             kind: 'strength',
             maxWeightSet: { weight: 90, reps: 5 },
+            totalSets: 3,
             next: { direction: 'up', step: 2.5 },
           },
         ]),
         entry('Fitness/Workouts/2026-08-10.md', '2026-08-10', [
-          { exerciseName: 'Squat', kind: 'strength', maxWeightSet: { weight: 100, reps: 5 } },
+          {
+            exerciseName: 'Squat',
+            kind: 'strength',
+            maxWeightSet: { weight: 92.5, reps: 5 },
+            totalSets: 3,
+          },
         ]),
       ]),
       { sourcePath: 'Fitness/Workouts/2026-08-17.md', date: '2026-08-17' },
     )
 
-    expect(history.get('Squat')?.nextPlan?.value).toEqual({ direction: 'up', step: 2.5 })
+    expect(formatNextPlanBadge(history.get('Squat'), 'strength', 'kg')).toBeNull()
+    expect(history.get('Squat')?.strength?.lastSessionMax?.value).toEqual({ weight: 92.5, reps: 5 })
+  })
+
+  it('keeps a plan through a later session where the exercise was added but nothing logged', () => {
+    const history = buildExerciseHistoryMap(
+      fitKitIndex([
+        entry('Fitness/Workouts/2026-08-03.md', '2026-08-03', [
+          {
+            exerciseName: 'Squat',
+            kind: 'strength',
+            maxWeightSet: { weight: 100, reps: 5 },
+            totalSets: 3,
+            next: { direction: 'up', step: 2.5 },
+          },
+        ]),
+        entry('Fitness/Workouts/2026-08-10.md', '2026-08-10', [
+          { exerciseName: 'Squat', kind: 'strength', totalSets: 0 },
+        ]),
+      ]),
+      { sourcePath: 'Fitness/Workouts/2026-08-17.md', date: '2026-08-17' },
+    )
+
+    expect(formatNextPlanBadge(history.get('Squat'), 'strength', 'kg')).toEqual({
+      text: 'Next: 102.5 kg',
+      title: 'Planned on 2026-08-03: up 2.5 kg from 100 kg',
+      icon: 'arrow-up',
+    })
   })
 
   it('prefers the most recently written note when two sessions share a date', () => {
