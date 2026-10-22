@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- A next-session plan now applies to the next session that logs the exercise, then stops showing, instead of staying in force until you record another plan.
+
 ### Fixed
 
 ### Removed

@@ -189,6 +189,58 @@ describe('dashboard composer', () => {
     expect(markdown.indexOf('## PBs')).toBeLessThan(markdown.indexOf('## Next session plans'))
   })
 
+  it('lists a plan only while the latest session of the exercise recorded it', () => {
+    const index: FitKitIndex = {
+      schemaVersion: 1,
+      builtAt: 0,
+      entries: [
+        {
+          path: 'Fitness/Workouts/2026-08-03.md',
+          mtime: 1,
+          date: '2026-08-03',
+          name: 'Earlier',
+          exercises: [
+            {
+              exerciseName: 'Squat',
+              kind: 'strength',
+              maxWeightSet: { weight: 100, reps: 5 },
+              totalSets: 3,
+              next: { direction: 'up', step: 2.5 },
+            },
+            {
+              exerciseName: 'Bench',
+              kind: 'strength',
+              maxWeightSet: { weight: 60, reps: 5 },
+              totalSets: 3,
+              next: { direction: 'down', step: 5 },
+            },
+          ],
+        },
+        {
+          path: 'Fitness/Workouts/2026-08-10.md',
+          mtime: 2,
+          date: '2026-08-10',
+          name: 'Later',
+          exercises: [
+            {
+              exerciseName: 'Squat',
+              kind: 'strength',
+              maxWeightSet: { weight: 102.5, reps: 5 },
+              totalSets: 3,
+            },
+            { exerciseName: 'Bench', kind: 'strength', totalSets: 0 },
+          ],
+        },
+      ],
+      diagnostics: [],
+    }
+
+    const markdown = composeDashboard(index, 'Fitness/Workouts', 'Fitness/Exercises', new Set())
+
+    const plans = markdown.split('## Next session plans')[1]?.split('\n## ')[0]
+    expect(plans?.trim()).toBe('- **[[#Bench|Bench]]:** down 5 kg (planned 2026-08-03)')
+  })
+
   it('lists a pounds exercise next-time plan in pounds', () => {
     const index: FitKitIndex = {
       schemaVersion: 1,
