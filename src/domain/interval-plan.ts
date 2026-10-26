@@ -1,10 +1,12 @@
 /**
  * The one-line interval plan on a duration card: `[plan:: 8 x 30s @ 300W, 90s rest]`.
  * Work is a duration or `open`; the target is watts (`300W`), load (`120kg`) or a
- * level (`L12`); the pace is a fixed rest after each rep or `every <period>` (EMOM).
+ * level (`L12`); the pace is a fixed rest after each rep or `every <period>` (EMOM), and
+ * an optional `adjust 5` after it sets the plan's own stepper step.
  */
 
 import { formatDurationInput, parseDurationInput } from './duration-input'
+import { formatStepperStep, parseStepperStep, type StepperStep } from './interval-stepper'
 
 export const INTENSITY_KINDS = ['watts', 'load', 'level'] as const
 
@@ -19,6 +21,8 @@ export interface IntervalPlan {
   workSeconds: number | null
   intensity: { kind: IntensityKind; target: number }
   pace: { kind: 'rest'; seconds: number } | { kind: 'every'; seconds: number }
+  /** The plan's own `adjust`, which overrides the app-wide stepper step. */
+  stepperStep?: StepperStep
 }
 
 export type IntervalPlanResult = { ok: true; plan: IntervalPlan } | { ok: false; reason: string }
@@ -27,13 +31,23 @@ const PLAN = /^(\d+)\s*x\s*(\S+)\s*@\s*(\S+)\s*,\s*(.+)$/i
 const TARGET = /^(?:(\d+(?:\.\d+)?)(w|kg)|l(\d+(?:\.\d+)?))$/i
 const EVERY = /^every\s+(.+)$/i
 const REST = /^(.+?)\s+rest$/i
+const ADJUST = /^adjust\s+(.+)$/i
 
 export function parseIntervalPlan(raw: string): IntervalPlanResult {
   const match = raw.trim().match(PLAN)
   if (!match) {
     return { ok: false, reason: 'Write the plan as "8 x 30s @ 300W, 90s rest".' }
   }
-  const [, rawReps = '', rawWork = '', rawTarget = '', rawPace = ''] = match
+  const [, rawReps = '', rawWork = '', rawTarget = '', rawTail = ''] = match
+  const [rawPace = '', ...rawOptions] = rawTail.split(',')
+  const rawAdjust = rawOptions.join(',').trim()
+  const stepperStep = rawOptions.length === 0 ? undefined : adjustOf(rawAdjust)
+  if (stepperStep === null) {
+    return {
+      ok: false,
+      reason: `"${rawAdjust}" is not a stepper step like "adjust 10%" or "adjust 5".`,
+    }
+  }
   const intensity = parseTarget(rawTarget)
   if (!intensity) {
     return { ok: false, reason: `"${rawTarget}" is not a target like 300W, 120kg or L12.` }
@@ -65,7 +79,15 @@ export function parseIntervalPlan(raw: string): IntervalPlanResult {
       reason: `Work (${formatDurationInput(workSeconds)}) has to be shorter than the period (${formatDurationInput(pace.seconds)}).`,
     }
   }
-  return { ok: true, plan: { reps, workSeconds, intensity, pace } }
+  return {
+    ok: true,
+    plan: { reps, workSeconds, intensity, pace, ...(stepperStep ? { stepperStep } : {}) },
+  }
+}
+
+function adjustOf(raw: string): StepperStep | null {
+  const value = ADJUST.exec(raw)?.[1]
+  return value === undefined ? null : parseStepperStep(value)
 }
 
 export function parseTarget(raw: string): IntervalPlan['intensity'] | null {
@@ -99,7 +121,8 @@ export function formatIntervalPlan(plan: IntervalPlan): string {
     plan.pace.kind === 'every'
       ? `every ${formatPlanSeconds(plan.pace.seconds)}`
       : `${formatPlanSeconds(plan.pace.seconds)} rest`
-  return `${plan.reps} x ${work} @ ${formatTarget(plan.intensity)}, ${pace}`
+  const adjust = plan.stepperStep ? `, adjust ${formatStepperStep(plan.stepperStep)}` : ''
+  return `${plan.reps} x ${work} @ ${formatTarget(plan.intensity)}, ${pace}${adjust}`
 }
 
 export function formatTarget(intensity: IntervalPlan['intensity']): string {

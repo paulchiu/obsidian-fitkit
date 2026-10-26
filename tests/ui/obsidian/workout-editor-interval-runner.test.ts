@@ -278,6 +278,19 @@ describe('WorkoutEditorView interval runner', () => {
     expect(runnerText(view, 'fitkit-runner-stepper-value')).toBe(value)
   })
 
+  it("steps by the plan's own adjust over the app setting", async () => {
+    const { view } = await openEditor({
+      body: bike('(adjust 5) (x 3 (work 30s 300W) (rest 90s))'),
+      settings: { intervalStepperStep: '20%' },
+    })
+    button(view.contentEl, 'Start interval plan').click()
+    restAfterRep1(view)
+
+    button(view.contentEl, 'Raise last rep').click()
+
+    expect(runnerText(view, 'fitkit-runner-stepper-value')).toBe('Rep 1: 305 W')
+  })
+
   it('corrects the rep just done while working a step that followed it with no rest', async () => {
     const view = await start(bike('(x 2 (on 30s 350W) (off 30s 150W))'))
     runTo('07:15:31')

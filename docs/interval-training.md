@@ -43,6 +43,8 @@ Two buttons add rows. The `+` at the foot of a repeat's bracket adds a step, res
 
 A target field can hold several targets, such as `L8 L10 L12`, and takes the next one each round of the repeat around it. That is how a pyramid or a ladder fits in one row.
 
+`Stepper step`, after the rows, sets how far the runner's minus and plus move a rep for this plan: a percentage such as `20%` or an amount such as `5`. Left blank, its placeholder shows the app-wide step from [Settings](settings.md) that applies instead.
+
 Beneath the rows, the preview gives the rep count and total time, such as `13 reps · 24m20s`, or says what is stopping the plan from running. `Save` stays disabled until the plan can run.
 
 ### Writing a plan as text
@@ -146,10 +148,11 @@ A plan is a run of bracketed lists, played left to right:
 | `(x 3 …)`                 | Repeats what follows. Repeats nest, and a rest at the end of a repeat goes between its rounds, not after the last.                                                              |
 | `(every 2m …)`            | Starts each step inside one period after the last one started, resting for whatever the step left (EMOM). Open work needs it, and timed work has to be shorter than the period. |
 | `(climb 1m (L8 L10 L12))` | A list of targets takes the next one each round of the repeat around it.                                                                                                        |
+| `(adjust 5)`              | How far the runner's minus and plus move a rep for this plan, as an amount (`5`) or a percentage (`20%`). Once per plan, at the top level, not inside a repeat or `every`.      |
 
 The target is watts (`300W`), load (`120kg`) or a level (`L12`), one kind per plan, and each row records the same field. Quote a name with spaces: `("big gear" 2m 260W)`.
 
-The earlier one-line form still works for a single repeat: `8 x 30s @ 300W, 90s rest` or `6 x open @ 120kg, every 2m`, read as `<reps> x <work> @ <target>, <pace>`.
+The earlier one-line form still works for a single repeat: `8 x 30s @ 300W, 90s rest` or `6 x open @ 120kg, every 2m`, read as `<reps> x <work> @ <target>, <pace>`. It takes a stepper step after the pace: `8 x 30s @ 300W, 90s rest, adjust 5`.
 
 How a plan and its rows look in the note is in [Note format](note-format.md#interval-plans).
 
@@ -172,7 +175,7 @@ An interval card swaps the play button for `Start`, which reads `Start from rep 
 
 - The clock counts the work down (or up, for open work) and then the rest. A named step's name heads the clock, with its target beneath, the set and round when repeats nest, and the step that comes next.
 - The big button reads `Rest` while you work, which ends the rep with the time you did. It reads `Next` when the next step follows with no rest, `Finish` on the last step, and `Skip` while you rest, which starts the next rep at once. A phase whose time runs out ends by itself.
-- Each finished rep is written to the note straight away with the target filled in. During rest, the minus and plus buttons correct the intensity of the rep you just did, from what the machine's console showed. Each tap moves it by 10% of the target unless `Interval stepper step` in [Settings](settings.md) says otherwise. When the next rep starts with no rest, as with a step that follows the last directly, they show while you work it instead, still correcting the rep before.
+- Each finished rep is written to the note straight away with the target filled in. During rest, the minus and plus buttons correct the intensity of the rep you just did, from what the machine's console showed. Each tap moves it by the plan's own `adjust` (see [Plan syntax](#plan-syntax)), or else by `Interval stepper step` in [Settings](settings.md), 10% of the target by default. When the next rep starts with no rest, as with a step that follows the last directly, they show while you work it instead, still correcting the rep before.
 - Rep dots go green for reps on target (within 5% of the step's target, held for the full work time; open work counts intensity only), amber otherwise, and grey for a step with no target. The last and average intensity sit beneath them.
 - `Pause` banks the time so far, and `End run` returns to the card with the reps you finished. When the plan is done, the runner shows how many reps hit the target.
 

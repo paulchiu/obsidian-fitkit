@@ -4,7 +4,8 @@
  */
 
 import { formatPlanSeconds, formatTarget, parseIntervalPlan } from './interval-plan'
-import { parseIntervalProgram, readPlanLists, type PlanNode } from './interval-program'
+import { isAdjust, parseIntervalProgram, readPlanLists, type PlanNode } from './interval-program'
+import { formatStepperStep } from './interval-stepper'
 
 export interface OutlineStep {
   kind: 'step'
@@ -45,7 +46,14 @@ export function outlineFromPlan(raw: string): OutlineItem[] | null {
   if (!parseIntervalProgram(text).ok) {
     return null
   }
-  return itemsOf(readPlanLists(text))
+  return itemsOf(readPlanLists(text).filter((node) => !isAdjust(node)))
+}
+
+/** The plan's own stepper step as it is written (`5`, `10%`), or blank when it has none. */
+export function adjustFromPlan(raw: string): string {
+  const parsed = parseIntervalProgram(raw)
+  const step = parsed.ok ? parsed.program.stepperStep : undefined
+  return step ? formatStepperStep(step) : ''
 }
 
 function outlineFromOneLine(text: string): OutlineItem[] | null {
@@ -137,9 +145,11 @@ function targetTextOf(node: PlanNode): string | null {
   return words.includes(null) ? null : words.join(' ')
 }
 
-/** The plan text for the rows, on one line. */
-export function planFromOutline(items: readonly OutlineItem[]): string {
-  return items.map(itemText).join(' ')
+/** The plan text for the rows, on one line, led by `(adjust …)` when `adjust` is not blank. */
+export function planFromOutline(items: readonly OutlineItem[], adjust = ''): string {
+  const plan = items.map(itemText).join(' ')
+  const step = word(adjust)
+  return step === '' ? plan : `(adjust ${step}) ${plan}`
 }
 
 function itemText(item: OutlineItem): string {
@@ -166,7 +176,7 @@ function itemText(item: OutlineItem): string {
 /** A name as one word, quoted when it has a space or would read as a keyword. */
 function nameText(name: string): string {
   const text = name.replace(/"/g, '').trim()
-  return /^[^\s()]+$/.test(text) && !/^(x|rest|every)$/i.test(text) ? text : `"${text}"`
+  return /^[^\s()]+$/.test(text) && !/^(x|rest|every|adjust)$/i.test(text) ? text : `"${text}"`
 }
 
 /** A typed time or count as one word, with anything that would break the plan taken out. */

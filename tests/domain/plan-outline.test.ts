@@ -104,8 +104,9 @@ describe('planFromOutline', () => {
         step('easy spin', ' 5 m ', ' 120W '),
         step('Rest', '1m', 'L8, L10'),
         step('every', '30s'),
+        step('Adjust', '20s'),
       ]),
-    ).toBe('("easy spin" 5m 120W) ("Rest" 1m (L8 L10)) ("every" 30s)')
+    ).toBe('("easy spin" 5m 120W) ("Rest" 1m (L8 L10)) ("every" 30s) ("Adjust" 20s)')
   })
 })
 

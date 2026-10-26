@@ -5,7 +5,7 @@ import type { IntervalPreset } from '../../domain/interval-presets'
 import type { DraftItem } from '../model/plan-draft'
 import { DOCS_URL, PLAN_EXAMPLES, type PlanPreview } from '../model/plan-form'
 import { ActionBar } from './action-bar'
-import { TextAreaField } from './fields'
+import { TextAreaField, TextField } from './fields'
 import { IconButton, PlanBuilder, type PlanBuilderActions } from './plan-builder'
 
 export interface PlanFormActions extends PlanBuilderActions {
@@ -13,6 +13,7 @@ export interface PlanFormActions extends PlanBuilderActions {
   onSteps: () => void
   onText: () => void
   onTextInput: (text: string) => void
+  onStepperStepInput: (value: string) => void
   onToggleExamples: () => void
   onClear: () => void
   onCancel: () => void
@@ -26,6 +27,9 @@ export interface PlanFormProps {
   /** Says the plan was asked for as steps but cannot be shown as them. */
   showNote: boolean
   text: string
+  /** The Steps view's stepper step field, blank for the app-wide default. */
+  stepperStep: string
+  defaultStepperStep: string
   examplesOpen: boolean
   preview: PlanPreview
   canClear: boolean
@@ -51,6 +55,8 @@ export function PlanForm({
   rows,
   showNote,
   text,
+  stepperStep,
+  defaultStepperStep,
   examplesOpen,
   preview,
   canClear,
@@ -102,7 +108,22 @@ export function PlanForm({
         </div>
       </div>
       <div class="fitkit-plan-builder" hidden={!inSteps}>
-        {rows ? <PlanBuilder items={rows} actions={actions} /> : null}
+        {rows ? (
+          <>
+            <PlanBuilder items={rows} actions={actions} />
+            <div class="fitkit-plan-row">
+              <span class="fitkit-plan-word">Stepper step</span>
+              <TextField
+                class="fitkit-input fitkit-plan-time"
+                aria-label="Stepper step"
+                placeholder={defaultStepperStep}
+                attributes={TEXT_ATTRIBUTES}
+                value={stepperStep}
+                onValueInput={actions.onStepperStepInput}
+              />
+            </div>
+          </>
+        ) : null}
       </div>
       <TextAreaField
         class="fitkit-input fitkit-plan-text"
