@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [1.13.0] - 2026-10-26
+
+### Added
+
 - The interval runner's minus and plus buttons now also show while working a rep that started with no rest after the last, correcting the rep just done.
 
 ### Changed
