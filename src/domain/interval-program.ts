@@ -136,7 +136,7 @@ interface CompileContext {
 const MAX_STEPS = 500
 
 function compileProgram(nodes: readonly PlanNode[]): IntervalProgram {
-  const adjusts = nodes.filter(isAdjust)
+  const stepperStep = stepperStepOf(nodes.filter(isAdjust))
   const items = withoutTrailingRests(
     compileNodes(
       nodes.filter((node) => !isAdjust(node)),
@@ -162,14 +162,22 @@ function compileProgram(nodes: readonly PlanNode[]): IntervalProgram {
   if (kinds.length > 1) {
     fail('Use one kind of target in a plan: watts (300W), load (120kg) or level (L12).')
   }
-  const stepperStep = stepperStepOf(adjusts)
   return { steps, intensity: kinds[0] ?? null, ...(stepperStep ? { stepperStep } : {}) }
 }
 
-/** An `(adjust …)` list, which sets the plan's stepper step rather than adding a step. */
+/**
+ * An `(adjust …)` list with at most one value, which sets the plan's stepper step. With a time
+ * and target, like `(adjust 30s 300W)`, it is still a step named adjust.
+ */
 export function isAdjust(node: PlanNode): boolean {
   const head = node.kind === 'list' ? node.items[0] : undefined
-  return head?.kind === 'word' && !head.quoted && head.text.toLowerCase() === 'adjust'
+  return (
+    node.kind === 'list' &&
+    node.items.length <= 2 &&
+    head?.kind === 'word' &&
+    !head.quoted &&
+    head.text.toLowerCase() === 'adjust'
+  )
 }
 
 function stepperStepOf(adjusts: readonly PlanNode[]): StepperStep | undefined {
@@ -180,8 +188,8 @@ function stepperStepOf(adjusts: readonly PlanNode[]): StepperStep | undefined {
   if (others.length > 0) {
     fail('Write (adjust …) once in a plan.')
   }
-  const [, value, ...extra] = adjust.kind === 'list' ? adjust.items : []
-  const step = value?.kind === 'word' && extra.length === 0 ? parseStepperStep(value.text) : null
+  const value = adjust.kind === 'list' ? adjust.items[1] : undefined
+  const step = value?.kind === 'word' ? parseStepperStep(value.text) : null
   return step ?? fail('Write the stepper step as (adjust 10%) or (adjust 5).')
 }
 
@@ -208,7 +216,7 @@ function compileNode(node: PlanNode, context: CompileContext): PlanItem[] {
     const seconds = args.length === 1 ? durationOf(args[0]) : undefined
     return seconds === undefined ? fail('Write a rest as (rest 90s).') : [{ kind: 'rest', seconds }]
   }
-  if (keyword === 'adjust') {
+  if (isAdjust(node)) {
     return fail('Put (adjust …) at the top of the plan, not inside a repeat or every.')
   }
   if (keyword === 'every') {

@@ -147,9 +147,8 @@ function targetTextOf(node: PlanNode): string | null {
 
 /** The plan text for the rows, on one line, led by `(adjust …)` when `adjust` is not blank. */
 export function planFromOutline(items: readonly OutlineItem[], adjust = ''): string {
-  const plan = items.map(itemText).join(' ')
   const step = word(adjust)
-  return step === '' ? plan : `(adjust ${step}) ${plan}`
+  return [...(step === '' ? [] : [`(adjust ${step})`]), ...items.map(itemText)].join(' ')
 }
 
 function itemText(item: OutlineItem): string {

@@ -1,8 +1,7 @@
 /**
  * The one-line interval plan on a duration card: `[plan:: 8 x 30s @ 300W, 90s rest]`.
  * Work is a duration or `open`; the target is watts (`300W`), load (`120kg`) or a
- * level (`L12`); the pace is a fixed rest after each rep or `every <period>` (EMOM), and
- * an optional `adjust 5` after it sets the plan's own stepper step.
+ * level (`L12`); the pace is a fixed rest after each rep or `every <period>` (EMOM).
  */
 
 import { formatDurationInput, parseDurationInput } from './duration-input'
@@ -21,7 +20,7 @@ export interface IntervalPlan {
   workSeconds: number | null
   intensity: { kind: IntensityKind; target: number }
   pace: { kind: 'rest'; seconds: number } | { kind: 'every'; seconds: number }
-  /** The plan's own `adjust`, which overrides the app-wide stepper step. */
+  /** The `adjust` after the pace. */
   stepperStep?: StepperStep
 }
 
@@ -39,8 +38,11 @@ export function parseIntervalPlan(raw: string): IntervalPlanResult {
     return { ok: false, reason: 'Write the plan as "8 x 30s @ 300W, 90s rest".' }
   }
   const [, rawReps = '', rawWork = '', rawTarget = '', rawTail = ''] = match
-  const [rawPace = '', ...rawOptions] = rawTail.split(',')
-  const rawAdjust = rawOptions.join(',').trim()
+  const [rawPace = '', ...rawOptions] = rawTail.split(',').map((part) => part.trim())
+  if (rawOptions.length > 1 && rawOptions.every((option) => ADJUST.test(option))) {
+    return { ok: false, reason: 'Write adjust once in a plan.' }
+  }
+  const rawAdjust = rawOptions.join(', ')
   const stepperStep = rawOptions.length === 0 ? undefined : adjustOf(rawAdjust)
   if (stepperStep === null) {
     return {
@@ -59,9 +61,9 @@ export function parseIntervalPlan(raw: string): IntervalPlanResult {
   if (workSeconds === undefined) {
     return { ok: false, reason: `"${rawWork}" is not a work time like 30s or open.` }
   }
-  const pace = parsePace(rawPace.trim())
+  const pace = parsePace(rawPace)
   if (!pace) {
-    return { ok: false, reason: `"${rawPace.trim()}" is not a pace like "90s rest" or "every 1m".` }
+    return { ok: false, reason: `"${rawPace}" is not a pace like "90s rest" or "every 1m".` }
   }
   const reps = Number(rawReps)
   if (reps < 1 || workSeconds === 0) {

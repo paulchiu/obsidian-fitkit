@@ -85,6 +85,15 @@ describe('parseIntervalProgram', () => {
     expect([parsed.stepperStep, parsed.steps.length]).toEqual([stepperStep, 3])
   })
 
+  it.each([
+    ['("adjust" 20s) (x 2 (work 30s 300W))', ['adjust', 'work', 'work']],
+    ['(adjust 30s 300W) (x 2 (adjust 1m 200W))', ['adjust', 'adjust', 'adjust']],
+  ])('reads %s as steps named adjust', (plan, names) => {
+    const parsed = program(plan)
+
+    expect([parsed.stepperStep, parsed.steps.map((step) => step.name)]).toEqual([undefined, names])
+  })
+
   it('names each step by its first word and puts the rest of a repeat between its rounds', () => {
     expect(program('(x 2 (work 20s 400W) (rest 10s))')).toEqual({
       intensity: 'watts',
@@ -254,7 +263,6 @@ describe('parseIntervalProgram', () => {
     ['(x 30 (x 30 (a 30s 300W)))', 'That plan is too long to run. Keep it under 500 steps.'],
     ['(adjust ten) (a 30s 300W)', 'Write the stepper step as (adjust 10%) or (adjust 5).'],
     ['(adjust) (a 30s 300W)', 'Write the stepper step as (adjust 10%) or (adjust 5).'],
-    ['(adjust 5 10) (a 30s 300W)', 'Write the stepper step as (adjust 10%) or (adjust 5).'],
     [
       '(x 2 (adjust 5) (a 30s 300W))',
       'Put (adjust …) at the top of the plan, not inside a repeat or every.',
@@ -264,6 +272,8 @@ describe('parseIntervalProgram', () => {
       'Put (adjust …) at the top of the plan, not inside a repeat or every.',
     ],
     ['(adjust 5) (a 30s 300W) (adjust 10%)', 'Write (adjust …) once in a plan.'],
+    ['(adjust ten)', 'Write the stepper step as (adjust 10%) or (adjust 5).'],
+    ['8 x 30s @ 300W, 90s rest, adjust 5, adjust 10', 'Write adjust once in a plan.'],
     [
       '8 x 30s @ 300W, 90s rest, adjust ten',
       '"adjust ten" is not a stepper step like "adjust 10%" or "adjust 5".',

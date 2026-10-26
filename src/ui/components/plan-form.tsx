@@ -27,7 +27,6 @@ export interface PlanFormProps {
   /** Says the plan was asked for as steps but cannot be shown as them. */
   showNote: boolean
   text: string
-  /** The Steps view's stepper step field, blank for the app-wide default. */
   stepperStep: string
   defaultStepperStep: string
   examplesOpen: boolean

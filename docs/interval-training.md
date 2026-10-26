@@ -150,7 +150,7 @@ A plan is a run of bracketed lists, played left to right:
 | `(climb 1m (L8 L10 L12))` | A list of targets takes the next one each round of the repeat around it.                                                                                                        |
 | `(adjust 5)`              | How far the runner's minus and plus move a rep for this plan, as an amount (`5`) or a percentage (`20%`). Once per plan, at the top level, not inside a repeat or `every`.      |
 
-The target is watts (`300W`), load (`120kg`) or a level (`L12`), one kind per plan, and each row records the same field. Quote a name with spaces: `("big gear" 2m 260W)`.
+The target is watts (`300W`), load (`120kg`) or a level (`L12`), one kind per plan, and each row records the same field. Quote a name with spaces: `("big gear" 2m 260W)`. A step named adjust with only a time reads as a stepper step, so quote it: `("adjust" 30s)`.
 
 The earlier one-line form still works for a single repeat: `8 x 30s @ 300W, 90s rest` or `6 x open @ 120kg, every 2m`, read as `<reps> x <work> @ <target>, <pace>`. It takes a stepper step after the pace: `8 x 30s @ 300W, 90s rest, adjust 5`.
 

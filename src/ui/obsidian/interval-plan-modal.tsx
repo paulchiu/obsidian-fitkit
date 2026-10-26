@@ -31,7 +31,7 @@ export interface IntervalPlanModalOptions {
   suggested?: string
   /** Plans offered under "Start from"; the row is left out when there are none. */
   presets: readonly IntervalPreset[]
-  /** The app-wide stepper step, which a plan without its own `adjust` steps by. */
+  /** The app-wide stepper step, shown when the plan has none. */
   defaultStepperStep: string
   onSave: (plan: string | undefined) => void
 }

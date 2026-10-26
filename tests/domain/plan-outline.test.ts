@@ -110,6 +110,16 @@ describe('planFromOutline', () => {
   })
 })
 
+describe('planFromOutline with a stepper step', () => {
+  it('leads the plan with its adjust, tidying what was typed, and leaves it out when blank', () => {
+    expect([
+      planFromOutline([step('over', '1m', '300W')], ' 20 % '),
+      planFromOutline([], '5'),
+      planFromOutline([step('over', '1m')], ' '),
+    ]).toEqual(['(adjust 20%) (over 1m 300W)', '(adjust 5)', '(over 1m)'])
+  })
+})
+
 describe('outlineProblem', () => {
   it('names the first blank field', () => {
     expect([
