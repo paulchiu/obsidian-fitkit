@@ -22,6 +22,7 @@ import {
   parseIntervalPresets,
   upgradeIntervalPresets,
 } from './domain/interval-presets'
+import { DEFAULT_STEPPER_STEP, parseStepperStep } from './domain/interval-stepper'
 import { parseWeightUnit } from './domain/weight-unit'
 import type FitKitPlugin from './main'
 import { DeleteRegistryEntryModal } from './ui/obsidian/delete-registry-entry-modal'
@@ -44,6 +45,8 @@ export interface FitKitSettings {
   intervalBeepsEnabled: boolean
   /** The plan form's presets, one `Label: plan` per line. */
   intervalPresets: string
+  /** How far the interval runner's stepper moves a rep, as `10%` or a fixed amount. */
+  intervalStepperStep: string
   autosaveDebounceMs: number
   chartSessionsWindow: number
   exerciseRegistry: ExerciseRegistryEntry[]
@@ -58,6 +61,7 @@ export const DEFAULT_SETTINGS: FitKitSettings = {
   strengthRestTimerEnabled: true,
   intervalBeepsEnabled: true,
   intervalPresets: DEFAULT_INTERVAL_PRESETS,
+  intervalStepperStep: DEFAULT_STEPPER_STEP,
   autosaveDebounceMs: 600,
   chartSessionsWindow: 30,
   exerciseRegistry: [],
@@ -92,6 +96,7 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
     intervalPresets: upgradeIntervalPresets(
       stored.intervalPresets ?? DEFAULT_SETTINGS.intervalPresets,
     ),
+    intervalStepperStep: stored.intervalStepperStep ?? DEFAULT_SETTINGS.intervalStepperStep,
     autosaveDebounceMs: stored.autosaveDebounceMs ?? DEFAULT_SETTINGS.autosaveDebounceMs,
     chartSessionsWindow: stored.chartSessionsWindow ?? DEFAULT_SETTINGS.chartSessionsWindow,
     exerciseRegistry: normalizeStoredExerciseRegistry(
@@ -160,6 +165,7 @@ type FitKitSettingKey =
   | 'strengthRestTimerEnabled'
   | 'intervalBeepsEnabled'
   | 'intervalPresets'
+  | 'intervalStepperStep'
   | 'autosaveDebounceMs'
   | 'chartSessionsWindow'
 
@@ -194,6 +200,12 @@ type SettingRow =
 function validateIntervalPresets(value: string): string | undefined {
   const { invalid } = parseIntervalPresets(value)
   return invalid.length === 0 ? undefined : `Cannot read: ${invalid.join('; ')}`
+}
+
+function validateStepperStep(value: string): string | undefined {
+  return parseStepperStep(value)
+    ? undefined
+    : 'Enter a percentage such as 10% or an amount such as 5.'
 }
 
 export function coerceAutosaveDebounceMs(value: unknown): number {
@@ -329,6 +341,12 @@ export class FitKitSettingTab extends PluginSettingTab {
           },
           {
             kind: 'control',
+            name: 'Interval stepper step',
+            desc: 'How far the interval runner\'s minus and plus move a rep: a percentage of its target, such as "10%", or a fixed amount in the plan\'s own unit, such as "5".',
+            control: { type: 'text', key: 'intervalStepperStep', validate: validateStepperStep },
+          },
+          {
+            kind: 'control',
             name: 'Autosave debounce (ms)',
             desc: 'How long to wait after the last edit before persisting changes in the workout editor view.',
             control: {
@@ -428,6 +446,13 @@ export class FitKitSettingTab extends PluginSettingTab {
         break
       case 'intervalPresets':
         settings.intervalPresets = String(value)
+        break
+      case 'intervalStepperStep':
+        /** An entry it cannot read keeps the last good step; the control's message says why. */
+        if (!parseStepperStep(String(value))) {
+          return
+        }
+        settings.intervalStepperStep = String(value)
         break
       case 'autosaveDebounceMs':
         settings.autosaveDebounceMs = coerceAutosaveDebounceMs(value)

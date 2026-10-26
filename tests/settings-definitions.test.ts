@@ -85,6 +85,7 @@ describe('setting definitions', () => {
       ['toggle', 'strengthRestTimerEnabled'],
       ['toggle', 'intervalBeepsEnabled'],
       ['textarea', 'intervalPresets'],
+      ['text', 'intervalStepperStep'],
       ['number', 'autosaveDebounceMs'],
       ['number', 'chartSessionsWindow'],
     ])
@@ -138,7 +139,7 @@ describe('setting definitions', () => {
   it('gives every searchable row a description so settings search can match it', () => {
     const searchable = allRows(createTab().tab).filter((row) => row.searchable !== false)
 
-    expect(searchable).toHaveLength(8)
+    expect(searchable).toHaveLength(9)
     for (const row of searchable) {
       expect(row.name.length).toBeGreaterThan(0)
       expect(typeof row.desc).toBe('string')
@@ -240,6 +241,41 @@ describe('setControlValue', () => {
       validate?.(DEFAULT_SETTINGS.intervalPresets),
       validate?.('Tabata: 8 x 20s @ 400W, 10s rest\nOops: lots of reps'),
     ]).toEqual([undefined, 'Cannot read: Oops: lots of reps'])
+  })
+
+  it('saves the interval stepper step', async () => {
+    const { tab, settings, saveSettings } = createTab()
+
+    await tab.setControlValue('intervalStepperStep', '20%')
+
+    expect([settings.intervalStepperStep, saveSettings.mock.calls.length]).toEqual(['20%', 1])
+  })
+
+  it('rejects an interval stepper step that is neither a positive percentage nor amount', () => {
+    const control = allRows(createTab().tab).find(
+      (row) => row.control?.key === 'intervalStepperStep',
+    )?.control
+    const validate = control?.validate as unknown as ((value: string) => string | void) | undefined
+
+    expect(['10%', '2.5', '0', '-5', 'ten', '%'].map((value) => validate?.(value))).toEqual([
+      undefined,
+      undefined,
+      'Enter a percentage such as 10% or an amount such as 5.',
+      'Enter a percentage such as 10% or an amount such as 5.',
+      'Enter a percentage such as 10% or an amount such as 5.',
+      'Enter a percentage such as 10% or an amount such as 5.',
+    ])
+  })
+
+  it('keeps the last good interval stepper step when the entry cannot be read', async () => {
+    const { tab, settings, saveSettings } = createTab({
+      ...DEFAULT_SETTINGS,
+      intervalStepperStep: '5',
+    })
+
+    await tab.setControlValue('intervalStepperStep', 'ten')
+
+    expect([settings.intervalStepperStep, saveSettings.mock.calls.length]).toEqual(['5', 0])
   })
 
   it('ignores a key the tab does not own', async () => {

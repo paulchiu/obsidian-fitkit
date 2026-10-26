@@ -23,6 +23,7 @@ import {
 import { INTENSITY_KINDS } from '../../domain/interval-plan'
 import type { IntervalProgram } from '../../domain/interval-program'
 import { parseIntervalPresets } from '../../domain/interval-presets'
+import { stepperStepFrom } from '../../domain/interval-stepper'
 import { assertUnreachableKind } from '../../domain/exercise-kind'
 import {
   formatExerciseHistoryBadges,
@@ -1155,6 +1156,7 @@ export class WorkoutEditorView extends FileView {
         rows: session.rows,
         now: Date.now(),
         screen: session.screen,
+        stepperStep: stepperStepFrom(this.plugin.settings.intervalStepperStep),
       },
       handlers: {
         primary: primed({ kind: 'press' }),

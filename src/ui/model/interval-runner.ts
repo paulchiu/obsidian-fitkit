@@ -7,10 +7,12 @@ import {
   repsWithWorkDone,
   restsAfter,
   runPhase,
+  stepAt,
   targetedSteps,
   type RunPhase,
   type RunRow,
 } from '../../domain/interval-run'
+import { stepperAmount, type StepperStep } from '../../domain/interval-stepper'
 
 /** What the runner is drawn from, apart from which screen it is on. */
 export interface RunnerTimeline {
@@ -21,9 +23,6 @@ export interface RunnerTimeline {
 
 /** A planned step's dot: on target, short of it, done with no target, under way, or to come. */
 export type DotState = 'hit' | 'miss' | 'done' | 'current' | 'pending'
-
-/** How far one tap of the rest stepper moves each kind of intensity. */
-const ADJUST_STEP: Record<IntensityKind, number> = { watts: 5, load: 2.5, level: 1 }
 
 const UNIT: Record<IntensityKind, string> = { watts: ' W', load: ' kg', level: '' }
 
@@ -117,18 +116,19 @@ export function statsLabel({ rows, program }: RunnerTimeline): string | null {
 }
 
 /** The stepper for the rep just done: how far a tap moves it and its value, or null when there is none to correct. */
-export function repStepper({
-  rows,
-  program,
-}: RunnerTimeline): { step: number; value: string } | null {
+export function repStepper(
+  { rows, program }: RunnerTimeline,
+  stepperStep: StepperStep,
+): { step: number; value: string } | null {
   const kind = program.intensity
   const index = correctableRepIndex(rows)
   if (!kind || index === null) {
     return null
   }
   const value = rows[index]?.[kind]
+  const base = stepAt(program, index)?.target?.target ?? value ?? 0
   return {
-    step: ADJUST_STEP[kind],
+    step: stepperAmount(stepperStep, kind, base),
     value: value === undefined ? '' : `Rep ${index + 1}: ${formatIntensity(kind, value)}`,
   }
 }

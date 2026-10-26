@@ -668,10 +668,10 @@ describe('WorkoutEditorView interval plans', () => {
       button(view, 'Lower last rep').click()
       button(view, 'Lower last rep').click()
 
-      expect(runnerText(view, '.fitkit-runner-stepper-value')).toBe('Rep 1: 290 W')
+      expect(runnerText(view, '.fitkit-runner-stepper-value')).toBe('Rep 1: 240 W')
       await savedBody(contents, [
         ...BIKE,
-        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 20] [watts:: 290] [rest:: 0] [started:: 2026-10-12T07:15:20+10:00]',
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [duration:: 20] [watts:: 240] [rest:: 0] [started:: 2026-10-12T07:15:20+10:00]',
       ])
     })
 
@@ -689,7 +689,7 @@ describe('WorkoutEditorView interval plans', () => {
 
       await savedBody(contents, [
         ...ON_OFF,
-        '- [exercise:: [[Exercise Bike]]] [set:: 1] [step:: on] [duration:: 30] [watts:: 355]',
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [step:: on] [duration:: 30] [watts:: 385]',
         '- [exercise:: [[Exercise Bike]]] [set:: 2] [step:: off] [duration:: 0] [started:: 2026-10-12T07:15:30+10:00]',
       ])
     })
