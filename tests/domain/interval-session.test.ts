@@ -384,6 +384,26 @@ describe('interval session', () => {
       })
     })
 
+    it('nudges the rep just done, from its own target, while working a step that followed it with no rest', () => {
+      const working = { set: 2, durationSeconds: 0, startedAt: '2026-10-12T07:15:30+10:00' }
+      const { session } = resumed([{ set: 1, durationSeconds: 30 }, working], ON_OFF, sec(35))
+
+      expect(stepSession(session, { kind: 'adjust', delta: 5 }, sec(36)).effects).toEqual({
+        rows: [{ set: 1, durationSeconds: 30, watts: 355 }, working],
+        redraw: 'full',
+      })
+    })
+
+    it('nudges the rep just done when open work ran past its period, leaving no rest', () => {
+      const { session } = tickThrough(started(SLED), 1, 70)
+      const pressed = stepSession(session, { kind: 'press' }, sec(70)).session
+      const working = stepSession(pressed, { kind: 'tick' }, sec(71)).session
+
+      const adjusted = stepSession(working, { kind: 'adjust', delta: 5 }, sec(72))
+
+      expect(adjusted.effects.rows?.map((row) => row.load)).toEqual([125, undefined])
+    })
+
     it('does nothing on a plan with no intensity', () => {
       expect(
         stepSession(started(NO_INTENSITY), { kind: 'adjust', delta: 5 }, sec(1)).effects,

@@ -675,6 +675,25 @@ describe('WorkoutEditorView interval plans', () => {
       ])
     })
 
+    it('corrects the rep just done while working a step that followed it with no rest', async () => {
+      const ON_OFF = [
+        '## [[Exercise Bike]]',
+        '',
+        '- [exercise:: [[Exercise Bike]]] [plan:: (x 2 (on 30s 350W) (off 30s 150W))]',
+      ]
+      const { view, contents } = await openView(workoutSource(...ON_OFF))
+      button(view, 'Start interval plan').click()
+      runTo('07:15:31')
+
+      button(view, 'Raise last rep').click()
+
+      await savedBody(contents, [
+        ...ON_OFF,
+        '- [exercise:: [[Exercise Bike]]] [set:: 1] [step:: on] [duration:: 30] [watts:: 355]',
+        '- [exercise:: [[Exercise Bike]]] [set:: 2] [step:: off] [duration:: 0] [started:: 2026-10-12T07:15:30+10:00]',
+      ])
+    })
+
     it('shows the runner from the top and returns the list to where it was scrolled', async () => {
       const { view } = await openView(workoutSource(...BIKE))
       view.contentEl.scrollTop = 420

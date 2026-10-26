@@ -262,6 +262,27 @@ describe('WorkoutEditorView interval runner', () => {
     expect(runnerText(view, 'fitkit-runner-stepper-value')).toBe(value)
   })
 
+  it('corrects the rep just done while working a step that followed it with no rest', async () => {
+    const view = await start(bike('(x 2 (on 30s 350W) (off 30s 150W))'))
+    runTo('07:15:31')
+
+    expect(runnerText(view, 'fitkit-runner-stepper-value')).toBe('Rep 1: 350 W')
+  })
+
+  it('shows no stepper while working the first rep or a rep that followed a rest', async () => {
+    const stepper = (view: WorkoutEditorView): Element | null =>
+      runner(view).querySelector('.fitkit-runner-stepper')
+    const view = await start(bike(BIKE))
+    at('07:15:10')
+    const first = stepper(view)
+    restAfterRep1(view)
+    at('07:15:40')
+    const resting = stepper(view)
+    button(runner(view), 'Skip').click()
+
+    expect([first, resting !== null, stepper(view)]).toEqual([null, true, null])
+  })
+
   it('averages the reps done to one decimal place', async () => {
     const view = await start(
       bike(

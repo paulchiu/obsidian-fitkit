@@ -10,7 +10,7 @@ import {
   phaseLabel,
   phaseSeconds,
   primaryLabel,
-  restStepper,
+  repStepper,
   roundsLabel,
   statsLabel,
   targetLabel,
@@ -82,7 +82,7 @@ function Running({
   const target = targetLabel(resting, step)
   const rounds = roundsLabel(step, program)
   const stats = statsLabel(model)
-  const stepper = resting ? restStepper(model) : null
+  const stepper = repStepper(model)
   return (
     <div
       class={`fitkit-runner ${resting ? 'is-rest' : 'is-work'}${phase.paused ? ' is-paused' : ''}`}
@@ -141,7 +141,7 @@ function Dots({ states }: { states: readonly DotState[] }): JSX.Element {
   )
 }
 
-/** During rest, corrects the rep just done, read off the machine's console. */
+/** Corrects the rep just done, read off the machine's console. */
 function Stepper({
   step,
   value,

@@ -172,7 +172,7 @@ An interval card swaps the play button for `Start`, which reads `Start from rep 
 
 - The clock counts the work down (or up, for open work) and then the rest. A named step's name heads the clock, with its target beneath, the set and round when repeats nest, and the step that comes next.
 - The big button reads `Rest` while you work, which ends the rep with the time you did. It reads `Next` when the next step follows with no rest, `Finish` on the last step, and `Skip` while you rest, which starts the next rep at once. A phase whose time runs out ends by itself.
-- Each finished rep is written to the note straight away with the target filled in. During rest, the minus and plus buttons correct the intensity of the rep you just did, from what the machine's console showed.
+- Each finished rep is written to the note straight away with the target filled in. During rest, the minus and plus buttons correct the intensity of the rep you just did, from what the machine's console showed. When the next rep starts with no rest, as with a step that follows the last directly, they show while you work it instead, still correcting the rep before.
 - Rep dots go green for reps on target (within 5% of the step's target, held for the full work time; open work counts intensity only), amber otherwise, and grey for a step with no target. The last and average intensity sit beneath them.
 - `Pause` banks the time so far, and `End run` returns to the card with the reps you finished. When the plan is done, the runner shows how many reps hit the target.
 
