@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [1.15.0] - 2026-10-26
+
+### Added
+
 - An interval plan can set its own stepper step with `(adjust 5)` or `, adjust 5` in the one-line form, or the `Stepper step` field in the plan form's Steps view. Plans without one use the app-wide `Interval stepper step`.
 
 ### Changed
