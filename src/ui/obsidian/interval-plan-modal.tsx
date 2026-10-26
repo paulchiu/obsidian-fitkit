@@ -2,7 +2,12 @@ import { Menu, Modal, type App } from 'obsidian'
 import { render } from 'preact'
 
 import type { IntervalPreset } from '../../domain/interval-presets'
-import { outlineFromPlan, outlineProblem, planFromOutline } from '../../domain/plan-outline'
+import {
+  adjustFromPlan,
+  outlineFromPlan,
+  outlineProblem,
+  planFromOutline,
+} from '../../domain/plan-outline'
 import { PlanForm, type PlanFormActions, type PlanFormLayout } from '../components/plan-form'
 import { HostContext } from '../components/host'
 import {
@@ -26,6 +31,8 @@ export interface IntervalPlanModalOptions {
   suggested?: string
   /** Plans offered under "Start from"; the row is left out when there are none. */
   presets: readonly IntervalPreset[]
+  /** The app-wide stepper step, shown when the plan has none. */
+  defaultStepperStep: string
   onSave: (plan: string | undefined) => void
 }
 
@@ -44,6 +51,8 @@ export class IntervalPlanModal extends Modal {
   private text = ''
   /** The step editor's rows, or null while the plan is edited as text. */
   private rows: DraftItem[] | null = null
+  /** The Steps view's stepper step field, as typed. */
+  private adjust = ''
   private showNote = false
   private examplesOpen = false
   private lastId = 0
@@ -89,6 +98,8 @@ export class IntervalPlanModal extends Modal {
           rows={rows}
           showNote={this.showNote}
           text={text}
+          stepperStep={this.adjust}
+          defaultStepperStep={this.options.defaultStepperStep}
           examplesOpen={this.examplesOpen}
           preview={preview}
           canClear={this.options.initial !== undefined}
@@ -116,6 +127,7 @@ export class IntervalPlanModal extends Modal {
   private show(steps: boolean): void {
     const outline = steps ? outlineFromPlan(this.text) : null
     this.rows = outline ? withIds(outline, this.newId) : null
+    this.adjust = adjustFromPlan(this.text)
     this.showNote = steps && this.rows === null
     if (this.rows) {
       this.examplesOpen = false
@@ -134,7 +146,7 @@ export class IntervalPlanModal extends Modal {
       return
     }
     this.rows = change(this.rows)
-    this.text = planFromOutline(this.rows)
+    this.text = planFromOutline(this.rows, this.adjust)
     this.draw()
   }
 
@@ -165,6 +177,10 @@ export class IntervalPlanModal extends Modal {
     onTextInput: (text) => {
       this.text = text
       this.draw()
+    },
+    onStepperStepInput: (value) => {
+      this.adjust = value
+      this.edit((rows) => rows)
     },
     onToggleExamples: () => {
       this.examplesOpen = !this.examplesOpen

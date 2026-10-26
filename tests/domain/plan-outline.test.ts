@@ -104,8 +104,19 @@ describe('planFromOutline', () => {
         step('easy spin', ' 5 m ', ' 120W '),
         step('Rest', '1m', 'L8, L10'),
         step('every', '30s'),
+        step('Adjust', '20s'),
       ]),
-    ).toBe('("easy spin" 5m 120W) ("Rest" 1m (L8 L10)) ("every" 30s)')
+    ).toBe('("easy spin" 5m 120W) ("Rest" 1m (L8 L10)) ("every" 30s) ("Adjust" 20s)')
+  })
+})
+
+describe('planFromOutline with a stepper step', () => {
+  it('leads the plan with its adjust, tidying what was typed, and leaves it out when blank', () => {
+    expect([
+      planFromOutline([step('over', '1m', '300W')], ' 20 % '),
+      planFromOutline([], '5'),
+      planFromOutline([step('over', '1m')], ' '),
+    ]).toEqual(['(adjust 20%) (over 1m 300W)', '(adjust 5)', '(over 1m)'])
   })
 })
 

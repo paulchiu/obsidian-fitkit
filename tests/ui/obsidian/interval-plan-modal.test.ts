@@ -73,6 +73,7 @@ const open = (
     exerciseName: 'Exercise Bike',
     initial,
     presets,
+    defaultStepperStep: '10%',
     onSave,
   })
   modal.onOpen()
@@ -466,6 +467,40 @@ describe('interval plan modal', () => {
       expect([preview, onSave.mock.calls]).toEqual([
         '4 reps · 12m',
         [['(x 4 (over 90s 300W) (rest 2m))']],
+      ])
+    })
+
+    it("shows the plan's stepper step beside the rows, keeping it as the steps are edited", () => {
+      const { modal, onSave } = open('(adjust 5) (x 3 (over 1m 300W) (rest 2m))')
+      const shown = {
+        names: inputs(modal, 'Step name').map((input) => input.value),
+        step: inputs(modal, 'Stepper step').map((input) => input.value),
+      }
+
+      edit(inputs(modal, 'Rounds')[0], '4')
+      saveButton(modal).click()
+
+      expect([shown, onSave.mock.calls]).toEqual([
+        { names: ['over'], step: ['5'] },
+        [['(adjust 5) (x 4 (over 1m 300W) (rest 2m))']],
+      ])
+    })
+
+    it('writes the stepper step field into the plan, and drops the adjust once it is cleared', () => {
+      const { modal, onSave } = open('(x 3 (over 1m 300W))')
+      const [field] = inputs(modal, 'Stepper step')
+      const placeholder = field?.placeholder
+
+      edit(field, '20%')
+      saveButton(modal).click()
+      const { modal: cleared, onSave: onClearedSave } = open('(adjust 5) (x 3 (over 1m 300W))')
+      edit(inputs(cleared, 'Stepper step')[0], '')
+      saveButton(cleared).click()
+
+      expect([placeholder, onSave.mock.calls, onClearedSave.mock.calls]).toEqual([
+        '10%',
+        [['(adjust 20%) (x 3 (over 1m 300W))']],
+        [['(x 3 (over 1m 300W))']],
       ])
     })
 

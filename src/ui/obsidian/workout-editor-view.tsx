@@ -774,6 +774,7 @@ export class WorkoutEditorView extends FileView {
       initial: ex.plan,
       suggested: this.lastIntervalPlan(ex.name),
       presets: parseIntervalPresets(this.plugin.settings.intervalPresets).presets,
+      defaultStepperStep: this.plugin.settings.intervalStepperStep,
       onSave: (plan) => {
         ex.plan = plan
         this.markDirty()
@@ -1156,7 +1157,8 @@ export class WorkoutEditorView extends FileView {
         rows: session.rows,
         now: Date.now(),
         screen: session.screen,
-        stepperStep: stepperStepFrom(this.plugin.settings.intervalStepperStep),
+        stepperStep:
+          session.program.stepperStep ?? stepperStepFrom(this.plugin.settings.intervalStepperStep),
       },
       handlers: {
         primary: primed({ kind: 'press' }),

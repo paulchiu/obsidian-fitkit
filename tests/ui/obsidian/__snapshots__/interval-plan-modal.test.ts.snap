@@ -201,6 +201,10 @@ exports[`interval plan modal > structure > draws the reason in place of the prev
       span.fitkit-plan-icon[data-icon=plus]
       span
         "Add"
+    div.fitkit-plan-row
+      span.fitkit-plan-word
+        "Stepper step"
+      input.fitkit-input.fitkit-plan-time[aria-label=Stepper step][autocapitalize=off][placeholder=10%][spellcheck=false][type=text]
   textarea.fitkit-input.fitkit-plan-text[aria-label=Plan][autocapitalize=off][hidden=][rows=3][spellcheck=false]
   div.fitkit-plan-note[hidden=]
     "This plan can't be shown as steps, so edit it as text."
@@ -311,6 +315,10 @@ exports[`interval plan modal > structure > draws the step editor with a repeat t
       span.fitkit-plan-icon[data-icon=plus]
       span
         "Add"
+    div.fitkit-plan-row
+      span.fitkit-plan-word
+        "Stepper step"
+      input.fitkit-input.fitkit-plan-time[aria-label=Stepper step][autocapitalize=off][placeholder=10%][spellcheck=false][type=text]
   textarea.fitkit-input.fitkit-plan-text[aria-label=Plan][autocapitalize=off][hidden=][rows=3][spellcheck=false]
   div.fitkit-plan-note[hidden=]
     "This plan can't be shown as steps, so edit it as text."
@@ -432,6 +440,10 @@ exports[`interval plan modal > structure > draws the step editor with presets, a
       span.fitkit-plan-icon[data-icon=plus]
       span
         "Add"
+    div.fitkit-plan-row
+      span.fitkit-plan-word
+        "Stepper step"
+      input.fitkit-input.fitkit-plan-time[aria-label=Stepper step][autocapitalize=off][placeholder=10%][spellcheck=false][type=text]
   textarea.fitkit-input.fitkit-plan-text[aria-label=Plan][autocapitalize=off][hidden=][rows=3][spellcheck=false]
   div.fitkit-plan-note[hidden=]
     "This plan can't be shown as steps, so edit it as text."

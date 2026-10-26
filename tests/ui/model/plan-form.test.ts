@@ -37,6 +37,12 @@ describe('tidyPlan', () => {
       tidyPlan(' 6 x OPEN @ 120KG ,  every 2:00 '),
     ]).toEqual(['(warmup 10m) (x 3 (over 1m))', '("big  gear" 2m)', '6 x open @ 120kg, every 2m'])
   })
+
+  it("keeps a one-line plan's adjust after its pace", () => {
+    expect(tidyPlan(' 8 x 30s @ 300W ,  90s rest ,  ADJUST 5 ')).toBe(
+      '8 x 30s @ 300W, 90s rest, adjust 5',
+    )
+  })
 })
 
 describe('PLAN_EXAMPLES', () => {

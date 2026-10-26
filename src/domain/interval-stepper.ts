@@ -21,6 +21,11 @@ export function parseStepperStep(raw: string): StepperStep | null {
   return match[2] ? { kind: 'percent', percent: value } : { kind: 'amount', amount: value }
 }
 
+/** The step as it is written in a setting or a plan: `10%` or `5`. */
+export function formatStepperStep(step: StepperStep): string {
+  return step.kind === 'percent' ? `${step.percent}%` : String(step.amount)
+}
+
 /** The step a setting names, or the default for text it cannot read. */
 export function stepperStepFrom(raw: string): StepperStep {
   return parseStepperStep(raw) ?? { kind: 'percent', percent: DEFAULT_PERCENT }
