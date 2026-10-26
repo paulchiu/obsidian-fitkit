@@ -110,6 +110,22 @@ export function repsWithWorkDone(rows: readonly RunRow[]): RunRow[] {
   return open && !isResting(open) ? rows.slice(0, -1) : [...rows]
 }
 
+/**
+ * The index of the rep the stepper corrects: the one resting, or the one just done while
+ * the open rep follows it with no rest between. Null while there is no such rep.
+ */
+export function correctableRep(rows: readonly RunRow[], program: IntervalProgram): number | null {
+  const open = openRow(rows)
+  if (!open) {
+    return null
+  }
+  if (isResting(open)) {
+    return rows.length - 1
+  }
+  const previous = rows.length > 1 ? stepAt(program, rows.length - 2) : undefined
+  return previous && !restsAfter(previous) ? rows.length - 2 : null
+}
+
 /** The last row, while it is still being timed or is paused mid-run. */
 function openRow(rows: readonly RunRow[]): RunRow | undefined {
   const last = rows[rows.length - 1]

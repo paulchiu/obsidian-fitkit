@@ -7,7 +7,7 @@ import {
   dotStates,
   finishedScore,
   primaryLabel,
-  restStepper,
+  repStepper,
   roundsLabel,
   statsLabel,
   targetLabel,
@@ -28,6 +28,14 @@ const timeline = (plan: string, rows: RunRow[]) => ({
 })
 
 const done = (fields: RunRow): RunRow => ({ durationSeconds: 30, restSeconds: 90, ...fields })
+
+/** A rep in its rest, ten seconds in. */
+const resting = (fields: RunRow): RunRow => ({
+  durationSeconds: 30,
+  restSeconds: 0,
+  startedAt: '2026-10-12T07:15:00+10:00',
+  ...fields,
+})
 
 describe('roundsLabel', () => {
   it.each([
@@ -100,18 +108,18 @@ describe('statsLabel', () => {
   })
 })
 
-describe('restStepper', () => {
+describe('repStepper', () => {
   it.each([
     ['3 x 30s @ 300W, 90s rest', { watts: 300 }, { step: 5, value: 'Rep 1: 300 W' }],
     ['3 x 30s @ 100kg, 90s rest', { load: 100 }, { step: 2.5, value: 'Rep 1: 100 kg' }],
     ['3 x 30s @ L4, 90s rest', { level: 4 }, { step: 1, value: 'Rep 1: L4' }],
     ['3 x 30s @ 300W, 90s rest', {}, { step: 5, value: '' }],
   ])('steps %s by its kind', (plan, fields, stepper) => {
-    expect(restStepper(timeline(plan, [done(fields)]))).toEqual(stepper)
+    expect(repStepper(timeline(plan, [resting(fields)]))).toEqual(stepper)
   })
 
   it('is null for a plan with no intensity', () => {
-    expect(restStepper(timeline('(x 2 (work 30s))', [done({})]))).toBeNull()
+    expect(repStepper(timeline('(x 2 (work 30s))', [resting({})]))).toBeNull()
   })
 })
 

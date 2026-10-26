@@ -1,6 +1,7 @@
 import { formatTarget, type IntensityKind } from '../../domain/interval-plan'
 import type { IntervalProgram, PlanStep } from '../../domain/interval-program'
 import {
+  correctableRep,
   hasOpenRep,
   isOnTarget,
   repsWithWorkDone,
@@ -115,19 +116,20 @@ export function statsLabel({ rows, program }: RunnerTimeline): string | null {
   return `Last ${formatIntensity(kind, last)} · avg ${formatIntensity(kind, Math.round(average * 10) / 10)}`
 }
 
-/** The rest stepper for the rep just done: how far a tap moves it and its value, or null for a plan with no intensity. */
-export function restStepper({
+/** The stepper for the rep just done: how far a tap moves it and its value, or null when there is none to correct. */
+export function repStepper({
   rows,
   program,
 }: RunnerTimeline): { step: number; value: string } | null {
   const kind = program.intensity
-  if (!kind) {
+  const index = correctableRep(rows, program)
+  if (!kind || index === null) {
     return null
   }
-  const value = rows[rows.length - 1]?.[kind]
+  const value = rows[index]?.[kind]
   return {
     step: ADJUST_STEP[kind],
-    value: value === undefined ? '' : `Rep ${rows.length}: ${formatIntensity(kind, value)}`,
+    value: value === undefined ? '' : `Rep ${index + 1}: ${formatIntensity(kind, value)}`,
   }
 }
 

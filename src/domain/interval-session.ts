@@ -8,6 +8,7 @@ import type { IntervalProgram } from './interval-program'
 import {
   advanceRun,
   catchUpRun,
+  correctableRep,
   endCutRun,
   endRun,
   hasOpenRep,
@@ -106,7 +107,7 @@ export function stepSession(session: RunSession, event: RunEvent, now: number): 
     case 'end':
       return leaving(settle(session, { rows: endRun(rows, now) }, now))
     case 'adjust':
-      return adjustLastRep(session, event.delta, now)
+      return adjustRep(session, event.delta, now)
     case 'resume-cut':
       return settle(
         { ...session, screen: { kind: 'running' } },
@@ -215,16 +216,17 @@ function caughtUpNotice(filled: number, program: IntervalProgram): string {
     : `${filled} reps finished while Obsidian was closed. They have the target filled in, so check their ${label}.`
 }
 
-/** The rest stepper: nudges the last rep's intensity, starting from the target when none is logged. */
-function adjustLastRep(session: RunSession, delta: number, now: number): RunTransition {
+/** The stepper: nudges the {@link correctableRep}'s intensity, starting from the target when none is logged. */
+function adjustRep(session: RunSession, delta: number, now: number): RunTransition {
   const kind = session.program.intensity
+  const index = correctableRep(session.rows, session.program)
   const rows = session.rows.map((row) => ({ ...row }))
-  const last = rows[rows.length - 1]
-  if (!last || !kind) {
+  const rep = index === null ? undefined : rows[index]
+  if (index === null || !rep || !kind) {
     return { session, effects: {} }
   }
-  const target = session.program.steps[rows.length - 1]?.target?.target ?? 0
-  last[kind] = Math.max(0, Math.round(((last[kind] ?? target) + delta) * 10) / 10)
+  const target = session.program.steps[index]?.target?.target ?? 0
+  rep[kind] = Math.max(0, Math.round(((rep[kind] ?? target) + delta) * 10) / 10)
   return settle(session, { rows }, now)
 }
 
