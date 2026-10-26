@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [1.14.0] - 2026-10-26
+
+### Added
+
 - An `Interval stepper step` setting sets how far the interval runner's minus and plus move a rep, as a percentage of its target or a fixed amount.
 
 ### Changed
