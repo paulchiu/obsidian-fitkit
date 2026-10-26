@@ -239,13 +239,13 @@ describe('WorkoutEditorView interval runner', () => {
   })
 
   it.each([
-    { kind: 'watts', plan: BIKE, control: 'Raise last rep', value: 'Rep 1: 305 W' },
-    { kind: 'watts', plan: BIKE, control: 'Lower last rep', value: 'Rep 1: 295 W' },
+    { kind: 'watts', plan: BIKE, control: 'Raise last rep', value: 'Rep 1: 330 W' },
+    { kind: 'watts', plan: BIKE, control: 'Lower last rep', value: 'Rep 1: 270 W' },
     {
       kind: 'load',
       plan: '3 x 30s @ 100kg, 90s rest',
       control: 'Raise last rep',
-      value: 'Rep 1: 102.5 kg',
+      value: 'Rep 1: 110 kg',
     },
     {
       kind: 'level',
@@ -258,6 +258,22 @@ describe('WorkoutEditorView interval runner', () => {
     restAfterRep1(view)
 
     button(view.contentEl, control).click()
+
+    expect(runnerText(view, 'fitkit-runner-stepper-value')).toBe(value)
+  })
+
+  it.each([
+    { setting: '20%', value: 'Rep 1: 360 W' },
+    { setting: '5', value: 'Rep 1: 305 W' },
+  ])('steps by $setting from settings', async ({ setting, value }) => {
+    const { view } = await openEditor({
+      body: bike(BIKE),
+      settings: { intervalStepperStep: setting },
+    })
+    button(view.contentEl, 'Start interval plan').click()
+    restAfterRep1(view)
+
+    button(view.contentEl, 'Raise last rep').click()
 
     expect(runnerText(view, 'fitkit-runner-stepper-value')).toBe(value)
   })

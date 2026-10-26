@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- An `Interval stepper step` setting sets how far the interval runner's minus and plus move a rep, as a percentage of its target or a fixed amount.
+
 ### Changed
+
+- The interval runner's minus and plus now move a rep by 10% of its target by default, instead of a fixed 5 W, 2.5 kg or 1 level.
 
 ### Fixed
 

@@ -3,6 +3,7 @@ import type { JSX, RefObject } from 'preact'
 import { formatStep } from '../../domain/interval-program'
 import { runPhase, stepAt } from '../../domain/interval-run'
 import type { RunScreen } from '../../domain/interval-session'
+import type { StepperStep } from '../../domain/interval-stepper'
 import {
   cutOffLabels,
   dotStates,
@@ -22,6 +23,7 @@ import { Clock, Control } from './screen-parts'
 export interface RunnerModel extends RunnerTimeline {
   exerciseName: string
   screen: RunScreen
+  stepperStep: StepperStep
 }
 
 export interface RunnerHandlers {
@@ -82,7 +84,7 @@ function Running({
   const target = targetLabel(resting, step)
   const rounds = roundsLabel(step, program)
   const stats = statsLabel(model)
-  const stepper = repStepper(model)
+  const stepper = repStepper(model, model.stepperStep)
   return (
     <div
       class={`fitkit-runner ${resting ? 'is-rest' : 'is-work'}${phase.paused ? ' is-paused' : ''}`}

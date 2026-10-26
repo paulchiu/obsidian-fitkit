@@ -83,6 +83,19 @@ describe('settings migration', () => {
     expect(migrated.exerciseRegistry).toEqual([{ name: 'Plank', kind: 'duration', aliases: [] }])
   })
 
+  it.each([
+    ['5', '5'],
+    [5, '10%'],
+    ['ten', '10%'],
+  ])('loads a stored interval stepper step of %j as %j', (stored, loaded) => {
+    const migrated = settingsFromStored({
+      intervalStepperStep: stored,
+      schemaVersion: 1,
+    } as unknown as Partial<FitKitSettings>)
+
+    expect(migrated.intervalStepperStep).toBe(loaded)
+  })
+
   it('keeps the interval marker only on a stored duration entry', () => {
     const migrated = settingsFromStored({
       exerciseRegistry: [

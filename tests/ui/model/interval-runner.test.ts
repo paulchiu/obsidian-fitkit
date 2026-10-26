@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { parseIntervalProgram } from '../../../src/domain/interval-program'
 import type { RunRow } from '../../../src/domain/interval-run'
+import type { StepperStep } from '../../../src/domain/interval-stepper'
 import {
   cutOffLabels,
   dotStates,
@@ -26,6 +27,8 @@ const timeline = (plan: string, rows: RunRow[]) => ({
   rows,
   now: Date.parse('2026-10-12T07:15:10+10:00'),
 })
+
+const TENTH: StepperStep = { kind: 'percent', percent: 10 }
 
 const done = (fields: RunRow): RunRow => ({ durationSeconds: 30, restSeconds: 90, ...fields })
 
@@ -110,16 +113,36 @@ describe('statsLabel', () => {
 
 describe('repStepper', () => {
   it.each([
-    ['3 x 30s @ 300W, 90s rest', { watts: 300 }, { step: 5, value: 'Rep 1: 300 W' }],
-    ['3 x 30s @ 100kg, 90s rest', { load: 100 }, { step: 2.5, value: 'Rep 1: 100 kg' }],
+    ['3 x 30s @ 300W, 90s rest', { watts: 300 }, { step: 30, value: 'Rep 1: 300 W' }],
+    ['3 x 30s @ 100kg, 90s rest', { load: 100 }, { step: 10, value: 'Rep 1: 100 kg' }],
     ['3 x 30s @ L4, 90s rest', { level: 4 }, { step: 1, value: 'Rep 1: L4' }],
-    ['3 x 30s @ 300W, 90s rest', {}, { step: 5, value: '' }],
-  ])('steps %s by its kind', (plan, fields, stepper) => {
-    expect(repStepper(timeline(plan, [resting(fields)]))).toEqual(stepper)
+    ['3 x 30s @ 300W, 90s rest', {}, { step: 30, value: '' }],
+    ['3 x 30s @ 42.5kg, 90s rest', { load: 42.5 }, { step: 4.5, value: 'Rep 1: 42.5 kg' }],
+    ['3 x 30s @ 255W, 90s rest', { watts: 255 }, { step: 26, value: 'Rep 1: 255 W' }],
+    ['3 x 30s @ 4W, 90s rest', { watts: 4 }, { step: 1, value: 'Rep 1: 4 W' }],
+    ['3 x 30s @ 2kg, 90s rest', { load: 2 }, { step: 0.5, value: 'Rep 1: 2 kg' }],
+  ])('steps %s by a tenth of its target', (plan, fields, stepper) => {
+    expect(repStepper(timeline(plan, [resting(fields)]), TENTH)).toEqual(stepper)
+  })
+
+  it('steps a rep with no target by a tenth of what it logged', () => {
+    expect(
+      repStepper(timeline('(warmup 30s) (hard 30s 300W)', [resting({ watts: 200 })]), TENTH)?.step,
+    ).toBe(20)
+  })
+
+  it.each([
+    ['3 x 30s @ 300W, 90s rest', { watts: 300 }],
+    ['3 x 30s @ 100kg, 90s rest', { load: 100 }],
+    ['3 x 30s @ L4, 90s rest', { level: 4 }],
+  ])('steps %s by a fixed amount in its own unit', (plan, fields) => {
+    expect(repStepper(timeline(plan, [resting(fields)]), { kind: 'amount', amount: 5 })?.step).toBe(
+      5,
+    )
   })
 
   it('is null for a plan with no intensity', () => {
-    expect(repStepper(timeline('(x 2 (work 30s))', [resting({})]))).toBeNull()
+    expect(repStepper(timeline('(x 2 (work 30s))', [resting({})]), TENTH)).toBeNull()
   })
 })
 
