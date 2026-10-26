@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- The interval runner's minus and plus buttons now also show while working a step that follows the last with no rest, correcting the rep just done.
+- The interval runner's minus and plus buttons now also show while working a rep that started with no rest after the last, correcting the rep just done.
 
 ### Changed
 

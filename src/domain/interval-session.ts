@@ -8,7 +8,7 @@ import type { IntervalProgram } from './interval-program'
 import {
   advanceRun,
   catchUpRun,
-  correctableRep,
+  correctableRepIndex,
   endCutRun,
   endRun,
   hasOpenRep,
@@ -18,6 +18,7 @@ import {
   resumeCutRun,
   runPhase,
   startRun,
+  stepAt,
   togglePauseRun,
   type RunPhase,
   type RunRow,
@@ -216,17 +217,20 @@ function caughtUpNotice(filled: number, program: IntervalProgram): string {
     : `${filled} reps finished while Obsidian was closed. They have the target filled in, so check their ${label}.`
 }
 
-/** The stepper: nudges the {@link correctableRep}'s intensity, starting from the target when none is logged. */
+/** The stepper: nudges the {@link correctableRepIndex} rep's intensity, starting from its target when none is logged. */
 function adjustRep(session: RunSession, delta: number, now: number): RunTransition {
   const kind = session.program.intensity
-  const index = correctableRep(session.rows, session.program)
-  const rows = session.rows.map((row) => ({ ...row }))
-  const rep = index === null ? undefined : rows[index]
-  if (index === null || !rep || !kind) {
+  const index = correctableRepIndex(session.rows)
+  if (!kind || index === null) {
     return { session, effects: {} }
   }
-  const target = session.program.steps[index]?.target?.target ?? 0
-  rep[kind] = Math.max(0, Math.round(((rep[kind] ?? target) + delta) * 10) / 10)
+  const rows = session.rows.map((row, i) => {
+    if (i !== index) {
+      return row
+    }
+    const target = stepAt(session.program, index)?.target?.target ?? 0
+    return { ...row, [kind]: Math.max(0, Math.round(((row[kind] ?? target) + delta) * 10) / 10) }
+  })
   return settle(session, { rows }, now)
 }
 

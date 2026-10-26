@@ -270,13 +270,17 @@ describe('WorkoutEditorView interval runner', () => {
   })
 
   it('shows no stepper while working the first rep or a rep that followed a rest', async () => {
+    const stepper = (view: WorkoutEditorView): Element | null =>
+      runner(view).querySelector('.fitkit-runner-stepper')
     const view = await start(bike(BIKE))
     at('07:15:10')
-    const first = runnerText(view, 'fitkit-runner-stepper-value')
+    const first = stepper(view)
     restAfterRep1(view)
+    at('07:15:40')
+    const resting = stepper(view)
     button(runner(view), 'Skip').click()
 
-    expect([first, runnerText(view, 'fitkit-runner-stepper-value')]).toEqual([undefined, undefined])
+    expect([first, resting !== null, stepper(view)]).toEqual([null, true, null])
   })
 
   it('averages the reps done to one decimal place', async () => {

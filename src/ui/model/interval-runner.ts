@@ -1,7 +1,7 @@
 import { formatTarget, type IntensityKind } from '../../domain/interval-plan'
 import type { IntervalProgram, PlanStep } from '../../domain/interval-program'
 import {
-  correctableRep,
+  correctableRepIndex,
   hasOpenRep,
   isOnTarget,
   repsWithWorkDone,
@@ -122,7 +122,7 @@ export function repStepper({
   program,
 }: RunnerTimeline): { step: number; value: string } | null {
   const kind = program.intensity
-  const index = correctableRep(rows, program)
+  const index = correctableRepIndex(rows)
   if (!kind || index === null) {
     return null
   }

@@ -112,9 +112,9 @@ export function repsWithWorkDone(rows: readonly RunRow[]): RunRow[] {
 
 /**
  * The index of the rep the stepper corrects: the one resting, or the one just done while
- * the open rep follows it with no rest between. Null while there is no such rep.
+ * the open rep followed it with no rest logged between. Null while there is no such rep.
  */
-export function correctableRep(rows: readonly RunRow[], program: IntervalProgram): number | null {
+export function correctableRepIndex(rows: readonly RunRow[]): number | null {
   const open = openRow(rows)
   if (!open) {
     return null
@@ -122,8 +122,8 @@ export function correctableRep(rows: readonly RunRow[], program: IntervalProgram
   if (isResting(open)) {
     return rows.length - 1
   }
-  const previous = rows.length > 1 ? stepAt(program, rows.length - 2) : undefined
-  return previous && !restsAfter(previous) ? rows.length - 2 : null
+  const previous = rows[rows.length - 2]
+  return previous && !previous.restSeconds ? rows.length - 2 : null
 }
 
 /** The last row, while it is still being timed or is paused mid-run. */
