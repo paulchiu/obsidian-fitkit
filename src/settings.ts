@@ -96,7 +96,7 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
     intervalPresets: upgradeIntervalPresets(
       stored.intervalPresets ?? DEFAULT_SETTINGS.intervalPresets,
     ),
-    intervalStepperStep: stored.intervalStepperStep ?? DEFAULT_SETTINGS.intervalStepperStep,
+    intervalStepperStep: storedStepperStep(stored.intervalStepperStep),
     autosaveDebounceMs: stored.autosaveDebounceMs ?? DEFAULT_SETTINGS.autosaveDebounceMs,
     chartSessionsWindow: stored.chartSessionsWindow ?? DEFAULT_SETTINGS.chartSessionsWindow,
     exerciseRegistry: normalizeStoredExerciseRegistry(
@@ -109,6 +109,13 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
       stored.hiddenDashboardSectionsByPath ?? DEFAULT_SETTINGS.hiddenDashboardSectionsByPath,
     schemaVersion: DEFAULT_SETTINGS.schemaVersion,
   }
+}
+
+/** A stored step survives the load only as text it can read, since `data.json` may be edited by hand. */
+function storedStepperStep(value: unknown): string {
+  return typeof value === 'string' && parseStepperStep(value)
+    ? value
+    : DEFAULT_SETTINGS.intervalStepperStep
 }
 
 function normalizeStoredExerciseRegistry(
@@ -448,7 +455,6 @@ export class FitKitSettingTab extends PluginSettingTab {
         settings.intervalPresets = String(value)
         break
       case 'intervalStepperStep':
-        /** An entry it cannot read keeps the last good step; the control's message says why. */
         if (!parseStepperStep(String(value))) {
           return
         }

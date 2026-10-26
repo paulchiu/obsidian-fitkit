@@ -119,6 +119,8 @@ describe('repStepper', () => {
     ['3 x 30s @ 300W, 90s rest', {}, { step: 30, value: '' }],
     ['3 x 30s @ 42.5kg, 90s rest', { load: 42.5 }, { step: 4.5, value: 'Rep 1: 42.5 kg' }],
     ['3 x 30s @ 255W, 90s rest', { watts: 255 }, { step: 26, value: 'Rep 1: 255 W' }],
+    ['3 x 30s @ 4W, 90s rest', { watts: 4 }, { step: 1, value: 'Rep 1: 4 W' }],
+    ['3 x 30s @ 2kg, 90s rest', { load: 2 }, { step: 0.5, value: 'Rep 1: 2 kg' }],
   ])('steps %s by a tenth of its target', (plan, fields, stepper) => {
     expect(repStepper(timeline(plan, [resting(fields)]), TENTH)).toEqual(stepper)
   })
