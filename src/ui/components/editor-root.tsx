@@ -24,7 +24,7 @@ export interface EditorPage {
   isWorkout: boolean
   metaLine: string
   /** The view rewrites the meta line through this as autosave settles. */
-  metaLineRef: RefObject<HTMLSpanElement>
+  metaLineRef: RefObject<HTMLSpanElement | null>
   conflict: boolean
   cards: Array<Omit<CardProps, 'handlers'>>
   cardHandlers: CardHandlers
@@ -41,14 +41,14 @@ export type EditorScene =
       kind: 'set-timer'
       model: SetTimerModel
       handlers: SetTimerHandlers
-      clock: RefObject<HTMLDivElement>
+      clock: RefObject<HTMLDivElement | null>
     }
-  | { kind: 'rest'; seconds: number; stop: () => void; clock: RefObject<HTMLDivElement> }
+  | { kind: 'rest'; seconds: number; stop: () => void; clock: RefObject<HTMLDivElement | null> }
   | {
       kind: 'run'
       model: RunnerModel
       handlers: RunnerHandlers
-      clock: RefObject<HTMLDivElement>
+      clock: RefObject<HTMLDivElement | null>
     }
   | { kind: 'editor'; page: EditorPage }
 

@@ -10,7 +10,7 @@ export function Clock({
   clock,
 }: {
   seconds: number
-  clock: RefObject<HTMLDivElement>
+  clock: RefObject<HTMLDivElement | null>
 }): JSX.Element {
   useLayoutEffect(() => {
     if (clock.current) clock.current.textContent = formatClock(seconds)

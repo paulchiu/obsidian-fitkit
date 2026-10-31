@@ -45,7 +45,7 @@ export function Runner({
 }: {
   model: RunnerModel
   handlers: RunnerHandlers
-  clock: RefObject<HTMLDivElement>
+  clock: RefObject<HTMLDivElement | null>
 }): JSX.Element {
   const { screen } = model
   switch (screen.kind) {
@@ -72,7 +72,7 @@ function Running({
 }: {
   model: RunnerModel
   handlers: RunnerHandlers
-  clock: RefObject<HTMLDivElement>
+  clock: RefObject<HTMLDivElement | null>
 }): JSX.Element {
   const { program } = model
   const phase = runPhase(model.rows, program, model.now)
