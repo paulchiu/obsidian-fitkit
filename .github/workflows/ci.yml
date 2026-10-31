@@ -36,3 +36,29 @@ jobs:
 
       - name: Test
         run: npm test
+
+  # Merges only after quality-check passes; `gh pr merge --auto` would not wait, since main has no required checks.
+  dependabot-merge:
+    name: Merge eligible Dependabot PRs
+    needs: quality-check
+    if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v3
+        with:
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+
+      # Major bumps are excluded even though dependabot.yml currently restricts grouped
+      # updates to minor/patch, since an ungrouped or future major update would otherwise
+      # merge itself without review.
+      - name: Merge minor/patch updates
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
