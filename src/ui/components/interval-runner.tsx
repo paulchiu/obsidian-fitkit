@@ -134,6 +134,9 @@ const DOT_CLASS: Record<DotState, string> = {
   pending: 'fitkit-runner-dot',
 }
 
+/** Past this many reps the dots are slivers, so the current one stands taller to stay findable. */
+const LONG_PLAN_REPS = 40
+
 /** One dot per planned rep; the stylesheet narrows the gap by the rep count so the row never wraps. */
 function Dots({ states }: { states: readonly DotState[] }): JSX.Element {
   const row = useDomEffect<HTMLDivElement>(
@@ -141,7 +144,7 @@ function Dots({ states }: { states: readonly DotState[] }): JSX.Element {
     [states.length],
   )
   return (
-    <div class="fitkit-runner-dots" ref={row}>
+    <div class={`fitkit-runner-dots${states.length > LONG_PLAN_REPS ? ' is-long' : ''}`} ref={row}>
       {states.map((state, i) => (
         <span key={i} class={DOT_CLASS[state]} />
       ))}

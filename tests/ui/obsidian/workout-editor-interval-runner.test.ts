@@ -244,7 +244,7 @@ describe('WorkoutEditorView interval runner', () => {
       expect([
         styleOf(runner(view).querySelector('.fitkit-runner-dots'), 'flex-wrap'),
         styleOf(
-          runner(view).querySelector('.fitkit-runner-dot'),
+          runner(view).querySelector('.fitkit-runner-dot:not(.is-current)'),
           'flex-basis',
           'flex-shrink',
           'min-width',
@@ -259,6 +259,39 @@ describe('WorkoutEditorView interval runner', () => {
       expect(styleOf(row, '--fitkit-reps', 'gap')).toEqual([
         '20',
         'min(6px, calc(100% / var(--fitkit-reps, 1) / 3))',
+      ])
+    })
+
+    it("rings dots with an inset shadow that shrinks with them, in each rep state's colour", async () => {
+      const view = await start(bike(BIKE))
+      runTo('07:15:31')
+      button(runner(view), 'Skip').click()
+      const [hit, current, pending] = runner(view).querySelectorAll('.fitkit-runner-dot')
+
+      expect([
+        styleOf(hit ?? null, 'box-shadow', 'background'),
+        styleOf(current ?? null, 'box-shadow'),
+        styleOf(pending ?? null, 'box-shadow'),
+      ]).toEqual([
+        ['none', 'var(--color-green, var(--text-success))'],
+        ['inset 0 0 0 2px var(--interactive-accent)'],
+        ['inset 0 0 0 2px var(--background-modifier-border)'],
+      ])
+    })
+
+    it('keeps the current rep findable: at least 3px wide, and taller once a plan passes 40 reps', async () => {
+      const currentIn = async (reps: number): Promise<string[]> => {
+        const view = await start(bike(`${reps} x 10s @ 300W, 10s rest`))
+        return styleOf(
+          runner(view).querySelector('.fitkit-runner-dot.is-current'),
+          'min-width',
+          'height',
+        )
+      }
+
+      expect([await currentIn(40), await currentIn(41)]).toEqual([
+        ['3px', '12px'],
+        ['3px', '16px'],
       ])
     })
   })
