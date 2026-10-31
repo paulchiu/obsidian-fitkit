@@ -273,8 +273,8 @@ describe('WorkoutEditorView interval runner', () => {
       const [hit, miss, current, pending] = runner(view).querySelectorAll('.fitkit-runner-dot')
 
       expect([
-        styleOf(hit ?? null, 'box-shadow', 'background'),
-        styleOf(miss ?? null, 'box-shadow', 'background'),
+        styleOf(hit ?? null, 'box-shadow', 'background-color'),
+        styleOf(miss ?? null, 'box-shadow', 'background-color'),
         styleOf(current ?? null, 'box-shadow'),
         styleOf(pending ?? null, 'box-shadow'),
       ]).toEqual([
@@ -307,7 +307,7 @@ describe('WorkoutEditorView interval runner', () => {
       )
       const done = runner(view).querySelector('.fitkit-runner-dot.is-done')
 
-      expect(styleOf(done, 'background')).toEqual(['var(--text-faint)'])
+      expect(styleOf(done, 'background-color')).toEqual(['var(--text-faint)'])
     })
   })
 

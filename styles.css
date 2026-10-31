@@ -1788,17 +1788,17 @@ body.is-mobile .fitkit-editor-root {
 }
 
 .fitkit-runner-dot.is-hit {
-  background: var(--color-green, var(--text-success));
+  background-color: var(--color-green, var(--text-success));
   box-shadow: none;
 }
 
 .fitkit-runner-dot.is-miss {
-  background: var(--color-orange, var(--text-warning));
+  background-color: var(--color-orange, var(--text-warning));
   box-shadow: none;
 }
 
 .fitkit-runner-dot.is-done {
-  background: var(--background-modifier-border);
+  background-color: var(--background-modifier-border);
 }
 
 .fitkit-runner-dot.is-current {
@@ -1812,7 +1812,7 @@ body.is-mobile .fitkit-editor-root {
 
 /** A long plan's dots are too thin to show a ring, so done reps take a lighter fill than reps to come. */
 .fitkit-runner-dots.is-long .fitkit-runner-dot.is-done {
-  background: var(--text-faint);
+  background-color: var(--text-faint);
 }
 
 .fitkit-runner-stepper {
