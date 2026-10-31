@@ -137,7 +137,7 @@ const DOT_CLASS: Record<DotState, string> = {
 /** Past this many reps the dots are slivers, so the current one stands taller to stay findable. */
 const LONG_PLAN_REPS = 40
 
-/** One dot per planned rep; the stylesheet narrows the gap by the rep count so the row never wraps. */
+/** One dot per planned rep, on one row; `--fitkit-reps` lets the stylesheet narrow the gap as the count grows. */
 function Dots({ states }: { states: readonly DotState[] }): JSX.Element {
   const row = useDomEffect<HTMLDivElement>(
     (el) => el.style.setProperty('--fitkit-reps', String(states.length)),

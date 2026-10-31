@@ -252,7 +252,7 @@ describe('WorkoutEditorView interval runner', () => {
       ]).toEqual([['nowrap'], ['12px', '1', '0px']])
     })
 
-    it('narrows the gap as the rep count grows, keeping 6px up to 16 reps on a phone-width row', async () => {
+    it('gives the stylesheet the rep count, which caps the gap at 6px and narrows it as reps grow', async () => {
       const view = await start(bike('20 x 30s @ 300W, 30s rest'))
       const row = runner(view).querySelector('.fitkit-runner-dots')
 
@@ -263,17 +263,23 @@ describe('WorkoutEditorView interval runner', () => {
     })
 
     it("rings dots with an inset shadow that shrinks with them, in each rep state's colour", async () => {
-      const view = await start(bike(BIKE))
-      runTo('07:15:31')
-      button(runner(view), 'Skip').click()
-      const [hit, current, pending] = runner(view).querySelectorAll('.fitkit-runner-dot')
+      const view = await start(
+        bike(
+          '4 x 30s @ 300W, 90s rest',
+          '[set:: 1] [duration:: 30] [watts:: 300] [rest:: 90]',
+          '[set:: 2] [duration:: 30] [watts:: 200] [rest:: 90]',
+        ),
+      )
+      const [hit, miss, current, pending] = runner(view).querySelectorAll('.fitkit-runner-dot')
 
       expect([
         styleOf(hit ?? null, 'box-shadow', 'background'),
+        styleOf(miss ?? null, 'box-shadow', 'background'),
         styleOf(current ?? null, 'box-shadow'),
         styleOf(pending ?? null, 'box-shadow'),
       ]).toEqual([
         ['none', 'var(--color-green, var(--text-success))'],
+        ['none', 'var(--color-orange, var(--text-warning))'],
         ['inset 0 0 0 2px var(--interactive-accent)'],
         ['inset 0 0 0 2px var(--background-modifier-border)'],
       ])
@@ -293,6 +299,15 @@ describe('WorkoutEditorView interval runner', () => {
         ['3px', '12px'],
         ['3px', '16px'],
       ])
+    })
+
+    it('fills done reps lighter than reps to come once a plan passes 40 reps, when a dot is too thin for its ring', async () => {
+      const view = await start(
+        bike('(x 41 (spin 10s) (rest 10s))', '[set:: 1] [duration:: 10] [rest:: 10]'),
+      )
+      const done = runner(view).querySelector('.fitkit-runner-dot.is-done')
+
+      expect(styleOf(done, 'background')).toEqual(['var(--text-faint)'])
     })
   })
 
