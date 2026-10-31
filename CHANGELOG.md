@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [1.15.1] - 2026-10-31
+
+### Added
+
+### Changed
+
+### Fixed
+
 - The interval runner's rep dots stay on one row at any plan length, shrinking to fit instead of wrapping onto a second line.
 
 ### Removed
