@@ -16,7 +16,7 @@ import {
 } from '../../fixtures/workout-editor'
 import { harnessWindow } from '../../harness/obsidian-dom'
 import { outline } from '../../harness/outline'
-import { findUnstyledClasses } from '../../harness/stylesheet'
+import { ensureStylesheetLoaded, findUnstyledClasses } from '../../harness/stylesheet'
 
 useEditorEnvironment()
 
@@ -225,6 +225,90 @@ describe('WorkoutEditorView interval runner', () => {
       'Work · rep 2 of 3',
       ['fitkit-runner-dot is-hit', 'fitkit-runner-dot is-current', 'fitkit-runner-dot'],
     ])
+  })
+
+  describe('rep dots', () => {
+    /** The computed value of each property on `el`, read through the shipped stylesheet. */
+    const styleOf = (el: Element | null, ...properties: string[]): string[] => {
+      if (!el) {
+        throw new Error('No element to style')
+      }
+      ensureStylesheetLoaded()
+      const style = harnessWindow.getComputedStyle(el)
+      return properties.map((property) => style.getPropertyValue(property).trim())
+    }
+
+    it('keeps the dots on one row, letting each dot shrink below full size', async () => {
+      const view = await start(bike(BIKE))
+
+      expect([
+        styleOf(runner(view).querySelector('.fitkit-runner-dots'), 'flex-wrap'),
+        styleOf(
+          runner(view).querySelector('.fitkit-runner-dot:not(.is-current)'),
+          'flex-basis',
+          'flex-shrink',
+          'min-width',
+        ),
+      ]).toEqual([['nowrap'], ['12px', '1', '0px']])
+    })
+
+    it('gives the stylesheet the rep count, which caps the gap at 6px and narrows it as reps grow', async () => {
+      const view = await start(bike('20 x 30s @ 300W, 30s rest'))
+      const row = runner(view).querySelector('.fitkit-runner-dots')
+
+      expect(styleOf(row, '--fitkit-reps', 'gap')).toEqual([
+        '20',
+        'min(6px, calc(100% / var(--fitkit-reps, 1) / 3))',
+      ])
+    })
+
+    it("rings dots with an inset shadow that shrinks with them, in each rep state's colour", async () => {
+      const view = await start(
+        bike(
+          '4 x 30s @ 300W, 90s rest',
+          '[set:: 1] [duration:: 30] [watts:: 300] [rest:: 90]',
+          '[set:: 2] [duration:: 30] [watts:: 200] [rest:: 90]',
+        ),
+      )
+      const [hit, miss, current, pending] = runner(view).querySelectorAll('.fitkit-runner-dot')
+
+      expect([
+        styleOf(hit ?? null, 'box-shadow', 'background-color'),
+        styleOf(miss ?? null, 'box-shadow', 'background-color'),
+        styleOf(current ?? null, 'box-shadow'),
+        styleOf(pending ?? null, 'box-shadow'),
+      ]).toEqual([
+        ['none', 'var(--color-green, var(--text-success))'],
+        ['none', 'var(--color-orange, var(--text-warning))'],
+        ['inset 0 0 0 2px var(--interactive-accent)'],
+        ['inset 0 0 0 2px var(--background-modifier-border)'],
+      ])
+    })
+
+    it('keeps the current rep findable: at least 3px wide, and taller once a plan passes 40 reps', async () => {
+      const currentIn = async (reps: number): Promise<string[]> => {
+        const view = await start(bike(`${reps} x 10s @ 300W, 10s rest`))
+        return styleOf(
+          runner(view).querySelector('.fitkit-runner-dot.is-current'),
+          'min-width',
+          'height',
+        )
+      }
+
+      expect([await currentIn(40), await currentIn(41)]).toEqual([
+        ['3px', '12px'],
+        ['3px', '16px'],
+      ])
+    })
+
+    it('fills done reps lighter than reps to come once a plan passes 40 reps, when a dot is too thin for its ring', async () => {
+      const view = await start(
+        bike('(x 41 (spin 10s) (rest 10s))', '[set:: 1] [duration:: 10] [rest:: 10]'),
+      )
+      const done = runner(view).querySelector('.fitkit-runner-dot.is-done')
+
+      expect(styleOf(done, 'background-color')).toEqual(['var(--text-faint)'])
+    })
   })
 
   it('disables the primary button while paused and enables it on resume', async () => {

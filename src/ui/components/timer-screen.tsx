@@ -31,7 +31,7 @@ export function SetTimer({
 }: {
   model: SetTimerModel
   handlers: SetTimerHandlers
-  clock: RefObject<HTMLDivElement>
+  clock: RefObject<HTMLDivElement | null>
 }): JSX.Element {
   const primary = model.running
     ? { text: 'Stop', label: 'Stop timer', onClick: handlers.stop }
@@ -79,7 +79,7 @@ export function RestTimer({
 }: {
   seconds: number
   stop: () => void
-  clock: RefObject<HTMLDivElement>
+  clock: RefObject<HTMLDivElement | null>
 }): JSX.Element {
   return (
     <div class="fitkit-runner is-rest">

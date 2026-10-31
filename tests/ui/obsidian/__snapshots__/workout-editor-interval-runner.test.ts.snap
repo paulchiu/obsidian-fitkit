@@ -38,7 +38,7 @@ exports[`WorkoutEditorView interval runner > draws the runner finished with no t
       "1"
     div.fitkit-runner-target
       "reps done"
-    div.fitkit-runner-dots
+    div.fitkit-runner-dots[style=--fitkit-reps: 1;]
       span.fitkit-runner-dot.is-done
   button.fitkit-btn.fitkit-btn-primary.fitkit-runner-primary[type=button]
     "Back to workout""
@@ -56,7 +56,7 @@ exports[`WorkoutEditorView interval runner > draws the runner finished, scored a
       "2/3"
     div.fitkit-runner-target
       "reps on target"
-    div.fitkit-runner-dots
+    div.fitkit-runner-dots[style=--fitkit-reps: 3;]
       span.fitkit-runner-dot.is-hit
       span.fitkit-runner-dot.is-miss
       span.fitkit-runner-dot.is-hit
@@ -78,7 +78,7 @@ exports[`WorkoutEditorView interval runner > draws the runner resting on a plan 
       "rest"
     div.fitkit-runner-next
       "Next: work 30s"
-    div.fitkit-runner-dots
+    div.fitkit-runner-dots[style=--fitkit-reps: 3;]
       span.fitkit-runner-dot.is-done
       span.fitkit-runner-dot
       span.fitkit-runner-dot
@@ -109,7 +109,7 @@ exports[`WorkoutEditorView interval runner > draws the runner resting while paus
       "rest"
     div.fitkit-runner-next
       "Next: 30s @ 300W"
-    div.fitkit-runner-dots
+    div.fitkit-runner-dots[style=--fitkit-reps: 3;]
       span.fitkit-runner-dot.is-miss
       span.fitkit-runner-dot
       span.fitkit-runner-dot
@@ -151,7 +151,7 @@ exports[`WorkoutEditorView interval runner > draws the runner resting with the s
       "rest"
     div.fitkit-runner-next
       "Next: 30s @ 300W"
-    div.fitkit-runner-dots
+    div.fitkit-runner-dots[style=--fitkit-reps: 3;]
       span.fitkit-runner-dot.is-miss
       span.fitkit-runner-dot
       span.fitkit-runner-dot
@@ -195,7 +195,7 @@ exports[`WorkoutEditorView interval runner > draws the runner working a named st
       "Round 1 of 2"
     div.fitkit-runner-next
       "Next: off 30s @ 150W"
-    div.fitkit-runner-dots
+    div.fitkit-runner-dots[style=--fitkit-reps: 4;]
       span.fitkit-runner-dot.is-current
       span.fitkit-runner-dot
       span.fitkit-runner-dot
@@ -231,7 +231,7 @@ exports[`WorkoutEditorView interval runner > draws the runner working a step in 
       "Set 2 of 2 · round 1 of 2"
     div.fitkit-runner-next
       "Next: under 1m @ 220W"
-    div.fitkit-runner-dots
+    div.fitkit-runner-dots[style=--fitkit-reps: 8;]
       span.fitkit-runner-dot.is-hit
       span.fitkit-runner-dot.is-hit
       span.fitkit-runner-dot.is-hit
@@ -267,7 +267,7 @@ exports[`WorkoutEditorView interval runner > draws the runner working the last s
       "warmup"
     div.fitkit-runner-clock
       "0:20"
-    div.fitkit-runner-dots
+    div.fitkit-runner-dots[style=--fitkit-reps: 1;]
       span.fitkit-runner-dot.is-current
   button.fitkit-btn.fitkit-runner-primary.fitkit-btn-primary[type=button]
     "Finish"
@@ -296,7 +296,7 @@ exports[`WorkoutEditorView interval runner > draws the runner working while paus
       "300W target"
     div.fitkit-runner-next
       "Next: 30s @ 300W"
-    div.fitkit-runner-dots
+    div.fitkit-runner-dots[style=--fitkit-reps: 3;]
       span.fitkit-runner-dot.is-current
       span.fitkit-runner-dot
       span.fitkit-runner-dot
@@ -329,7 +329,7 @@ exports[`WorkoutEditorView interval runner > draws the runner working, no step n
       "300W target"
     div.fitkit-runner-next
       "Next: 30s @ 300W"
-    div.fitkit-runner-dots
+    div.fitkit-runner-dots[style=--fitkit-reps: 3;]
       span.fitkit-runner-dot.is-current
       span.fitkit-runner-dot
       span.fitkit-runner-dot

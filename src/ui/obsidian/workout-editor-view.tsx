@@ -136,14 +136,14 @@ interface SetTimerScreen {
   entry: EditableDurationEntry
   /** Null while the set is stopped. */
   stopwatch: Stopwatch | null
-  clock: RefObject<HTMLDivElement>
+  clock: RefObject<HTMLDivElement | null>
 }
 
 interface RunScreen {
   kind: 'run'
   card: ExerciseCard
   session: RunSession
-  clock: RefObject<HTMLDivElement>
+  clock: RefObject<HTMLDivElement | null>
   /** Also the screen's wake lock. */
   cues: CuePlayer
 }
@@ -151,7 +151,7 @@ interface RunScreen {
 interface RestScreen {
   kind: 'rest'
   startedAtMs: number
-  clock: RefObject<HTMLDivElement>
+  clock: RefObject<HTMLDivElement | null>
 }
 
 /** A screen that takes over the whole tab in place of the card list. */
@@ -201,7 +201,7 @@ export class WorkoutEditorView extends FileView {
   private resizeListenersStore?: Set<() => void>
   private layoutStore?: Layout
   private cardHandlersStore?: CardHandlers
-  private metaLineStore?: RefObject<HTMLSpanElement>
+  private metaLineStore?: RefObject<HTMLSpanElement | null>
   /** The latest draw asked for while a drag was in progress, made once the drag ends. */
   private sceneAfterDrag?: EditorScene
   private dragSession: DragSession | null = null
@@ -398,7 +398,7 @@ export class WorkoutEditorView extends FileView {
   }
 
   /** The header's meta line, which autosave rewrites between draws. */
-  private get metaLine(): RefObject<HTMLSpanElement> {
+  private get metaLine(): RefObject<HTMLSpanElement | null> {
     this.metaLineStore ??= createRef()
     return this.metaLineStore
   }

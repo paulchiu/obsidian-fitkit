@@ -1770,34 +1770,49 @@ body.is-mobile .fitkit-editor-root {
 
 .fitkit-runner-dots {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
-  gap: 6px;
+  /** Gaps take at most a third of each rep's share, so short plans keep today's 6px. */
+  gap: min(6px, calc(100% / var(--fitkit-reps, 1) / 3));
+  align-items: center;
+  width: 100%;
 }
 
+/** The ring is an inset shadow, since a border keeps a dot from shrinking below its own width. */
 .fitkit-runner-dot {
-  width: 12px;
+  flex: 0 1 12px;
+  min-width: 0;
   height: 12px;
-  border-radius: 50%;
-  border: 2px solid var(--background-modifier-border);
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 2px var(--background-modifier-border);
 }
 
 .fitkit-runner-dot.is-hit {
-  background: var(--color-green, var(--text-success));
-  border-color: var(--color-green, var(--text-success));
+  background-color: var(--color-green, var(--text-success));
+  box-shadow: none;
 }
 
 .fitkit-runner-dot.is-miss {
-  background: var(--color-orange, var(--text-warning));
-  border-color: var(--color-orange, var(--text-warning));
+  background-color: var(--color-orange, var(--text-warning));
+  box-shadow: none;
 }
 
 .fitkit-runner-dot.is-done {
-  background: var(--background-modifier-border);
+  background-color: var(--background-modifier-border);
 }
 
 .fitkit-runner-dot.is-current {
-  border-color: var(--interactive-accent);
+  min-width: 3px;
+  box-shadow: inset 0 0 0 2px var(--interactive-accent);
+}
+
+.fitkit-runner-dots.is-long .fitkit-runner-dot.is-current {
+  height: 16px;
+}
+
+/** A long plan's dots are too thin to show a ring, so done reps take a lighter fill than reps to come. */
+.fitkit-runner-dots.is-long .fitkit-runner-dot.is-done {
+  background-color: var(--text-faint);
 }
 
 .fitkit-runner-stepper {

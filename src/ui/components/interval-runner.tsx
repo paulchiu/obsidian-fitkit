@@ -18,6 +18,7 @@ import {
   type DotState,
   type RunnerTimeline,
 } from '../model/interval-runner'
+import { useDomEffect } from './dom-effect'
 import { Clock, Control } from './screen-parts'
 
 export interface RunnerModel extends RunnerTimeline {
@@ -44,7 +45,7 @@ export function Runner({
 }: {
   model: RunnerModel
   handlers: RunnerHandlers
-  clock: RefObject<HTMLDivElement>
+  clock: RefObject<HTMLDivElement | null>
 }): JSX.Element {
   const { screen } = model
   switch (screen.kind) {
@@ -71,7 +72,7 @@ function Running({
 }: {
   model: RunnerModel
   handlers: RunnerHandlers
-  clock: RefObject<HTMLDivElement>
+  clock: RefObject<HTMLDivElement | null>
 }): JSX.Element {
   const { program } = model
   const phase = runPhase(model.rows, program, model.now)
@@ -133,9 +134,17 @@ const DOT_CLASS: Record<DotState, string> = {
   pending: 'fitkit-runner-dot',
 }
 
+/** Past this many reps the dots are slivers, so the current one stands taller to stay findable. */
+const LONG_PLAN_REPS = 40
+
+/** One dot per planned rep, on one row; `--fitkit-reps` lets the stylesheet narrow the gap as the count grows. */
 function Dots({ states }: { states: readonly DotState[] }): JSX.Element {
+  const row = useDomEffect<HTMLDivElement>(
+    (el) => el.style.setProperty('--fitkit-reps', String(states.length)),
+    [states.length],
+  )
   return (
-    <div class="fitkit-runner-dots">
+    <div class={`fitkit-runner-dots${states.length > LONG_PLAN_REPS ? ' is-long' : ''}`} ref={row}>
       {states.map((state, i) => (
         <span key={i} class={DOT_CLASS[state]} />
       ))}
