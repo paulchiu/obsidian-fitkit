@@ -16,7 +16,7 @@ import {
 } from '../../fixtures/workout-editor'
 import { harnessWindow } from '../../harness/obsidian-dom'
 import { outline } from '../../harness/outline'
-import { findUnstyledClasses } from '../../harness/stylesheet'
+import { ensureStylesheetLoaded, findUnstyledClasses } from '../../harness/stylesheet'
 
 useEditorEnvironment()
 
@@ -225,6 +225,42 @@ describe('WorkoutEditorView interval runner', () => {
       'Work · rep 2 of 3',
       ['fitkit-runner-dot is-hit', 'fitkit-runner-dot is-current', 'fitkit-runner-dot'],
     ])
+  })
+
+  describe('rep dots', () => {
+    /** The computed value of each property on `el`, read through the shipped stylesheet. */
+    const styleOf = (el: Element | null, ...properties: string[]): string[] => {
+      if (!el) {
+        throw new Error('No element to style')
+      }
+      ensureStylesheetLoaded()
+      const style = harnessWindow.getComputedStyle(el)
+      return properties.map((property) => style.getPropertyValue(property).trim())
+    }
+
+    it('keeps the dots on one row, letting each dot shrink below full size', async () => {
+      const view = await start(bike(BIKE))
+
+      expect([
+        styleOf(runner(view).querySelector('.fitkit-runner-dots'), 'flex-wrap'),
+        styleOf(
+          runner(view).querySelector('.fitkit-runner-dot'),
+          'flex-basis',
+          'flex-shrink',
+          'min-width',
+        ),
+      ]).toEqual([['nowrap'], ['12px', '1', '0px']])
+    })
+
+    it('narrows the gap as the rep count grows, keeping 6px up to 16 reps on a phone-width row', async () => {
+      const view = await start(bike('20 x 30s @ 300W, 30s rest'))
+      const row = runner(view).querySelector('.fitkit-runner-dots')
+
+      expect(styleOf(row, '--fitkit-reps', 'gap')).toEqual([
+        '20',
+        'min(6px, calc(100% / var(--fitkit-reps, 1) / 3))',
+      ])
+    })
   })
 
   it('disables the primary button while paused and enables it on resume', async () => {

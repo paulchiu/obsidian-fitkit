@@ -18,6 +18,7 @@ import {
   type DotState,
   type RunnerTimeline,
 } from '../model/interval-runner'
+import { useDomEffect } from './dom-effect'
 import { Clock, Control } from './screen-parts'
 
 export interface RunnerModel extends RunnerTimeline {
@@ -133,9 +134,14 @@ const DOT_CLASS: Record<DotState, string> = {
   pending: 'fitkit-runner-dot',
 }
 
+/** One dot per planned rep; the stylesheet narrows the gap by the rep count so the row never wraps. */
 function Dots({ states }: { states: readonly DotState[] }): JSX.Element {
+  const row = useDomEffect<HTMLDivElement>(
+    (el) => el.style.setProperty('--fitkit-reps', String(states.length)),
+    [states.length],
+  )
   return (
-    <div class="fitkit-runner-dots">
+    <div class="fitkit-runner-dots" ref={row}>
       {states.map((state, i) => (
         <span key={i} class={DOT_CLASS[state]} />
       ))}
