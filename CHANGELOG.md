@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+### Removed
+
+## [1.15.3] - 2026-11-06
+
+### Added
+
+### Changed
+
+### Fixed
+
 - The interval runner's Next hint names the rest that follows a rep, such as `Next: rest 90s`, instead of skipping to the rep after it.
 
 ### Removed
