@@ -295,7 +295,7 @@ exports[`WorkoutEditorView interval runner > draws the runner working while paus
     div.fitkit-runner-target
       "300W target"
     div.fitkit-runner-next
-      "Next: 30s @ 300W"
+      "Next: rest 90s"
     div.fitkit-runner-dots[style=--fitkit-reps: 3;]
       span.fitkit-runner-dot.is-current
       span.fitkit-runner-dot
@@ -328,7 +328,7 @@ exports[`WorkoutEditorView interval runner > draws the runner working, no step n
     div.fitkit-runner-target
       "300W target"
     div.fitkit-runner-next
-      "Next: 30s @ 300W"
+      "Next: rest 90s"
     div.fitkit-runner-dots[style=--fitkit-reps: 3;]
       span.fitkit-runner-dot.is-current
       span.fitkit-runner-dot

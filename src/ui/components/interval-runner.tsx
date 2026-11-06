@@ -1,6 +1,5 @@
 import type { JSX, RefObject } from 'preact'
 
-import { formatStep } from '../../domain/interval-program'
 import { runPhase, stepAt } from '../../domain/interval-run'
 import type { RunScreen } from '../../domain/interval-session'
 import type { StepperStep } from '../../domain/interval-stepper'
@@ -8,6 +7,7 @@ import {
   cutOffLabels,
   dotStates,
   finishedScore,
+  nextLabel,
   phaseLabel,
   phaseSeconds,
   primaryLabel,
@@ -84,6 +84,7 @@ function Running({
   const upcoming = program.steps[phase.rep]
   const target = targetLabel(resting, step)
   const rounds = roundsLabel(step, program)
+  const next = nextLabel(resting, step, upcoming)
   const stats = statsLabel(model)
   const stepper = repStepper(model, model.stepperStep)
   return (
@@ -99,7 +100,7 @@ function Running({
         <Clock seconds={phaseSeconds(phase)} clock={clock} />
         {target !== null && <div class="fitkit-runner-target">{target}</div>}
         {rounds !== null && <div class="fitkit-runner-rounds">{rounds}</div>}
-        {upcoming && <div class="fitkit-runner-next">{`Next: ${formatStep(upcoming)}`}</div>}
+        {next !== null && <div class="fitkit-runner-next">{next}</div>}
         <Dots states={dotStates(model)} />
         {stats !== null && <div class="fitkit-runner-stats">{stats}</div>}
         {phase.paused && <div class="fitkit-runner-note">Paused</div>}
