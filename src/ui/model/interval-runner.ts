@@ -52,7 +52,7 @@ export function targetLabel(resting: boolean, step: PlanStep): string | null {
   return step.target ? `${formatTarget(step.target)} target` : null
 }
 
-/** What follows this phase: the rest after the work when one follows, else the next step; null on the last. */
+/** What follows this phase: a rest after the work, else the next step; null on the last. */
 export function nextLabel(
   resting: boolean,
   step: PlanStep,
