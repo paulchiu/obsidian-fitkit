@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Cleared the two CSS lint warnings in the community plugin review: a duplicate `overflow` and a multi-column `column-gap`. No visible change.
+
 ### Removed
 
 ## [1.15.1] - 2026-10-31
