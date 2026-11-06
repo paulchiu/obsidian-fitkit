@@ -1,5 +1,5 @@
-import { formatTarget, type IntensityKind } from '../../domain/interval-plan'
-import type { IntervalProgram, PlanStep } from '../../domain/interval-program'
+import { formatPlanSeconds, formatTarget, type IntensityKind } from '../../domain/interval-plan'
+import { formatStep, type IntervalProgram, type PlanStep } from '../../domain/interval-program'
 import {
   correctableRepIndex,
   hasOpenRep,
@@ -50,6 +50,24 @@ export function targetLabel(resting: boolean, step: PlanStep): string | null {
     return 'rest'
   }
   return step.target ? `${formatTarget(step.target)} target` : null
+}
+
+/** What follows this phase: a rest after the work, else the next step; null on the last. */
+export function nextLabel(
+  resting: boolean,
+  step: PlanStep,
+  upcoming: PlanStep | undefined,
+): string | null {
+  if (!upcoming) {
+    return null
+  }
+  if (resting || !restsAfter(step)) {
+    return `Next: ${formatStep(upcoming)}`
+  }
+  /** An every pace rests until its period ends, so the length is unknown while the work runs. */
+  return step.everySeconds === undefined
+    ? `Next: rest ${formatPlanSeconds(step.restSeconds)}`
+    : 'Next: rest'
 }
 
 /** Skip during rest; during work, Rest when a rest follows, Next when a step does, Finish on the last. */

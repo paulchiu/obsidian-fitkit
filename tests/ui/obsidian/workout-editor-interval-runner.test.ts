@@ -227,6 +227,58 @@ describe('WorkoutEditorView interval runner', () => {
     ])
   })
 
+  describe('next hint', () => {
+    const nextHint = (view: WorkoutEditorView): string | null | undefined =>
+      runnerText(view, 'fitkit-runner-next')
+
+    it('names the rest and its length while working a rep that rests after', async () => {
+      const view = await start(bike(BIKE))
+      at('07:15:10')
+      expect(nextHint(view)).toBe('Next: rest 90s')
+    })
+
+    it('names the rest without a length on an every pace, since that rest lasts until the period ends', async () => {
+      const view = await start(bike('3 x 30s @ 300W, every 2m'))
+      at('07:15:10')
+      expect(nextHint(view)).toBe('Next: rest')
+    })
+
+    it("names a later rep's rest step in minutes", async () => {
+      const view = await start(
+        bike(
+          '(x 3 (on 30s 300W) (rest 2m))',
+          '[set:: 1] [step:: on] [duration:: 30] [watts:: 300] [rest:: 120]',
+        ),
+      )
+      expect(runnerText(view, 'fitkit-runner-phase')).toBe('Work · rep 2 of 3')
+      expect(nextHint(view)).toBe('Next: rest 2m')
+    })
+
+    it('names the next rep while resting on an every pace', async () => {
+      const view = await start(bike('3 x 30s @ 300W, every 2m'))
+      restAfterRep1(view)
+      expect(nextHint(view)).toBe('Next: 30s @ 300W')
+    })
+
+    it('names the next step while working a rep that goes straight into it', async () => {
+      const view = await start(bike('(x 2 (on 30s 350W) (off 30s 150W))'))
+      at('07:15:10')
+      expect(nextHint(view)).toBe('Next: off 30s @ 150W')
+    })
+
+    it('names the next rep while resting', async () => {
+      const view = await start(bike(BIKE))
+      restAfterRep1(view)
+      expect(nextHint(view)).toBe('Next: 30s @ 300W')
+    })
+
+    it('is absent on the last rep', async () => {
+      const view = await start(bike(WARMUP))
+      at('07:15:10')
+      expect(nextHint(view)).toBeUndefined()
+    })
+  })
+
   describe('rep dots', () => {
     /** The computed value of each property on `el`, read through the shipped stylesheet. */
     const styleOf = (el: Element | null, ...properties: string[]): string[] => {
