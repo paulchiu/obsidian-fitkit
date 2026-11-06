@@ -388,7 +388,6 @@ body.is-mobile .fitkit-editor-root {
 /** A long set list stops at its measured cap and fades out; clip keeps focus from scrolling hidden rows in. */
 .fitkit-set-rows.is-capped {
   max-height: var(--fitkit-set-cap, 50vh);
-  overflow: hidden;
   overflow: clip;
   -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 48px), transparent);
   mask-image: linear-gradient(to bottom, black calc(100% - 48px), transparent);
@@ -1881,7 +1880,7 @@ body.is-mobile .fitkit-editor-root {
 .fitkit-sync-step {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  column-gap: 10px;
+  gap: 0 10px;
   padding: 8px 0;
   border-top: 1px solid var(--background-modifier-border);
 }
