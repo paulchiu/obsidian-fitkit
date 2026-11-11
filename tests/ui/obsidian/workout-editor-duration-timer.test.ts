@@ -85,7 +85,7 @@ import { WorkoutEditorView } from '../../../src/ui/obsidian/workout-editor-view'
 import { buildMockVaultFolderTree } from '../../fixtures/mock-vault-folder-tree'
 import { createTestRoot, harnessDocument, harnessWindow } from '../../harness/obsidian-dom'
 import { outline } from '../../harness/outline'
-import { findUnstyledClasses } from '../../harness/stylesheet'
+import { ensureStylesheetLoaded, findUnstyledClasses } from '../../harness/stylesheet'
 
 harness.createRoot = createTestRoot
 
@@ -592,6 +592,56 @@ describe('WorkoutEditorView timer screen structure', () => {
     expect(outline(runner(view))).toMatchSnapshot()
     expect(findUnstyledClasses(view.contentEl)).toEqual([])
   })
+
+  /** The computed value of each property on `el`, read through the shipped stylesheet. */
+  const styleOf = (el: Element | null | undefined, ...properties: string[]): string[] => {
+    if (!el) {
+      throw new Error('No element to style')
+    }
+    ensureStylesheetLoaded()
+    const style = harnessWindow.getComputedStyle(el)
+    return properties.map((property) => style.getPropertyValue(property).trim())
+  }
+
+  const SCREENS = [
+    {
+      screen: 'set timer',
+      row: '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90]',
+      open: 'Start timer',
+    },
+    {
+      screen: 'rest timer',
+      row: '- [exercise:: [[Rowing]]] [set:: 1] [duration:: 90]',
+      open: 'Start rest timer',
+    },
+    {
+      screen: 'interval runner',
+      row: '- [exercise:: [[Rowing]]] [plan:: 3 x 30s @ 300W, 90s rest]',
+      open: 'Start interval plan',
+    },
+  ]
+
+  it.each(SCREENS)('stretches the $screen to the full height of the tab', async ({ row, open }) => {
+    const { view } = await openView(workoutSource(row))
+
+    clickButton(view, open)
+
+    expect(styleOf(runner(view).parentElement, 'min-height')).toEqual(['100%'])
+  })
+
+  it.each(SCREENS)(
+    'sizes the $screen clock from the card width, capped by the window height',
+    async ({ row, open }) => {
+      const { view } = await openView(workoutSource(row))
+
+      clickButton(view, open)
+
+      const [clockSize] = styleOf(runner(view).querySelector('.fitkit-runner-clock'), 'font-size')
+      expect(styleOf(runner(view), 'container-type')).toEqual(['inline-size'])
+      /** jsdom resolves the window-height term to pixels against its own window, so only its presence is pinned. */
+      expect(clockSize).toMatch(/^clamp\(64px, min\(26cqi, [\d.]+px\), 280px\)$/)
+    },
+  )
 
   it.each([
     { screen: 'set timer', open: 'Start timer', clock: '1:42' },

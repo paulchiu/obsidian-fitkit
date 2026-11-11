@@ -61,19 +61,19 @@ export function EditorRoot({ scene }: { scene: EditorScene }): JSX.Element {
       return <Skeleton />
     case 'set-timer':
       return (
-        <Container>
+        <Container fillsTab>
           <SetTimer model={scene.model} handlers={scene.handlers} clock={scene.clock} />
         </Container>
       )
     case 'rest':
       return (
-        <Container>
+        <Container fillsTab>
           <RestTimer seconds={scene.seconds} stop={scene.stop} clock={scene.clock} />
         </Container>
       )
     case 'run':
       return (
-        <Container>
+        <Container fillsTab>
           <Runner model={scene.model} handlers={scene.handlers} clock={scene.clock} />
         </Container>
       )
@@ -86,8 +86,17 @@ export function EditorRoot({ scene }: { scene: EditorScene }): JSX.Element {
   }
 }
 
-function Container({ children }: { children: JSX.Element }): JSX.Element {
-  return <div class="fitkit-container">{children}</div>
+/** A screen container fills the tab's height, so a timer card reaches the bottom of a tall tab. */
+function Container({
+  children,
+  fillsTab = false,
+}: {
+  children: JSX.Element
+  fillsTab?: boolean
+}): JSX.Element {
+  return (
+    <div class={fillsTab ? 'fitkit-container is-full-tab' : 'fitkit-container'}>{children}</div>
+  )
 }
 
 function Skeleton(): JSX.Element {

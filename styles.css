@@ -80,6 +80,10 @@ body.is-mobile .fitkit-editor-root {
   gap: 14px;
 }
 
+.fitkit-container.is-full-tab {
+  min-height: 100%;
+}
+
 .fitkit-header {
   display: grid;
   gap: 4px;
@@ -1688,6 +1692,7 @@ body.is-mobile .fitkit-editor-root {
   gap: 16px;
   min-height: min(640px, 80vh);
   padding: 16px;
+  container-type: inline-size;
   border-radius: var(--radius-l, 12px);
   background: var(--background-secondary);
   border: 2px solid var(--background-modifier-border);
@@ -1734,7 +1739,8 @@ body.is-mobile .fitkit-editor-root {
 
 .fitkit-runner-clock,
 .fitkit-runner-hits {
-  font-size: clamp(64px, 22vw, 120px);
+  /** Sized from the card so a wide desktop tab gets a big clock; the window height stops it crowding a short one. */
+  font-size: clamp(64px, min(26cqi, 30vh), 280px);
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
