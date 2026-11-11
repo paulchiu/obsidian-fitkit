@@ -80,7 +80,7 @@ body.is-mobile .fitkit-editor-root {
   gap: 14px;
 }
 
-.fitkit-container.is-screen {
+.fitkit-container.is-full-tab {
   min-height: 100%;
 }
 
