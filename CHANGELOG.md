@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The set timer, rest timer and interval runner fill the whole tab on desktop, and the clock grows with the card instead of stopping at 120px, so a tall desktop tab no longer leaves a band of empty space below the timer.
+
 ### Removed
 
 ## [1.15.3] - 2026-11-06
