@@ -96,7 +96,9 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
     strengthRestTimerEnabled:
       stored.strengthRestTimerEnabled ?? DEFAULT_SETTINGS.strengthRestTimerEnabled,
     intervalBeepsEnabled: stored.intervalBeepsEnabled ?? DEFAULT_SETTINGS.intervalBeepsEnabled,
-    intervalCountdownSeconds: storedCountdownSeconds(stored.intervalCountdownSeconds),
+    intervalCountdownSeconds: isCountdownSeconds(stored.intervalCountdownSeconds)
+      ? stored.intervalCountdownSeconds
+      : DEFAULT_SETTINGS.intervalCountdownSeconds,
     intervalPresets: upgradeIntervalPresets(
       stored.intervalPresets ?? DEFAULT_SETTINGS.intervalPresets,
     ),
@@ -122,14 +124,19 @@ function storedStepperStep(value: unknown): string {
     : DEFAULT_SETTINGS.intervalStepperStep
 }
 
-/** A stored countdown survives the load only as a whole number of seconds in range. */
-function storedCountdownSeconds(value: unknown): number {
-  return typeof value === 'number' &&
+function isCountdownSeconds(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
     Number.isInteger(value) &&
     value >= COUNTDOWN_SECONDS_MIN &&
     value <= COUNTDOWN_SECONDS_MAX
-    ? value
-    : DEFAULT_SETTINGS.intervalCountdownSeconds
+  )
+}
+
+function validateCountdownSeconds(value: number): string | undefined {
+  return isCountdownSeconds(value)
+    ? undefined
+    : `Enter a whole number between ${COUNTDOWN_SECONDS_MIN} and ${COUNTDOWN_SECONDS_MAX}.`
 }
 
 function normalizeStoredExerciseRegistry(
@@ -187,6 +194,7 @@ type FitKitSettingKey =
   | 'autoOpenWorkoutEditor'
   | 'strengthRestTimerEnabled'
   | 'intervalBeepsEnabled'
+  | 'intervalCountdownSeconds'
   | 'intervalPresets'
   | 'intervalStepperStep'
   | 'autosaveDebounceMs'
@@ -348,8 +356,20 @@ export class FitKitSettingTab extends PluginSettingTab {
           {
             kind: 'control',
             name: 'Interval beeps',
-            desc: 'Beep through the last three seconds of each interval and when it changes, and vibrate where the device can.',
+            desc: 'Beep through a countdown at the end of each interval and when it changes, and vibrate where the device can.',
             control: { type: 'toggle', key: 'intervalBeepsEnabled' },
+          },
+          {
+            kind: 'control',
+            name: 'Countdown beeps (seconds)',
+            desc: "How many of an interval's last seconds beep before the next one starts, from 0 to 10. At 0 only the change itself beeps.",
+            control: {
+              type: 'number',
+              key: 'intervalCountdownSeconds',
+              defaultValue: DEFAULT_SETTINGS.intervalCountdownSeconds,
+              validate: validateCountdownSeconds,
+            },
+            fallbackBounds: { min: COUNTDOWN_SECONDS_MIN, max: COUNTDOWN_SECONDS_MAX },
           },
           {
             kind: 'control',
@@ -467,6 +487,14 @@ export class FitKitSettingTab extends PluginSettingTab {
       case 'intervalBeepsEnabled':
         settings.intervalBeepsEnabled = Boolean(value)
         break
+      case 'intervalCountdownSeconds': {
+        const seconds = typeof value === 'number' ? value : Number.parseFloat(String(value))
+        if (!isCountdownSeconds(seconds)) {
+          return
+        }
+        settings.intervalCountdownSeconds = seconds
+        break
+      }
       case 'intervalPresets':
         settings.intervalPresets = String(value)
         break

@@ -53,7 +53,7 @@ name: Squat Day
 
 For timed sessions such as Tabata, over-unders or EMOMs, switch a duration card to interval with `Change type...` in the card menu. The plan form opens with common sessions to start from, or you can build your own from steps, rests and repeats, with a watts, load or level target on each step.
 
-`Start` then takes over the tab with a big clock: it counts each step down, beeps the last three seconds, and writes every rep to the note as it finishes, with the time you did and the intensity you held.
+`Start` then takes over the tab with a big clock: it counts each step down, beeps a countdown through the last few seconds, and writes every rep to the note as it finishes, with the time you did and the intensity you held.
 
 ![An interval card on a phone with its plan profile and logged reps, beside the runner counting down an over step](docs/images/interval-mobile.png)
 

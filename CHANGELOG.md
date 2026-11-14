@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A `Countdown beeps (seconds)` setting under `Interval beeps` picks how many of a timed step's last seconds the interval runner beeps, from 0 to 10. It defaults to 3, the count the runner always used.
+
 ### Changed
 
 ### Fixed
