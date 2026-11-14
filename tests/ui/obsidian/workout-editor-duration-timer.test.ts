@@ -85,9 +85,13 @@ import { WorkoutEditorView } from '../../../src/ui/obsidian/workout-editor-view'
 import { buildMockVaultFolderTree } from '../../fixtures/mock-vault-folder-tree'
 import { createTestRoot, harnessDocument, harnessWindow } from '../../harness/obsidian-dom'
 import { outline } from '../../harness/outline'
-import { ensureStylesheetLoaded, findUnstyledClasses } from '../../harness/stylesheet'
+import { computedStyle, declaredStyle, findUnstyledClasses } from '../../harness/stylesheet'
 
 harness.createRoot = createTestRoot
+
+afterEach(() => {
+  harnessDocument.body.replaceChildren()
+})
 
 const WORKOUT_PATH = 'Fitness/Workouts/2026-09-30.md'
 
@@ -128,6 +132,7 @@ const openView = async (
   plugin.settings = { ...DEFAULT_SETTINGS }
   plugin.refreshIndexEntry = async (): Promise<void> => {}
   const view = new WorkoutEditorView({ app } as unknown as WorkspaceLeaf, plugin)
+  harnessDocument.body.appendChild(view.contentEl)
   await view.onOpen()
   await view.setState({ file: WORKOUT_PATH }, { history: false })
   return { view, contents }
@@ -598,9 +603,7 @@ describe('WorkoutEditorView timer screen structure', () => {
     if (!el) {
       throw new Error('No element to style')
     }
-    ensureStylesheetLoaded()
-    const style = harnessWindow.getComputedStyle(el)
-    return properties.map((property) => style.getPropertyValue(property).trim())
+    return properties.map((property) => computedStyle(el, property))
   }
 
   const SCREENS = [
@@ -636,10 +639,25 @@ describe('WorkoutEditorView timer screen structure', () => {
 
       clickButton(view, open)
 
-      const [clockSize] = styleOf(runner(view).querySelector('.fitkit-runner-clock'), 'font-size')
-      expect(styleOf(runner(view), 'container-type')).toEqual(['inline-size'])
-      /** jsdom resolves the window-height term to pixels against its own window, so only its presence is pinned. */
-      expect(clockSize).toMatch(/^clamp\(64px, min\(26cqi, [\d.]+px\), 280px\)$/)
+      const card = runner(view) as HTMLElement
+      const clockSizeAt = (cardWidth: string): string => {
+        /** jsdom has no layout, so the card width a pane would give is set on the container. */
+        card.style.width = cardWidth
+        const [size] = styleOf(card.querySelector('.fitkit-runner-clock'), 'font-size')
+        return size ?? ''
+      }
+      const windowCap = `${(harnessWindow.innerHeight * 3) / 10}px`
+
+      expect(styleOf(card, 'container-type')).toEqual(['inline-size'])
+      expect([clockSizeAt('100px'), clockSizeAt('400px'), clockSizeAt('2000px')]).toEqual([
+        '64px',
+        '104px',
+        windowCap,
+      ])
+      /** jsdom's window is too short for the window term to reach the ceiling, so it is read as declared. */
+      expect(declaredStyle('.fitkit-runner-clock', 'font-size')).toBe(
+        'clamp(64px, min(26cqi, 30vh), 280px)',
+      )
     },
   )
 

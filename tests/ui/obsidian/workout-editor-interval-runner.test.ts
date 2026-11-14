@@ -16,7 +16,12 @@ import {
 } from '../../fixtures/workout-editor'
 import { harnessWindow } from '../../harness/obsidian-dom'
 import { outline } from '../../harness/outline'
-import { ensureStylesheetLoaded, findUnstyledClasses } from '../../harness/stylesheet'
+import {
+  computedStyle,
+  computedStyleWithoutToken,
+  findUnstyledClasses,
+  THEME_TOKENS,
+} from '../../harness/stylesheet'
 
 useEditorEnvironment()
 
@@ -285,9 +290,7 @@ describe('WorkoutEditorView interval runner', () => {
       if (!el) {
         throw new Error('No element to style')
       }
-      ensureStylesheetLoaded()
-      const style = harnessWindow.getComputedStyle(el)
-      return properties.map((property) => style.getPropertyValue(property).trim())
+      return properties.map((property) => computedStyle(el, property))
     }
 
     it('keeps the dots on one row, letting each dot shrink below full size', async () => {
@@ -306,12 +309,14 @@ describe('WorkoutEditorView interval runner', () => {
 
     it('gives the stylesheet the rep count, which caps the gap at 6px and narrows it as reps grow', async () => {
       const view = await start(bike('20 x 30s @ 300W, 30s rest'))
-      const row = runner(view).querySelector('.fitkit-runner-dots')
+      const row = runner(view).querySelector<HTMLElement>('.fitkit-runner-dots')
+      if (!row) {
+        throw new Error('No rep dots rendered')
+      }
 
-      expect(styleOf(row, '--fitkit-reps', 'gap')).toEqual([
-        '20',
-        'min(6px, calc(100% / var(--fitkit-reps, 1) / 3))',
-      ])
+      /** A third of each rep's share of the row: 100% / 20 / 3, or 100% / 1 / 3 with no count. */
+      expect(styleOf(row, '--fitkit-reps', 'gap')).toEqual(['20', 'min(6px, 1.66667%)'])
+      expect(computedStyleWithoutToken(row, 'gap', '--fitkit-reps')).toBe('min(6px, 33.3333%)')
     })
 
     it("rings dots with an inset shadow that shrinks with them, in each rep state's colour", async () => {
@@ -330,11 +335,30 @@ describe('WorkoutEditorView interval runner', () => {
         styleOf(current ?? null, 'box-shadow'),
         styleOf(pending ?? null, 'box-shadow'),
       ]).toEqual([
-        ['none', 'var(--color-green, var(--text-success))'],
-        ['none', 'var(--color-orange, var(--text-warning))'],
-        ['inset 0 0 0 2px var(--interactive-accent)'],
-        ['inset 0 0 0 2px var(--background-modifier-border)'],
+        ['none', THEME_TOKENS['--color-green']],
+        ['none', THEME_TOKENS['--color-orange']],
+        [`${THEME_TOKENS['--interactive-accent']} 0px 0px 0px 2px inset`],
+        [`${THEME_TOKENS['--background-modifier-border']} 0px 0px 0px 2px inset`],
       ])
+    })
+
+    it('falls back to the success and warning text colours on a theme without the palette', async () => {
+      const view = await start(
+        bike(
+          '4 x 30s @ 300W, 90s rest',
+          '[set:: 1] [duration:: 30] [watts:: 300] [rest:: 90]',
+          '[set:: 2] [duration:: 30] [watts:: 200] [rest:: 90]',
+        ),
+      )
+      const [hit, miss] = runner(view).querySelectorAll<HTMLElement>('.fitkit-runner-dot')
+      if (!hit || !miss) {
+        throw new Error('Expected a hit and a missed rep dot')
+      }
+
+      expect([
+        computedStyleWithoutToken(hit, 'background-color', '--color-green'),
+        computedStyleWithoutToken(miss, 'background-color', '--color-orange'),
+      ]).toEqual([THEME_TOKENS['--text-success'], THEME_TOKENS['--text-warning']])
     })
 
     it('keeps the current rep findable: at least 3px wide, and taller once a plan passes 40 reps', async () => {
@@ -359,7 +383,7 @@ describe('WorkoutEditorView interval runner', () => {
       )
       const done = runner(view).querySelector('.fitkit-runner-dot.is-done')
 
-      expect(styleOf(done, 'background-color')).toEqual(['var(--text-faint)'])
+      expect(styleOf(done, 'background-color')).toEqual([THEME_TOKENS['--text-faint']])
     })
   })
 

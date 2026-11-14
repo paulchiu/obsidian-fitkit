@@ -2,8 +2,16 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
-import { createTestRoot, harnessDocument, harnessWindow } from './obsidian-dom'
-import { ensureStylesheetLoaded, expectAppliedThemeToken, findUnstyledClasses } from './stylesheet'
+import { createTestRoot, harnessDocument } from './obsidian-dom'
+import {
+  computedStyle,
+  computedStyleWithoutToken,
+  ensureStylesheetLoaded,
+  expectAppliedThemeToken,
+  findUnstyledClasses,
+  THEME_TOKENS,
+  withSafeAreaFallbacks,
+} from './stylesheet'
 
 vi.mock('obsidian', () => {
   class Modal {
@@ -48,8 +56,8 @@ describe('stylesheet', () => {
     const tall = root.createDiv({ cls: 'fitkit-skeleton-line is-tall' })
     const base = root.createDiv({ cls: 'fitkit-skeleton-line' })
 
-    expect(harnessWindow.getComputedStyle(tall).getPropertyValue('height')).toBe('32px')
-    expect(harnessWindow.getComputedStyle(base).getPropertyValue('height')).toBe('12px')
+    expect(computedStyle(tall, 'height')).toBe('32px')
+    expect(computedStyle(base, 'height')).toBe('12px')
   })
 
   it('reports the theme token instead of a resolved colour', () => {
@@ -58,6 +66,22 @@ describe('stylesheet', () => {
     const empty = root.createDiv({ cls: 'fitkit-empty' })
 
     expectAppliedThemeToken(empty, 'color', '--text-muted')
+  })
+
+  it('refuses to read the style of a detached element, which jsdom leaves uncomputed', () => {
+    const detached = createTestRoot().createDiv({ cls: 'fitkit-empty' })
+
+    expect(() => computedStyle(detached, 'color')).toThrow(/Attach the element/)
+  })
+
+  it('routes each safe-area inset through a harness property, keeping a stylesheet fallback', () => {
+    expect(
+      withSafeAreaFallbacks(
+        'a { padding: env(safe-area-inset-bottom) env( safe-area-inset-left , 2px ); }',
+      ),
+    ).toBe(
+      'a { padding: env(safe-area-inset-bottom, var(--harness-safe-area-inset-bottom, 0px)) env(safe-area-inset-left, var(--harness-safe-area-inset-left, 2px)); }',
+    )
   })
 
   it('reports a class with a mistyped prefix instead of skipping it', () => {
@@ -94,9 +118,10 @@ describe('stylesheet', () => {
     harnessDocument.body.appendChild(root)
     const note = root.createDiv({ cls: 'fitkit-note-line fitkit-exercise-note-line' })
 
-    expect(harnessWindow.getComputedStyle(note).getPropertyValue('padding-inline')).toBe(
-      'var(--size-4-2, 8px)',
-    )
+    expect([
+      computedStyle(note, 'padding-inline'),
+      computedStyleWithoutToken(note, 'padding-inline', '--size-4-2'),
+    ]).toEqual([THEME_TOKENS['--size-4-2'], '8px'])
   })
 
   it('keeps bodyweight header tracks and spacer on one trailing-column token', () => {
