@@ -1009,6 +1009,15 @@ describe('WorkoutEditorView interval plans', () => {
         expect(tones).toEqual([880, 880, 880, 1320])
       })
 
+      it('beeps as many of the last seconds as the countdown setting asks for', async () => {
+        const { view } = await openView(workoutSource(...BIKE), { intervalCountdownSeconds: 5 })
+        button(view, 'Start interval plan').click()
+
+        runTo('07:15:31')
+
+        expect(tones).toEqual([880, 880, 880, 880, 880, 1320])
+      })
+
       it('double-beeps when work runs straight into the next step', async () => {
         const { view } = await openView(
           workoutSource(

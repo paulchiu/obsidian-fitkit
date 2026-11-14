@@ -1049,7 +1049,14 @@ export class WorkoutEditorView extends FileView {
     for (const card of this.model?.exercises ?? []) {
       const plan = intervalColumns(card).plan
       const now = Date.now()
-      const resumed = plan && resumeSession(card.durationEntries, plan, now)
+      const resumed =
+        plan &&
+        resumeSession(
+          card.durationEntries,
+          plan,
+          now,
+          this.plugin.settings.intervalCountdownSeconds,
+        )
       if (resumed) {
         this.applyRun(this.enterRun(card, resumed.session, { keepScroll: true }), resumed, now)
         return
@@ -1125,7 +1132,12 @@ export class WorkoutEditorView extends FileView {
     /** Bank what holds the tab before reading the rows the run starts from. */
     this.screens.teardown('bank')
     const now = Date.now()
-    const started = startSession(card.durationEntries, program, now)
+    const started = startSession(
+      card.durationEntries,
+      program,
+      now,
+      this.plugin.settings.intervalCountdownSeconds,
+    )
     const run = this.enterRun(card, started.session)
     run.cues.prime()
     this.applyRun(run, started, now)

@@ -52,10 +52,10 @@ const tickThrough = (
 }
 
 const started = (program: IntervalProgram, rows: RunRow[] = []): RunSession =>
-  startSession(rows, program, sec(0)).session
+  startSession(rows, program, sec(0), 3).session
 
 const resumed = (rows: RunRow[], program: IntervalProgram, now: number): RunTransition => {
-  const result = resumeSession(rows, program, now)
+  const result = resumeSession(rows, program, now, 3)
   if (!result) {
     throw new Error('no open rep to resume')
   }
@@ -72,7 +72,7 @@ describe('interval session', () => {
   })
 
   it('starts by writing rep 1 and showing the runner', () => {
-    const { session, effects } = startSession([{ durationSeconds: 0 }], BIKE, sec(0))
+    const { session, effects } = startSession([{ durationSeconds: 0 }], BIKE, sec(0), 3)
 
     expect({ screen: session.screen, rows: session.rows, effects }).toEqual({
       screen: { kind: 'running' },
@@ -414,7 +414,12 @@ describe('interval session', () => {
   describe('reopening', () => {
     it('has nothing to resume when no rep is open', () => {
       expect(
-        resumeSession([{ set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 }], BIKE, sec(0)),
+        resumeSession(
+          [{ set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 }],
+          BIKE,
+          sec(0),
+          3,
+        ),
       ).toBeNull()
     })
 

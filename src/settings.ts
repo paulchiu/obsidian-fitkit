@@ -43,6 +43,8 @@ export interface FitKitSettings {
   autoOpenWorkoutEditor: boolean
   strengthRestTimerEnabled: boolean
   intervalBeepsEnabled: boolean
+  /** How many of a timed step's last seconds the interval runner beeps. */
+  intervalCountdownSeconds: number
   /** The plan form's presets, one `Label: plan` per line. */
   intervalPresets: string
   /** How far the interval runner's stepper moves a rep, as `10%` or a fixed amount. */
@@ -60,6 +62,7 @@ export const DEFAULT_SETTINGS: FitKitSettings = {
   autoOpenWorkoutEditor: true,
   strengthRestTimerEnabled: true,
   intervalBeepsEnabled: true,
+  intervalCountdownSeconds: 3,
   intervalPresets: DEFAULT_INTERVAL_PRESETS,
   intervalStepperStep: DEFAULT_STEPPER_STEP,
   autosaveDebounceMs: 600,
@@ -93,6 +96,8 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
     strengthRestTimerEnabled:
       stored.strengthRestTimerEnabled ?? DEFAULT_SETTINGS.strengthRestTimerEnabled,
     intervalBeepsEnabled: stored.intervalBeepsEnabled ?? DEFAULT_SETTINGS.intervalBeepsEnabled,
+    intervalCountdownSeconds:
+      stored.intervalCountdownSeconds ?? DEFAULT_SETTINGS.intervalCountdownSeconds,
     intervalPresets: upgradeIntervalPresets(
       stored.intervalPresets ?? DEFAULT_SETTINGS.intervalPresets,
     ),
