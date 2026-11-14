@@ -1487,7 +1487,7 @@ export class WorkoutEditorView extends FileView {
     const selector = `.fitkit-cell[data-label="${label}"] input.fitkit-input`
     const preferredInput = row.querySelector(`${selector}[data-fitkit-default-focus="true"]`)
     const input = preferredInput ?? row.querySelector(selector)
-    if (input instanceof HTMLInputElement) {
+    if (input?.instanceOf(HTMLInputElement)) {
       input.focus()
       input.select()
     }
@@ -1703,7 +1703,7 @@ export class WorkoutEditorView extends FileView {
     const onDown = (evt: PointerEvent): void => {
       const card = handle.closest('.fitkit-card')
       const list = card?.parentElement
-      if (evt.button !== 0 || this.dragSession || !(card instanceof HTMLElement) || !list) {
+      if (evt.button !== 0 || this.dragSession || !card?.instanceOf(HTMLElement) || !list) {
         return
       }
       const fromIndex = readCardIndex(card)

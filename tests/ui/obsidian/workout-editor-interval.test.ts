@@ -1286,7 +1286,7 @@ describe('WorkoutEditorView interval plans', () => {
       const { view } = await openView(longBike(20))
       harnessDocument.body.append(view.contentEl)
       const input = rows(view).querySelector('input')
-      if (!(input instanceof harnessWindow.HTMLInputElement)) {
+      if (!input?.instanceOf(harnessWindow.HTMLInputElement)) {
         throw new Error('set input not rendered')
       }
 
