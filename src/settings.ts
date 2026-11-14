@@ -96,8 +96,7 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
     strengthRestTimerEnabled:
       stored.strengthRestTimerEnabled ?? DEFAULT_SETTINGS.strengthRestTimerEnabled,
     intervalBeepsEnabled: stored.intervalBeepsEnabled ?? DEFAULT_SETTINGS.intervalBeepsEnabled,
-    intervalCountdownSeconds:
-      stored.intervalCountdownSeconds ?? DEFAULT_SETTINGS.intervalCountdownSeconds,
+    intervalCountdownSeconds: storedCountdownSeconds(stored.intervalCountdownSeconds),
     intervalPresets: upgradeIntervalPresets(
       stored.intervalPresets ?? DEFAULT_SETTINGS.intervalPresets,
     ),
@@ -121,6 +120,16 @@ function storedStepperStep(value: unknown): string {
   return typeof value === 'string' && parseStepperStep(value)
     ? value
     : DEFAULT_SETTINGS.intervalStepperStep
+}
+
+/** A stored countdown survives the load only as a whole number of seconds in range. */
+function storedCountdownSeconds(value: unknown): number {
+  return typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= COUNTDOWN_SECONDS_MIN &&
+    value <= COUNTDOWN_SECONDS_MAX
+    ? value
+    : DEFAULT_SETTINGS.intervalCountdownSeconds
 }
 
 function normalizeStoredExerciseRegistry(
@@ -154,6 +163,8 @@ function normalizeStoredLevels(levels: unknown): string[] | undefined {
 const AUTOSAVE_DEBOUNCE_MIN = 0
 const CHART_WINDOW_MIN = 5
 const CHART_WINDOW_MAX = 365
+const COUNTDOWN_SECONDS_MIN = 0
+const COUNTDOWN_SECONDS_MAX = 10
 
 /**
  * Bounds are enforced here rather than as `min`/`max` on the control, because
