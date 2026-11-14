@@ -118,7 +118,7 @@ function Skeleton(): JSX.Element {
 }
 
 function Page({ page }: { page: EditorPage }): JSX.Element {
-  const empty = page.cards.length === 0
+  const noExercises = page.cards.length === 0
   return (
     <>
       <Header page={page} />
@@ -130,7 +130,7 @@ function Page({ page }: { page: EditorPage }): JSX.Element {
         <>
           {page.conflict && <Conflict reload={page.handlers.reload} />}
           <div class="fitkit-exercise-list">
-            {empty ? (
+            {noExercises ? (
               <EmptyCard add={page.handlers.addExercise} />
             ) : (
               page.cards.map((card) => (
@@ -138,7 +138,7 @@ function Page({ page }: { page: EditorPage }): JSX.Element {
               ))
             )}
           </div>
-          {(!empty || page.restEnabled) && <Footer page={page} showAdd={!empty} />}
+          <Footer page={page} showAdd={!noExercises} />
         </>
       )}
     </>
@@ -154,7 +154,11 @@ function EmptyCard({ add }: { add: () => void }): JSX.Element {
       <span ref={icon} class="fitkit-empty-card-icon" aria-hidden="true" />
       <div class="fitkit-empty-card-title">No exercises yet</div>
       <div class="fitkit-empty-card-hint">Add an exercise to start logging sets.</div>
-      <button type="button" class="fitkit-btn mod-cta fitkit-empty-card-add" onClick={add}>
+      <button
+        type="button"
+        class="fitkit-btn fitkit-btn-primary fitkit-empty-card-add"
+        onClick={add}
+      >
         <span ref={plus} class="fitkit-empty-card-add-icon" aria-hidden="true" />
         <span>Add exercise</span>
       </button>
@@ -207,7 +211,10 @@ function Conflict({ reload }: { reload: () => void }): JSX.Element {
   )
 }
 
-function Footer({ page, showAdd }: { page: EditorPage; showAdd: boolean }): JSX.Element {
+function Footer({ page, showAdd }: { page: EditorPage; showAdd: boolean }): JSX.Element | null {
+  if (!showAdd && !page.restEnabled) {
+    return null
+  }
   return (
     <div class="fitkit-footer">
       {showAdd && (

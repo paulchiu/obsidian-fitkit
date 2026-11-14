@@ -6,7 +6,10 @@ vi.mock('obsidian', async () =>
 
 import {
   button,
+  choose,
+  chooseMenuItem,
   createEditor,
+  openCardMenu,
   openEditor,
   pickerModal,
   pressKey,
@@ -52,6 +55,21 @@ describe('WorkoutEditorView with no exercises', () => {
       view.contentEl.querySelector('.fitkit-empty-card'),
       footerButtons(view.contentEl),
     ]).toEqual([null, ['Add exercise', 'Start rest']])
+  })
+
+  it('shows the card again once the last exercise is removed', async () => {
+    const { view } = await openEditor({
+      body: ['## [[Squat]]', '', '- [exercise:: [[Squat]]] [set:: 1] [weight:: 100] [reps:: 5]'],
+    })
+
+    openCardMenu(view)
+    chooseMenuItem('Remove exercise')
+    await choose('Remove exercise?', 'Remove')
+
+    expect([emptyCard(view.contentEl) !== null, footerButtons(view.contentEl)]).toEqual([
+      true,
+      ['Start rest'],
+    ])
   })
 
   it('keeps Start rest in the footer but no second Add exercise while the card shows', async () => {

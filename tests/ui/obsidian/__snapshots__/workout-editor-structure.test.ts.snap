@@ -422,7 +422,7 @@ exports[`WorkoutEditorView structure > draws the empty card in place of the card
       "No exercises yet"
     div.fitkit-empty-card-hint
       "Add an exercise to start logging sets."
-    button.fitkit-btn.mod-cta.fitkit-empty-card-add[type=button]
+    button.fitkit-btn.fitkit-btn-primary.fitkit-empty-card-add[type=button]
       span.fitkit-empty-card-add-icon[aria-hidden=true][data-icon=plus]
       span
         "Add exercise""
