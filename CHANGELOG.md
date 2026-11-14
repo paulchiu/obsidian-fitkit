@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - A `Countdown beeps (seconds)` setting under `Interval beeps` picks how many of a timed step's last seconds the interval runner beeps, from 0 to 10. It defaults to 3, the count the runner always used.
+- A workout with no exercises shows a `No exercises yet` card with an `Add exercise` button in place of the empty list, and the footer drops its own `Add exercise` until the first exercise is added.
 
 ### Changed
 
