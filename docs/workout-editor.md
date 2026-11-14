@@ -17,7 +17,7 @@ The second command works on any Markdown file, so it is also how you convert an 
 
 ## Adding an exercise
 
-`Add exercise` in the footer suggests names FitKit already knows about. Pick an existing one and the card takes its kind from the registry. Type a new one and FitKit asks whether to create an exercise note for it.
+A workout with no exercises shows a `No exercises yet` card with its own `Add exercise` button, which stands in for the footer's until the first exercise is added. `Add exercise` suggests names FitKit already knows about. Pick an existing one and the card takes its kind from the registry. Type a new one and FitKit asks whether to create an exercise note for it.
 
 Leave `Create exercise note` ticked for anything you want to chart and revisit; the note is what gives the exercise a progression chart, a `Recent sessions` table, and a home for your own notes. Untick it and you get a no-note registry entry instead. Both paths register the name, so it appears in the registry table. `Skip` registers nothing and leaves the exercise living only in workout history.
 
