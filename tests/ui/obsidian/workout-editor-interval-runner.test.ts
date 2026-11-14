@@ -309,10 +309,14 @@ describe('WorkoutEditorView interval runner', () => {
 
     it('gives the stylesheet the rep count, which caps the gap at 6px and narrows it as reps grow', async () => {
       const view = await start(bike('20 x 30s @ 300W, 30s rest'))
-      const row = runner(view).querySelector('.fitkit-runner-dots')
+      const row = runner(view).querySelector<HTMLElement>('.fitkit-runner-dots')
+      if (!row) {
+        throw new Error('No rep dots rendered')
+      }
 
-      /** A third of each of the 20 reps' share of the row: 100% / 20 / 3. */
+      /** A third of each rep's share of the row: 100% / 20 / 3, or 100% / 1 / 3 with no count. */
       expect(styleOf(row, '--fitkit-reps', 'gap')).toEqual(['20', 'min(6px, 1.66667%)'])
+      expect(computedStyleWithoutToken(row, 'gap', '--fitkit-reps')).toBe('min(6px, 33.3333%)')
     })
 
     it("rings dots with an inset shadow that shrinks with them, in each rep state's colour", async () => {

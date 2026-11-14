@@ -52,14 +52,14 @@ export function ensureStylesheetLoaded(): void {
 }
 
 /**
- * jsdom defines no safe-area insets, so an unset `env()` would void its whole declaration.
- * Each gets a fallback reading a harness property, `0px` unless a test sets it, as on a notchless screen.
+ * jsdom defines no safe-area insets, so an `env()` without a fallback would void its whole declaration.
+ * Each reads a harness property instead, defaulting to the stylesheet's fallback (one without parentheses) or `0px`.
  */
-function withSafeAreaFallbacks(css: string): string {
+export function withSafeAreaFallbacks(css: string): string {
   return css.replace(
-    /env\(safe-area-inset-(top|right|bottom|left)\)/g,
-    (_match, side: string) =>
-      `env(safe-area-inset-${side}, var(--harness-safe-area-inset-${side}, 0px))`,
+    /env\(\s*safe-area-inset-(top|right|bottom|left)\s*(?:,\s*([^()]*?)\s*)?\)/g,
+    (_match, side: string, fallback: string | undefined) =>
+      `env(safe-area-inset-${side}, var(--harness-safe-area-inset-${side}, ${fallback ?? '0px'}))`,
   )
 }
 

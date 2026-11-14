@@ -79,8 +79,8 @@ describe('modal button bar', () => {
     const { modal, bar } = renderSheet()
     modal.addClass('fitkit-keyboard-up')
     /** The offsets the keyboard sheet sets while the keyboard is up. */
-    modal.style.setProperty('--fitkit-keyboard-top', '40px')
-    modal.style.setProperty('--fitkit-keyboard-room', '300px')
+    modal.style.setProperty('--fitkit-keyboard-top', '41.5px')
+    modal.style.setProperty('--fitkit-keyboard-room', '301.5px')
 
     expect({
       alignSelf: computedStyle(modal, 'align-self'),
@@ -89,8 +89,8 @@ describe('modal button bar', () => {
       barPaddingBottom: computedStyle(bar, 'padding-bottom'),
     }).toEqual({
       alignSelf: 'flex-start',
-      marginTop: '40px',
-      maxHeight: '300px',
+      marginTop: '41.5px',
+      maxHeight: '301.5px',
       barPaddingBottom: SPACING,
     })
   })

@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 
-import { createTestRoot, harnessDocument, harnessWindow } from './obsidian-dom'
-import { ensureStylesheetLoaded } from './stylesheet'
+import { createTestRoot, harnessDocument } from './obsidian-dom'
+import { computedStyle, ensureStylesheetLoaded } from './stylesheet'
 
 beforeAll(() => {
   ensureStylesheetLoaded()
@@ -34,19 +34,17 @@ function render(cls: string, rootStyle: Record<string, string> = {}): RenderedBu
   harnessDocument.body.appendChild(root)
   const button = root.createEl('button', { cls })
   const glyph = button.createSvg('svg')
-  const style = harnessWindow.getComputedStyle(button)
-  const glyphStyle = harnessWindow.getComputedStyle(glyph)
   return {
     padding: (['top', 'right', 'bottom', 'left'] as const)
-      .map((side) => style.getPropertyValue(`padding-${side}`))
+      .map((side) => computedStyle(button, `padding-${side}`))
       .join(' '),
-    width: style.getPropertyValue('width'),
-    height: style.getPropertyValue('height'),
-    background: style.getPropertyValue('background'),
-    color: style.getPropertyValue('color'),
+    width: computedStyle(button, 'width'),
+    height: computedStyle(button, 'height'),
+    background: computedStyle(button, 'background'),
+    color: computedStyle(button, 'color'),
     glyph: {
-      width: glyphStyle.getPropertyValue('width'),
-      height: glyphStyle.getPropertyValue('height'),
+      width: computedStyle(glyph, 'width'),
+      height: computedStyle(glyph, 'height'),
     },
   }
 }
