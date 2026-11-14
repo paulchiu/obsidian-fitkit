@@ -414,6 +414,20 @@ exports[`WorkoutEditorView structure > draws the conflict banner when the note c
     "Reload from disk""
 `;
 
+exports[`WorkoutEditorView structure > draws the empty card in place of the cards when the workout has no exercises 1`] = `
+"div.fitkit-exercise-list
+  div.fitkit-empty-card
+    span.fitkit-empty-card-icon[aria-hidden=true][data-icon=dumbbell]
+    div.fitkit-empty-card-title
+      "No exercises yet"
+    div.fitkit-empty-card-hint
+      "Add an exercise to start logging sets."
+    button.fitkit-btn.mod-cta.fitkit-empty-card-add[type=button]
+      span.fitkit-empty-card-add-icon[aria-hidden=true][data-icon=plus]
+      span
+        "Add exercise""
+`;
+
 exports[`WorkoutEditorView structure > draws the empty state before a workout is loaded 1`] = `
 "div.fitkit-empty
   "Open a workout note to edit.""

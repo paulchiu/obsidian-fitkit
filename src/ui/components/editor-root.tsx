@@ -118,6 +118,7 @@ function Skeleton(): JSX.Element {
 }
 
 function Page({ page }: { page: EditorPage }): JSX.Element {
+  const empty = page.cards.length === 0
   return (
     <>
       <Header page={page} />
@@ -129,14 +130,35 @@ function Page({ page }: { page: EditorPage }): JSX.Element {
         <>
           {page.conflict && <Conflict reload={page.handlers.reload} />}
           <div class="fitkit-exercise-list">
-            {page.cards.map((card) => (
-              <ExerciseCardView key={card.ex} {...card} handlers={page.cardHandlers} />
-            ))}
+            {empty ? (
+              <EmptyCard add={page.handlers.addExercise} />
+            ) : (
+              page.cards.map((card) => (
+                <ExerciseCardView key={card.ex} {...card} handlers={page.cardHandlers} />
+              ))
+            )}
           </div>
-          <Footer page={page} />
+          {(!empty || page.restEnabled) && <Footer page={page} showAdd={!empty} />}
         </>
       )}
     </>
+  )
+}
+
+/** Stands in for the exercise list, and its button for the footer's, until the workout has an exercise. */
+function EmptyCard({ add }: { add: () => void }): JSX.Element {
+  const icon = useIcon<HTMLSpanElement>('dumbbell')
+  const plus = useIcon<HTMLSpanElement>('plus')
+  return (
+    <div class="fitkit-empty-card">
+      <span ref={icon} class="fitkit-empty-card-icon" aria-hidden="true" />
+      <div class="fitkit-empty-card-title">No exercises yet</div>
+      <div class="fitkit-empty-card-hint">Add an exercise to start logging sets.</div>
+      <button type="button" class="fitkit-btn mod-cta fitkit-empty-card-add" onClick={add}>
+        <span ref={plus} class="fitkit-empty-card-add-icon" aria-hidden="true" />
+        <span>Add exercise</span>
+      </button>
+    </div>
   )
 }
 
@@ -185,12 +207,14 @@ function Conflict({ reload }: { reload: () => void }): JSX.Element {
   )
 }
 
-function Footer({ page }: { page: EditorPage }): JSX.Element {
+function Footer({ page, showAdd }: { page: EditorPage; showAdd: boolean }): JSX.Element {
   return (
     <div class="fitkit-footer">
-      <button class="fitkit-btn" onClick={page.handlers.addExercise}>
-        Add exercise
-      </button>
+      {showAdd && (
+        <button class="fitkit-btn" onClick={page.handlers.addExercise}>
+          Add exercise
+        </button>
+      )}
       {page.restEnabled && (
         <RestControl last={page.lastRestSeconds} start={page.handlers.startRest} />
       )}

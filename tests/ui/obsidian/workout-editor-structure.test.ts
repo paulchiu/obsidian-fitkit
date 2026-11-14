@@ -70,6 +70,14 @@ describe('WorkoutEditorView structure', () => {
     expect(findUnstyledClasses(container)).toEqual([])
   })
 
+  it('draws the empty card in place of the cards when the workout has no exercises', async () => {
+    const { view } = await openEditor({ body: [] })
+
+    const list = part(view.contentEl, '.fitkit-exercise-list')
+    expect(outline(list)).toMatchSnapshot()
+    expect(findUnstyledClasses(list)).toEqual([])
+  })
+
   it('draws the footer with the last rest beside the rest button', async () => {
     const { view } = await openEditor({ body: STRENGTH })
     button(view.contentEl, 'Start rest timer').click()
