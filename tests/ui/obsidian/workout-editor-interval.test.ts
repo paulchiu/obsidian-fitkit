@@ -1018,6 +1018,34 @@ describe('WorkoutEditorView interval plans', () => {
         expect(tones).toEqual([880, 880, 880, 880, 880, 1320])
       })
 
+      it('skips the countdown at 0 but still beeps the change to rest', async () => {
+        const { view } = await openView(workoutSource(...BIKE), { intervalCountdownSeconds: 0 })
+        button(view, 'Start interval plan').click()
+
+        runTo('07:15:31')
+
+        expect(tones).toEqual([1320])
+      })
+
+      it.each([0, 10])(
+        'double-beeps work running into the next step with a countdown of %i',
+        async (countdown) => {
+          const { view } = await openView(
+            workoutSource(
+              '## [[Exercise Bike]]',
+              '',
+              '- [exercise:: [[Exercise Bike]]] [plan:: (x 2 (on 30s 350W) (off 30s 150W))]',
+            ),
+            { intervalCountdownSeconds: countdown },
+          )
+          button(view, 'Start interval plan').click()
+
+          runTo('07:15:31')
+
+          expect(tones.filter((hz) => hz !== 880)).toEqual([1100, 1100])
+        },
+      )
+
       it('double-beeps when work runs straight into the next step', async () => {
         const { view } = await openView(
           workoutSource(
@@ -1034,7 +1062,10 @@ describe('WorkoutEditorView interval plans', () => {
       })
 
       it('stays silent when interval beeps are off', async () => {
-        const { view } = await openView(workoutSource(...BIKE), { intervalBeepsEnabled: false })
+        const { view } = await openView(workoutSource(...BIKE), {
+          intervalBeepsEnabled: false,
+          intervalCountdownSeconds: 10,
+        })
         button(view, 'Start interval plan').click()
 
         runTo('07:15:31')
