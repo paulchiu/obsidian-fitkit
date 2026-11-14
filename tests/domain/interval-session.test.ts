@@ -128,6 +128,44 @@ describe('interval session', () => {
       expect(tickThrough(started(program), 1, to).cues).toEqual(cues)
     })
 
+    it('counts down work and rest for as many seconds as the run was started with', () => {
+      const run = startSession([], BIKE, sec(0), 5).session
+
+      expect(tickThrough(run, 1, 121).cues).toEqual([
+        [25, 'count'],
+        [26, 'count'],
+        [27, 'count'],
+        [28, 'count'],
+        [29, 'count'],
+        [30, 'go'],
+        [115, 'count'],
+        [116, 'count'],
+        [117, 'count'],
+        [118, 'count'],
+        [119, 'count'],
+        [120, 'go'],
+      ])
+    })
+
+    it('keeps the countdown length a reopened run was resumed with', () => {
+      const rows: RunRow[] = [
+        { set: 1, durationSeconds: 0, startedAt: '2026-10-12T07:15:00+10:00' },
+      ]
+      const result = resumeSession(rows, BIKE, sec(10), 5)
+      if (!result) {
+        throw new Error('no open rep to resume')
+      }
+
+      expect(tickThrough(result.session, 11, 31).cues).toEqual([
+        [25, 'count'],
+        [26, 'count'],
+        [27, 'count'],
+        [28, 'count'],
+        [29, 'count'],
+        [30, 'go'],
+      ])
+    })
+
     it('sounds the finish when the last rep ends', () => {
       const rows: RunRow[] = [
         { set: 1, durationSeconds: 30, watts: 300, restSeconds: 90 },

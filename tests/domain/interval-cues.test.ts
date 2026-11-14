@@ -12,13 +12,20 @@ const work = (rep: number, remaining: number | null): RunPhase => ({
 })
 
 describe('cueBetween', () => {
-  it('counts down with a short cue as each of the last three seconds arrives', () => {
+  it('counts down with a short cue as each of the last three seconds arrives at a length of 3', () => {
     expect([
       cueBetween(work(1, 5), work(1, 4), 3),
       cueBetween(work(1, 4), work(1, 3), 3),
       cueBetween(work(1, 3), work(1, 3), 3),
       cueBetween(work(1, 2), work(1, 1), 3),
     ]).toEqual([null, 'count', null, 'count'])
+  })
+
+  it('stays quiet through the end of a step at a length of 0', () => {
+    expect([cueBetween(work(1, 2), work(1, 1), 0), cueBetween(work(1, 1), work(1, 0), 0)]).toEqual([
+      null,
+      null,
+    ])
   })
 
   it('gives the phase change its own cue', () => {
