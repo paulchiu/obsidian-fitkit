@@ -84,6 +84,7 @@ describe('setting definitions', () => {
       ['toggle', 'autoOpenWorkoutEditor'],
       ['toggle', 'strengthRestTimerEnabled'],
       ['toggle', 'intervalBeepsEnabled'],
+      ['number', 'intervalCountdownSeconds'],
       ['textarea', 'intervalPresets'],
       ['text', 'intervalStepperStep'],
       ['number', 'autosaveDebounceMs'],
@@ -136,10 +137,40 @@ describe('setting definitions', () => {
     expect(chart?.(Number.NaN)).toBe('Enter a number.')
   })
 
+  it('offers the countdown length under Interval beeps without fixing it at three seconds', () => {
+    const behavior = groups(createTab().tab).find((group) => group.heading === 'Behavior')
+    const names = behavior?.items.map((row) => row.name) ?? []
+    const beeps = names.indexOf('Interval beeps')
+
+    expect(names[beeps + 1]).toBe('Countdown beeps (seconds)')
+    expect(
+      behavior?.items
+        .filter((row) => row.name === 'Interval beeps' || row.name.startsWith('Countdown'))
+        .map((row) => /three seconds/i.test(String(row.desc))),
+    ).toEqual([false, false])
+  })
+
+  it('accepts a countdown of 0 to 10 whole seconds', () => {
+    const validate = allRows(createTab().tab).find(
+      (row) => row.control?.key === 'intervalCountdownSeconds',
+    )?.control?.validate
+
+    expect([validate?.(0), validate?.(3), validate?.(10)]).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ])
+    expect([validate?.(11), validate?.(-1), validate?.(2.5)]).toEqual([
+      'Enter a whole number between 0 and 10.',
+      'Enter a whole number between 0 and 10.',
+      'Enter a whole number between 0 and 10.',
+    ])
+  })
+
   it('gives every searchable row a description so settings search can match it', () => {
     const searchable = allRows(createTab().tab).filter((row) => row.searchable !== false)
 
-    expect(searchable).toHaveLength(9)
+    expect(searchable).toHaveLength(10)
     for (const row of searchable) {
       expect(row.name.length).toBeGreaterThan(0)
       expect(typeof row.desc).toBe('string')
@@ -218,6 +249,26 @@ describe('setControlValue', () => {
     await tab.setControlValue('intervalBeepsEnabled', false)
 
     expect([settings.intervalBeepsEnabled, saveSettings.mock.calls.length]).toEqual([false, 1])
+  })
+
+  it('saves the countdown length', async () => {
+    const { tab, settings, saveSettings } = createTab()
+
+    await tab.setControlValue('intervalCountdownSeconds', '5')
+
+    expect([settings.intervalCountdownSeconds, saveSettings.mock.calls.length]).toEqual([5, 1])
+  })
+
+  it('keeps the last good countdown length when the entry is out of range or not whole', async () => {
+    const { tab, settings, saveSettings } = createTab({
+      ...DEFAULT_SETTINGS,
+      intervalCountdownSeconds: 5,
+    })
+
+    await tab.setControlValue('intervalCountdownSeconds', '11')
+    await tab.setControlValue('intervalCountdownSeconds', '2.5')
+
+    expect([settings.intervalCountdownSeconds, saveSettings.mock.calls.length]).toEqual([5, 0])
   })
 
   it('saves the interval presets as written', async () => {

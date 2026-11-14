@@ -96,6 +96,24 @@ describe('settings migration', () => {
     expect(migrated.intervalStepperStep).toBe(loaded)
   })
 
+  it.each([
+    [undefined, 3],
+    [0, 0],
+    [5, 5],
+    [10, 10],
+    [11, 3],
+    [-1, 3],
+    [2.5, 3],
+    ['5', 3],
+  ])('loads a stored countdown length of %j as %j', (stored, loaded) => {
+    const migrated = settingsFromStored({
+      intervalCountdownSeconds: stored,
+      schemaVersion: 1,
+    } as unknown as Partial<FitKitSettings>)
+
+    expect(migrated.intervalCountdownSeconds).toBe(loaded)
+  })
+
   it('keeps the interval marker only on a stored duration entry', () => {
     const migrated = settingsFromStored({
       exerciseRegistry: [

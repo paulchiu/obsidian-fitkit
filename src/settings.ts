@@ -43,6 +43,8 @@ export interface FitKitSettings {
   autoOpenWorkoutEditor: boolean
   strengthRestTimerEnabled: boolean
   intervalBeepsEnabled: boolean
+  /** How many of a timed step's last seconds the interval runner beeps. */
+  intervalCountdownSeconds: number
   /** The plan form's presets, one `Label: plan` per line. */
   intervalPresets: string
   /** How far the interval runner's stepper moves a rep, as `10%` or a fixed amount. */
@@ -60,6 +62,7 @@ export const DEFAULT_SETTINGS: FitKitSettings = {
   autoOpenWorkoutEditor: true,
   strengthRestTimerEnabled: true,
   intervalBeepsEnabled: true,
+  intervalCountdownSeconds: 3,
   intervalPresets: DEFAULT_INTERVAL_PRESETS,
   intervalStepperStep: DEFAULT_STEPPER_STEP,
   autosaveDebounceMs: 600,
@@ -93,6 +96,9 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
     strengthRestTimerEnabled:
       stored.strengthRestTimerEnabled ?? DEFAULT_SETTINGS.strengthRestTimerEnabled,
     intervalBeepsEnabled: stored.intervalBeepsEnabled ?? DEFAULT_SETTINGS.intervalBeepsEnabled,
+    intervalCountdownSeconds: isCountdownSeconds(stored.intervalCountdownSeconds)
+      ? stored.intervalCountdownSeconds
+      : DEFAULT_SETTINGS.intervalCountdownSeconds,
     intervalPresets: upgradeIntervalPresets(
       stored.intervalPresets ?? DEFAULT_SETTINGS.intervalPresets,
     ),
@@ -116,6 +122,21 @@ function storedStepperStep(value: unknown): string {
   return typeof value === 'string' && parseStepperStep(value)
     ? value
     : DEFAULT_SETTINGS.intervalStepperStep
+}
+
+function isCountdownSeconds(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= COUNTDOWN_SECONDS_MIN &&
+    value <= COUNTDOWN_SECONDS_MAX
+  )
+}
+
+function validateCountdownSeconds(value: number): string | undefined {
+  return isCountdownSeconds(value)
+    ? undefined
+    : `Enter a whole number between ${COUNTDOWN_SECONDS_MIN} and ${COUNTDOWN_SECONDS_MAX}.`
 }
 
 function normalizeStoredExerciseRegistry(
@@ -149,6 +170,8 @@ function normalizeStoredLevels(levels: unknown): string[] | undefined {
 const AUTOSAVE_DEBOUNCE_MIN = 0
 const CHART_WINDOW_MIN = 5
 const CHART_WINDOW_MAX = 365
+const COUNTDOWN_SECONDS_MIN = 0
+const COUNTDOWN_SECONDS_MAX = 10
 
 /**
  * Bounds are enforced here rather than as `min`/`max` on the control, because
@@ -171,6 +194,7 @@ type FitKitSettingKey =
   | 'autoOpenWorkoutEditor'
   | 'strengthRestTimerEnabled'
   | 'intervalBeepsEnabled'
+  | 'intervalCountdownSeconds'
   | 'intervalPresets'
   | 'intervalStepperStep'
   | 'autosaveDebounceMs'
@@ -332,8 +356,20 @@ export class FitKitSettingTab extends PluginSettingTab {
           {
             kind: 'control',
             name: 'Interval beeps',
-            desc: 'Beep through the last three seconds of each interval and when it changes, and vibrate where the device can.',
+            desc: 'Beep through a countdown at the end of each interval and when it changes, and vibrate where the device can.',
             control: { type: 'toggle', key: 'intervalBeepsEnabled' },
+          },
+          {
+            kind: 'control',
+            name: 'Countdown beeps (seconds)',
+            desc: "How many of an interval's last seconds beep before the next one starts, from 0 to 10. At 0 only the change itself beeps.",
+            control: {
+              type: 'number',
+              key: 'intervalCountdownSeconds',
+              defaultValue: DEFAULT_SETTINGS.intervalCountdownSeconds,
+              validate: validateCountdownSeconds,
+            },
+            fallbackBounds: { min: COUNTDOWN_SECONDS_MIN, max: COUNTDOWN_SECONDS_MAX },
           },
           {
             kind: 'control',
@@ -451,6 +487,14 @@ export class FitKitSettingTab extends PluginSettingTab {
       case 'intervalBeepsEnabled':
         settings.intervalBeepsEnabled = Boolean(value)
         break
+      case 'intervalCountdownSeconds': {
+        const seconds = typeof value === 'number' ? value : Number.parseFloat(String(value))
+        if (!isCountdownSeconds(seconds)) {
+          return
+        }
+        settings.intervalCountdownSeconds = seconds
+        break
+      }
       case 'intervalPresets':
         settings.intervalPresets = String(value)
         break

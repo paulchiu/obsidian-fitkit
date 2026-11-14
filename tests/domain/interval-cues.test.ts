@@ -12,23 +12,33 @@ const work = (rep: number, remaining: number | null): RunPhase => ({
 })
 
 describe('cueBetween', () => {
-  it('counts down with a short cue as each of the last three seconds arrives', () => {
+  it('counts down with a short cue as each of the last three seconds arrives at a length of 3', () => {
     expect([
-      cueBetween(work(1, 5), work(1, 4)),
-      cueBetween(work(1, 4), work(1, 3)),
-      cueBetween(work(1, 3), work(1, 3)),
-      cueBetween(work(1, 2), work(1, 1)),
+      cueBetween(work(1, 5), work(1, 4), 3),
+      cueBetween(work(1, 4), work(1, 3), 3),
+      cueBetween(work(1, 3), work(1, 3), 3),
+      cueBetween(work(1, 2), work(1, 1), 3),
     ]).toEqual([null, 'count', null, 'count'])
+  })
+
+  it('stays quiet through the end of a step at a length of 0', () => {
+    expect([cueBetween(work(1, 2), work(1, 1), 0), cueBetween(work(1, 1), work(1, 0), 0)]).toEqual([
+      null,
+      null,
+    ])
   })
 
   it('gives the phase change its own cue', () => {
     const rest: RunPhase = { kind: 'rest', rep: 1, elapsed: 0, remaining: 90, paused: false }
 
-    expect([cueBetween(work(1, 0), rest), cueBetween(rest, work(2, 30))]).toEqual(['go', 'go'])
+    expect([cueBetween(work(1, 0), rest, 3), cueBetween(rest, work(2, 30), 3)]).toEqual([
+      'go',
+      'go',
+    ])
   })
 
   it('stays quiet for open work, which has no countdown', () => {
-    expect(cueBetween(work(1, null), work(1, null))).toBeNull()
+    expect(cueBetween(work(1, null), work(1, null), 3)).toBeNull()
   })
 
   it('counts down the end of rest too', () => {
@@ -40,10 +50,13 @@ describe('cueBetween', () => {
       paused: false,
     })
 
-    expect([cueBetween(rest(4), rest(3)), cueBetween(rest(1), rest(0))]).toEqual(['count', null])
+    expect([cueBetween(rest(4), rest(3), 3), cueBetween(rest(1), rest(0), 3)]).toEqual([
+      'count',
+      null,
+    ])
   })
 
   it('gives work running straight into the next step a cue of its own', () => {
-    expect(cueBetween(work(1, 0), work(2, 30))).toBe('shift')
+    expect(cueBetween(work(1, 0), work(2, 30), 3)).toBe('shift')
   })
 })

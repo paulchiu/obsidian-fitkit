@@ -36,6 +36,8 @@ export interface RunSession {
   /** The phase the last tick saw, so the next one knows which cue it crossed. */
   readonly lastPhase: RunPhase
   readonly lastTickAt: number
+  /** How many of a timed step's last seconds count down. */
+  readonly countdownSeconds: number
 }
 
 export type RunEvent =
@@ -73,9 +75,13 @@ export function startSession(
   rows: readonly RunRow[],
   program: IntervalProgram,
   now: number,
+  countdownSeconds: number,
 ): RunTransition {
   const started = startRun(rows, program, now)
-  return { session: openSession(started, program, now), effects: { rows: started, redraw: 'full' } }
+  return {
+    session: openSession(started, program, now, countdownSeconds),
+    effects: { rows: started, redraw: 'full' },
+  }
 }
 
 /**
@@ -86,11 +92,12 @@ export function resumeSession(
   rows: readonly RunRow[],
   program: IntervalProgram,
   now: number,
+  countdownSeconds: number,
 ): RunTransition | null {
   if (!hasOpenRep(rows)) {
     return null
   }
-  const session = openSession(rows, program, now)
+  const session = openSession(rows, program, now, countdownSeconds)
   return rows[rows.length - 1]?.startedAt === undefined
     ? { session, effects: {} }
     : catchUp(session, now)
@@ -124,13 +131,19 @@ export function stepSession(session: RunSession, event: RunEvent, now: number): 
   }
 }
 
-function openSession(rows: readonly RunRow[], program: IntervalProgram, now: number): RunSession {
+function openSession(
+  rows: readonly RunRow[],
+  program: IntervalProgram,
+  now: number,
+  countdownSeconds: number,
+): RunSession {
   return {
     program,
     rows,
     screen: { kind: 'running' },
     lastPhase: runPhase(rows, program, now),
     lastTickAt: now,
+    countdownSeconds,
   }
 }
 
@@ -149,7 +162,9 @@ function tick(session: RunSession, now: number): RunTransition {
   }
   const result = advanceRun(session.rows, session.program, now)
   const next = settle(ticked, result, now)
-  const cue = result.finished ? 'go' : cueBetween(session.lastPhase, next.session.lastPhase)
+  const cue = result.finished
+    ? 'go'
+    : cueBetween(session.lastPhase, next.session.lastPhase, session.countdownSeconds)
   return {
     session: next.session,
     effects: {

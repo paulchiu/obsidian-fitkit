@@ -179,7 +179,7 @@ An interval card swaps the play button for `Start`, which reads `Start from rep 
 - Rep dots go green for reps on target (within 5% of the step's target, held for the full work time; open work counts intensity only), amber otherwise, and grey for a step with no target. They stay on one row however long the plan: past about 16 reps they shrink to fit, and in a long plan they become thin ticks with the current rep standing taller. The last and average intensity sit beneath them.
 - `Pause` banks the time so far, and `End run` returns to the card with the reps you finished. When the plan is done, the runner shows how many reps hit the target.
 
-With `Interval beeps` on (see [Settings](settings.md)), the last three seconds of each interval beep, the change between work and rest has its own tone, and a double beep marks work running straight into the next step. The runner keeps the screen awake where the platform allows. Beeps cannot sound while the phone has Obsidian suspended.
+With `Interval beeps` on (see [Settings](settings.md)), the last few seconds of each interval beep (three by default, set by `Countdown beeps (seconds)`), the change between work and rest has its own tone, and a double beep marks work running straight into the next step. The runner keeps the screen awake where the platform allows. Beeps cannot sound while the phone has Obsidian suspended.
 
 ### If Obsidian closes mid-run
 
