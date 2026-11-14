@@ -3,7 +3,14 @@ import { join } from 'node:path'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { createTestRoot, harnessDocument, harnessWindow } from './obsidian-dom'
-import { ensureStylesheetLoaded, expectAppliedThemeToken, findUnstyledClasses } from './stylesheet'
+import {
+  computedStyle,
+  computedStyleWithoutToken,
+  ensureStylesheetLoaded,
+  expectAppliedThemeToken,
+  findUnstyledClasses,
+  THEME_TOKENS,
+} from './stylesheet'
 
 vi.mock('obsidian', () => {
   class Modal {
@@ -60,6 +67,12 @@ describe('stylesheet', () => {
     expectAppliedThemeToken(empty, 'color', '--text-muted')
   })
 
+  it('refuses to read the style of a detached element, which jsdom leaves uncomputed', () => {
+    const detached = createTestRoot().createDiv({ cls: 'fitkit-empty' })
+
+    expect(() => computedStyle(detached, 'color')).toThrow(/Attach the element/)
+  })
+
   it('reports a class with a mistyped prefix instead of skipping it', () => {
     const root = createTestRoot()
     harnessDocument.body.appendChild(root)
@@ -94,9 +107,10 @@ describe('stylesheet', () => {
     harnessDocument.body.appendChild(root)
     const note = root.createDiv({ cls: 'fitkit-note-line fitkit-exercise-note-line' })
 
-    expect(harnessWindow.getComputedStyle(note).getPropertyValue('padding-inline')).toBe(
-      'var(--size-4-2, 8px)',
-    )
+    expect([
+      computedStyle(note, 'padding-inline'),
+      computedStyleWithoutToken(note, 'padding-inline', '--size-4-2'),
+    ]).toEqual([THEME_TOKENS['--size-4-2'], '8px'])
   })
 
   it('keeps bodyweight header tracks and spacer on one trailing-column token', () => {

@@ -17,11 +17,17 @@ is all zeros), so element overflow is out of scope by design.
   calls (`createEl`, `createDiv`, `createSpan`, `createSvg`, `empty`,
   `addClass`, `setText`, `setAttr`, and the rest). Everything else is plain
   jsdom. Extensions install on import. `createTestRoot()` gives each test a
-  fresh detached root; `findButtons()` and `modalElements()` are the shared
-  shapes for modal tests.
-- `stylesheet.ts` loads `styles.css` once (`ensureStylesheetLoaded()`),
-  asserts which theme token a property resolves to
-  (`expectAppliedThemeToken()`, since jsdom never substitutes `var()`), and
+  fresh detached root; attach it to `harnessDocument.body` before reading its
+  style, since jsdom computes nothing for a detached element. `findButtons()`
+  and `modalElements()` are the shared shapes for modal tests.
+- `stylesheet.ts` loads `styles.css` once (`ensureStylesheetLoaded()`) with a
+  distinct stand-in value for each Obsidian theme token in `THEME_TOKENS`, so
+  `computedStyle()` resolves `var()` and a value names its token
+  (`expectAppliedThemeToken()`); `computedStyleWithoutToken()` pins a `var()`
+  fallback. jsdom defines no safe-area insets, so `env(safe-area-inset-*)`
+  reads `--harness-safe-area-inset-*` (`0px` unless a test sets it).
+  `declaredStyle()` reads a value as declared, for a term jsdom cannot reach
+  (its window is a fixed 768px tall). It also
   reports rendered classes the stylesheet never styles
   (`findUnstyledClasses()`). A class passes when a selector names it or it is
   recognised (`is-*`/`has-*` state hooks, plus the Obsidian classes in
