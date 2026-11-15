@@ -23,7 +23,7 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'beta') &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (github.event.action != 'labeled' ||
-        contains(fromJSON('["beta", "major", "minor", "patch"]'), github.event.label.name))
+        contains(fromJSON('["beta", "major", "minor", "patch", "norelease"]'), github.event.label.name))
     runs-on: ubuntu-26.04
     permissions:
       contents: write
@@ -49,7 +49,11 @@ jobs:
         run: |
           git fetch --quiet --tags origin main
           STABLE=$(git show origin/main:package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
-          VERSION=$(STABLE="$STABLE" TAGS="$(git tag --list)" node scripts/beta-version.ts)
+          # Surfaces the script's reason, such as a norelease PR having no version, as the run's error.
+          if ! VERSION=$(STABLE="$STABLE" TAGS="$(git tag --list)" node scripts/beta-version.ts 2> "$RUNNER_TEMP/beta-reason"); then
+            echo "::error::$(cat "$RUNNER_TEMP/beta-reason")"
+            exit 1
+          fi
           if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" > /dev/null; then
             echo "::error::$VERSION already exists, probably from another beta PR. Push again to take the next number."
             exit 1
