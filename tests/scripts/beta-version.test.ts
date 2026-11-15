@@ -24,6 +24,14 @@ describe('betaVersion', () => {
     })
   })
 
+  it('refuses a beta for a norelease PR, since merging it releases nothing', () => {
+    expect(betaVersion('1.8.0', ['beta', 'minor', 'norelease'], [])).toEqual({
+      ok: false,
+      reason:
+        'A norelease PR never releases, so a beta has no version to take. Remove norelease to publish one.',
+    })
+  })
+
   it('takes the largest semver label when several are present, as the stable release does', () => {
     expect(betaVersion('1.8.3', ['patch', 'beta', 'major'], [])).toEqual({
       ok: true,

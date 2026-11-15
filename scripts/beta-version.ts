@@ -6,12 +6,11 @@
 
 import { pathToFileURL } from 'node:url'
 
+import { releaseBump, SEMVER_BUMPS } from './release-bump.ts'
+
 export type BetaVersionResult = { ok: true; version: string } | { ok: false; reason: string }
 
-/** In release.yml's priority order. */
-const BUMPS = ['major', 'minor', 'patch'] as const
-
-type Bump = (typeof BUMPS)[number]
+type Bump = (typeof SEMVER_BUMPS)[number]
 
 function bumpVersion([major = 0, minor = 0, patch = 0]: number[], bump: Bump): string {
   if (bump === 'major') return `${major + 1}.0.0`
@@ -28,11 +27,14 @@ export function betaVersion(
   if (!/^\d+\.\d+\.\d+$/.test(stable)) {
     return { ok: false, reason: `Expected main to be on a plain X.Y.Z version, found "${stable}".` }
   }
-  const bump = BUMPS.find((b) => labels.includes(b))
-  if (!bump) {
+  /** A beta previews what merging releases, so it follows the Release workflow's bump. */
+  const bump = releaseBump(labels)
+  if (bump === 'norelease') {
     return {
       ok: false,
-      reason: 'A beta needs one of the major, minor or patch labels to pick its version.',
+      reason: SEMVER_BUMPS.some((b) => labels.includes(b))
+        ? 'A norelease PR never releases, so a beta has no version to take. Remove norelease to publish one.'
+        : 'A beta needs one of the major, minor or patch labels to pick its version.',
     }
   }
   const prefix = `${bumpVersion(stable.split('.').map(Number), bump)}-beta.`
