@@ -13,10 +13,9 @@ jobs:
         uses: actions/github-script@v9
         with:
           script: |
-            // Mirrors release.yml's bump-detection priority: major > minor > patch > norelease.
-            // A semver label is allowed to coexist with `norelease` (Dependabot always adds
-            // `norelease` alongside its own semver-magnitude label), so the actual error is
-            // having more than one semver label, not norelease co-occurring with one.
+            // Mirrors release.yml's bump priority (scripts/release-bump.ts): norelease > major > minor > patch.
+            // Dependabot adds `norelease` beside its own semver label, which is allowed and releases nothing,
+            // so the error is having more than one semver label, not norelease beside one.
             const labels = context.payload.pull_request.labels.map(l => l.name);
             const semverLabels = ['major', 'minor', 'patch'];
             const versionLabels = [...semverLabels, 'norelease'];
