@@ -38,15 +38,10 @@ jobs:
 
       - name: Determine version bump
         id: bump
-        uses: actions/github-script@v9
-        with:
-          result-encoding: string
-          script: |
-            const labels = context.payload.pull_request.labels.map(l => l.name);
-            if (labels.includes('major')) return 'major';
-            if (labels.includes('minor')) return 'minor';
-            if (labels.includes('patch')) return 'patch';
-            return 'norelease';
+        # norelease wins over any semver label (scripts/release-bump.ts); a script failure fails the step rather than release with an empty bump.
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: bump=$(node scripts/release-bump.ts) && echo "result=$bump" >> "$GITHUB_OUTPUT"
 
       - name: Skip release
         if: steps.bump.outputs.result == 'norelease'

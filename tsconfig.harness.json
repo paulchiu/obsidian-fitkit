@@ -2,7 +2,15 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "types": ["node"],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/harness/**/*.ts", "scripts/beta-version.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/harness/**/*.ts",
+    "scripts/beta-version.ts",
+    "scripts/release-bump.ts"
+  ]
 }
