@@ -38,10 +38,10 @@ jobs:
 
       - name: Determine version bump
         id: bump
-        # norelease wins over any semver label; see scripts/release-bump.ts.
+        # norelease wins over any semver label (scripts/release-bump.ts); a script failure fails the step rather than release with an empty bump.
         env:
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-        run: echo "result=$(node scripts/release-bump.ts)" >> "$GITHUB_OUTPUT"
+        run: bump=$(node scripts/release-bump.ts) && echo "result=$bump" >> "$GITHUB_OUTPUT"
 
       - name: Skip release
         if: steps.bump.outputs.result == 'norelease'
