@@ -11,6 +11,7 @@ import {
 
 import { frontmatterTypeIs } from './domain/frontmatter'
 import { formatIsoDate } from './domain/dates'
+import { defaultWorkoutName } from './domain/workout-name'
 import {
   SYNC_REPAIR_STEPS,
   type SyncRepairOutcome,
@@ -49,8 +50,8 @@ import {
 import { buildExerciseRegistrySnapshot } from './vault/exercise-registry-vault'
 import { createWorkoutIndex, type WorkoutIndex } from './vault/workout-index'
 
-function emptyWorkoutMarkdown(date: string): string {
-  return `---\ntype: workout\ndate: ${date}\nname: \n---\n`
+function newWorkoutMarkdown(date: string, name: string): string {
+  return `---\ntype: workout\ndate: ${date}\nname: ${name}\n---\n`
 }
 
 const BUSY_LEAF_RETRY_MS = 50
@@ -152,7 +153,8 @@ export default class FitKitPlugin extends Plugin {
       id: 'open-todays-workout',
       name: "Open today's workout",
       callback: async () => {
-        const today = formatIsoDate(new Date())
+        const now = new Date()
+        const today = formatIsoDate(now)
         const folder = normalizePath(workoutsFolder(this.settings))
         const path = normalizePath(`${folder}/${workoutFilename(today)}`)
         let file = this.app.vault.getAbstractFileByPath(path)
@@ -160,7 +162,10 @@ export default class FitKitPlugin extends Plugin {
           if (!this.app.vault.getAbstractFileByPath(folder)) {
             await this.app.vault.createFolder(folder).catch(() => undefined)
           }
-          file = await this.app.vault.create(path, emptyWorkoutMarkdown(today))
+          file = await this.app.vault.create(
+            path,
+            newWorkoutMarkdown(today, defaultWorkoutName(this.settings.defaultWorkoutName, now)),
+          )
         }
         if (file instanceof TFile) {
           await this.openWorkoutEditor(file)

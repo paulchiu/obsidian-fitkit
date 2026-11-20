@@ -41,6 +41,8 @@ export { dashboardPath, exercisesFolder, workoutFilename, workoutsFolder } from 
 export interface FitKitSettings {
   fitnessRoot: string
   autoOpenWorkoutEditor: boolean
+  /** Name template for a workout FitKit creates; blank leaves it unnamed. */
+  defaultWorkoutName: string
   strengthRestTimerEnabled: boolean
   intervalBeepsEnabled: boolean
   /** How many of a timed step's last seconds the interval runner beeps. */
@@ -60,6 +62,7 @@ export interface FitKitSettings {
 export const DEFAULT_SETTINGS: FitKitSettings = {
   fitnessRoot: 'Fitness',
   autoOpenWorkoutEditor: true,
+  defaultWorkoutName: '',
   strengthRestTimerEnabled: true,
   intervalBeepsEnabled: true,
   intervalCountdownSeconds: 3,
@@ -93,6 +96,10 @@ export function settingsFromStored(stored: Partial<FitKitSettings> | null): FitK
   return {
     fitnessRoot: stored.fitnessRoot ?? DEFAULT_SETTINGS.fitnessRoot,
     autoOpenWorkoutEditor: stored.autoOpenWorkoutEditor ?? DEFAULT_SETTINGS.autoOpenWorkoutEditor,
+    defaultWorkoutName:
+      typeof stored.defaultWorkoutName === 'string'
+        ? stored.defaultWorkoutName
+        : DEFAULT_SETTINGS.defaultWorkoutName,
     strengthRestTimerEnabled:
       stored.strengthRestTimerEnabled ?? DEFAULT_SETTINGS.strengthRestTimerEnabled,
     intervalBeepsEnabled: stored.intervalBeepsEnabled ?? DEFAULT_SETTINGS.intervalBeepsEnabled,
