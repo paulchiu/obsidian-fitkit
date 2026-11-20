@@ -452,7 +452,9 @@ describe('FitKitPlugin command registration', () => {
       const app = makeApp(
         {},
         {
-          getAbstractFileByPath: vi.fn((path: string) => (path === existing.path ? existing : null)),
+          getAbstractFileByPath: vi.fn((path: string) =>
+            path === existing.path ? existing : null,
+          ),
           create,
           process,
           read: vi.fn(async () => '---\ntype: workout\ndate: 2026-10-21\nname: \n---\n'),

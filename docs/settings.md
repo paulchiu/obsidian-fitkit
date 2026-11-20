@@ -17,6 +17,7 @@ Changing the root does not move existing files. Move them yourself first, then p
 ## Behaviour
 
 - `Auto-open workout editor` switches a `type: workout` note into the structured editor when you open it. Turn it off to land in Markdown by default and open the editor deliberately from the command palette.
+- `Default workout name` names each workout `Open today's workout` creates. It is blank by default, which leaves new workouts unnamed. `{{weekday}}` becomes the day, such as `Friday`, `{{date}}` the date as `yyyy-mm-dd`, and `{{time-of-day}}` one of `Morning` (from 5:00), `Afternoon` (from 12:00), `Evening` (from 17:00) or `Night` (from 21:00). So `{{weekday}} workout` gives `Friday workout`. A line below the box shows the name a workout created now would get. Existing workouts keep their names.
 - `Rest timer` shows the rest timer in the editor footer. It counts up from zero and remembers your last rest after you stop it.
 - `Interval beeps` beeps a countdown at the end of each interval and the change between work and rest in the interval runner, and vibrates where the device can.
 - `Countdown beeps (seconds)` is how many of a timed step's last seconds beep, one beep as each arrives. It defaults to 3. At 0 the countdown is silent, but the change between steps and the double beep between back-to-back work steps still sound. A whole number from 0 to 10 is accepted; anything else is refused in the setting, and a stored value outside that loads as 3. With `Interval beeps` off, the runner stays silent whatever this says.

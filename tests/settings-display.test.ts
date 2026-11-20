@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createTestRoot } from './harness/obsidian-dom'
 
@@ -99,13 +99,13 @@ interface DefinitionRow {
   searchable?: unknown
 }
 
-function displayTab(): {
+function displayTab(overrides: Partial<FitKitSettings> = {}): {
   tab: FitKitSettingTab
   containerEl: HTMLElement
   settings: FitKitSettings
 } {
   rendered.length = 0
-  const settings: FitKitSettings = { ...DEFAULT_SETTINGS }
+  const settings: FitKitSettings = { ...DEFAULT_SETTINGS, ...overrides }
   const containerEl = createTestRoot()
   const tab = Object.create(FitKitSettingTab.prototype) as FitKitSettingTab
   tab.plugin = { settings, saveSettings: async () => undefined } as never
@@ -175,5 +175,37 @@ describe('display fallback', () => {
     displayTab()
 
     expect(rendered.find((row) => row.name === 'Interval presets')?.input).toBe('textarea')
+  })
+})
+
+describe('default workout name preview', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  const preview = (containerEl: HTMLElement): string | null | undefined =>
+    containerEl.querySelector('.fitkit-default-name-preview')?.textContent
+
+  it('says new workouts stay unnamed while the name is blank', () => {
+    const { containerEl } = displayTab()
+
+    expect(preview(containerEl)).toBe('New workouts stay unnamed.')
+  })
+
+  it('shows the name a workout created now would get', () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 10, 20, 7, 0))
+
+    const { containerEl } = displayTab({ defaultWorkoutName: '{{weekday}} {{time-of-day}}' })
+
+    expect(preview(containerEl)).toBe('Right now: Friday Morning')
+  })
+
+  it('follows the name as it is edited', async () => {
+    const { tab, containerEl } = displayTab()
+
+    await tab.setControlValue('defaultWorkoutName', 'Gym')
+
+    expect(preview(containerEl)).toBe('Right now: Gym')
   })
 })

@@ -24,6 +24,7 @@ import {
 } from './domain/interval-presets'
 import { DEFAULT_STEPPER_STEP, parseStepperStep } from './domain/interval-stepper'
 import { parseWeightUnit } from './domain/weight-unit'
+import { defaultWorkoutName } from './domain/workout-name'
 import type FitKitPlugin from './main'
 import { DeleteRegistryEntryModal } from './ui/obsidian/delete-registry-entry-modal'
 import { ExerciseRegistryEntryModal } from './ui/obsidian/exercise-registry-entry-modal'
@@ -199,6 +200,7 @@ function validateNumber(value: number, min: number, max?: number): string | void
 type FitKitSettingKey =
   | 'fitnessRoot'
   | 'autoOpenWorkoutEditor'
+  | 'defaultWorkoutName'
   | 'strengthRestTimerEnabled'
   | 'intervalBeepsEnabled'
   | 'intervalCountdownSeconds'
@@ -294,6 +296,8 @@ export class FitKitSettingTab extends PluginSettingTab {
     dashboard: HTMLElement
   } | null = null
 
+  private defaultNamePreview: HTMLElement | null = null
+
   constructor(app: App, plugin: FitKitPlugin) {
     super(app, plugin)
     this.plugin = plugin
@@ -353,6 +357,17 @@ export class FitKitSettingTab extends PluginSettingTab {
             name: 'Auto-open workout editor',
             desc: 'When opening a workout note, switch it into the editor automatically; turn this off to use normal Markdown reading mode by default.',
             control: { type: 'toggle', key: 'autoOpenWorkoutEditor' },
+          },
+          {
+            kind: 'control',
+            name: 'Default workout name',
+            desc: 'Name for each workout "Open today\'s workout" creates; leave blank to leave new workouts unnamed. {{weekday}} becomes the day, such as Friday, {{date}} the date, and {{time-of-day}} Morning, Afternoon, Evening or Night.',
+            control: { type: 'text', key: 'defaultWorkoutName' },
+          },
+          {
+            kind: 'block',
+            name: 'Default workout name preview',
+            render: (el) => this.renderDefaultNamePreview(el),
           },
           {
             kind: 'control',
@@ -488,6 +503,9 @@ export class FitKitSettingTab extends PluginSettingTab {
       case 'autoOpenWorkoutEditor':
         settings.autoOpenWorkoutEditor = Boolean(value)
         break
+      case 'defaultWorkoutName':
+        settings.defaultWorkoutName = String(value)
+        break
       case 'strengthRestTimerEnabled':
         settings.strengthRestTimerEnabled = Boolean(value)
         break
@@ -523,6 +541,9 @@ export class FitKitSettingTab extends PluginSettingTab {
     await this.plugin.saveSettings()
     if (key === 'fitnessRoot') {
       this.refreshDerivedPaths()
+    }
+    if (key === 'defaultWorkoutName') {
+      this.refreshDefaultNamePreview()
     }
     if (key === 'strengthRestTimerEnabled') {
       this.plugin.refreshWorkoutEditorViews()
@@ -615,6 +636,18 @@ export class FitKitSettingTab extends PluginSettingTab {
     values.workouts.setText(workoutsFolder(settings))
     values.exercises.setText(exercisesFolder(settings))
     values.dashboard.setText(dashboardPath(settings))
+  }
+
+  private renderDefaultNamePreview(containerEl: HTMLElement): void {
+    this.defaultNamePreview = containerEl.createDiv({
+      cls: 'setting-item-description fitkit-default-name-preview',
+    })
+    this.refreshDefaultNamePreview()
+  }
+
+  private refreshDefaultNamePreview(): void {
+    const name = defaultWorkoutName(this.plugin.settings.defaultWorkoutName, new Date())
+    this.defaultNamePreview?.setText(name ? `Right now: ${name}` : 'New workouts stay unnamed.')
   }
 
   private renderRegistry(containerEl: HTMLElement): void {
