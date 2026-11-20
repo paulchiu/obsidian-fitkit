@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [3.1.0] - 2026-11-20
+
+### Added
+
 - A `Default workout name` setting names each workout `Open today's workout` creates, with `{{weekday}}`, `{{date}}` and `{{time-of-day}}` tokens. It is blank, and so off, by default.
 
 ### Changed
