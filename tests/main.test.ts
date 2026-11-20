@@ -406,68 +406,67 @@ describe('FitKitPlugin command registration', () => {
   })
 
   describe('with a default workout name', () => {
-    const openTodaysWorkout = async (defaultWorkoutName: string) => {
+    const TODAY = 'Fitness/Workouts/2026-10-21.md'
+
+    /** Loads the plugin at noon the day before, then runs the command at 00:30 on 21 October in Sydney. */
+    const openTodaysWorkout = async (defaultWorkoutName: string, existing?: string) => {
       vi.stubEnv('TZ', 'Australia/Sydney')
       vi.useFakeTimers({ toFake: ['Date'] })
-      vi.setSystemTime(new Date('2026-10-20T13:30:00Z'))
-      const create = vi.fn(async (path: string) => makeWorkoutFile(path))
-      const app = makeApp(
-        {},
-        {
-          getAbstractFileByPath: vi.fn(() => null),
-          createFolder: vi.fn(async () => undefined),
-          create,
-        },
-      )
-      const plugin = new (FitKitPlugin as unknown as { new (app: MockApp): FitKitPlugin })(app)
-      vi.spyOn(plugin, 'loadData').mockResolvedValue({ defaultWorkoutName })
-      await plugin.onload()
-
-      await registeredCommands.find((command) => command.id === 'open-todays-workout')?.callback?.()
-      return create
-    }
-
-    it('names a new workout with the plain text', async () => {
-      const create = await openTodaysWorkout('Gym')
-
-      expect(create).toHaveBeenCalledWith(
-        'Fitness/Workouts/2026-10-21.md',
-        '---\ntype: workout\ndate: 2026-10-21\nname: Gym\n---\n',
-      )
-    })
-
-    it('fills the tokens from the local time it creates the workout', async () => {
-      const create = await openTodaysWorkout('{{weekday}} {{time-of-day}} {{date}}')
-
-      expect(create).toHaveBeenCalledWith(
-        'Fitness/Workouts/2026-10-21.md',
-        '---\ntype: workout\ndate: 2026-10-21\nname: Wednesday Night 2026-10-21\n---\n',
-      )
-    })
-
-    it('opens an existing workout without renaming it', async () => {
-      const existing = makeWorkoutFile('Fitness/Workouts/2026-10-21.md')
+      vi.setSystemTime(new Date('2026-10-20T01:00:00Z'))
+      const existingFile = existing === undefined ? null : makeWorkoutFile(TODAY)
       const create = vi.fn(async (path: string) => makeWorkoutFile(path))
       const process = vi.fn(async () => undefined)
       const app = makeApp(
         {},
         {
-          getAbstractFileByPath: vi.fn((path: string) =>
-            path === existing.path ? existing : null,
-          ),
+          getAbstractFileByPath: vi.fn((path: string) => (path === TODAY ? existingFile : null)),
+          createFolder: vi.fn(async () => undefined),
           create,
           process,
-          read: vi.fn(async () => '---\ntype: workout\ndate: 2026-10-21\nname: \n---\n'),
+          read: vi.fn(async () => existing ?? ''),
         },
       )
       const plugin = new (FitKitPlugin as unknown as { new (app: MockApp): FitKitPlugin })(app)
-      vi.spyOn(plugin, 'loadData').mockResolvedValue({ defaultWorkoutName: 'Gym' })
-      vi.stubEnv('TZ', 'Australia/Sydney')
-      vi.useFakeTimers({ toFake: ['Date'] })
-      vi.setSystemTime(new Date('2026-10-20T13:30:00Z'))
+      vi.spyOn(plugin, 'loadData').mockResolvedValue({ defaultWorkoutName })
       await plugin.onload()
+      vi.setSystemTime(new Date('2026-10-20T13:30:00Z'))
 
       await registeredCommands.find((command) => command.id === 'open-todays-workout')?.callback?.()
+      return { create, process }
+    }
+
+    it('names a new workout with the plain text', async () => {
+      const { create } = await openTodaysWorkout('Gym')
+
+      expect(create).toHaveBeenCalledWith(
+        TODAY,
+        '---\ntype: workout\ndate: 2026-10-21\nname: Gym\n---\n',
+      )
+    })
+
+    it('fills the tokens from the local time the command runs', async () => {
+      const { create } = await openTodaysWorkout('{{weekday}} {{time-of-day}} {{date}}')
+
+      expect(create).toHaveBeenCalledWith(
+        TODAY,
+        '---\ntype: workout\ndate: 2026-10-21\nname: Wednesday Night 2026-10-21\n---\n',
+      )
+    })
+
+    it('quotes a name YAML would otherwise misread', async () => {
+      const { create } = await openTodaysWorkout('{{month}}: {{weekday}}')
+
+      expect(create).toHaveBeenCalledWith(
+        TODAY,
+        '---\ntype: workout\ndate: 2026-10-21\nname: "{{month}}: Wednesday"\n---\n',
+      )
+    })
+
+    it('opens an existing workout without renaming it', async () => {
+      const { create, process } = await openTodaysWorkout(
+        'Gym',
+        '---\ntype: workout\ndate: 2026-10-21\nname: \n---\n',
+      )
 
       expect(create).not.toHaveBeenCalled()
       expect(process).not.toHaveBeenCalled()

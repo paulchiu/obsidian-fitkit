@@ -1268,6 +1268,11 @@ body.is-mobile .fitkit-editor-root {
   content: none;
 }
 
+/* The preview reads as the line under its field, so it sits close beneath it. */
+.setting-item.fitkit-setting-block:has(> .fitkit-default-name-preview) {
+  padding-top: 0;
+}
+
 .fitkit-registry-section {
   display: grid;
   gap: 8px;

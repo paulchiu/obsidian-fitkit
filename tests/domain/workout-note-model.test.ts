@@ -1404,3 +1404,40 @@ describe('relabelSetsAsFirstLevel', () => {
     expect(relabelSetsAsFirstLevel(entry)).toEqual([{ level: 2, reps: 8 }])
   })
 })
+
+describe('workout names in frontmatter', () => {
+  const noteNamed = (frontmatterNameLine: string): string =>
+    `---\ntype: workout\ndate: 2026-11-20\n${frontmatterNameLine}\n---\n`
+  const nameLine = (note: string): string | undefined =>
+    note.split('\n').find((line) => line.startsWith('name:'))
+
+  it.each([
+    ['Gym: legday', 'name: "Gym: legday"'],
+    ['Friday #1', 'name: "Friday #1"'],
+    ['#1 push', 'name: "#1 push"'],
+    ['{{month}} workout', 'name: "{{month}} workout"'],
+    ['[A] day', 'name: "[A] day"'],
+    ['"Big" day', 'name: "\\"Big\\" day"'],
+    ['2026', 'name: "2026"'],
+    ['yes', 'name: "yes"'],
+  ])('quotes %j so YAML reads it as written', (name, line) => {
+    const model = expectWorkoutModel(noteNamed('name: '), 'quoted.md')
+
+    const serialized = serializeWorkoutNote({ ...model, name })
+
+    expect(nameLine(serialized)).toBe(line)
+    expect(expectWorkoutModel(serialized, 'quoted.md').name).toBe(name)
+  })
+
+  it.each(['Squat Day', "Paul's run", 'Leg day - heavy', ''])('leaves %j unquoted', (name) => {
+    const model = expectWorkoutModel(noteNamed('name: '), 'plain.md')
+
+    expect(nameLine(serializeWorkoutNote({ ...model, name }))).toBe(`name: ${name}`)
+  })
+
+  it('reads a single-quoted name as YAML does', () => {
+    expect(expectWorkoutModel(noteNamed("name: 'Leg: it''s on'"), 'single.md').name).toBe(
+      "Leg: it's on",
+    )
+  })
+})

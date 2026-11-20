@@ -7,6 +7,7 @@
 import { assertUnreachableKind, EXERCISE_KINDS, type ExerciseKind } from './exercise-kind'
 import type { IntensityFields } from './interval-plan'
 import { formatNextPlan, parseNextPlan, type NextPlan } from './next-plan'
+import { formatYamlText, readYamlText } from './yaml-text'
 
 export type { ExerciseKind }
 
@@ -239,7 +240,7 @@ export function parseWorkoutNote(source: string, sourcePath: string): ParseResul
     return { model: null, isWorkout: false, warnings }
   }
   const date = frontmatter.get('date') ?? ''
-  const name = frontmatter.get('name') ?? ''
+  const name = readYamlText(frontmatter.get('name') ?? '')
 
   /**
    * Walk the body. Strip fenced blocks and any other content the model does
@@ -529,7 +530,7 @@ export function serializeWorkoutNote(model: WorkoutNoteModel): string {
   lines.push('---')
   lines.push('type: workout')
   lines.push(`date: ${model.date}`)
-  lines.push(`name: ${model.name}`)
+  lines.push(`name: ${formatYamlText(model.name)}`)
   for (const extra of model.frontmatterExtra) {
     lines.push(extra)
   }

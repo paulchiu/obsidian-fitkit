@@ -24,7 +24,7 @@ import {
 } from './domain/interval-presets'
 import { DEFAULT_STEPPER_STEP, parseStepperStep } from './domain/interval-stepper'
 import { parseWeightUnit } from './domain/weight-unit'
-import { defaultWorkoutName } from './domain/workout-name'
+import { workoutNameFromTemplate } from './domain/workout-name'
 import type FitKitPlugin from './main'
 import { DeleteRegistryEntryModal } from './ui/obsidian/delete-registry-entry-modal'
 import { ExerciseRegistryEntryModal } from './ui/obsidian/exercise-registry-entry-modal'
@@ -646,7 +646,7 @@ export class FitKitSettingTab extends PluginSettingTab {
   }
 
   private refreshDefaultNamePreview(): void {
-    const name = defaultWorkoutName(this.plugin.settings.defaultWorkoutName, new Date())
+    const name = workoutNameFromTemplate(this.plugin.settings.defaultWorkoutName, new Date())
     this.defaultNamePreview?.setText(name ? `Right now: ${name}` : 'New workouts stay unnamed.')
   }
 

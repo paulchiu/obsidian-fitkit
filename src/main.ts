@@ -11,7 +11,8 @@ import {
 
 import { frontmatterTypeIs } from './domain/frontmatter'
 import { formatIsoDate } from './domain/dates'
-import { defaultWorkoutName } from './domain/workout-name'
+import { workoutNameFromTemplate } from './domain/workout-name'
+import { formatYamlText } from './domain/yaml-text'
 import {
   SYNC_REPAIR_STEPS,
   type SyncRepairOutcome,
@@ -51,7 +52,7 @@ import { buildExerciseRegistrySnapshot } from './vault/exercise-registry-vault'
 import { createWorkoutIndex, type WorkoutIndex } from './vault/workout-index'
 
 function newWorkoutMarkdown(date: string, name: string): string {
-  return `---\ntype: workout\ndate: ${date}\nname: ${name}\n---\n`
+  return `---\ntype: workout\ndate: ${date}\nname: ${formatYamlText(name)}\n---\n`
 }
 
 const BUSY_LEAF_RETRY_MS = 50
@@ -164,7 +165,10 @@ export default class FitKitPlugin extends Plugin {
           }
           file = await this.app.vault.create(
             path,
-            newWorkoutMarkdown(today, defaultWorkoutName(this.settings.defaultWorkoutName, now)),
+            newWorkoutMarkdown(
+              today,
+              workoutNameFromTemplate(this.settings.defaultWorkoutName, now),
+            ),
           )
         }
         if (file instanceof TFile) {
