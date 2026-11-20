@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A workout name containing YAML punctuation, such as `Leg day: heavy #2`, is now quoted in the note's frontmatter, so Obsidian reads it as written and keeps treating the note as a workout.
+
 ### Removed
 
 ## [3.0.0] - 2026-11-14
