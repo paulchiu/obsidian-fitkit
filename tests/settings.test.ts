@@ -194,6 +194,20 @@ describe('settings migration', () => {
   })
 })
 
+describe('stored default workout name', () => {
+  it('keeps a stored template', () => {
+    expect(
+      settingsFromStored({ defaultWorkoutName: '{{weekday}} workout' }).defaultWorkoutName,
+    ).toBe('{{weekday}} workout')
+  })
+
+  it('falls back to blank when the stored value is not text', () => {
+    const stored = { defaultWorkoutName: 42 } as unknown as Partial<FitKitSettings>
+
+    expect(settingsFromStored(stored).defaultWorkoutName).toBe('')
+  })
+})
+
 describe('deleted exercise tombstones', () => {
   it('normalizes and dedupes tombstones', () => {
     expect(addDeletedExerciseTombstone([' Squat ', 'bench press'], 'squat')).toEqual([

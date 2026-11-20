@@ -82,6 +82,7 @@ describe('setting definitions', () => {
     expect(controls.map((control) => [control.type, control.key])).toEqual([
       ['folder', 'fitnessRoot'],
       ['toggle', 'autoOpenWorkoutEditor'],
+      ['text', 'defaultWorkoutName'],
       ['toggle', 'strengthRestTimerEnabled'],
       ['toggle', 'intervalBeepsEnabled'],
       ['number', 'intervalCountdownSeconds'],
@@ -150,6 +151,16 @@ describe('setting definitions', () => {
     ).toEqual([false, false])
   })
 
+  it('offers a default workout name as text, describing its tokens, under Behavior', () => {
+    const behavior = groups(createTab().tab).find((group) => group.heading === 'Behavior')
+    const row = behavior?.items.find((item) => item.name === 'Default workout name')
+
+    expect(row?.control).toMatchObject({ type: 'text', key: 'defaultWorkoutName' })
+    expect(String(row?.desc)).toContain('{{weekday}}')
+    expect(String(row?.desc)).toContain('{{date}}')
+    expect(String(row?.desc)).toContain('{{time-of-day}}')
+  })
+
   it('accepts a countdown of 0 to 10 whole seconds', () => {
     const validate = allRows(createTab().tab).find(
       (row) => row.control?.key === 'intervalCountdownSeconds',
@@ -170,7 +181,7 @@ describe('setting definitions', () => {
   it('gives every searchable row a description so settings search can match it', () => {
     const searchable = allRows(createTab().tab).filter((row) => row.searchable !== false)
 
-    expect(searchable).toHaveLength(10)
+    expect(searchable).toHaveLength(11)
     for (const row of searchable) {
       expect(row.name.length).toBeGreaterThan(0)
       expect(typeof row.desc).toBe('string')
@@ -193,6 +204,7 @@ describe('setting definitions', () => {
 
     expect(excluded.map((row) => row.name)).toEqual([
       'Derived paths',
+      'Default workout name preview',
       'About sync and repair',
       'About the registry',
       'Exercises',
@@ -300,6 +312,17 @@ describe('setControlValue', () => {
     await tab.setControlValue('intervalStepperStep', '20%')
 
     expect([settings.intervalStepperStep, saveSettings.mock.calls.length]).toEqual(['20%', 1])
+  })
+
+  it('saves the default workout name as written', async () => {
+    const { tab, settings, saveSettings } = createTab()
+
+    await tab.setControlValue('defaultWorkoutName', '{{weekday}} workout')
+
+    expect([settings.defaultWorkoutName, saveSettings.mock.calls.length]).toEqual([
+      '{{weekday}} workout',
+      1,
+    ])
   })
 
   it('rejects an interval stepper step that is neither a positive percentage nor amount', () => {

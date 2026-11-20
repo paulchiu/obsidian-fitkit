@@ -9,9 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A `Default workout name` setting names each workout `Open today's workout` creates, with `{{weekday}}`, `{{date}}` and `{{time-of-day}}` tokens. It is blank, and so off, by default.
+
 ### Changed
 
 ### Fixed
+
+- A workout name containing YAML punctuation, such as `Leg day: heavy #2`, is now quoted in the note's frontmatter, so Obsidian reads it as written and keeps treating the note as a workout.
 
 ### Removed
 
